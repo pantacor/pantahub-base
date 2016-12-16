@@ -1,0 +1,157 @@
+# this is an example of the Uber API
+# as a demonstration of an API spec in YAML
+swagger: '2.0'
+info:
+  title: PANTAHUB Core API - Devices
+  contact:
+    name: Team PANTAHUB
+    url: http://www.pantahub.com/support
+    email: asac129@gmail.com
+  description: Join the Federation of Humans and Things, with cloud and devices
+  version: "1.0.0"
+# the domain of the service
+host: api.pantahub.com
+# array of all schemes that your API supports
+schemes:
+  - https
+  - http
+# will be prefixed to all paths
+basePath: /api
+produces:
+  - application/json
+securityDefinitions:
+  basicAuth:
+    type: basic
+    description: Authenticate with core services
+paths:
+  /devices/:
+    get:
+      summary: Devices Stored
+      description: |
+        The Devices endpoint returns a list of objects visible to the calling
+        user.
+      security:
+        - basicAuth: []
+      parameters:
+        - name: start
+          in: query
+          description: Item top start this page
+          required: false
+          type: number
+          format: int
+        - name: maxitems
+          in: query
+          description: Max Items to retrieve (default "all")
+          required: false
+          type: number
+          format: int
+      responses:
+        200:
+          description: The Objects in the store
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Device'
+        default:
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+    post:
+      summary: New Device
+      description: |
+        Create a new Device so it can join the fleet
+      security:
+        - basicAuth: []
+      parameters:
+        - name: newobject
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/Device'
+      responses:
+        200:
+          description: |
+            Echos the newly created device resource back to the client with id
+            updated to the actual id.
+            Also sets Location header to the URL of the created Device.
+          schema:
+            $ref: '#/definitions/Device'
+        default:
+          description: Unexpected Error
+          schema:
+            $ref: '#/definitions/Error'
+  /devices/{device-id}:
+    get:
+      summary: Device Resource
+      description: |
+        The device is stored with an id, an owner and a secret
+      security:
+        - basicAuth: []
+      parameters:
+        - name: device-id
+          in: path
+          description: the device id to resolve
+          type: string
+          required: true
+      responses:
+        200:
+          description: The Device found
+          schema:
+            $ref: '#/definitions/Device'
+        default:
+          description: Unexpected Error
+          schema:
+            $ref: '#/definitions/Error'
+    put:
+      summary: Device Metainfo Update
+      description: |
+        The Device meta information as a whole syntax. Returns the
+        new resource. You cannot change the owner
+      security:
+        - basicAuth: []
+      parameters:
+        - name: device-id
+          in: path
+          description: the device id to resolve
+          type: string
+          required: true
+        - name: object
+          in: body
+          required: true
+          description: the new object meta data
+          schema:
+            $ref: '#/definitions/Device'
+      responses:
+        200:
+          description: The Device with the applied changes
+          schema:
+            $ref: '#/definitions/Device'
+        default:
+          description: Unexpected Error
+          schema:
+            $ref: '#/definitions/Error'
+definitions:
+  Device:
+    type: object
+    properties:
+      id:
+        type: string
+        description: id of the object
+      owner:
+        type: string
+        description: the prn id of the owner for the device
+      secret:
+        type: string
+        description: the device auth secret used by the ID provider
+  Error:
+    type: object
+    properties:
+      code:
+        type: integer
+        format: int32
+      message:
+        type: string
+      fields:
+        type: string
+
+

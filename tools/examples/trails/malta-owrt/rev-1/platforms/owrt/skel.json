@@ -1,0 +1,11 @@
+{
+  "type": "lxc",
+  "parent": null,
+  "configs": {},
+  "exec": "/sbin/init",
+  "share": [
+    "NETWORK",
+    "UTS",
+    "IPC"
+  ]
+}

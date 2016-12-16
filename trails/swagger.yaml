@@ -1,0 +1,369 @@
+# this is an example of the Uber API
+# as a demonstration of an API spec in YAML
+swagger: '2.0'
+info:
+  title: PANTAHUB Core API - Trails
+  contact:
+    name: Team PANTAHUB
+    url: http://www.pantahub.com/support
+    email: asac129@gmail.com
+  description: Join the Federation of Humans and Things, with cloud and devices
+  version: "1.0.0"
+# the domain of the service
+host: api.pantahub.com
+# array of all schemes that your API supports
+schemes:
+  - https
+# will be prefixed to all paths
+basePath: /v1
+produces:
+  - application/json
+paths:
+  /trails:
+    get:
+      summary: Get Trails visible in calling context
+      description: |
+        Get a list of trails that are visible to the user/principle/roles associated with the calling context. Users usually see trails for all their devices, but devices only see their very own.
+      parameters:
+        - name: start
+          in: query
+          description: Item top start this page
+          required: false
+          type: number
+          format: int
+        - name: maxitems
+          in: query
+          description: Max Items to retrieve (default "all")
+          required: false
+          type: number
+          format: int
+      responses:
+        200:
+          description: The Trails in the store
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Trail'
+        default:
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+    post:
+      summary: Create new Trailing for device
+      description: |
+        Create a new Trail for the calling device. The Trail will have the same ID as the calling device.
+      parameters:
+        - name: factory-state
+          in: body
+          description: Factory state json to seed during trail creation
+          required: true
+          schema:
+            $ref: '#/definitions/State'
+      responses:
+        200:
+          description: The Trails in the store
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Trail'
+        default:
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+  /trails/{trail-id}:
+    get:
+      summary: Create new Trailing for device
+      description: |
+        Create a new Trail for the calling device. The Trail will have the same ID as the calling device.
+      parameters:
+        - name: trail-id
+          in: path
+          description: ID Of the trail
+          required: true
+          type: string
+      responses:
+        200:
+          description: The Trails in the store
+          schema:
+            $ref: '#/definitions/Trail'
+        default:
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+  /trails/{trail-id}/head:
+    get:
+      summary: Current Head of the trail
+      description: |
+        Get the the most recently added step in full
+      parameters:
+        - name: trail-id
+          in: path
+          description: ID Of the trail
+          required: true
+          type: string
+      responses:
+        200:
+          description: The Most recently added step in the trail
+          schema:
+            $ref: '#/definitions/Step'
+        default:
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+    patch:
+      summary: move the head forward through patching
+      description: |
+        move current head of the trail forward adding a new step that applies a
+        provided json merge diff to current topmost step
+      parameters:
+        - name: trail-id
+          in: path
+          description: ID Of the trail
+          required: true
+          type: string
+        - name: step-patch
+          in: body
+          description: patch the trail
+          required: true
+          schema:
+            $ref: '#/definitions/State'
+      responses:
+        200:
+          description: The Most recently added step in the trail
+          schema:
+            $ref: '#/definitions/Step'
+        default:
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+  /trails/{trail-id}/steps:
+    get:
+      summary: Steps for Trail
+      description: |
+        Get the steps of a given trail
+      parameters:
+        - name: trail-id
+          in: path
+          description: ID Of the trail
+          required: true
+          type: string
+        - name: start
+          in: query
+          description: Item top start this page
+          required: false
+          type: number
+          format: int
+        - name: maxitems
+          in: query
+          description: Max Items to retrieve. default "all"
+          required: false
+          type: number
+          format: int
+      responses:
+        200:
+          description: The Trails in the store
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Step'
+        default:
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+    post:
+      summary: Add a new step
+      description: |
+        Add a new step to the trail. The json must refer include the revision
+        that must be exactly a +1 increment of the current latest step. Otherwise,
+        the entry will be rejected for data integrity reasons.
+        This method requires a the complete step definition to be posted (NOT THE DIFF).
+        If you want to post the diff, you can PATCH the fake /trails/{trail-id}/head step.
+      parameters:
+        - name: trail-id
+          in: path
+          description: ID Of the trail
+          required: true
+          type: string
+        - name: new-state
+          in: body
+          description: the new step json
+          schema:
+            $ref: '#/definitions/Step'
+      responses:
+        200:
+          description: The Trails in the store
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Step'
+        default:
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+  /trails/{trail-id}/steps/{step-rev}:
+    get:
+      summary: A trail step
+      description: |
+        Get the requested step-rev for a given trail with trail-id
+      parameters:
+        - name: trail-id
+          in: path
+          description: ID Of the trail
+          required: true
+          type: string
+        - name: step-rev
+          in: path
+          description: ID Of the step
+          required: true
+          type: string
+      responses:
+        200:
+          description: The Trails in the store
+          schema:
+            $ref: '#/definitions/Step'
+        default:
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+  /trails/{trail-id}/steps/{step-rev}/progress:
+    get:
+      summary: A trail step
+      description: |
+        Get the requested step-rev for a given trail with trail-id
+      parameters:
+        - name: trail-id
+          in: path
+          description: ID Of the trail
+          required: true
+          type: string
+        - name: step-rev
+          in: path
+          description: ID Of the step
+          required: true
+          type: string
+      responses:
+        200:
+          description: The Trails in the store
+          schema:
+            $ref: '#/definitions/StepProgress'
+        default:
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+    put:
+      summary: A trail step
+      description: |
+        Get the requested step-rev for a given trail with trail-id
+      parameters:
+        - name: trail-id
+          in: path
+          description: ID Of the trail
+          required: true
+          type: string
+        - name: step-rev
+          in: path
+          description: ID Of the step
+          required: true
+          type: string
+        - name: progressbody
+          in: body
+          description: the progress info to report
+          schema:
+            $ref: '#/definitions/StepProgress'
+      responses:
+        200:
+          description: The Trails in the store
+          schema:
+            $ref: '#/definitions/StepProgress'
+        default:
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+definitions:
+  Trail:
+    type: object
+    properties:
+      owner:
+        type: string
+        description: prn resource id for the owner of this trail
+      device:
+        type: string
+        description: prn resource id for the device of this trail
+      factory-state:
+        type: object
+        description: the factory state setting for this device trail
+      last-in-sync:
+        type: string
+        description: time of when device was last time in sync with trail goal
+  State:
+    type: object
+    properties:
+      content:
+        type: object
+        description: json content reflecting state
+  Step:
+    type: object
+    properties:
+      owner:
+        type: string
+        description: prn resource id for the owner of this trail. identical to id in trail
+      device:
+        type: string
+        description: prn resource id for the device of this trail
+      committer:
+        type: string
+        description: prn resource id of the account that has posted the step
+      trail-id:
+        type: string
+        description: object id of the parent trail
+      rev:
+        type: number
+        format: int32
+        description: The revision of the step
+      commit-msg:
+        type: string
+        description: commit message - human readable short description of the change done by going this step
+      state:
+        type: object
+        description: the json state goal of the step
+      step-time:
+        type: string
+        description: the time of last step status change.
+  StepProgress:
+    type: object
+    properties:
+      progress-time:
+        type: string
+        description: the time/date of last progress report
+      progress:
+        type: number
+        format: float
+        description: progress in in 0-100
+      status:
+        type: string
+        description: progress status
+        enum:
+          - NEW
+          - QUEUED
+          - INPROGRESS
+          - ABORT
+          - ABORTED
+          - DONE
+          - ERROR
+      status-msg:
+        type: string
+        description: human readable short info supplementing the machine readable status
+      log:
+        type: string
+        description: the log of the step
+  Error:
+    type: object
+    properties:
+      code:
+        type: integer
+        format: int32
+      message:
+        type: string
+      fields:
+        type: string
+

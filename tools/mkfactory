@@ -1,0 +1,327 @@
+#!/bin/sh
+
+set -e
+
+debug=1
+
+cmd=$0
+factorydir=$1
+username=$2
+password=$3
+factoryimg=`dirname $factorydir`/`basename $factorydir`.img
+skeljson=$factorydir/skel.json
+kernelpath=$factorydir/kernel.img
+systemcdir=$factorydir/systemc
+volumesdir=$factorydir/volumes
+platformsdir=$factorydir/platforms
+
+bearertoken=
+
+usage() {
+  echo "Usage: $cmd <factory-sources> <username> <password>"
+}
+
+pantahub_login() {
+   echo "Logging in as $username:$password"
+   bearertoken=`http POST localhost:12365/api/auth/login username="$username" password="$password" \
+     | json token`
+   if test -z "$bearertoken"; then
+      echo failed to log in.
+      exit 100
+   fi
+}
+
+merge_trailsjson() {
+  tomerge="$1"
+  
+  curjson=`cat $factoryimg/state.json`
+  echo ${curjson}'
+  '${tomerge} | json --merge > $factoryimg/state.json
+
+  echo "New state.json:"
+  cat $factoryimg/state.json
+}
+
+merge_json() {
+  jsonfile="$1"
+  tomerge="$2"
+  
+  curjson=`cat $jsonfile`
+  echo ${curjson}'
+  '${tomerge} | json --merge > $jsonfile
+
+  echo "New jsonfile ($jsonfile):"
+  cat $jsonfile
+}
+
+upload_file() {
+   path=$1
+   objectname=`basename $path`
+   sha256sum=`sha256sum $path | awk '{print $1}'`
+   size=`stat --printf="%s" $path`
+   mimetype=`file -b --mime-type $path`
+
+   fileid=`http GET 'localhost:12365/api/objects/?filter={"size":"'${size}'","sha256sum":"'${sha256sum}'"}' \
+	Authorization:"Bearer $bearertoken" | json '[0].id'`
+
+   if test -z "$fileid"; then
+     response=`http POST localhost:12365/api/objects/ \
+          Authorization:"Bearer $bearertoken" \
+          objectname="$objectname" \
+          size="$size" \
+          sha256sum="$sha256sum" \
+          mime-type="$mimetype"`
+     fileid=`echo $response | json id`
+     puturl=`http GET localhost:12365/api/objects/$fileid Authorization:"Bearer $bearertoken" | json signed-puturl`
+
+     if test -z "$debug"; then
+       cat $path | http PUT "$puturl"
+     fi
+   else
+     echo found existing fileobject. reusing id instead of uploading: $fileid > /dev/stderr
+   fi
+
+   if test -z "$fileid"; then
+     echo failed to setup file object
+     echo response: $response
+     exit 110
+   fi
+
+   echo $fileid
+}
+
+if test -z "$factorydir" -o -z "$username" -o -z "$password"; then
+  echo you must provide a factory directory, username and password as arguments
+  usage
+  exit 1
+fi
+
+if ! test -d  "$factorydir"; then
+  echo factory dir does not exist
+  usage
+  exit 2
+fi
+
+if ! test -e "$kernelpath"; then
+  echo kernel image must exist: $kernelpath
+  exit 3
+fi
+
+if ! test -d "$systemcdir"; then
+  echo systemc dir must exist: $systemcdir
+  exit 4
+fi
+
+if ! test -d "$volumesdir"; then
+  echo volumes dir must exist: $volumesdir
+  exit 5
+fi
+
+volumes=`ls -d $volumesdir/*`
+if test -z "$volumes"; then
+  echo volumesdir dir must not be empty: $volumnesdir
+  exit 55
+fi
+
+if ! test -d "$platformsdir"; then
+  echo platforms dir must exist: $platformsdir
+  exit 6
+fi
+
+platforms=`ls -d $platformsdir/* || true`
+if test -z "$platforms"; then
+  echo platforms dir must not be empty: $platformsdir
+  exit 66
+fi
+
+if ! test -e "$skeljson"; then
+  echo skel.json must exist: $skeljson
+  exit 7
+fi
+
+if test -d "$factoryimg"; then
+  rm -r $factoryimg
+fi
+
+echo "Logging in ..."
+pantahub_login
+echo "Logged in $bearertoken"
+
+mkdir $factoryimg
+cp -f $skeljson $factoryimg/state.json
+
+# -------- KERNEL ...
+echo "Uploading kernel: $kernelpath ..."
+prn=`upload_file $kernelpath`
+echo "Uploaded file: $prn"
+
+echo "Seeding kernel.img $kernelpath in factory image: $factoryimg"
+cp -f $kernelpath $factoryimg/
+
+merge_trailsjson '{ "kernel": { "key": "kernel.img", "value": "'${prn}'" } }'
+
+# -------- SYSTEMC ARRAY ...
+mkdir $factoryimg/systemc
+
+files_snippet=
+for f in "`ls -d $systemcdir/* || true`"; do
+  if test -z "$files_snippet"; then
+    files_snippet='{ "systemc": ['
+  else
+    files_snippet="${files_snippet} ,"
+  fi
+  echo adding file for systemc: $f
+  echo "Uploading $f"
+  prn=`upload_file $f`
+  echo "Uploaded $f as $prn"
+
+  echo "Seeding systemc file $f in factory image: $factoryimg"
+  cp -f $f $factoryimg/systemc/
+
+  snip="{ \"`basename $f`\": \"$prn\" }"
+  files_snippet="$files_snippet `echo $snip | json -M`"
+done
+
+if ! test -z "$files_snippet"; then
+  files_snippet=${files_snippet}' ]}'
+else
+  echo "No systemc files provided in $systemcdir"
+  exit 5
+fi
+
+echo "systemcfiles: $files_snippet"
+merge_trailsjson "$files_snippet"
+
+# -------- VOLUMES MAP ...
+
+mkdir $factoryimg/volumes
+
+files_snippet=
+for f in `ls -d $volumesdir/*`; do
+  # ignore directory and spit out warning
+  if test -d "$f"; then
+     echo "WARNING: file in volumesdir is a DIR: $f"
+     continue
+  fi
+
+  if test -z "$files_snippet"; then
+    files_snippet='{'
+  else
+    files_snippet="${files_snippet}, "
+  fi
+
+  voltype=""
+  if test -w "$f"; then
+     voltype="rw"
+  else
+     voltype="ro"
+  fi
+
+  echo adding $voltype volume: $f
+  echo "Uploading $f"
+  prn=`upload_file $f`
+  echo "Uploaded $f as $prn"
+
+  echo "Seeding volume $f in factory image: $factoryimg"
+  cp -r $f $factoryimg/volumes/
+
+  files_snippet="$files_snippet \"`basename $f`\": { \"type\": \"$voltype\", \"file\": \"$prn\" } "
+done
+
+if ! test -z "$files_snippet"; then
+  files_snippet=${files_snippet}' }'
+  volumes_snippet='{ "volumes":'`echo ${files_snippet} | json -M`'}' 
+else
+  echo "No volumes files provided in $volumesdir"
+  exit 5
+fi
+
+echo "volumes: $volumes_snippet"
+merge_trailsjson "$volumes_snippet"
+
+# -------- PLATFORMS MAP ...
+
+mkdir $factoryimg/platforms
+
+platforms_snippet=
+for f in $platforms; do
+  # ignore directory and spit out warning
+  if ! test -d "$f"; then
+     echo "WARNING: file in volumesdir must be a DIR: $f"
+     continue
+  fi
+
+  if test -z "$platforms_snippet"; then
+    platforms_snippet='{ "platforms": {'
+  else
+    platforms_snippet="${platforms_snippet}, "
+  fi
+
+  p=`basename $f`
+  echo adding platform $p
+  if ! test -e $f/skel.json; then
+     echo "platform $p must have a skel.json"
+     exit 201
+  fi
+
+  mkdir -p $factoryimg/platforms/$p/
+  cp -f $f/skel.json $factoryimg/platforms/$p/platform.json
+
+  if ! test -d $f/configs; then
+     echo "platform $p must have a configs directory"
+     exit 202
+  fi
+
+  configs=`ls -d $f/configs/* || true`
+  
+  if test -z "$configs"; then
+     echo "platform $p must have a configs in $f/configs/"
+     exit 203
+  fi
+
+  mkdir $factoryimg/platforms/$p/configs/
+
+  files_snippet=
+  for c in $configs; do
+    if test -z "$files_snippet"; then
+      files_snippet='{'
+    else
+      files_snippet="${files_snippet}, "
+    fi
+
+    echo "Uploading config $c"
+    prn=`upload_file $c`
+    echo "Uploaded config $c as $prn"
+
+    echo "Seeding config $c for platform $p in factoryimg: $factoryimg"
+    cp -f $c $factoryimg/platforms/$p/configs/
+
+    files_snippet="$files_snippet \"`basename $c`\": \"$prn\""
+  done
+    
+  if ! test -z "$files_snippet"; then
+    files_snippet=${files_snippet}' }'
+    configs_snippet='{ "configs": '`echo $files_snippet | json -M`' }'
+  else
+    echo "No config files provided in $f/configs"
+    exit 204
+  fi
+
+  echo "platform configs (for $p): $configs_snippet"
+  merge_json $factoryimg/platforms/$p/platform.json "$configs_snippet"
+  
+  platforms_snippet="$platforms_snippet \"$p\": `cat $factoryimg/platforms/$p/platform.json` "
+
+  rm -f $factoryimg/platforms/$p/platform.json
+done
+
+if ! test -z "$platforms_snippet"; then
+  platforms_snippet=${platforms_snippet}' } }'
+else
+  echo "No platforms provided in $platformsdir"
+  exit 5
+fi
+
+echo "platforms: $platforms_snippet"
+merge_trailsjson "$platforms_snippet"
+

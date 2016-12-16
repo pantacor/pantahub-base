@@ -1,0 +1,195 @@
+# this is an example of the Uber API
+# as a demonstration of an API spec in YAML
+swagger: '2.0'
+info:
+  title: PANTAHUB Core API - Objects
+  contact:
+    name: Team PANTAHUB
+    url: http://www.pantahub.com/support
+    email: asac129@gmail.com
+  description: Join the Federation of Humans and Things, with cloud and devices
+  version: "1.0.0"
+# the domain of the service
+host: api.pantahub.com
+# array of all schemes that your API supports
+schemes:
+  - https
+# will be prefixed to all paths
+basePath: /v1/
+produces:
+  - application/json
+paths:
+  /objects:
+    get:
+      summary: Objects Stored
+      description: |
+        The Objects endpoint returns a list of objects visible to the calling
+        user.
+      parameters:
+        - name: start
+          in: query
+          description: Item top start this page
+          required: false
+          type: number
+          format: int
+        - name: maxitems
+          in: query
+          description: Max Items to retrieve (default "all")
+          required: false
+          type: number
+          format: int
+      responses:
+        200:
+          description: The Objects in the store
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Object'
+        default:
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+    post:
+      summary: New Object
+      description: |
+        Create a new Object ready for upload to mass storage service. Provides
+        some metadata.
+      parameters:
+        - name: newobject
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/Object'
+      responses:
+        200:
+          description: |
+            Echos the newly created object resource back to the client with id
+            updated to the actual id.
+            Also sets Location header to the URL of the created Object.
+          schema:
+            $ref: '#/definitions/Object'
+        default:
+          description: Unexpected Error
+          schema:
+            $ref: '#/definitions/Error'
+  /objects/{object-id}:
+    get:
+      summary: Object Stored
+      description: |
+        The Object stored with id object-id from path. This function retrieves
+        additional attributes that give presigned download and put URLs
+        for download and upload of the binary blob for this resource
+      parameters:
+        - name: object-id
+          in: path
+          description: the object id to resolve
+          type: string
+          required: true
+      responses:
+        200:
+          description: The Object found
+          schema:
+            $ref: '#/definitions/ObjectWithAccess'
+        default:
+          description: Unexpected Error
+          schema:
+            $ref: '#/definitions/Error'
+    put:
+      summary: Object Metainfo Update
+      description: |
+        The Object meta information as a whole syntax. Returns the
+        new resource.
+      parameters:
+        - name: object-id
+          in: path
+          description: the object id to resolve
+          type: string
+          required: true
+        - name: object
+          in: body
+          required: true
+          description: the new object meta data
+          schema:
+            $ref: '#/definitions/Object'
+      responses:
+        200:
+          description: The Object with the applied changes
+          schema:
+            $ref: '#/definitions/Object'
+        default:
+          description: Unexpected Error
+          schema:
+            $ref: '#/definitions/Error'
+    patch:
+      summary: Object Metainfo Update
+      description: |
+        The Object meta information is changed using RFC78.. json merge
+        syntax. Returns the new resource.
+      parameters:
+        - name: object-id
+          in: path
+          description: the object id to resolve
+          type: string
+          required: true
+        - name: objectpatch
+          in: body
+          required: true
+          description: the RFCXXX compatible patch for the object
+          schema:
+            $ref: '#/definitions/Object'
+      responses:
+        200:
+          description: The Object with the applied changes
+          schema:
+            $ref: '#/definitions/Object'
+        default:
+          description: Unexpected Error
+          schema:
+            $ref: '#/definitions/Error'
+definitions:
+  Object:
+    type: object
+    properties:
+      size:
+        type: string
+        description: size of the object to be stored
+      sha256sum:
+        type: string
+        description: the hashsum to check integrity
+      mime-type:
+        type: string
+        description: the mime type of the file to upload
+      vpath:
+        type: string
+        description: the unique path like string used as human readable ID and tree navigation
+  ObjectWithAccess:
+    type: object
+    properties:
+      size:
+        type: string
+        description: size of the object to be stored
+      sha256sum:
+        type: string
+        description: the hashsum to check integrity
+      mime-type:
+        type: string
+        description: the mime type of the file to upload
+      vpath:
+        type: string
+        description: the unique path like string used as human readable ID and tree navigation
+      get-url:
+        type: string
+        description: presigned download URL to get the blob if user has permission to access
+      put-url:
+        type: string
+        description: presigned upload URL to put the blob if user has permission to access
+  Error:
+    type: object
+    properties:
+      code:
+        type: integer
+        format: int32
+      message:
+        type: string
+      fields:
+        type: string

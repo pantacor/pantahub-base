@@ -1,0 +1,94 @@
+#!/bin/sh
+
+set -e
+
+# PREREQs on tools front
+
+jsoncmd=`which json`
+
+if test -z "$jsoncmd"; then
+ echo "json command not found. try running 'npm install -g json'"
+ exit 1
+fi
+
+if test ! -x "$jsoncmd"; then
+ echo "$jsconcmd not executable? check your system..."
+ exit 2
+fi
+
+httpcmd=`which http`
+
+if test -z "$httpcmd"; then
+ echo "http command not found. try installing httpie tool ..."
+ exit 3
+fi
+
+if test ! -x "$httpcmd"; then
+ echo "$httpcmd not executable? check your system..."
+ exit 4
+fi
+
+
+# usage checks
+
+usage(){
+  echo "Usage: $cmd <device-prn> <device-secret> <factory-json-file>"
+  if test -n "$1"; then
+     echo    Error: $1
+  fi
+  exit 100
+}
+
+cmd=`basename $0`
+device_prn="$1"
+device_secret="$2"
+factory_state_jsonfile="$3"
+
+if test -z "$device_prn"; then
+  usage "Missing device-prn"
+fi
+
+if test -z "$device_secret"; then
+  usage "Missing device-secret"
+fi
+
+if test -z "$factory_state_jsonfile"; then
+  usage "Missing factory-state-jsonfile"
+fi
+
+if ! test -e "$factory_state_jsonfile"; then
+  usage "factory-state-jsonfile not found: $factory_state_jsonfile"
+fi
+
+# B U S I N E S S    L O G I C
+
+# --- LOGIN FIRST ---
+
+httpresult=`http POST localhost:12365/api/auth/login \
+	username="$device_prn" \
+	password="$device_secret"`
+
+DTOKEN=`echo $httpresult | json token`
+
+if test -z $DTOKEN; then
+  echo "device login with given credentials ($device_prn:$device_secret) failed."
+  echo Check the output below:
+  echo $httpresult
+  exit 100
+fi
+
+httpresult=`cat $factory_state_jsonfile | \
+	http POST localhost:12365/api/trails/ \
+		Authorization:" Bearer $DTOKEN"`
+
+trailid=`echo $httpresult | json id`
+
+if test -z "$trailid"; then
+  echo Error creating trail. See output below:
+  echo $httpresult
+  exit 101
+fi
+
+echo Trail created: $trailid
+echo $httpresult | json
+

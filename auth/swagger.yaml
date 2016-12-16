@@ -1,0 +1,88 @@
+# this is an example of the Uber API
+# as a demonstration of an API spec in YAML
+swagger: '2.0'
+info:
+  title: PANTAHUB Core API - Identity and Auth
+  contact:
+    name: Team PANTAHUB
+    url: http://www.pantahub.com/support
+    email: asac129@gmail.com
+  description: Join the Federation of Humans and Things, with cloud and devices
+  version: "1.0.0"
+# the domain of the service
+host: api.pantahub.com
+# array of all schemes that your API supports
+schemes:
+  - https
+  - http
+# will be prefixed to all paths
+basePath: /api
+produces:
+  - application/json
+securityDefinitions:
+  basicAuth:
+    type: basic
+    description: Authenticate with core services
+paths:
+  /auth/login:
+    get:
+      summary: get
+      description: get refreshed token logged in user
+      security:
+        - basicAuth: []
+      responses:
+        200:
+          description: The Login Response
+          schema:
+            $ref: '#/definitions/UserLoginResponse'
+        default:
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+    post:
+      summary: Log in with user credentials
+      description: |
+        login with user credentials. receive an access token for future use
+      parameters:
+        - name: userlogin
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/UserLogin'
+      responses:
+        200:
+          description: The Login Response
+          schema:
+            $ref: '#/definitions/UserLoginResponse'
+        default:
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+definitions:
+  UserLogin:
+    type: object
+    properties:
+      login-id:
+        type: string
+        description: login-id of the user to log in
+      secret:
+        type: string
+        description: the secret of the login-id
+  UserLoginResponse:
+    type: object
+    properties:
+      token:
+        type: string
+        description: the access token for the login
+  Error:
+    type: object
+    properties:
+      code:
+        type: integer
+        format: int32
+      message:
+        type: string
+      fields:
+        type: string
+
+
