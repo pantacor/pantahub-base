@@ -29,43 +29,43 @@ var payloads = map[string]map[string]interface{}{
 	"admin": map[string]interface{}{
 		"roles": "admin",
 		"type":  "USER",
-		"prn":  "brn:pantahub.com:auth:/admin",
+		"prn":   "brn:pantahub.com:auth:/admin",
 	},
 	"user1": map[string]interface{}{
 		"roles": "user",
 		"type":  "USER",
-		"prn":  "prn:pantahub.com:auth:/user1",
+		"prn":   "prn:pantahub.com:auth:/user1",
 	},
 	"user2": map[string]interface{}{
 		"roles": "user",
 		"type":  "USER",
-		"prn":  "prn:pantahub.com:auth:/user2",
+		"prn":   "prn:pantahub.com:auth:/user2",
 	},
 	"service1": map[string]interface{}{
 		"roles": "service",
 		"type":  "SERVICE",
-		"prn":  "prn:pantahub.com:auth:/service1",
+		"prn":   "prn:pantahub.com:auth:/service1",
 	},
 	"service2": map[string]interface{}{
 		"roles": "service",
 		"type":  "SERVICE",
-		"prn":  "prn:pantahub.com:auth:/service2",
+		"prn":   "prn:pantahub.com:auth:/service2",
 	},
 	"service3": map[string]interface{}{
 		"roles": "user",
 		"type":  "SERVICE",
-		"prn":  "prn:pantahub.com:auth:/service3",
+		"prn":   "prn:pantahub.com:auth:/service3",
 	},
 	"device1": map[string]interface{}{
 		"roles": "device",
 		"type":  "DEVICE",
-		"prn":  "prn:pantahub.com:auth:/device1",
+		"prn":   "prn:pantahub.com:auth:/device1",
 		"owner": "prn:pantahub.com:auth:/user1",
 	},
 	"device2": map[string]interface{}{
 		"roles": "device",
 		"type":  "DEVICE",
-		"prn":  "prn:pantahub.com:auth:/device2",
+		"prn":   "prn:pantahub.com:auth:/device2",
 		"owner": "prn:pantahub.com:auth:/user2",
 	},
 }
@@ -184,7 +184,7 @@ func (a *AuthApp) devicePayload(deviceId string) *map[string]interface{} {
 	val := map[string]interface{}{
 		"roles": "device",
 		"type":  "DEVICE",
-		"prn":  device.Abrn,
+		"prn":   device.Prn,
 		"owner": device.Owner,
 	}
 
