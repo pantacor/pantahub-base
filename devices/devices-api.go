@@ -24,7 +24,7 @@ type DevicesApp struct {
 
 type Device struct {
 	Id     bson.ObjectId `json:"id" bson:"_id"`
-	Abrn   string        `json:"prn"`
+	Prn    string        `json:"prn"`
 	Nick   string        `json:"nick"`
 	Owner  string        `json:"owner"`
 	Secret string        `json:"secret"`
@@ -43,7 +43,7 @@ func (a *DevicesApp) handle_postdevice(w rest.ResponseWriter, r *rest.Request) {
 
 	mgoid := bson.NewObjectId()
 	newDevice.Id = mgoid
-	newDevice.Abrn = "prn:::devices:/" + newDevice.Id.Hex()
+	newDevice.Prn = "prn:::devices:/" + newDevice.Id.Hex()
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
 	if !ok {
@@ -90,7 +90,7 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 
 	err := collection.FindId(bson.ObjectIdHex(putId)).One(&newDevice)
 
-	prn := newDevice.Abrn
+	prn := newDevice.Prn
 
 	if err != nil {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
@@ -109,7 +109,7 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	if newDevice.Abrn != prn {
+	if newDevice.Prn != prn {
 		rest.Error(w, "Cannot change device prn in PUT", http.StatusForbidden)
 		return
 	}
