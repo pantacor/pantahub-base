@@ -32,6 +32,7 @@ package trails
 //   - find smart way to figure when device is in sync based on reported state
 //   - consider enforcing sequential processing of steps to have a clean tail?
 import (
+	"pantahub-base/devices"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -89,6 +90,7 @@ type StepProgress struct {
 type TrailSummary struct {
 	DeviceId         bson.ObjectId `json:"deviceid"`
 	Device           string        `json:"device"`
+	DeviceNick       string        `json:"device-nick"`
 	Rev              int           `json:"revision"`
 	ProgressRev      int           `json:"progress-revision"`
 	Progress         int           `json:"progress"`   // progress number. steps or 1-100
@@ -605,6 +607,13 @@ func (a *TrailsApp) handle_gettrailstepsummary(w rest.ResponseWriter, r *rest.Re
 		return
 	}
 
+	collDevices := a.mgoSession.DB(a.mgoDb).C("pantahub_devices")
+
+	if collDevices == nil {
+		rest.Error(w, "Error with Database connectivity - devices", http.StatusInternalServerError)
+		return
+	}
+
 	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
 	trailId := r.PathParam("id")
 
@@ -614,6 +623,16 @@ func (a *TrailsApp) handle_gettrailstepsummary(w rest.ResponseWriter, r *rest.Re
 	}
 
 	summary, _ := a.get_trailsummary_one(bson.ObjectIdHex(trailId), owner.(string), collSteps)
+
+	device := devices.Device{}
+	err := collDevices.Find(bson.M{"_id": summary.DeviceId}).One(&device)
+	if err != nil {
+		rest.Error(w, "Error getting device record for id "+summary.DeviceId.Hex(),
+			http.StatusInternalServerError)
+		return
+	}
+
+	summary.DeviceNick = device.Nick
 
 	w.WriteJson(summary)
 }
@@ -644,6 +663,13 @@ func (a *TrailsApp) handle_gettrailsummary(w rest.ResponseWriter, r *rest.Reques
 		return
 	}
 
+	collDevices := a.mgoSession.DB(a.mgoDb).C("pantahub_devices")
+
+	if collDevices == nil {
+		rest.Error(w, "Error with Database connectivity - devices", http.StatusInternalServerError)
+		return
+	}
+
 	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
 
 	if authType != "USER" {
@@ -659,6 +685,15 @@ func (a *TrailsApp) handle_gettrailsummary(w rest.ResponseWriter, r *rest.Reques
 	for i, v := range trails {
 		summaries[i], _ = a.get_trailsummary_one(v.Id, owner.(string), collSteps)
 		summaries[i].TrailTouchedTime = v.LastTouched
+
+		device := devices.Device{}
+		err := collDevices.Find(bson.M{"_id": summaries[i].DeviceId}).One(&device)
+		if err != nil {
+			rest.Error(w, "Error getting device record for id "+summaries[i].DeviceId.Hex(),
+				http.StatusInternalServerError)
+			return
+		}
+		summaries[i].DeviceNick = device.Nick
 	}
 	w.WriteJson(summaries)
 }
