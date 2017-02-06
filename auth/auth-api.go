@@ -29,7 +29,7 @@ var payloads = map[string]map[string]interface{}{
 	"admin": map[string]interface{}{
 		"roles": "admin",
 		"type":  "USER",
-		"prn":   "brn:pantahub.com:auth:/admin",
+		"prn":   "prn:pantahub.com:auth:/admin",
 	},
 	"user1": map[string]interface{}{
 		"roles": "user",
