@@ -32,10 +32,10 @@ package trails
 //   - find smart way to figure when device is in sync based on reported state
 //   - consider enforcing sequential processing of steps to have a clean tail?
 import (
-	"pantahub-base/devices"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"pantahub-base/devices"
 	"strconv"
 	"strings"
 	"time"
@@ -269,11 +269,11 @@ func (a *TrailsApp) handle_gettrail(w rest.ResponseWriter, r *rest.Request) {
 	if authType == "DEVICE" {
 		err = coll.Find(bson.M{"_id": getId, "device": owner}).One(&trail)
 	} else if authType == "USER" {
-		err = coll.Find(bson.M{"_id": bson.ObjectIdHex(getId), "owner": owner}).One(&trail)
+		err = coll.Find(bson.M{"_id": getId, "owner": owner}).One(&trail)
 	}
 
 	if err != nil {
-		rest.Error(w, "No access to resource", http.StatusInternalServerError)
+		rest.Error(w, "No access to resource: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
