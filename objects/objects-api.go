@@ -31,10 +31,11 @@ type ObjectsApp struct {
 }
 
 type Object struct {
-	Id         string `json:"id" bson:"_id"`
+	Id         string `json:"id" bson:"id"`
+	StorageId  string `json:"storage-id" bson:"_id"`
 	Owner      string `json:"owner"`
 	ObjectName string `json:"objectname"`
-	Sha256sum  string `json:"sha256sum"`
+	Sha        string `json:"sha256sum"`
 	Size       string `json:"size"`
 	MimeType   string `json:"mime-type"`
 }
@@ -128,8 +129,9 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	storageId := MakeStorageId(ownerStr, newObject.Sha256sum)
-	newObject.Id = storageId
+	storageId := MakeStorageId(ownerStr, newObject.Sha)
+	newObject.StorageId = storageId
+	newObject.Id = newObject.Sha
 	fmt.Println("storeid: " + storageId)
 
 	_, err := collection.UpsertId(storageId, newObject)
@@ -183,6 +185,7 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 	r.DecodeJsonPayload(&newObject)
 
 	newObject.Owner = owner.(string)
+	newObject.StorageId = storageId
 	newObject.Id = putId
 
 	collection.UpsertId(storageId, newObject)
