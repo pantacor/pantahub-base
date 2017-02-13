@@ -4,7 +4,10 @@
 package objects
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -16,7 +19,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"labix.org/v2/mgo"
-	"labix.org/v2/mgo/bson"
 )
 
 type ObjectsApp struct {
@@ -29,12 +31,12 @@ type ObjectsApp struct {
 }
 
 type Object struct {
-	Id         bson.ObjectId `json:"id" bson:"_id"`
-	Owner      string        `json:"owner"`
-	ObjectName string        `json:"objectname"`
-	Sha256sum  string        `json:"sha256sum"`
-	Size       string        `json:"size"`
-	MimeType   string        `json:"mime-type"`
+	Id         string `json:"id" bson:"_id"`
+	Owner      string `json:"owner"`
+	ObjectName string `json:"objectname"`
+	Sha256sum  string `json:"sha256sum"`
+	Size       string `json:"size"`
+	MimeType   string `json:"mime-type"`
 }
 
 type ObjectWithAccess struct {
@@ -90,14 +92,19 @@ func handle_auth(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(jwtClaims)
 }
 
+func MakeStorageId(owner string, sha string) string {
+	res := sha256.Sum256([]byte(owner + "/" + sha))
+	newSha := res[:]
+	hexRes := make([]byte, hex.EncodedLen(len(newSha)))
+	hex.Encode(hexRes, newSha)
+	return string(hexRes)
+}
+
 func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 
 	newObject := Object{}
 
 	r.DecodeJsonPayload(&newObject)
-
-	mgoid := bson.NewObjectId()
-	newObject.Id = mgoid
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
 	if !ok {
@@ -105,7 +112,14 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, "You need to be logged in as a USER", http.StatusForbidden)
 		return
 	}
-	newObject.Owner = owner.(string)
+	ownerStr, ok := owner.(string)
+	if !ok {
+		// XXX: find right error
+		rest.Error(w, "Invalid Access Token", http.StatusForbidden)
+		return
+	}
+
+	newObject.Owner = ownerStr
 
 	collection := a.mgoSession.DB(a.mgoDb).C("pantahub_objects")
 
@@ -113,7 +127,16 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
-	collection.UpsertId(mgoid, newObject)
+
+	storageId := MakeStorageId(ownerStr, newObject.Sha256sum)
+	newObject.Id = storageId
+	fmt.Println("storeid: " + storageId)
+
+	_, err := collection.UpsertId(storageId, newObject)
+
+	if err != nil {
+		rest.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 
 	w.WriteJson(newObject)
 }
@@ -122,8 +145,6 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 
 	newObject := Object{}
 
-	putId := r.PathParam("id")
-
 	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
 	if !ok {
 		// XXX: find right error
@@ -138,7 +159,16 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	err := collection.FindId(bson.ObjectIdHex(putId)).One(&newObject)
+	ownerStr, ok := owner.(string)
+	if !ok {
+		// XXX: find right error
+		rest.Error(w, "Invalid Access", http.StatusForbidden)
+		return
+	}
+	putId := r.PathParam("id")
+	storageId := MakeStorageId(ownerStr, putId)
+
+	err := collection.FindId(storageId).One(&newObject)
 
 	if err != nil {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
@@ -153,9 +183,9 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 	r.DecodeJsonPayload(&newObject)
 
 	newObject.Owner = owner.(string)
-	newObject.Id = bson.ObjectIdHex(putId)
+	newObject.Id = putId
 
-	collection.UpsertId(newObject.Id, newObject)
+	collection.UpsertId(storageId, newObject)
 
 	w.WriteJson(newObject)
 }
@@ -163,8 +193,6 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 func (a *ObjectsApp) handle_getobject(w rest.ResponseWriter, r *rest.Request) {
 
 	var filesObjWithAccess ObjectWithAccess
-
-	mgoid := bson.ObjectIdHex(r.PathParam("id"))
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["owner"]
 	if !ok {
@@ -183,7 +211,18 @@ func (a *ObjectsApp) handle_getobject(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	err := collection.FindId(mgoid).One(&filesObjWithAccess)
+	ownerStr, ok := owner.(string)
+
+	if !ok {
+		// XXX: find right error
+		rest.Error(w, "Invalid Access", http.StatusForbidden)
+		return
+	}
+
+	objId := r.PathParam("id")
+	storageId := MakeStorageId(ownerStr, objId)
+
+	err := collection.FindId(storageId).One(&filesObjWithAccess)
 
 	if err != nil {
 		rest.Error(w, "No Access", http.StatusForbidden)
@@ -203,7 +242,7 @@ func (a *ObjectsApp) handle_getobject(w rest.ResponseWriter, r *rest.Request) {
 		// GET URL
 		req, _ := svc.GetObjectRequest(&s3.GetObjectInput{
 			Bucket: aws.String("systemcloud-001"),
-			Key:    aws.String(mgoid.Hex()),
+			Key:    aws.String(storageId),
 		})
 		urlStr, _ := req.Presign(15 * time.Minute)
 		filesObjWithAccess.SignedGetUrl = urlStr
@@ -211,7 +250,7 @@ func (a *ObjectsApp) handle_getobject(w rest.ResponseWriter, r *rest.Request) {
 		// PUT URL
 		req, _ = svc.PutObjectRequest(&s3.PutObjectInput{
 			Bucket: aws.String("systemcloud-001"),
-			Key:    aws.String(mgoid.Hex()),
+			Key:    aws.String(storageId),
 		})
 		urlStr, _ = req.Presign(15 * time.Minute)
 		filesObjWithAccess.SignedPutUrl = urlStr
@@ -219,8 +258,8 @@ func (a *ObjectsApp) handle_getobject(w rest.ResponseWriter, r *rest.Request) {
 		filesObjWithAccess.Now = strconv.FormatInt(req.Time.Unix(), 10)
 		filesObjWithAccess.ExpireTime = strconv.FormatInt(int64(req.ExpireTime.Seconds()), 10)
 	} else {
-		filesObjWithAccess.SignedGetUrl = PantahubS3DevUrl() + "/local-s3/" + mgoid.Hex()
-		filesObjWithAccess.SignedPutUrl = PantahubS3DevUrl() + "/local-s3/" + mgoid.Hex()
+		filesObjWithAccess.SignedGetUrl = PantahubS3DevUrl() + "/local-s3/" + storageId
+		filesObjWithAccess.SignedPutUrl = PantahubS3DevUrl() + "/local-s3/" + storageId
 
 		timeNow := time.Now()
 		filesObjWithAccess.Now = strconv.FormatInt(timeNow.Unix(), 10)
@@ -266,8 +305,6 @@ func (a *ObjectsApp) handle_getobjects(w rest.ResponseWriter, r *rest.Request) {
 
 func (a *ObjectsApp) handle_deleteobject(w rest.ResponseWriter, r *rest.Request) {
 
-	delId := r.PathParam("id")
-
 	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
 	if !ok {
 		// XXX: find right error
@@ -282,12 +319,23 @@ func (a *ObjectsApp) handle_deleteobject(w rest.ResponseWriter, r *rest.Request)
 		return
 	}
 
+	ownerStr, ok := owner.(string)
+
+	if !ok {
+		// XXX: find right error
+		rest.Error(w, "Invalid Access", http.StatusForbidden)
+		return
+	}
+
+	delId := r.PathParam("id")
+	storageId := MakeStorageId(ownerStr, delId)
+
 	newObject := Object{}
 
-	collection.FindId(bson.ObjectIdHex(delId)).One(&newObject)
+	collection.FindId(storageId).One(&newObject)
 
 	if newObject.Owner == owner {
-		collection.RemoveId(bson.ObjectIdHex(delId))
+		collection.RemoveId(storageId)
 	}
 
 	w.WriteJson(newObject)
