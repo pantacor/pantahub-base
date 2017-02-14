@@ -549,6 +549,43 @@ func (a *TrailsApp) handle_getstep(w rest.ResponseWriter, r *rest.Request) {
 }
 
 //
+// ## GET /trails/:id/steps/:rev/state
+//   get step state
+//
+//   just the raw data of a step without metainfo...
+//
+func (a *TrailsApp) handle_getstepstate(w rest.ResponseWriter, r *rest.Request) {
+
+	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	if !ok {
+		// XXX: find right error
+		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		return
+	}
+
+	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+
+	coll := a.mgoSession.DB(a.mgoDb).C("pantahub_steps")
+
+	if coll == nil {
+		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+
+	step := Step{}
+
+	trailId := r.PathParam("id")
+	rev := r.PathParam("rev")
+
+	if authType == "DEVICE" {
+		coll.Find(bson.M{"_id": trailId + "-" + rev, "device": owner}).One(&step)
+	} else if authType == "USER" {
+		coll.Find(bson.M{"_id": trailId + "-" + rev, "owner": owner}).One(&step)
+	}
+	w.WriteJson(step.State)
+}
+
+//
 // ## PUT /trails/:id/steps/:rev/progress
 //   Post Step Progress information for a step.
 //
@@ -833,6 +870,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *TrailsApp {
 		rest.Post("/:id/steps", app.handle_poststep),
 		rest.Get("/:id/steps", app.handle_getsteps),
 		rest.Get("/:id/steps/:rev", app.handle_getstep),
+		rest.Get("/:id/steps/:rev/state", app.handle_getstepstate),
 		rest.Put("/:id/steps/:rev/progress", app.handle_putstepprogress),
 		rest.Get("/:id/summary", app.handle_gettrailstepsummary),
 	)
