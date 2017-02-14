@@ -1,5 +1,5 @@
 //
-// Copyright 2016  Alexander Sack <asac129@gmail.com>
+// Copyright 2016,2017  Alexander Sack <asac129@gmail.com>
 //
 package trails
 
@@ -33,6 +33,7 @@ package trails
 //   - consider enforcing sequential processing of steps to have a clean tail?
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"pantahub-base/devices"
@@ -99,6 +100,16 @@ type TrailSummary struct {
 	StepTime         time.Time     `json:"step-time" bson:"step-time"`
 	ProgressTime     time.Time     `json:"progress-time" bson:"progress-time"`
 	TrailTouchedTime time.Time     `json:"trail-touched-time" bson:"trail-touched-time"`
+}
+
+type PvrRemote struct {
+	RemoteSpec         string   `json:"pvr-spec"`         // the pvr remote protocol spec available
+	JsonGetUrl         string   `json:"json-get-url"`     // where to pvr post stuff
+	JsonKey            string   `json:"json-key"`         // what key is to use in post json [default: json]
+	ObjectsEndpointUrl string   `json:"objects-endpoint"` // where to store/retrieve objects
+	PostUrl            string   `json:"post-url"`         // where to post/announce new revisions
+	PostFields         []string `json:"post-fields"`      // what fields require input
+	PostFieldsOpt      []string `json:"post-fields-opt"`  // what optional fields are available [default: <empty>]
 }
 
 func handle_auth(w rest.ResponseWriter, r *rest.Request) {
@@ -280,6 +291,74 @@ func (a *TrailsApp) handle_gettrail(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(trail)
 }
 
+func getBaseApiEndpointXXX(r *rest.Request) (string, error) {
+	i := strings.Index(r.Request.RequestURI, "/api/trails")
+	if i < 0 {
+		return "", errors.New("Bad Server configuration (cannot produce object endpoint)")
+	}
+	newUri := r.Request.RequestURI[0:i]
+	return r.BaseUrl().String() + newUri, nil
+}
+
+func (a *TrailsApp) handle_gettrailpvrinfo(w rest.ResponseWriter, r *rest.Request) {
+
+	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	if !ok {
+		// XXX: find right error
+		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		return
+	}
+
+	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+
+	coll := a.mgoSession.DB(a.mgoDb).C("pantahub_steps")
+
+	if coll == nil {
+		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+
+	getId := r.PathParam("id")
+	step := Step{}
+
+	var err error
+	//	get last step
+	if authType == "DEVICE" {
+		err = coll.Find(bson.M{"device": owner, "trail-id": bson.ObjectIdHex(getId)}).Sort("-rev").One(&step)
+	} else if authType == "USER" {
+		err = coll.Find(bson.M{"owner": owner, "trail-id": bson.ObjectIdHex(getId)}).Sort("-rev").One(&step)
+	}
+
+	if err != nil {
+		rest.Error(w, "No access to resource: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	baseApi, err := getBaseApiEndpointXXX(r)
+
+	if err != nil {
+		rest.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	oe := baseApi + "/api/objects"
+	jsonGet := baseApi + "/api/trails/" + getId + "/steps/" + strconv.Itoa(step.Rev) + "/state"
+	postUrl := baseApi + "/api/trails/" + getId + "/steps"
+	postFields := []string{"commit-msg"}
+	postFieldsOpt := []string{}
+
+	remoteInfo := PvrRemote{
+		RemoteSpec:         "pvr-pantahub-1",
+		JsonGetUrl:         jsonGet,
+		ObjectsEndpointUrl: oe,
+		JsonKey:            "state",
+		PostUrl:            postUrl,
+		PostFields:         postFields,
+		PostFieldsOpt:      postFieldsOpt,
+	}
+
+	w.WriteJson(remoteInfo)
+}
+
 //
 // POST /trails/:id/steps
 //  post a new step to the head of the trail. You must include the correct Rev
@@ -418,10 +497,14 @@ func (a *TrailsApp) handle_getsteps(w rest.ResponseWriter, r *rest.Request) {
 	progress_status := r.URL.Query().Get("progress.status")
 	if progress_status != "" {
 		m := map[string]interface{}{}
-		json.Unmarshal([]byte(progress_status), &m)
-		query["progress.status"] = m
+		err := json.Unmarshal([]byte(progress_status), &m)
+		if err != nil {
+			query["progress.status"] = progress_status
+		} else {
+			query["progress.status"] = m
+		}
 	}
-	coll.Find(query).All(&steps)
+	coll.Find(query).Sort("-rev").All(&steps)
 
 	w.WriteJson(steps)
 }
@@ -712,6 +795,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *TrailsApp {
 	app.mgoDb = "pantahub-base"
 
 	app.Api = rest.NewApi()
+
 	// we dont use default stack because we dont want content type enforcement
 	app.Api.Use(&rest.AccessLogApacheMiddleware{})
 	app.Api.Use(rest.DefaultCommonStack...)
@@ -745,6 +829,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *TrailsApp {
 		rest.Post("/", app.handle_posttrail),
 		rest.Get("/summary", app.handle_gettrailsummary),
 		rest.Get("/:id", app.handle_gettrail),
+		rest.Get("/:id/.pvrremote", app.handle_gettrailpvrinfo),
 		rest.Post("/:id/steps", app.handle_poststep),
 		rest.Get("/:id/steps", app.handle_getsteps),
 		rest.Get("/:id/steps/:rev", app.handle_getstep),
