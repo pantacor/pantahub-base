@@ -140,7 +140,8 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	w.WriteJson(newObject)
+	newObjectWithAccess := a.makeObjAccessible(newObject, storageId)
+	w.WriteJson(newObjectWithAccess)
 }
 
 func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
@@ -193,51 +194,9 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(newObject)
 }
 
-func (a *ObjectsApp) handle_getobject(w rest.ResponseWriter, r *rest.Request) {
-
-	var filesObjWithAccess ObjectWithAccess
-
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["owner"]
-	if !ok {
-		owner, ok = r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
-		// XXX: find right error
-		if !ok {
-			rest.Error(w, "You need to be logged in as USER or DEVICE with owner", http.StatusForbidden)
-			return
-		}
-	}
-
-	collection := a.mgoSession.DB(a.mgoDb).C("pantahub_objects")
-
-	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
-	}
-
-	ownerStr, ok := owner.(string)
-
-	if !ok {
-		// XXX: find right error
-		rest.Error(w, "Invalid Access", http.StatusForbidden)
-		return
-	}
-
-	objId := r.PathParam("id")
-	storageId := MakeStorageId(ownerStr, objId)
-
-	err := collection.FindId(storageId).One(&filesObjWithAccess)
-
-	if err != nil {
-		rest.Error(w, "No Access", http.StatusForbidden)
-		return
-	}
-
-	// XXX: fixme; needs delegation of authorization for device accessing its resources
-	// could be subscriptions, but also something else
-	if filesObjWithAccess.Owner != owner {
-		rest.Error(w, "No Access", http.StatusForbidden)
-		return
-	}
+func (a *ObjectsApp) makeObjAccessible(obj Object, storageId string) ObjectWithAccess {
+	filesObjWithAccess := ObjectWithAccess{}
+	filesObjWithAccess.Object = obj
 
 	if PantahubS3Production() {
 		svc := s3.New(session.New(&aws.Config{Region: aws.String("us-east-1")}))
@@ -269,6 +228,54 @@ func (a *ObjectsApp) handle_getobject(w rest.ResponseWriter, r *rest.Request) {
 		duration, _ := time.ParseDuration("15m")
 		filesObjWithAccess.ExpireTime = strconv.FormatInt(timeNow.Add(duration).Unix(), 10)
 	}
+	return filesObjWithAccess
+}
+
+func (a *ObjectsApp) handle_getobject(w rest.ResponseWriter, r *rest.Request) {
+
+	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["owner"]
+	if !ok {
+		owner, ok = r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+		// XXX: find right error
+		if !ok {
+			rest.Error(w, "You need to be logged in as USER or DEVICE with owner", http.StatusForbidden)
+			return
+		}
+	}
+
+	collection := a.mgoSession.DB(a.mgoDb).C("pantahub_objects")
+
+	if collection == nil {
+		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+
+	ownerStr, ok := owner.(string)
+
+	if !ok {
+		// XXX: find right error
+		rest.Error(w, "Invalid Access", http.StatusForbidden)
+		return
+	}
+
+	objId := r.PathParam("id")
+	storageId := MakeStorageId(ownerStr, objId)
+
+	var filesObj Object
+	err := collection.FindId(storageId).One(&filesObj)
+
+	if err != nil {
+		rest.Error(w, "No Access", http.StatusForbidden)
+		return
+	}
+
+	// XXX: fixme; needs delegation of authorization for device accessing its resources
+	// could be subscriptions, but also something else
+	if filesObj.Owner != owner {
+		rest.Error(w, "No Access", http.StatusForbidden)
+		return
+	}
+	filesObjWithAccess := a.makeObjAccessible(filesObj, storageId)
 
 	w.WriteJson(filesObjWithAccess)
 }
