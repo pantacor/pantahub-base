@@ -5,7 +5,6 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/dgrijalva/jwt-go"
 
-	"pantahub-base/devices/swagger/models"
 	"errors"
 	"log"
 	"net/http"
@@ -232,9 +231,14 @@ func (mw *JWTMiddleware) RefreshHandler(writer rest.ResponseWriter, request *res
 	writer.WriteJson(resultToken{Token: tokenString})
 }
 
+type ModelError struct {
+   Code int `json:"code"`
+   Message string `json:"message"`
+}
+
 func (mw *JWTMiddleware) unauthorized(writer rest.ResponseWriter) {
 	writer.Header().Set("WWW-Authenticate", "JWT realm="+mw.Realm)
-	err := models.Error{}
+	err := ModelError{}
 
 	err.Code = http.StatusUnauthorized
 	err.Message = "Not Authorized"

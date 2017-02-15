@@ -6,8 +6,6 @@ package devices
 import (
 	"net/http"
 
-	"pantahub-base/devices/swagger/models"
-
 	"github.com/StephanDollberg/go-json-rest-middleware-jwt"
 	"github.com/ant0ine/go-json-rest/rest"
 	petname "github.com/dustinkirkland/golang-petname"
@@ -164,10 +162,15 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(device)
 }
 
+type ModelError struct {
+   Code int `json:"code"`
+   Message string `json:"message"`
+}
+
 func (a *DevicesApp) handle_getdevices(w rest.ResponseWriter, r *rest.Request) {
 	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
 	if !ok {
-		err := models.Error{}
+		err := ModelError{}
 		err.Code = http.StatusInternalServerError
 		err.Message = "You need to be logged in as a USER"
 
