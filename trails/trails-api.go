@@ -359,6 +359,67 @@ func (a *TrailsApp) handle_gettrailpvrinfo(w rest.ResponseWriter, r *rest.Reques
 	w.WriteJson(remoteInfo)
 }
 
+func (a *TrailsApp) handle_getsteppvrinfo(w rest.ResponseWriter, r *rest.Request) {
+
+	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	if !ok {
+		// XXX: find right error
+		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		return
+	}
+
+	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+
+	coll := a.mgoSession.DB(a.mgoDb).C("pantahub_steps")
+
+	if coll == nil {
+		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+
+	getId := r.PathParam("id")
+	revId := r.PathParam("rev")
+	stepId := getId + "-" + revId
+	step := Step{}
+
+	var err error
+	//	get step and check right to access
+	if authType == "DEVICE" {
+		err = coll.Find(bson.M{"device": owner, "_id": stepId}).One(&step)
+	} else if authType == "USER" {
+		err = coll.Find(bson.M{"owner": owner, "_id": stepId}).One(&step)
+	}
+
+	if err != nil {
+		rest.Error(w, "No access to resource: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	baseApi, err := getBaseApiEndpointXXX(r)
+
+	if err != nil {
+		rest.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	oe := baseApi + "/api/objects"
+	jsonUrl := baseApi + "/api/trails/" + getId + "/steps/" + revId + "/state"
+	postUrl := baseApi + "/api/trails/" + getId + "/steps"
+	postFields := []string{"commit-msg"}
+	postFieldsOpt := []string{}
+
+	remoteInfo := PvrRemote{
+		RemoteSpec:         "pvr-pantahub-1",
+		JsonGetUrl:         jsonUrl,
+		ObjectsEndpointUrl: oe,
+		JsonKey:            "state",
+		PostUrl:            postUrl,
+		PostFields:         postFields,
+		PostFieldsOpt:      postFieldsOpt,
+	}
+
+	w.WriteJson(remoteInfo)
+}
+
 //
 // POST /trails/:id/steps
 //  post a new step to the head of the trail. You must include the correct Rev
@@ -870,6 +931,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *TrailsApp {
 		rest.Post("/:id/steps", app.handle_poststep),
 		rest.Get("/:id/steps", app.handle_getsteps),
 		rest.Get("/:id/steps/:rev", app.handle_getstep),
+		rest.Get("/:id/steps/:rev/.pvrremote", app.handle_getsteppvrinfo),
 		rest.Get("/:id/steps/:rev/state", app.handle_getstepstate),
 		rest.Put("/:id/steps/:rev/progress", app.handle_putstepprogress),
 		rest.Get("/:id/summary", app.handle_gettrailstepsummary),
