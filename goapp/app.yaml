@@ -1,0 +1,16 @@
+# go appengine
+
+application: www-pantahub-beta
+runtime: go
+api_version: go1
+
+handlers:
+- url: /.*
+  script: _go_app
+
+env_variables:
+  AWS_REGION: us-east-1
+  AWS_ACCESS_KEY_ID: AKIAIR5QHQ2CEP3BQFAQ
+  AWS_SECRET_ACCESS_KEY: 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
+  PANTAHUB_S3PATH: production
+
