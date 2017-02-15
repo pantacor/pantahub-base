@@ -81,7 +81,20 @@ func DoInit() {
 		mongoPort = "27017"
 	}
 
-	session, err := mgo.Dial(mongoHost + ":" + mongoPort)
+	mongoUser := os.Getenv("MONGO_USER")
+	mongoPass := os.Getenv("MONGO_PASS")
+
+	mongoCreds := ""
+	if mongoUser != "" {
+		mongoCreds += mongoUser + ":" + mongoPass + "@"
+	}
+
+	mongoDb := os.Getenv("MONGO_DB")
+	if mongoDb == "" {
+		mongoDb = "pantahub-base"
+	}
+
+	session, err := mgo.Dial(mongoCreds + mongoHost + ":" + mongoPort + "/" + mongoDb)
 
 	if err != nil {
 		panic(err)
