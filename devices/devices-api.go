@@ -9,8 +9,8 @@ import (
 	"github.com/StephanDollberg/go-json-rest-middleware-jwt"
 	"github.com/ant0ine/go-json-rest/rest"
 	petname "github.com/dustinkirkland/golang-petname"
-	"labix.org/v2/mgo"
-	"labix.org/v2/mgo/bson"
+	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 )
 
 type DevicesApp struct {
@@ -163,8 +163,8 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 }
 
 type ModelError struct {
-   Code int `json:"code"`
-   Message string `json:"message"`
+	Code    int    `json:"code"`
+	Message string `json:"message"`
 }
 
 func (a *DevicesApp) handle_getdevices(w rest.ResponseWriter, r *rest.Request) {

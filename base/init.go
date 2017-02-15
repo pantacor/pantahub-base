@@ -21,7 +21,7 @@ import (
 
 	"github.com/StephanDollberg/go-json-rest-middleware-jwt"
 
-	"labix.org/v2/mgo"
+	"gopkg.in/mgo.v2"
 )
 
 type FileUploadServer struct {
@@ -94,7 +94,10 @@ func DoInit() {
 		mongoDb = "pantahub-base"
 	}
 
-	session, err := mgo.Dial(mongoCreds + mongoHost + ":" + mongoPort + "/" + mongoDb)
+	mongoConnect := "mongodb://" + mongoCreds + mongoHost + ":" + mongoPort + "/" + mongoDb
+	fmt.Println("mongodb connect: " + mongoConnect)
+
+	session, err := mgo.Dial(mongoConnect)
 
 	if err != nil {
 		panic(err)

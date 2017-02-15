@@ -13,4 +13,9 @@ env_variables:
   AWS_ACCESS_KEY_ID: AKIAIR5QHQ2CEP3BQFAQ
   AWS_SECRET_ACCESS_KEY: 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
   PANTAHUB_S3PATH: production
+  MONGO_HOST: ds145299.mlab.com
+  MONGO_PORT: 45299
+  MONGO_USER: ph-production
+  MONGO_PASS: pr0dN3inT0lo
+  MONGO_DB: pantabase-serv
 
