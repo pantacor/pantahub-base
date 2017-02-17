@@ -37,6 +37,7 @@ import (
 	"fmt"
 	"net/http"
 	"pantahub-base/devices"
+	"pvr/api"
 	"strconv"
 	"strings"
 	"time"
@@ -100,16 +101,6 @@ type TrailSummary struct {
 	StepTime         time.Time     `json:"step-time" bson:"step-time"`
 	ProgressTime     time.Time     `json:"progress-time" bson:"progress-time"`
 	TrailTouchedTime time.Time     `json:"trail-touched-time" bson:"trail-touched-time"`
-}
-
-type PvrRemote struct {
-	RemoteSpec         string   `json:"pvr-spec"`         // the pvr remote protocol spec available
-	JsonGetUrl         string   `json:"json-get-url"`     // where to pvr post stuff
-	JsonKey            string   `json:"json-key"`         // what key is to use in post json [default: json]
-	ObjectsEndpointUrl string   `json:"objects-endpoint"` // where to store/retrieve objects
-	PostUrl            string   `json:"post-url"`         // where to post/announce new revisions
-	PostFields         []string `json:"post-fields"`      // what fields require input
-	PostFieldsOpt      []string `json:"post-fields-opt"`  // what optional fields are available [default: <empty>]
 }
 
 func handle_auth(w rest.ResponseWriter, r *rest.Request) {
@@ -346,7 +337,7 @@ func (a *TrailsApp) handle_gettrailpvrinfo(w rest.ResponseWriter, r *rest.Reques
 	postFields := []string{"commit-msg"}
 	postFieldsOpt := []string{}
 
-	remoteInfo := PvrRemote{
+	remoteInfo := pvrapi.PvrRemote{
 		RemoteSpec:         "pvr-pantahub-1",
 		JsonGetUrl:         jsonGet,
 		ObjectsEndpointUrl: oe,
@@ -407,7 +398,7 @@ func (a *TrailsApp) handle_getsteppvrinfo(w rest.ResponseWriter, r *rest.Request
 	postFields := []string{"commit-msg"}
 	postFieldsOpt := []string{}
 
-	remoteInfo := PvrRemote{
+	remoteInfo := pvrapi.PvrRemote{
 		RemoteSpec:         "pvr-pantahub-1",
 		JsonGetUrl:         jsonUrl,
 		ObjectsEndpointUrl: oe,
