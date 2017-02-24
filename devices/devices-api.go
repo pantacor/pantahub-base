@@ -189,11 +189,28 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 
 	mgoid := bson.ObjectIdHex(r.PathParam("id"))
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	authId, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in as a USER", http.StatusForbidden)
+		rest.Error(w, "You need to be logged in.", http.StatusForbidden)
 		return
+	}
+
+	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+
+	if !ok {
+		// XXX: find right error
+		rest.Error(w, "You need to be logged in with a known authentication type.", http.StatusForbidden)
+		return
+	}
+
+	callerIsUser := false
+	callerIsDevice := false
+
+	if authType == "DEVICE" {
+		callerIsDevice = true
+	} else {
+		callerIsUser = true
 	}
 
 	collection := a.mgoSession.DB(a.mgoDb).C("pantahub_devices")
@@ -212,7 +229,12 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 
 	// XXX: fixme; needs delegation of authorization for device accessing its resources
 	// could be subscriptions, but also something else
-	if device.Owner != owner {
+	if callerIsDevice && device.Prn != authId {
+		rest.Error(w, "No Access", http.StatusForbidden)
+		return
+	}
+
+	if callerIsUser && device.Owner != authId {
 		rest.Error(w, "No Access", http.StatusForbidden)
 		return
 	}
