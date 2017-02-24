@@ -23,7 +23,7 @@ TOKEN=`http localhost:12365/api/auth/login username=user1 password=user1 | json 
 
 ## Upload File
 
-### Register a Device
+### Register a Device (As User)
 
 ```
 http POST localhost:12365/api/devices/  Authorization:"Bearer $TOKEN" \
@@ -43,6 +43,63 @@ X-Powered-By: go-json-rest
     "secret": "yourdevicesecret"
 }
 ```
+
+### Register a Device for Claiming (As Device)
+
+To allow distribution of images and to allow transfer of ownership, devices
+that have no owner can have a challenge field that allows an authenticated
+user to claim it through its PUT endpoint.
+
+In example of generic image a device would first register itself with its own
+secret to the hub and would present the user with a challenge that he can
+use to claim it.
+
+Example:
+
+1. device registers itself
+```
+http POST localhost:12365/api/devices secret="mysec1"
+{
+  "id": "58b0bbf0c094f605418b1a84",
+  "prn": "prn:::devices:/58b0bbf0c094f605418b1a84",
+  "nick": "growing_dodo",
+  "owner": "",
+  "secret": "mysec1",
+  "time-created": "2017-02-25T00:04:16.568431302+01:00",
+  "time-modified": "0001-01-01T00:00:00Z",
+  "challenge": "probably-relieved-insect"
+}
+
+Note how the output has a challenge entry, but no owner yet...
+
+2. extract the challenge from the json and display to user
+```
+challenge=probably-relieved-insect
+```
+3. as a logged in user with TOKEN you claim the device through a simple PUT
+```
+http PUT localhost:12365/api/devices/58b0bbf0c094f605418b1a84?challenge=$challenge Authorization:"Bearer $TOKEN"
+HTTP/1.1 200 OK
+Content-Length: 276
+Content-Type: application/json; charset=utf-8
+Date: Fri, 24 Feb 2017 23:11:02 GMT
+X-Powered-By: go-json-rest
+
+{
+    "challenge": "",
+    "id": "58b0bbf0c094f605418b1a84",
+    "nick": "growing_dodo",
+    "owner": "prn:pantahub.com:auth:/user1",
+    "prn": "prn:::devices:/58b0bbf0c094f605418b1a84",
+    "secret": "mysec1",
+    "time-created": "2017-02-25T00:04:16.568+01:00",
+    "time-modified": "2017-02-25T00:11:02.251026642+01:00"
+}
+```
+
+As you can see the challenge field is now reset and the owner is assigned.
+
+
 
 ### Get Your Devices
 

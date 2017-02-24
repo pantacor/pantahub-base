@@ -5,6 +5,7 @@ package devices
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/StephanDollberg/go-json-rest-middleware-jwt"
 	"github.com/ant0ine/go-json-rest/rest"
@@ -21,11 +22,14 @@ type DevicesApp struct {
 }
 
 type Device struct {
-	Id     bson.ObjectId `json:"id" bson:"_id"`
-	Prn    string        `json:"prn"`
-	Nick   string        `json:"nick"`
-	Owner  string        `json:"owner"`
-	Secret string        `json:"secret"`
+	Id           bson.ObjectId `json:"id" bson:"_id"`
+	Prn          string        `json:"prn"`
+	Nick         string        `json:"nick"`
+	Owner        string        `json:"owner"`
+	Secret       string        `json:"secret"`
+	TimeCreated  time.Time     `json:"time-created"`
+	TimeModified time.Time     `json:"time-modified"`
+	Challenge    string        `json:"challenge"`
 }
 
 func handle_auth(w rest.ResponseWriter, r *rest.Request) {
@@ -42,14 +46,23 @@ func (a *DevicesApp) handle_postdevice(w rest.ResponseWriter, r *rest.Request) {
 	mgoid := bson.NewObjectId()
 	newDevice.Id = mgoid
 	newDevice.Prn = "prn:::devices:/" + newDevice.Id.Hex()
+	newDevice.Challenge = petname.Generate(3, "-")
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
-	if !ok {
-		// XXX: find right error
-		rest.Error(w, "You need to be logged in as a USER", http.StatusForbidden)
-		return
+	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
+
+	var owner interface{}
+
+	if ok {
+		owner, ok = jwtPayload.(map[string]interface{})["prn"]
 	}
-	newDevice.Owner = owner.(string)
+
+	if ok {
+		newDevice.Owner = owner.(string)
+	} else {
+		newDevice.Owner = ""
+	}
+
+	newDevice.TimeCreated = time.Now()
 
 	if newDevice.Nick == "" {
 		newDevice.Nick = petname.Generate(2, "_")
@@ -72,11 +85,28 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 
 	putId := r.PathParam("id")
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	authId, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in as a USER", http.StatusForbidden)
+		rest.Error(w, "You need to be logged in.", http.StatusForbidden)
 		return
+	}
+
+	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+
+	if !ok {
+		// XXX: find right error
+		rest.Error(w, "You need to be logged in with a known authentication type.", http.StatusForbidden)
+		return
+	}
+
+	callerIsUser := false
+	callerIsDevice := false
+
+	if authType == "DEVICE" {
+		callerIsDevice = true
+	} else {
+		callerIsUser = true
 	}
 
 	collection := a.mgoSession.DB(a.mgoDb).C("pantahub_devices")
@@ -89,14 +119,23 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 	err := collection.FindId(bson.ObjectIdHex(putId)).One(&newDevice)
 
 	prn := newDevice.Prn
+	timeCreated := newDevice.TimeCreated
+	owner := newDevice.Owner
+	challenge := newDevice.Challenge
+	challengeVal := r.FormValue("challenge")
 
 	if err != nil {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
 	}
 
-	if newDevice.Owner != owner {
-		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
+	if callerIsDevice && newDevice.Prn != authId {
+		rest.Error(w, "Not Device Accessible Resource Id", http.StatusForbidden)
+		return
+	}
+
+	if callerIsUser && newDevice.Owner != "" && newDevice.Owner != authId {
+		rest.Error(w, "Not User Accessible Resource Id", http.StatusForbidden)
 		return
 	}
 
@@ -112,14 +151,33 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
+	if newDevice.Owner != owner {
+		rest.Error(w, "Cannot change device owner in PUT", http.StatusForbidden)
+		return
+	}
+
+	if newDevice.TimeCreated != timeCreated {
+		rest.Error(w, "Cannot change device timeCreated in PUT", http.StatusForbidden)
+		return
+	}
+
 	if newDevice.Secret == "" {
 		rest.Error(w, "Empty Secret not allowed for devices in PUT", http.StatusForbidden)
 		return
 	}
 
-	newDevice.Owner = owner.(string)
-	newDevice.Id = bson.ObjectIdHex(putId)
+	/* in case someone claims the device like this, update owner */
+	if len(challenge) > 0 {
+		if challenge == challengeVal {
+			newDevice.Owner = authId.(string)
+			newDevice.Challenge = ""
+		} else {
+			rest.Error(w, "No Access to Device", http.StatusForbidden)
+			return
+		}
+	}
 
+	newDevice.TimeModified = time.Now()
 	collection.UpsertId(newDevice.Id, newDevice)
 
 	w.WriteJson(newDevice)
@@ -238,7 +296,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *DevicesApp {
 	// no authentication needed for /login
 	app.Api.Use(&rest.IfMiddleware{
 		Condition: func(request *rest.Request) bool {
-			return true
+			// post new device means to register... allow this unauthenticated
+			return !(request.Method == "POST" && request.URL.Path == "/")
 		},
 		IfTrue: app.jwt_middleware,
 	})
