@@ -17,11 +17,11 @@ import (
 	"pantahub-base/auth"
 	"pantahub-base/devices"
 	"pantahub-base/objects"
+	"pantahub-base/plog"
 	"pantahub-base/trails"
+	"pantahub-base/utils"
 
 	"github.com/StephanDollberg/go-json-rest-middleware-jwt"
-
-	"gopkg.in/mgo.v2"
 )
 
 type FileUploadServer struct {
@@ -70,38 +70,7 @@ func (f FileUploadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func DoInit() {
 
-	// XXX: make mongo host configurable through env
-	mongoHost := os.Getenv("MONGO_HOST")
-	if mongoHost == "" {
-		mongoHost = "localhost"
-	}
-
-	mongoPort := os.Getenv("MONGO_PORT")
-	if mongoPort == "" {
-		mongoPort = "27017"
-	}
-
-	mongoUser := os.Getenv("MONGO_USER")
-	mongoPass := os.Getenv("MONGO_PASS")
-
-	mongoCreds := ""
-	if mongoUser != "" {
-		mongoCreds += mongoUser + ":" + mongoPass + "@"
-	}
-
-	mongoDb := os.Getenv("MONGO_DB")
-	if mongoDb == "" {
-		mongoDb = "pantahub-base"
-	}
-
-	mongoConnect := "mongodb://" + mongoCreds + mongoHost + ":" + mongoPort + "/" + mongoDb
-	fmt.Println("mongodb connect: " + mongoConnect)
-
-	session, err := mgo.Dial(mongoConnect)
-
-	if err != nil {
-		panic(err)
-	}
+	session, _ := utils.GetMongoSession()
 
 	{
 		app := auth.New(&jwt.JWTMiddleware{
@@ -132,6 +101,14 @@ func DoInit() {
 			Realm: "pantahub services",
 		}, session)
 		http.Handle("/api/trails/", http.StripPrefix("/api/trails", app.Api.MakeHandler()))
+	}
+
+	{
+		app := plog.New(&jwt.JWTMiddleware{
+			Key:   []byte("secret key"),
+			Realm: "pantahub services",
+		}, session)
+		http.Handle("/api/plug/", http.StripPrefix("/api/plog", app.Api.MakeHandler()))
 	}
 
 	if !objects.PantahubS3Production() {
