@@ -100,53 +100,6 @@ func doLogin(t *testing.T) {
 	}
 }
 
-func TestAuthBase(t *testing.T) {
-	setUp(t)
-
-	t.Run("No credentials 401", testNoCredsLogin401)
-	t.Run("Wrong credentials 401", testBadCredsLogin401)
-	t.Run("Good Login", testGoodLogin)
-
-	doLogin(t)
-
-	t.Run("Refresh Token", testRefreshToken)
-
-	tearDown(t)
-}
-
-func testRefreshToken(t *testing.T) {
-	u := *serverUrl
-	u.Path = "/login"
-
-	res, err := resty.R().SetAuthToken(authTokenUser1).Get(u.String())
-
-	if err != nil {
-		t.Errorf("internal error calling test server " + err.Error())
-		t.Fail()
-	}
-
-	if res.StatusCode() != 200 {
-		t.Errorf("login without username/password must yield 200")
-	}
-
-	var resMap map[string]interface{}
-
-	err = json.Unmarshal(res.Body(), &resMap)
-
-	if err != nil {
-		t.Errorf("Bad json returned from server for login " + err.Error())
-		t.Fail()
-	}
-
-	var ok bool
-
-	authTokenUser1, ok = resMap["token"].(string)
-	if !ok {
-		t.Errorf("Body contained no token: " + string(res.Body()))
-		t.Fail()
-	}
-}
-
 func testNoCredsLogin401(t *testing.T) {
 
 	u := *serverUrl
@@ -202,4 +155,51 @@ func testGoodLogin(t *testing.T) {
 	if res.StatusCode() != 200 {
 		t.Errorf("login without username/password must yield 401")
 	}
+}
+
+func testRefreshToken(t *testing.T) {
+	u := *serverUrl
+	u.Path = "/login"
+
+	res, err := resty.R().SetAuthToken(authTokenUser1).Get(u.String())
+
+	if err != nil {
+		t.Errorf("internal error calling test server " + err.Error())
+		t.Fail()
+	}
+
+	if res.StatusCode() != 200 {
+		t.Errorf("login without username/password must yield 200")
+	}
+
+	var resMap map[string]interface{}
+
+	err = json.Unmarshal(res.Body(), &resMap)
+
+	if err != nil {
+		t.Errorf("Bad json returned from server for login " + err.Error())
+		t.Fail()
+	}
+
+	var ok bool
+
+	authTokenUser1, ok = resMap["token"].(string)
+	if !ok {
+		t.Errorf("Body contained no token: " + string(res.Body()))
+		t.Fail()
+	}
+}
+
+func TestAuthLogin(t *testing.T) {
+	setUp(t)
+
+	t.Run("No credentials 401", testNoCredsLogin401)
+	t.Run("Wrong credentials 401", testBadCredsLogin401)
+	t.Run("Good Login", testGoodLogin)
+
+	doLogin(t)
+
+	t.Run("Refresh Token", testRefreshToken)
+
+	tearDown(t)
 }
