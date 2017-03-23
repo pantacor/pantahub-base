@@ -131,16 +131,17 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 
 	storageId := MakeStorageId(ownerStr, newObject.Sha)
 	newObject.StorageId = storageId
-	newObject.Id = newObject.Sha
-	fmt.Println("storeid: " + storageId)
+       newObject.Id = newObject.Sha
+       fmt.Println("storeid: " + storageId)
 
-	_, err := collection.UpsertId(storageId, newObject)
+       err := collection.Insert(newObject)
 
-	if err != nil {
-		rest.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+       if err != nil {
+               w.WriteHeader(http.StatusConflict)
+               w.Header().Add("X-PH-Error", "Error inserting object into database "+err.Error())
+       }
 
-	newObjectWithAccess := a.makeObjAccessible(newObject, storageId)
+       newObjectWithAccess := a.makeObjAccessible(newObject, storageId)
 	w.WriteJson(newObjectWithAccess)
 }
 
