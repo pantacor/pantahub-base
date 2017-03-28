@@ -15,7 +15,7 @@ env_variables:
   PANTAHUB_S3PATH: production
   MONGO_HOST: ds145299.mlab.com
   MONGO_PORT: 45299
-  MONGO_USER: ph-production
+  MONGO_USER: api-pantahub-com-production
   MONGO_PASS: pr0dN3inT0lo
   MONGO_DB: pantabase-serv
 
