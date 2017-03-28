@@ -14,7 +14,7 @@ Start your server:
 ## Authenticate
 
 ```
-http POST localhost:12365/api/auth/login username=user1 password=user1
+http POST localhost:12365/auth/login username=user1 password=user1
 
 HTTP/1.1 200 OK
 Content-Length: 256
@@ -33,7 +33,7 @@ Note down the token either from json body or header for further API access.
 You can use the json tool to do so automatically without hazzle:
 
 ```
-TOKEN=`http POST localhost:12365/api/auth/login username=user1 password=user1 | json token`
+TOKEN=`http POST localhost:12365/auth/login username=user1 password=user1 | json token`
 ```
 
 ## Account Classes
@@ -57,7 +57,7 @@ TOKEN=`http POST localhost:12365/api/auth/login username=user1 password=user1 | 
 To get a refreshed token, use the GET method with the Bearer token on the api/auth/login endpoint:
 
 ```
-http GET localhost:12365/api/auth/login  Authorization:"Bearer $TOKEN"    
+http GET localhost:12365/auth/login  Authorization:"Bearer $TOKEN"    
 HTTP/1.1 200 OK
 Content-Length: 256
 Content-Type: application/json; charset=utf-8
@@ -78,7 +78,7 @@ and the secret that you have put into  the device registry to do this.
 Example
 
 ```
-$ http POST localhost:12365/api/auth/login username="prn:::devices:/57ebaaddc094f6188d000002" password="yourdevicesecret"
+$ http POST localhost:12365/auth/login username="prn:::devices:/57ebaaddc094f6188d000002" password="yourdevicesecret"
 HTTP/1.1 200 OK
 Content-Length: 376
 Content-Type: application/json; charset=utf-8

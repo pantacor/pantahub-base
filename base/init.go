@@ -79,28 +79,28 @@ func DoInit() {
 			Timeout:    time.Minute * 60,
 			MaxRefresh: time.Hour * 24,
 		}, session)
-		http.Handle("/api/auth/", http.StripPrefix("/api/auth", app.Api.MakeHandler()))
+		http.Handle("/auth/", http.StripPrefix("/auth", app.Api.MakeHandler()))
 	}
 	{
 		app := objects.New(&jwt.JWTMiddleware{
 			Key:   []byte("secret key"),
 			Realm: "pantahub services",
 		}, session)
-		http.Handle("/api/objects/", http.StripPrefix("/api/objects", app.Api.MakeHandler()))
+		http.Handle("/objects/", http.StripPrefix("/api/objects", app.Api.MakeHandler()))
 	}
 	{
 		app := devices.New(&jwt.JWTMiddleware{
 			Key:   []byte("secret key"),
 			Realm: "pantahub services",
 		}, session)
-		http.Handle("/api/devices/", http.StripPrefix("/api/devices", app.Api.MakeHandler()))
+		http.Handle("/devices/", http.StripPrefix("/api/devices", app.Api.MakeHandler()))
 	}
 	{
 		app := trails.New(&jwt.JWTMiddleware{
 			Key:   []byte("secret key"),
 			Realm: "pantahub services",
 		}, session)
-		http.Handle("/api/trails/", http.StripPrefix("/api/trails", app.Api.MakeHandler()))
+		http.Handle("/trails/", http.StripPrefix("/trails", app.Api.MakeHandler()))
 	}
 
 	{
@@ -108,7 +108,7 @@ func DoInit() {
 			Key:   []byte("secret key"),
 			Realm: "pantahub services",
 		}, session)
-		http.Handle("/api/plug/", http.StripPrefix("/api/plog", app.Api.MakeHandler()))
+		http.Handle("/plog/", http.StripPrefix("/plog", app.Api.MakeHandler()))
 	}
 
 	if !objects.PantahubS3Production() {

@@ -16,7 +16,7 @@ Start your server:
 ## Login
 
 ```
-TOKEN=`http localhost:12365/api/auth/login username=user1 password=user1 | json token`
+TOKEN=`http localhost:12365/auth/login username=user1 password=user1 | json token`
 ```
 
 ... will store access token in TOKEN for requests below
@@ -26,7 +26,7 @@ TOKEN=`http localhost:12365/api/auth/login username=user1 password=user1 | json 
 ### Register a Device (As User)
 
 ```
-http POST localhost:12365/api/devices/  Authorization:"Bearer $TOKEN" \
+http POST localhost:12365/devices/  Authorization:"Bearer $TOKEN" \
     secret="yourdevicesecret"
 
 HTTP/1.1 200 OK
@@ -58,7 +58,7 @@ Example:
 
 1. device registers itself
 ```
-http POST localhost:12365/api/devices secret="mysec1"
+http POST localhost:12365/devices secret="mysec1"
 {
   "id": "58b0bbf0c094f605418b1a84",
   "prn": "prn:::devices:/58b0bbf0c094f605418b1a84",
@@ -78,7 +78,7 @@ challenge=probably-relieved-insect
 ```
 3. as a logged in user with TOKEN you claim the device through a simple PUT
 ```
-http PUT localhost:12365/api/devices/58b0bbf0c094f605418b1a84?challenge=$challenge Authorization:"Bearer $TOKEN"
+http PUT localhost:12365/devices/58b0bbf0c094f605418b1a84?challenge=$challenge Authorization:"Bearer $TOKEN"
 HTTP/1.1 200 OK
 Content-Length: 276
 Content-Type: application/json; charset=utf-8
@@ -106,7 +106,7 @@ As you can see the challenge field is now reset and the owner is assigned.
 ... only yours!
 
 ```
-http localhost:12365/api/devices/  Authorization:"Bearer $TOKEN"
+http localhost:12365/devices/  Authorization:"Bearer $TOKEN"
 HTTP/1.1 200 OK
 Content-Length: 345
 Content-Type: application/json; charset=utf-8
@@ -137,7 +137,7 @@ DEVICEID=57f41438b376a825cf000001
 ### Change Device Secret
 
 ```
-http PUT localhost:12365/api/devices/$DEVICEID  Authorization:"Bearer $TOKEN" \
+http PUT localhost:12365/devices/$DEVICEID  Authorization:"Bearer $TOKEN" \
     secret="mynewdevicesecret"
 
 

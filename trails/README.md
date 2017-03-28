@@ -20,7 +20,7 @@ To create a trail we use the POST method on the trails api top level element
 using the DTOKEN:
 
 ```
-http POST localhost:12365/api/trails/ Authorization:"Bearer $DTOKEN" \
+http POST localhost:12365/trails/ Authorization:"Bearer $DTOKEN" \
 	kernel:='{ "object": "prn:pantahub.com:objects:/57b6fa88c094f67942000001"}' \
 	app:='{"object": "prn:pantahub.com:objects:/57b6fa88c094f67942000002"}'
 
@@ -64,7 +64,7 @@ All other states can be queried with query parameter q=<STATE>|ALL
 Lets see as a user:
 
 ```
-http GET localhost:12365/api/trails/57c20e6fc094f6729b000001/steps Authorization:"Bearer $UTOKEN"
+http GET localhost:12365/trails/57c20e6fc094f6729b000001/steps Authorization:"Bearer $UTOKEN"
 HTTP/1.1 200 OK
 Content-Length: 424
 Content-Type: application/json; charset=utf-8
@@ -108,7 +108,7 @@ concurrently added steps can cause incontinuity in the sequence of steps.
 Lets simulate an app update as our rev 1:
 
 ```
-http POST  localhost:12365/api/trails/57c20e6fc094f6729b000001/steps Authorization:"Bearer $UTOKEN" \
+http POST  localhost:12365/trails/57c20e6fc094f6729b000001/steps Authorization:"Bearer $UTOKEN" \
 	rev:=1 \
 	commit-msg="Update App to new Release" \
 	state:='{
@@ -152,7 +152,7 @@ X-Powered-By: go-json-rest
 To access individual steps relative to the trail you use "rev" in the path:
 
 ```
-http GET localhost:12365/api/trails/57c20e6fc094f6729b000001/steps/1 Authorization:"Bearer $UTOKEN"
+http GET localhost:12365/trails/57c20e6fc094f6729b000001/steps/1 Authorization:"Bearer $UTOKEN"
 HTTP/1.1 200 OK
 Content-Length: 422
 Content-Type: application/json; charset=utf-8
@@ -191,7 +191,7 @@ step. In this case our device wants to confirms that it has seen the newly
 requested step and that it is acting on it.
 
 ```
-http PUT localhost:12365/api/trails/57c20e6fc094f6729b000001/steps/progress Authorization:"Bearer $DTOKEN" \
+http PUT localhost:12365/trails/57c20e6fc094f6729b000001/steps/progress Authorization:"Bearer $DTOKEN" \
 	log = "" \
 	progress = 0 \
 	status = "QUEUE" \

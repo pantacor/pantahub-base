@@ -36,7 +36,7 @@ Now start your server:
 ## Login
 
 ```
-TOKEN=`http localhost:12365/api/auth/login username=user1 password=user1 | json token`
+TOKEN=`http localhost:12365/auth/login username=user1 password=user1 | json token`
 ```
 
 ... will store access token in TOKEN for requests below
@@ -51,7 +51,7 @@ upload_file=myfile.jpg
 upload_size=12365
 upload_shasum256=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
-http POST localhost:12365/api/objects/  Authorization:"Bearer $TOKEN" \
+http POST localhost:12365/objects/  Authorization:"Bearer $TOKEN" \
 	objectname=$upload_file \
 	size=$upload_size \
 	sha256sum=$upload_shasum256
@@ -78,7 +78,7 @@ X-Powered-By: go-json-rest
 Use the id from above to get info about where to upload:
 
 ```
-http GET localhost:12365/api/objects/57b6fa9ac094f67942000002  Authorization:"Bearer $TOKEN"
+http GET localhost:12365/objects/57b6fa9ac094f67942000002  Authorization:"Bearer $TOKEN"
 
 HTTP/1.1 200 OK
 Content-Length: 941
