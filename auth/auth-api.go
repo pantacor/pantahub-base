@@ -193,9 +193,12 @@ func (a *AuthApp) handle_verify(w rest.ResponseWriter, r *rest.Request) {
 		if challenge == challengeVal {
 			newAccount.Challenge = ""
 		} else {
-			rest.Error(w, "No Access to Device", http.StatusForbidden)
+			rest.Error(w, "Invalid Challenge (wrong, used or never existed)", http.StatusPreconditionFailed)
 			return
 		}
+	} else {
+		rest.Error(w, "Invalid Challenge (wrong, used or never existed)", http.StatusPreconditionFailed)
+		return
 	}
 
 	newAccount.TimeModified = time.Now()
