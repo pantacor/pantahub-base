@@ -81,16 +81,26 @@ var payloads = map[string]map[string]interface{}{
 
 var r *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
 
-type EmailAccount struct {
-	Id           bson.ObjectId `json:"id" bson:"_id"`
-	Email        string        `json:"email" bson:"email"`
-	Nick         string        `json:"nick" bson:"nick"`
-	Prn          string        `json:"prn" bson:"prn"`
-	Password     string        `json:"password" bson:"password"`
-	PasswordNew  string        `json:"password-new" bson:"password-new"`
-	Challenge    string        `json:"-" bson:"challenge"`
-	TimeCreated  time.Time     `json:"time-created" bson:"time-created"`
-	TimeModified time.Time     `json:"time-modified" bson:"time-modified"`
+type AccountType string
+
+const (
+	ACCOUNT_TYPE_USER = AccountType("user-account")
+	ACCOUNT_TYPE_ORG  = AccountType("org-account")
+)
+
+type Account struct {
+	Id bson.ObjectId `json:"id" bson:"_id"`
+
+	Type  AccountType `json:"type" bson:"type"`
+	Email string      `json:"email" bson:"email"`
+	Nick  string      `json:"nick" bson:"nick"`
+	Prn   string      `json:"prn" bson:"prn"`
+
+	Password  string `json:"password" bson:"password"`
+	Challenge string `json:"-" bson:"challenge"`
+
+	TimeCreated  time.Time `json:"time-created" bson:"time-created"`
+	TimeModified time.Time `json:"time-modified" bson:"time-modified"`
 }
 
 func handle_auth(w rest.ResponseWriter, r *rest.Request) {
@@ -110,7 +120,7 @@ func generateChallenge() string {
 }
 
 func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
-	newAccount := EmailAccount{}
+	newAccount := Account{}
 
 	r.DecodeJsonPayload(&newAccount)
 
@@ -138,6 +148,7 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 	newAccount.Prn = "prn:::accounts:/" + newAccount.Id.Hex()
 	newAccount.Challenge = generateChallenge()
 	newAccount.TimeCreated = time.Now()
+	newAccount.Type = ACCOUNT_TYPE_USER // XXX: need org approach too
 	newAccount.TimeModified = newAccount.TimeCreated
 
 	collection := a.mgoSession.DB("").C("pantahub_accounts")
@@ -166,7 +177,7 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 
 func (a *AuthApp) handle_verify(w rest.ResponseWriter, r *rest.Request) {
 
-	newAccount := EmailAccount{}
+	newAccount := Account{}
 
 	collection := a.mgoSession.DB("").C("pantahub_accounts")
 
@@ -359,11 +370,11 @@ func isEmail(email string) bool {
 	return govalidator.IsEmail(email)
 }
 
-func (a *AuthApp) getAccount(idEmailNick string) (EmailAccount, error) {
+func (a *AuthApp) getAccount(idEmailNick string) (Account, error) {
 
 	var (
 		err     error
-		account EmailAccount
+		account Account
 	)
 
 	c := a.mgoSession.DB("").C("pantahub_accounts")
@@ -389,7 +400,7 @@ func (a *AuthApp) accountAuth(idEmailNick string, secret string) bool {
 
 	var (
 		err     error
-		account EmailAccount
+		account Account
 	)
 
 	account, err = a.getAccount(idEmailNick)
@@ -418,7 +429,7 @@ func (a *AuthApp) accountPayload(idEmailNick string) *map[string]interface{} {
 
 	var (
 		err     error
-		account EmailAccount
+		account Account
 	)
 
 	account, err = a.getAccount(idEmailNick)
