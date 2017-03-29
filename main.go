@@ -29,8 +29,8 @@ func main() {
 			case *net.IPAddr:
 				ip = v.IP
 			}
-			log.Printf("Serving @ https://" + ip.String() + ":12366/api/\n")
-			log.Printf("Serving @ http://" + ip.String() + ":12365/api/\n")
+			log.Printf("Serving @ https://" + ip.String() + ":12366/\n")
+			log.Printf("Serving @ http://" + ip.String() + ":12365/\n")
 		}
 	}
 	log.Fatal(http.ListenAndServe(":12365", nil))
