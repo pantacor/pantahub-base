@@ -52,7 +52,6 @@ type TrailsApp struct {
 	jwt_middleware *jwt.JWTMiddleware
 	Api            *rest.Api
 	mgoSession     *mgo.Session
-	mgoDb          string
 }
 
 type Trail struct {
@@ -168,7 +167,7 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 	newStep.ProgressTime = time.Now()
 	newStep.StepProgress.Status = "DONE"
 
-	collection := a.mgoSession.DB(a.mgoDb).C("pantahub_trails")
+	collection := a.mgoSession.DB("").C("pantahub_trails")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -182,7 +181,7 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	collection = a.mgoSession.DB(a.mgoDb).C("pantahub_steps")
+	collection = a.mgoSession.DB("").C("pantahub_steps")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -218,7 +217,7 @@ func (a *TrailsApp) handle_gettrails(w rest.ResponseWriter, r *rest.Request) {
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
 
-	coll := a.mgoSession.DB(a.mgoDb).C("pantahub_trails")
+	coll := a.mgoSession.DB("").C("pantahub_trails")
 
 	if coll == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -256,7 +255,7 @@ func (a *TrailsApp) handle_gettrail(w rest.ResponseWriter, r *rest.Request) {
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
 
-	coll := a.mgoSession.DB(a.mgoDb).C("pantahub_trails")
+	coll := a.mgoSession.DB("").C("pantahub_trails")
 
 	if coll == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -302,7 +301,7 @@ func (a *TrailsApp) handle_gettrailpvrinfo(w rest.ResponseWriter, r *rest.Reques
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
 
-	coll := a.mgoSession.DB(a.mgoDb).C("pantahub_steps")
+	coll := a.mgoSession.DB("").C("pantahub_steps")
 
 	if coll == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -361,7 +360,7 @@ func (a *TrailsApp) handle_getsteppvrinfo(w rest.ResponseWriter, r *rest.Request
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
 
-	coll := a.mgoSession.DB(a.mgoDb).C("pantahub_steps")
+	coll := a.mgoSession.DB("").C("pantahub_steps")
 
 	if coll == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -431,7 +430,7 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
 
-	collTrails := a.mgoSession.DB(a.mgoDb).C("pantahub_trails")
+	collTrails := a.mgoSession.DB("").C("pantahub_trails")
 
 	if collTrails == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -455,7 +454,7 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	collSteps := a.mgoSession.DB(a.mgoDb).C("pantahub_steps")
+	collSteps := a.mgoSession.DB("").C("pantahub_steps")
 
 	if collSteps == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -528,7 +527,7 @@ func (a *TrailsApp) handle_getsteps(w rest.ResponseWriter, r *rest.Request) {
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
 
-	coll := a.mgoSession.DB(a.mgoDb).C("pantahub_steps")
+	coll := a.mgoSession.DB("").C("pantahub_steps")
 
 	if coll == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -580,7 +579,7 @@ func (a *TrailsApp) handle_getstep(w rest.ResponseWriter, r *rest.Request) {
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
 
-	coll := a.mgoSession.DB(a.mgoDb).C("pantahub_steps")
+	coll := a.mgoSession.DB("").C("pantahub_steps")
 
 	if coll == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -617,7 +616,7 @@ func (a *TrailsApp) handle_getstepstate(w rest.ResponseWriter, r *rest.Request) 
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
 
-	coll := a.mgoSession.DB(a.mgoDb).C("pantahub_steps")
+	coll := a.mgoSession.DB("").C("pantahub_steps")
 
 	if coll == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -662,14 +661,14 @@ func (a *TrailsApp) handle_putstepprogress(w rest.ResponseWriter, r *rest.Reques
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
 
-	coll := a.mgoSession.DB(a.mgoDb).C("pantahub_steps")
+	coll := a.mgoSession.DB("").C("pantahub_steps")
 
 	if coll == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
-	collTrails := a.mgoSession.DB(a.mgoDb).C("pantahub_trails")
+	collTrails := a.mgoSession.DB("").C("pantahub_trails")
 
 	if collTrails == nil {
 		rest.Error(w, "Error with Database connectivity - trails", http.StatusInternalServerError)
@@ -772,14 +771,14 @@ func (a *TrailsApp) handle_gettrailstepsummary(w rest.ResponseWriter, r *rest.Re
 		return
 	}
 
-	collSteps := a.mgoSession.DB(a.mgoDb).C("pantahub_steps")
+	collSteps := a.mgoSession.DB("").C("pantahub_steps")
 
 	if collSteps == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
-	collDevices := a.mgoSession.DB(a.mgoDb).C("pantahub_devices")
+	collDevices := a.mgoSession.DB("").C("pantahub_devices")
 
 	if collDevices == nil {
 		rest.Error(w, "Error with Database connectivity - devices", http.StatusInternalServerError)
@@ -821,21 +820,21 @@ func (a *TrailsApp) handle_gettrailsummary(w rest.ResponseWriter, r *rest.Reques
 		return
 	}
 
-	collSteps := a.mgoSession.DB(a.mgoDb).C("pantahub_steps")
+	collSteps := a.mgoSession.DB("").C("pantahub_steps")
 
 	if collSteps == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
-	collTrails := a.mgoSession.DB(a.mgoDb).C("pantahub_trails")
+	collTrails := a.mgoSession.DB("").C("pantahub_trails")
 
 	if collTrails == nil {
 		rest.Error(w, "Error with Database connectivity - trails", http.StatusInternalServerError)
 		return
 	}
 
-	collDevices := a.mgoSession.DB(a.mgoDb).C("pantahub_devices")
+	collDevices := a.mgoSession.DB("").C("pantahub_devices")
 
 	if collDevices == nil {
 		rest.Error(w, "Error with Database connectivity - devices", http.StatusInternalServerError)
@@ -881,7 +880,6 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *TrailsApp {
 	app := new(TrailsApp)
 	app.jwt_middleware = jwtMiddleware
 	app.mgoSession = session
-	app.mgoDb = "pantahub-base"
 
 	app.Api = rest.NewApi()
 

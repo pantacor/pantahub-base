@@ -26,7 +26,6 @@ type PlogApp struct {
 	jwt_middleware *jwt.JWTMiddleware
 	Api            *rest.Api
 	mgoSession     *mgo.Session
-	mgoDb          string
 }
 
 type PlogPost struct {
@@ -59,7 +58,7 @@ func (a *PlogApp) handle_getplogposts(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	collPlogPosts := a.mgoSession.DB(a.mgoDb).C("pantahub_plogposts")
+	collPlogPosts := a.mgoSession.DB("").C("pantahub_plogposts")
 
 	if collPlogPosts == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -84,7 +83,6 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *PlogApp {
 	app := new(PlogApp)
 	app.jwt_middleware = jwtMiddleware
 	app.mgoSession = session
-	app.mgoDb = "pantahub-base"
 
 	app.Api = rest.NewApi()
 

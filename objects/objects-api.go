@@ -25,7 +25,6 @@ type ObjectsApp struct {
 	jwt_middleware *jwt.JWTMiddleware
 	Api            *rest.Api
 	mgoSession     *mgo.Session
-	mgoDb          string
 	awsS3Bucket    string
 	awsRegion      string
 }
@@ -122,7 +121,7 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 
 	newObject.Owner = ownerStr
 
-	collection := a.mgoSession.DB(a.mgoDb).C("pantahub_objects")
+	collection := a.mgoSession.DB("").C("pantahub_objects")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -131,17 +130,17 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 
 	storageId := MakeStorageId(ownerStr, newObject.Sha)
 	newObject.StorageId = storageId
-       newObject.Id = newObject.Sha
-       fmt.Println("storeid: " + storageId)
+	newObject.Id = newObject.Sha
+	fmt.Println("storeid: " + storageId)
 
-       err := collection.Insert(newObject)
+	err := collection.Insert(newObject)
 
-       if err != nil {
-               w.WriteHeader(http.StatusConflict)
-               w.Header().Add("X-PH-Error", "Error inserting object into database "+err.Error())
-       }
+	if err != nil {
+		w.WriteHeader(http.StatusConflict)
+		w.Header().Add("X-PH-Error", "Error inserting object into database "+err.Error())
+	}
 
-       newObjectWithAccess := a.makeObjAccessible(newObject, storageId)
+	newObjectWithAccess := a.makeObjAccessible(newObject, storageId)
 	w.WriteJson(newObjectWithAccess)
 }
 
@@ -156,7 +155,7 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	collection := a.mgoSession.DB(a.mgoDb).C("pantahub_objects")
+	collection := a.mgoSession.DB("").C("pantahub_objects")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -244,7 +243,7 @@ func (a *ObjectsApp) handle_getobject(w rest.ResponseWriter, r *rest.Request) {
 		}
 	}
 
-	collection := a.mgoSession.DB(a.mgoDb).C("pantahub_objects")
+	collection := a.mgoSession.DB("").C("pantahub_objects")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -290,7 +289,7 @@ func (a *ObjectsApp) handle_getobjects(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	collection := a.mgoSession.DB(a.mgoDb).C("pantahub_objects")
+	collection := a.mgoSession.DB("").C("pantahub_objects")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -323,7 +322,7 @@ func (a *ObjectsApp) handle_deleteobject(w rest.ResponseWriter, r *rest.Request)
 		return
 	}
 
-	collection := a.mgoSession.DB(a.mgoDb).C("pantahub_objects")
+	collection := a.mgoSession.DB("").C("pantahub_objects")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -361,7 +360,6 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *ObjectsApp {
 	// XXX: allow config through env
 	app.awsS3Bucket = "systemcloud-001"
 	app.awsRegion = "us-east-1"
-	app.mgoDb = "pantahub-base"
 
 	app.Api = rest.NewApi()
 	// we dont use default stack because we dont want content type enforcement

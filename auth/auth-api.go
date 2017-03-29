@@ -79,7 +79,6 @@ type AuthApp struct {
 	jwt_middleware *jwt.JWTMiddleware
 	Api            *rest.Api
 	mgoSession     *mgo.Session
-	mgoDb          string
 }
 
 func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
@@ -87,7 +86,6 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 	app := new(AuthApp)
 	app.jwt_middleware = jwtMiddleware
 	app.mgoSession = session
-	app.mgoDb = "pantahub-base"
 
 	jwtMiddleware.Authenticator = func(userId string, password string) bool {
 		if passwords[userId] != "" && passwords[userId] == password {
@@ -154,7 +152,7 @@ func prnGetId(prn string) string {
 
 func (a *AuthApp) deviceAuth(deviceId string, secret string) bool {
 
-	c := a.mgoSession.DB(a.mgoDb).C("pantahub_devices")
+	c := a.mgoSession.DB("").C("pantahub_devices")
 
 	id := prnGetId(deviceId)
 	mgoId := bson.ObjectIdHex(id)
@@ -169,7 +167,7 @@ func (a *AuthApp) deviceAuth(deviceId string, secret string) bool {
 
 func (a *AuthApp) devicePayload(deviceId string) *map[string]interface{} {
 
-	c := a.mgoSession.DB(a.mgoDb).C("pantahub_devices")
+	c := a.mgoSession.DB("").C("pantahub_devices")
 
 	id := prnGetId(deviceId)
 	mgoId := bson.ObjectIdHex(id)

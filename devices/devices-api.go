@@ -18,7 +18,6 @@ type DevicesApp struct {
 	jwt_middleware *jwt.JWTMiddleware
 	Api            *rest.Api
 	mgoSession     *mgo.Session
-	mgoDb          string
 }
 
 type Device struct {
@@ -68,7 +67,7 @@ func (a *DevicesApp) handle_postdevice(w rest.ResponseWriter, r *rest.Request) {
 		newDevice.Nick = petname.Generate(2, "_")
 	}
 
-	collection := a.mgoSession.DB(a.mgoDb).C("pantahub_devices")
+	collection := a.mgoSession.DB("").C("pantahub_devices")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -109,7 +108,7 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 		callerIsUser = true
 	}
 
-	collection := a.mgoSession.DB(a.mgoDb).C("pantahub_devices")
+	collection := a.mgoSession.DB("").C("pantahub_devices")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -213,7 +212,7 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 		callerIsUser = true
 	}
 
-	collection := a.mgoSession.DB(a.mgoDb).C("pantahub_devices")
+	collection := a.mgoSession.DB("").C("pantahub_devices")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -259,7 +258,7 @@ func (a *DevicesApp) handle_getdevices(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	collection := a.mgoSession.DB(a.mgoDb).C("pantahub_devices")
+	collection := a.mgoSession.DB("").C("pantahub_devices")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -284,7 +283,7 @@ func (a *DevicesApp) handle_deletedevice(w rest.ResponseWriter, r *rest.Request)
 		return
 	}
 
-	collection := a.mgoSession.DB(a.mgoDb).C("pantahub_devices")
+	collection := a.mgoSession.DB("").C("pantahub_devices")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -307,8 +306,6 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *DevicesApp {
 	app := new(DevicesApp)
 	app.jwt_middleware = jwtMiddleware
 	app.mgoSession = session
-
-	app.mgoDb = "pantahub-base"
 
 	app.Api = rest.NewApi()
 	// we dont use default stack because we dont want content type enforcement

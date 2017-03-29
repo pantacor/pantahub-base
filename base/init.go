@@ -86,14 +86,14 @@ func DoInit() {
 			Key:   []byte("secret key"),
 			Realm: "pantahub services",
 		}, session)
-		http.Handle("/objects/", http.StripPrefix("/api/objects", app.Api.MakeHandler()))
+		http.Handle("/objects/", http.StripPrefix("/objects", app.Api.MakeHandler()))
 	}
 	{
 		app := devices.New(&jwt.JWTMiddleware{
 			Key:   []byte("secret key"),
 			Realm: "pantahub services",
 		}, session)
-		http.Handle("/devices/", http.StripPrefix("/api/devices", app.Api.MakeHandler()))
+		http.Handle("/devices/", http.StripPrefix("/devices", app.Api.MakeHandler()))
 	}
 	{
 		app := trails.New(&jwt.JWTMiddleware{

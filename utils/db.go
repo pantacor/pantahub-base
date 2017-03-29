@@ -24,7 +24,7 @@ func GetMongoSession() (*mgo.Session, error) {
 
 	mongoCreds := ""
 	if mongoUser != "" {
-		mongoCreds += mongoUser + ":" + mongoPass + "@"
+		mongoCreds = mongoUser + ":" + mongoPass + "@"
 	}
 
 	mongoDb := os.Getenv("MONGO_DB")
