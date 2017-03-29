@@ -135,9 +135,10 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	newAccount.Id = bson.NewObjectId()
-	newAccount.Prn = "prn:::accounts:/" + newAccount.Email
+	newAccount.Prn = "prn:::accounts:/" + newAccount.Id.Hex()
 	newAccount.Challenge = generateChallenge()
 	newAccount.TimeCreated = time.Now()
+	newAccount.TimeModified = newAccount.TimeCreated
 
 	collection := a.mgoSession.DB("").C("pantahub_accounts")
 
