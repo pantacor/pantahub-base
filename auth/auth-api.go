@@ -7,9 +7,18 @@ import (
 	"strings"
 
 	"pantahub-base/devices"
+	"pantahub-base/utils"
+
+	"fmt"
+	"math/rand"
+	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/StephanDollberg/go-json-rest-middleware-jwt"
 	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/asaskevich/govalidator"
+	"gopkg.in/gomail.v2"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -70,9 +79,161 @@ var payloads = map[string]map[string]interface{}{
 	},
 }
 
+var r *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
+
+type EmailAccount struct {
+	Id           bson.ObjectId `json:"id" bson:"_id"`
+	Email        string        `json:"email" bson:"email"`
+	Nick         string        `json:"nick" bson:"nick"`
+	Prn          string        `json:"prn" bson:"prn"`
+	Password     string        `json:"password" bson:"password"`
+	PasswordNew  string        `json:"password-new" bson:"password-new"`
+	Challenge    string        `json:"-" bson:"challenge"`
+	TimeCreated  time.Time     `json:"time-created" bson:"time-created"`
+	TimeModified time.Time     `json:"time-modified" bson:"time-modified"`
+}
+
 func handle_auth(w rest.ResponseWriter, r *rest.Request) {
 	jwtClaims := r.Env["JWT_PAYLOAD"]
 	w.WriteJson(jwtClaims)
+}
+
+func generateChallenge() string {
+	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
+
+	result := make([]byte, 15)
+	for i := range result {
+		result[i] = chars[r.Intn(len(chars))]
+	}
+
+	return string(result)
+}
+
+func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
+	newAccount := EmailAccount{}
+
+	r.DecodeJsonPayload(&newAccount)
+
+	if newAccount.Email == "" {
+		rest.Error(w, "Accounts must have an email address", http.StatusPreconditionFailed)
+		return
+	}
+
+	if newAccount.Password == "" {
+		rest.Error(w, "Accounts must have a password set", http.StatusPreconditionFailed)
+		return
+	}
+
+	if newAccount.Nick == "" {
+		rest.Error(w, "Accounts must have a nick set", http.StatusPreconditionFailed)
+		return
+	}
+
+	if newAccount.Id != "" {
+		rest.Error(w, "Accounts cannot have id before creation", http.StatusPreconditionFailed)
+		return
+	}
+
+	newAccount.Id = bson.NewObjectId()
+	newAccount.Prn = "prn:::accounts:/" + newAccount.Email
+	newAccount.Challenge = generateChallenge()
+	newAccount.TimeCreated = time.Now()
+
+	collection := a.mgoSession.DB("").C("pantahub_accounts")
+
+	if collection == nil {
+		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+	_, err := collection.UpsertId(newAccount.Id, newAccount)
+
+	if err != nil {
+		rest.Error(w, "Error inserting new account: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	urlPrefix := utils.GetEnv("PANTAHUB_SCHEME") + "://" + utils.GetEnv("PANTAHUB_HOST")
+	if utils.GetEnv("PANTAHUB_PORT") != "" {
+		urlPrefix += ":"
+		urlPrefix += utils.GetEnv("PANTAHUB_PORT")
+	}
+
+	sendVerification(newAccount.Email, newAccount.Id.Hex(), newAccount.Challenge, urlPrefix)
+
+	w.WriteJson(newAccount)
+}
+
+func (a *AuthApp) handle_verify(w rest.ResponseWriter, r *rest.Request) {
+
+	newAccount := EmailAccount{}
+
+	collection := a.mgoSession.DB("").C("pantahub_accounts")
+
+	if collection == nil {
+		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+
+	r.ParseForm()
+	putId := r.FormValue("id")
+
+	err := collection.FindId(bson.ObjectIdHex(putId)).One(&newAccount)
+
+	if err != nil {
+		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
+		return
+	}
+
+	challenge := newAccount.Challenge
+	challengeVal := r.FormValue("challenge")
+
+	/* in case someone claims the device like this, update owner */
+	if len(challenge) > 0 {
+		if challenge == challengeVal {
+			newAccount.Challenge = ""
+		} else {
+			rest.Error(w, "No Access to Device", http.StatusForbidden)
+			return
+		}
+	}
+
+	newAccount.TimeModified = time.Now()
+	collection.UpsertId(newAccount.Id, newAccount)
+
+	w.WriteJson(newAccount)
+}
+
+func sendVerification(email, id, u string, urlPrefix string) bool {
+
+	link := urlPrefix + "/auth/verify?id=" + id + "&challenge=" + u
+
+	host := utils.GetEnv("SMTP_HOST")
+	portStr := utils.GetEnv("SMTP_PORT")
+	user := utils.GetEnv("SMTP_USER")
+	pass := utils.GetEnv("SMTP_PASS")
+	port, err := strconv.Atoi(portStr)
+
+	if err != nil {
+		fmt.Println("ERROR: Bad port - " + err.Error())
+		return false
+	}
+
+	body := "To verify your account, please click on the link: <a href=\"" + link +
+		"\">" + link + "</a><br><br>Best Regards,<br><br>" +
+		"A. Sack and R. Mendoza (Pantacor Founders)"
+
+	msg := gomail.NewMessage()
+	msg.SetAddressHeader("From", "hubpanta@gmail.com", "Pantahub Registration Desk")
+	msg.SetHeader("To", email)
+	msg.SetHeader("Subject", "Account Verification for api.pantahub.com")
+	msg.SetBody("text/html", body)
+	m := gomail.NewDialer(host, port, user, pass)
+	if err := m.DialAndSend(msg); err != nil {
+		fmt.Println("ERROR sending email - " + err.Error())
+		fmt.Println("Body not sent: \n\t" + body)
+		return false
+	}
+	return true
 }
 
 type AuthApp struct {
@@ -87,12 +248,40 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 	app.jwt_middleware = jwtMiddleware
 	app.mgoSession = session
 
+	index := mgo.Index{
+		Key:        []string{"nick"},
+		Unique:     true,
+		DropDups:   true,
+		Background: true, // See notes.
+		Sparse:     true,
+	}
+	err := app.mgoSession.DB("").C("pantahub_accounts").EnsureIndex(index)
+	if err != nil {
+		fmt.Println("Error setting up index for pantahub_accounts: " + err.Error())
+		return nil
+	}
+
+	index = mgo.Index{
+		Key:        []string{"email"},
+		Unique:     true,
+		DropDups:   true,
+		Background: true, // See notes.
+		Sparse:     true,
+	}
+	err = app.mgoSession.DB("").C("pantahub_accounts").EnsureIndex(index)
+	if err != nil {
+		fmt.Println("Error setting up index for pantahub_accounts: " + err.Error())
+		return nil
+	}
+
 	jwtMiddleware.Authenticator = func(userId string, password string) bool {
 		if passwords[userId] != "" && passwords[userId] == password {
 			return true
 		}
 		if strings.HasPrefix(userId, "prn:::devices:") {
 			return app.deviceAuth(userId, password)
+		} else {
+			return app.accountAuth(userId, password)
 		}
 		return false
 	}
@@ -103,7 +292,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 			if strings.HasPrefix(userId, "prn:::devices:") {
 				return *app.devicePayload(userId)
 			} else {
-				// XXX: FAIL HARD HERE! CODE SHOULD NEVER BE REACHABLE??
+				return *app.accountPayload(userId)
 			}
 		} else {
 			return plm
@@ -128,7 +317,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 	// no authentication needed for /login
 	app.Api.Use(&rest.IfMiddleware{
 		Condition: func(request *rest.Request) bool {
-			return request.URL.Path != "/login"
+			return request.URL.Path != "/login" &&
+				!(request.URL.Path == "/accounts" && request.Method == "POST") &&
+				!(request.URL.Path == "/verify" && request.Method == "GET")
 		},
 		IfTrue: app.jwt_middleware,
 	})
@@ -138,6 +329,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 		rest.Post("/login", app.jwt_middleware.LoginHandler),
 		rest.Get("/auth_status", handle_auth),
 		rest.Get("/login", app.jwt_middleware.RefreshHandler),
+		rest.Post("/accounts", app.handle_postaccount),
+		rest.Get("/verify", app.handle_verify),
 	)
 	app.Api.SetApp(api_router)
 
@@ -148,6 +341,98 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 func prnGetId(prn string) string {
 	idx := strings.Index(prn, "/")
 	return prn[idx+1 : len(prn)]
+}
+
+func isNick(nick string) bool {
+	l := len(nick)
+	if l > 3 && l < 24 {
+		return true
+	}
+	return false
+}
+
+func isEmail(email string) bool {
+	return govalidator.IsEmail(email)
+}
+
+func (a *AuthApp) getAccount(idEmailNick string) (EmailAccount, error) {
+
+	var (
+		err     error
+		account EmailAccount
+	)
+
+	c := a.mgoSession.DB("").C("pantahub_accounts")
+
+	// we accept three variants to identify the account:
+	//  - id (pure and with prn format
+	//  - email
+	//  - nick
+	if isEmail(idEmailNick) {
+		err = c.Find(bson.M{"email": idEmailNick}).One(&account)
+	} else if isNick(idEmailNick) {
+		err = c.Find(bson.M{"nick": idEmailNick}).One(&account)
+	} else {
+		id := prnGetId(idEmailNick)
+		mgoId := bson.ObjectIdHex(id)
+		err = c.FindId(mgoId).One(&account)
+	}
+
+	return account, err
+}
+
+func (a *AuthApp) accountAuth(idEmailNick string, secret string) bool {
+
+	var (
+		err     error
+		account EmailAccount
+	)
+
+	account, err = a.getAccount(idEmailNick)
+
+	// error with db or not found -> log and fail
+	if err != nil {
+		fmt.Println("ERROR finding account: " + err.Error())
+		return false
+	}
+
+	// account has still a challenge -> not activated -> fail to login
+	if account.Challenge != "" {
+		return false
+	}
+
+	// account has same password as the secret provided to func call -> success
+	if secret == account.Password {
+		return true
+	}
+
+	// fail by default.
+	return false
+}
+
+func (a *AuthApp) accountPayload(idEmailNick string) *map[string]interface{} {
+
+	var (
+		err     error
+		account EmailAccount
+	)
+
+	account, err = a.getAccount(idEmailNick)
+
+	// error with db or not found -> log and fail
+	if err != nil {
+		fmt.Println("ERROR finding account: " + err.Error())
+		return nil
+	}
+
+	val := map[string]interface{}{
+		"roles": "users",
+		"type":  "USER",
+		"nick":  account.Nick,
+		"prn":   account.Prn,
+	}
+
+	return &val
 }
 
 func (a *AuthApp) deviceAuth(deviceId string, secret string) bool {
