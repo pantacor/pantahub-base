@@ -16,7 +16,6 @@ import (
 
 	"github.com/StephanDollberg/go-json-rest-middleware-jwt"
 	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/asaskevich/govalidator"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -326,24 +325,6 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 	return app
 }
 
-// XXX: make this a nice prn helper tool
-func prnGetId(prn string) string {
-	idx := strings.Index(prn, "/")
-	return prn[idx+1 : len(prn)]
-}
-
-func isNick(nick string) bool {
-	l := len(nick)
-	if l > 3 && l < 24 {
-		return true
-	}
-	return false
-}
-
-func isEmail(email string) bool {
-	return govalidator.IsEmail(email)
-}
-
 func (a *AuthApp) getAccount(idEmailNick string) (Account, error) {
 
 	var (
@@ -357,12 +338,12 @@ func (a *AuthApp) getAccount(idEmailNick string) (Account, error) {
 	//  - id (pure and with prn format
 	//  - email
 	//  - nick
-	if isEmail(idEmailNick) {
+	if utils.IsEmail(idEmailNick) {
 		err = c.Find(bson.M{"email": idEmailNick}).One(&account)
-	} else if isNick(idEmailNick) {
+	} else if utils.IsNick(idEmailNick) {
 		err = c.Find(bson.M{"nick": idEmailNick}).One(&account)
 	} else {
-		id := prnGetId(idEmailNick)
+		id := utils.PrnGetId(idEmailNick)
 		mgoId := bson.ObjectIdHex(id)
 		err = c.FindId(mgoId).One(&account)
 	}
@@ -428,7 +409,7 @@ func (a *AuthApp) deviceAuth(deviceId string, secret string) bool {
 
 	c := a.mgoSession.DB("").C("pantahub_devices")
 
-	id := prnGetId(deviceId)
+	id := utils.PrnGetId(deviceId)
 	mgoId := bson.ObjectIdHex(id)
 
 	device := devices.Device{}
@@ -443,7 +424,7 @@ func (a *AuthApp) devicePayload(deviceId string) *map[string]interface{} {
 
 	c := a.mgoSession.DB("").C("pantahub_devices")
 
-	id := prnGetId(deviceId)
+	id := utils.PrnGetId(deviceId)
 	mgoId := bson.ObjectIdHex(id)
 
 	device := devices.Device{}
