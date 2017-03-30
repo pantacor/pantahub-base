@@ -12,13 +12,11 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/StephanDollberg/go-json-rest-middleware-jwt"
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/asaskevich/govalidator"
-	"gopkg.in/gomail.v2"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -176,7 +174,7 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 		urlPrefix += utils.GetEnv("PANTAHUB_PORT")
 	}
 
-	sendVerification(newAccount.Email, newAccount.Id.Hex(), newAccount.Challenge, urlPrefix)
+	utils.SendVerification(newAccount.Email, newAccount.Id.Hex(), newAccount.Challenge, urlPrefix)
 
 	w.WriteJson(newAccount)
 }
@@ -222,39 +220,6 @@ func (a *AuthApp) handle_verify(w rest.ResponseWriter, r *rest.Request) {
 	collection.UpsertId(newAccount.Id, newAccount)
 
 	w.WriteJson(newAccount)
-}
-
-func sendVerification(email, id, u string, urlPrefix string) bool {
-
-	link := urlPrefix + "/auth/verify?id=" + id + "&challenge=" + u
-
-	host := utils.GetEnv("SMTP_HOST")
-	portStr := utils.GetEnv("SMTP_PORT")
-	user := utils.GetEnv("SMTP_USER")
-	pass := utils.GetEnv("SMTP_PASS")
-	port, err := strconv.Atoi(portStr)
-
-	if err != nil {
-		fmt.Println("ERROR: Bad port - " + err.Error())
-		return false
-	}
-
-	body := "To verify your account, please click on the link: <a href=\"" + link +
-		"\">" + link + "</a><br><br>Best Regards,<br><br>" +
-		"A. Sack and R. Mendoza (Pantacor Founders)"
-
-	msg := gomail.NewMessage()
-	msg.SetAddressHeader("From", "hubpanta@gmail.com", "Pantahub Registration Desk")
-	msg.SetHeader("To", email)
-	msg.SetHeader("Subject", "Account Verification for api.pantahub.com")
-	msg.SetBody("text/html", body)
-	m := gomail.NewDialer(host, port, user, pass)
-	if err := m.DialAndSend(msg); err != nil {
-		fmt.Println("ERROR sending email - " + err.Error())
-		fmt.Println("Body not sent: \n\t" + body)
-		return false
-	}
-	return true
 }
 
 type AuthApp struct {
