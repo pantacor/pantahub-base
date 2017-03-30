@@ -43,11 +43,13 @@ var payloads = map[string]map[string]interface{}{
 	"user1": map[string]interface{}{
 		"roles": "user",
 		"type":  "USER",
+		"nick":  "user1",
 		"prn":   "prn:pantahub.com:auth:/user1",
 	},
 	"user2": map[string]interface{}{
 		"roles": "user",
 		"type":  "USER",
+		"nick":  "user2",
 		"prn":   "prn:pantahub.com:auth:/user2",
 	},
 	"service1": map[string]interface{}{
