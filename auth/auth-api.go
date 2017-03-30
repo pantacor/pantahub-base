@@ -160,7 +160,11 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 	_, err := collection.UpsertId(newAccount.Id, newAccount)
 
 	if err != nil {
-		rest.Error(w, "Error inserting new account: "+err.Error(), http.StatusInternalServerError)
+		if mgo.IsDup(err) {
+			rest.Error(w, "Email or Nick already in use", http.StatusPreconditionFailed)
+		} else {
+			rest.Error(w, "Internal Error: "+err.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -442,7 +446,7 @@ func (a *AuthApp) accountPayload(idEmailNick string) *map[string]interface{} {
 
 	val := map[string]interface{}{
 		"roles": "users",
-		"type":  "USER",
+		"type":  account.Type,
 		"nick":  account.Nick,
 		"prn":   account.Prn,
 	}
