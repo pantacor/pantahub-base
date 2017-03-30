@@ -84,8 +84,8 @@ var r *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
 type AccountType string
 
 const (
-	ACCOUNT_TYPE_USER = AccountType("user-account")
-	ACCOUNT_TYPE_ORG  = AccountType("org-account")
+	ACCOUNT_TYPE_USER = AccountType("USER")
+	ACCOUNT_TYPE_ORG  = AccountType("ORG")
 )
 
 type Account struct {
