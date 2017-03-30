@@ -294,6 +294,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 	}
 
 	jwtMiddleware.Authenticator = func(userId string, password string) bool {
+		if userId == "" || password == "" {
+			return false
+		}
 		if passwords[userId] != "" && passwords[userId] == password {
 			return true
 		}
