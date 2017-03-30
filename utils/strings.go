@@ -1,3 +1,6 @@
+//
+// Copyright 2017  Alexander Sack <asac129@gmail.com>
+//
 package utils
 
 import (
