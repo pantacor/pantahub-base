@@ -282,7 +282,9 @@ func (a *TrailsApp) handle_gettrail(w rest.ResponseWriter, r *rest.Request) {
 }
 
 func getBaseApiEndpointXXX(r *rest.Request) (string, error) {
-	i := strings.Index(r.Request.RequestURI, "/api/trails")
+	// XXX: this is a hack for nginx proxying apparently not setting right scheme
+	r.URL.Scheme = "https"
+	i := strings.Index(r.Request.RequestURI, "/trails")
 	if i < 0 {
 		return "", errors.New("Bad Server configuration (cannot produce object endpoint)")
 	}
@@ -330,9 +332,9 @@ func (a *TrailsApp) handle_gettrailpvrinfo(w rest.ResponseWriter, r *rest.Reques
 		rest.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
-	oe := baseApi + "/api/objects"
-	jsonGet := baseApi + "/api/trails/" + getId + "/steps/" + strconv.Itoa(step.Rev) + "/state"
-	postUrl := baseApi + "/api/trails/" + getId + "/steps"
+	oe := baseApi + "/objects"
+	jsonGet := baseApi + "/trails/" + getId + "/steps/" + strconv.Itoa(step.Rev) + "/state"
+	postUrl := baseApi + "/trails/" + getId + "/steps"
 	postFields := []string{"commit-msg"}
 	postFieldsOpt := []string{}
 
@@ -391,9 +393,9 @@ func (a *TrailsApp) handle_getsteppvrinfo(w rest.ResponseWriter, r *rest.Request
 		rest.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
-	oe := baseApi + "/api/objects"
-	jsonUrl := baseApi + "/api/trails/" + getId + "/steps/" + revId + "/state"
-	postUrl := baseApi + "/api/trails/" + getId + "/steps"
+	oe := baseApi + "/objects"
+	jsonUrl := baseApi + "/trails/" + getId + "/steps/" + revId + "/state"
+	postUrl := baseApi + "/trails/" + getId + "/steps"
 	postFields := []string{"commit-msg"}
 	postFieldsOpt := []string{}
 
