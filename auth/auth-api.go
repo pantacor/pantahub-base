@@ -10,7 +10,6 @@ import (
 	"pantahub-base/utils"
 
 	"fmt"
-	"math/rand"
 	"net/http"
 	"time"
 
@@ -78,8 +77,6 @@ var payloads = map[string]map[string]interface{}{
 	},
 }
 
-var r *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
-
 type AccountType string
 
 const (
@@ -105,17 +102,6 @@ type Account struct {
 func handle_auth(w rest.ResponseWriter, r *rest.Request) {
 	jwtClaims := r.Env["JWT_PAYLOAD"]
 	w.WriteJson(jwtClaims)
-}
-
-func generateChallenge() string {
-	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
-
-	result := make([]byte, 15)
-	for i := range result {
-		result[i] = chars[r.Intn(len(chars))]
-	}
-
-	return string(result)
 }
 
 func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
@@ -145,7 +131,7 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 
 	newAccount.Id = bson.NewObjectId()
 	newAccount.Prn = "prn:::accounts:/" + newAccount.Id.Hex()
-	newAccount.Challenge = generateChallenge()
+	newAccount.Challenge = utils.GenerateChallenge()
 	newAccount.TimeCreated = time.Now()
 	newAccount.Type = ACCOUNT_TYPE_USER // XXX: need org approach too
 	newAccount.TimeModified = newAccount.TimeCreated

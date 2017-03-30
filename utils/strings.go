@@ -1,7 +1,9 @@
 package utils
 
 import (
+	"math/rand"
 	"strings"
+	"time"
 
 	"github.com/asaskevich/govalidator"
 )
@@ -22,4 +24,17 @@ func IsNick(nick string) bool {
 
 func IsEmail(email string) bool {
 	return govalidator.IsEmail(email)
+}
+
+var r *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
+
+func GenerateChallenge() string {
+	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
+
+	result := make([]byte, 15)
+	for i := range result {
+		result[i] = chars[r.Intn(len(chars))]
+	}
+
+	return string(result)
 }
