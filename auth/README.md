@@ -11,6 +11,44 @@ Start your server:
 ./pantahub-serv
 ```
 
+## Register a user
+
+To register simply POST your details to the accounts endpoint. If nick and email are not taken
+it will send a registration confirm email out. In case of development server where SMTP is not working
+the regisgtration URL will be dumped to console for you to pick up.
+
+
+```
+http POST http://localhost:12365/auth/accounts email="asac@pantacor.com" nick="asac" password="XXXXXX"
+HTTP/1.1 200 OK
+Connection: keep-alive
+Content-Length: 303
+Content-Type: application/json; charset=utf-8
+Date: Wed, 29 Mar 2017 21:06:32 GMT
+Server: nginx/1.10.0 (Ubuntu)
+X-Powered-By: go-json-rest
+
+{
+    "email": "asac@pantacor.com", 
+    "id": "58dc21d76e2bc30224f160b0", 
+    "nick": "asac", 
+    "password": "XXXXXX", 
+    "password-new": "", 
+    "prn": "prn:::accounts:/58dc21d76e2bc30224f160b0", 
+    "time-created": "2017-03-29T16:06:31.345913416-05:00", 
+    "time-modified": "2017-03-29T16:06:31.345913416-05:00"
+}
+```
+
+In this case you will receive the confirmation link on the console of your pantahub server instance:
+
+```
+	To verify your account, please click on the link: <a href="http://localhost:12365/auth/verify?id=58dcb86bc094f66125a698dd&challenge=yuieui5a0ost1l2">http://localhost:12365/auth/verify?id=58dcb86bc094f66125a698dd&challenge=yuieui5a0ost1l2</a><br><br>Best Regards,<br><br>A. Sack and R. Mendoza (Pantacor Founders)
+```
+
+Simply open this url and you will be able to log in from here now.
+
+
 ## Authenticate
 
 ```
@@ -90,5 +128,6 @@ X-Powered-By: go-json-rest
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhYnJuIjoiYWJybjo6OmRldmljZXM6LzU3ZWJhYWRkYzA5NGY2MTg4ZDAwMDAwMiIsImV4cCI6MTQ3NTA4MjI0NywiaWQiOiJhYnJuOjo6ZGV2aWNlczovNTdlYmFhZGRjMDk0ZjYxODhkMDAwMDAyIiwib3JpZ19pYXQiOjE0NzUwNzg2NDcsIm93bmVyIjoiYWJybjphYmNpZS54eXo6YXV0aDovdXNlcjEiLCJyb2xlcyI6ImRldmljZSIsInR5cGUiOiJERVZJQ0UifQ.7_lwQB2mk-ZvuLrNzbk1Wg_UxGe5QQp9Nr9YbhEPq8w"
 }
 ```
+
 
 
