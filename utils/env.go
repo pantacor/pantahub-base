@@ -17,6 +17,8 @@ var defaultEnvs = map[string]string{
 	"SMTP_PORT": "25",
 	"SMTP_USER": "XXX",
 	"SMTP_PASS": "XXX",
+
+	"PH_AUTH": "https://localhost:12366/auth",
 }
 
 func GetEnv(key string) string {
