@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"time"
 
+	"pantahub-base/utils"
+
 	"github.com/StephanDollberg/go-json-rest-middleware-jwt"
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/aws/aws-sdk-go/aws"
@@ -49,7 +51,6 @@ type ObjectWithAccess struct {
 
 var pantahubS3Path string
 var pantahubS3Production bool
-var pantahubHttpUrl string
 var pantahubHttpsUrl string
 
 func init() {
@@ -65,14 +66,20 @@ func init() {
 		pantahubS3Path = "./local-s3/"
 	}
 
-	pantahubHost := os.Getenv("PANTAHUB_HOST")
+	pantahubHost := utils.GetEnv("PANTAHUB_HOST")
 
 	if pantahubHost == "" {
 		pantahubHost = "localhost"
 	}
 
-	pantahubHttpUrl = "http://" + pantahubHost + ":12365"
-	pantahubHttpsUrl = "https://" + pantahubHost + ":12366"
+	pantahubPort := utils.GetEnv("PANTAHUB_PORT")
+	pantahubScheme := utils.GetEnv("PANTAHUB_SCHEME")
+
+	pantahubHttpsUrl = pantahubScheme + "://" + pantahubHost
+
+	if pantahubPort != "" {
+		pantahubHttpsUrl += ":" + pantahubPort
+	}
 }
 
 func PantahubS3Production() bool {
