@@ -1,10 +1,16 @@
-package goapp
+//
+// Copyright 2016  Alexander Sack <asac129@gmail.com>
+//
+package main
 
 import (
-    "pantahub-base/base"
+	"pantahub-base/base"
+
+	"google.golang.org/appengine"
 )
 
-func init() {
-    base.DoInit()
-}
+func main() {
 
+	base.DoInit()
+	appengine.Main()
+}
