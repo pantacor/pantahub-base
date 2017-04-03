@@ -11,7 +11,10 @@ const (
 	ENV_PANTAHUB_SCHEME = "PANTAHUB_SCHEME"
 	ENV_PANTAHUB_AUTH   = "PH_AUTH"
 	ENV_MONGO_HOST      = "MONGO_HOST"
+	ENV_MONGO_PORT      = "MONGO_PORT"
 	ENV_MONGO_DB        = "MONGO_DB"
+	ENV_MONGO_USER      = "MONGO_USER"
+	ENV_MONGO_PASS      = "MONGO_PASS"
 	ENV_SMTP_HOST       = "SMTP_HOST"
 	ENV_SMTP_PORT       = "SMTP_PORT"
 	ENV_SMTP_USER       = "SMTP_USER"
@@ -25,6 +28,9 @@ var defaultEnvs = map[string]string{
 
 	ENV_MONGO_HOST: "localhost",
 	ENV_MONGO_DB:   "pantabase-serv",
+	ENV_MONGO_USER: "",
+	ENV_MONGO_PASS: "",
+	ENV_MONGO_PORT: "27017",
 
 	ENV_SMTP_HOST: "localhost",
 	ENV_SMTP_PORT: "25",
