@@ -14,10 +14,10 @@ func SendVerification(email, id, u string, urlPrefix string) bool {
 
 	link := urlPrefix + "/auth/verify?id=" + id + "&challenge=" + u
 
-	host := GetEnv("SMTP_HOST")
-	portStr := GetEnv("SMTP_PORT")
-	user := GetEnv("SMTP_USER")
-	pass := GetEnv("SMTP_PASS")
+	host := GetEnv(ENV_SMTP_HOST)
+	portStr := GetEnv(ENV_SMTP_PORT)
+	user := GetEnv(ENV_SMTP_USER)
+	pass := GetEnv(ENV_SMTP_PASS)
 	port, err := strconv.Atoi(portStr)
 
 	if err != nil {

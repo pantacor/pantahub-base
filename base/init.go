@@ -70,7 +70,7 @@ func (f FileUploadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func DoInit() {
 
-	phAuth := utils.GetEnv("PH_AUTH")
+	phAuth := utils.GetEnv(utils.ENV_PANTAHUB_AUTH)
 
 	session, _ := utils.GetMongoSession()
 

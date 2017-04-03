@@ -66,14 +66,14 @@ func init() {
 		pantahubS3Path = "./local-s3/"
 	}
 
-	pantahubHost := utils.GetEnv("PANTAHUB_HOST")
+	pantahubHost := utils.GetEnv(utils.ENV_PANTAHUB_HOST)
 
 	if pantahubHost == "" {
 		pantahubHost = "localhost"
 	}
 
-	pantahubPort := utils.GetEnv("PANTAHUB_PORT")
-	pantahubScheme := utils.GetEnv("PANTAHUB_SCHEME")
+	pantahubPort := utils.GetEnv(utils.ENV_PANTAHUB_PORT)
+	pantahubScheme := utils.GetEnv(utils.ENV_PANTAHUB_SCHEME)
 
 	pantahubHttpsUrl = pantahubScheme + "://" + pantahubHost
 

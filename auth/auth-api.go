@@ -153,10 +153,10 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	urlPrefix := utils.GetEnv("PANTAHUB_SCHEME") + "://" + utils.GetEnv("PANTAHUB_HOST")
-	if utils.GetEnv("PANTAHUB_PORT") != "" {
+	urlPrefix := utils.GetEnv(utils.ENV_PANTAHUB_SCHEME) + "://" + utils.GetEnv(utils.ENV_PANTAHUB_HOST)
+	if utils.GetEnv(utils.ENV_PANTAHUB_PORT) != "" {
 		urlPrefix += ":"
-		urlPrefix += utils.GetEnv("PANTAHUB_PORT")
+		urlPrefix += utils.GetEnv(utils.ENV_PANTAHUB_PORT)
 	}
 
 	utils.SendVerification(newAccount.Email, newAccount.Id.Hex(), newAccount.Challenge, urlPrefix)
