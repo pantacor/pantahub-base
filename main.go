@@ -8,14 +8,18 @@ import (
 	"net"
 	"net/http"
 	"pantahub-base/base"
+	"pantahub-base/utils"
 )
 
 func main() {
 
 	base.DoInit()
 
+	portInt := utils.GetEnv(utils.ENV_PANTAHUB_PORT_INT)
+	portIntTls := utils.GetEnv(utils.ENV_PANTAHUB_PORT_INT_TLS)
+
 	go func() {
-		log.Fatal(http.ListenAndServeTLS(":12366", "localhost.cert.pem", "localhost.key.pem", nil))
+		log.Fatal(http.ListenAndServeTLS(":"+portIntTls, "localhost.cert.pem", "localhost.key.pem", nil))
 	}()
 
 	ifaces, _ := net.Interfaces()
@@ -29,9 +33,9 @@ func main() {
 			case *net.IPAddr:
 				ip = v.IP
 			}
-			log.Printf("Serving @ https://" + ip.String() + ":12366/\n")
-			log.Printf("Serving @ http://" + ip.String() + ":12365/\n")
+			log.Printf("Serving @ https://" + ip.String() + ":" + portIntTls + "/\n")
+			log.Printf("Serving @ http://" + ip.String() + ":" + portInt + "/\n")
 		}
 	}
-	log.Fatal(http.ListenAndServe(":12365", nil))
+	log.Fatal(http.ListenAndServe(":"+portInt, nil))
 }
