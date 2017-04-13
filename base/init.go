@@ -104,7 +104,6 @@ func DoInit() {
 		}, session)
 		http.Handle("/trails/", http.StripPrefix("/trails", app.Api.MakeHandler()))
 	}
-
 	{
 		app := plog.New(&jwt.JWTMiddleware{
 			Key:   []byte("secret key"),

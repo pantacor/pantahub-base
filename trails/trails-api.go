@@ -372,8 +372,10 @@ func (a *TrailsApp) handle_getsteppvrinfo(w rest.ResponseWriter, r *rest.Request
 	}
 
 	oe := utils.GetApiEndpoint("/objects")
+
 	jsonUrl := utils.GetApiEndpoint("/trails/" + getId + "/steps/" +
 		revId + "/state")
+
 	postUrl := utils.GetApiEndpoint("/trails/" + getId + "/steps")
 	postFields := []string{"commit-msg"}
 	postFieldsOpt := []string{}
