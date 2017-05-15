@@ -166,13 +166,13 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 	newTrail.Owner = owner.(string)
 	newTrail.Device = device.(string)
 	newTrail.LastInSync = time.Time{}
-	newTrail.FactoryState = initialState
+	newTrail.FactoryState = bsonQuoteMap(&initialState)
 
 	newStep := Step{}
 	newStep.Id = newTrail.Id.Hex() + "-0"
 	newStep.TrailId = newTrail.Id
 	newStep.Rev = 0
-	newStep.State = initialState
+	newStep.State = bsonQuoteMap(&initialState)
 	newStep.Owner = newTrail.Owner
 	newStep.Device = newTrail.Device
 	newStep.CommitMsg = "Factory State (rev 0)"
@@ -248,6 +248,11 @@ func (a *TrailsApp) handle_gettrails(w rest.ResponseWriter, r *rest.Request) {
 	} else if authType == "USER" {
 		coll.Find(bson.M{"owner": owner}).All(&trails)
 	}
+
+	for _, v := range trails {
+		v.FactoryState = bsonUnquoteMap(&v.FactoryState)
+	}
+
 	w.WriteJson(trails)
 }
 
@@ -290,6 +295,8 @@ func (a *TrailsApp) handle_gettrail(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, "No access to resource: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	trail.FactoryState = bsonUnquoteMap(&trail.FactoryState)
 
 	w.WriteJson(trail)
 }
@@ -482,6 +489,7 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 	newStep.TrailId = trail.Id
 	newStep.StepTime = time.Now()
 	newStep.ProgressTime = time.Unix(0, 0)
+	newStep.State = bsonQuoteMap(&newStep.State)
 
 	err = collSteps.Insert(newStep)
 
@@ -552,6 +560,10 @@ func (a *TrailsApp) handle_getsteps(w rest.ResponseWriter, r *rest.Request) {
 	}
 	coll.Find(query).Sort("-rev").All(&steps)
 
+	for _, v := range steps {
+		v.State = bsonUnquoteMap(&v.State)
+	}
+
 	w.WriteJson(steps)
 }
 
@@ -591,6 +603,9 @@ func (a *TrailsApp) handle_getstep(w rest.ResponseWriter, r *rest.Request) {
 	} else if authType == "USER" {
 		coll.Find(bson.M{"_id": trailId + "-" + rev, "owner": owner}).One(&step)
 	}
+
+	step.State = bsonUnquoteMap(&step.State)
+
 	w.WriteJson(step)
 }
 
@@ -628,6 +643,91 @@ func (a *TrailsApp) handle_getstepstate(w rest.ResponseWriter, r *rest.Request) 
 	} else if authType == "USER" {
 		coll.Find(bson.M{"_id": trailId + "-" + rev, "owner": owner}).One(&step)
 	}
+
+	w.WriteJson(bsonUnquoteMap(&step.State))
+}
+
+func bsonQuoteMap(m *map[string]interface{}) map[string]interface{} {
+	escapedMap := map[string]interface{}{}
+	for k, v := range *m {
+		nk := strings.Replace(k, ".", "\uFF2E", -1)
+		// fmt.Printf("klen: %d nklen: %d\n", len([]byte(k)), len([]byte(nk)))
+		escapedMap[nk] = v
+	}
+	return escapedMap
+}
+
+func bsonUnquoteMap(m *map[string]interface{}) map[string]interface{} {
+	escapedMap := map[string]interface{}{}
+	for k, v := range *m {
+		nk := strings.Replace(k, "\uFF2E", ".", -1)
+		// fmt.Printf("klen: %d nklen: %d\n", len([]byte(k)), len([]byte(nk)))
+		escapedMap[nk] = v
+	}
+	return escapedMap
+}
+
+//
+// ## PUT /trails/:id/steps/:rev/state
+//   put step state (only if not yet consumed)
+//
+//   just the raw data of a step without metainfo like pvr put ...
+//
+func (a *TrailsApp) handle_putstepstate(w rest.ResponseWriter, r *rest.Request) {
+
+	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	if !ok {
+		// XXX: find right error
+		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		return
+	}
+
+	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+
+	coll := a.mgoSession.DB("").C("pantahub_steps")
+	if coll == nil {
+		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+
+	step := Step{}
+	trailId := r.PathParam("id")
+	rev := r.PathParam("rev")
+
+	if authType != "USER" {
+		rest.Error(w, "Need to be logged in as USER to put step state", http.StatusForbidden)
+		return
+	}
+
+	err := coll.Find(bson.M{"_id": trailId + "-" + rev, "owner": owner, "progress.status": "NEW"}).One(&step)
+
+	if err != nil {
+		rest.Error(w, "Error with accessing data: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	stateMap := map[string]interface{}{}
+	err = r.DecodeJsonPayload(&stateMap)
+	if err != nil {
+		rest.Error(w, "Error with request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	escapedMap := bsonQuoteMap(&stateMap)
+
+	step.State = escapedMap
+	step.StepTime = time.Now()
+	step.ProgressTime = time.Unix(0, 0)
+
+	step.Id = trailId + "-" + rev
+
+	err = coll.Update(bson.M{"_id": trailId + "-" + rev, "owner": owner, "progress.status": "NEW"}, step)
+
+	if err != nil {
+		rest.Error(w, "Error updating step state: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	w.WriteJson(step.State)
 }
 
@@ -732,6 +832,8 @@ func (a *TrailsApp) get_trailsummary_one(trailId bson.ObjectId, owner string, co
 	if err != nil {
 		return summary, err
 	}
+
+	step.State = bsonUnquoteMap(&step.State)
 
 	summary.Rev = step.Rev
 	if summary.Status == "" || summary.Rev > summary.ProgressRev {
@@ -917,6 +1019,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *TrailsApp {
 		rest.Get("/:id/steps/:rev", app.handle_getstep),
 		rest.Get("/:id/steps/:rev/.pvrremote", app.handle_getsteppvrinfo),
 		rest.Get("/:id/steps/:rev/state", app.handle_getstepstate),
+		rest.Put("/:id/steps/:rev/state", app.handle_putstepstate),
 		rest.Put("/:id/steps/:rev/progress", app.handle_putstepprogress),
 		rest.Get("/:id/summary", app.handle_gettrailstepsummary),
 	)
