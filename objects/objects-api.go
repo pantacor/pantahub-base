@@ -75,7 +75,7 @@ func init() {
 	}
 
 	if pantahubS3Path == "" {
-		pantahubS3Path = "./local-s3/"
+		pantahubS3Path = "../local-s3/"
 	}
 
 	pantahubHost := utils.GetEnv(utils.ENV_PANTAHUB_HOST)
