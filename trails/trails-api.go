@@ -207,6 +207,7 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
+	newTrail.FactoryState = bsonUnquoteMap(&newTrail.FactoryState)
 	w.WriteJson(newTrail)
 }
 
@@ -249,8 +250,9 @@ func (a *TrailsApp) handle_gettrails(w rest.ResponseWriter, r *rest.Request) {
 		coll.Find(bson.M{"owner": owner}).All(&trails)
 	}
 
-	for _, v := range trails {
+	for k, v := range trails {
 		v.FactoryState = bsonUnquoteMap(&v.FactoryState)
+		trails[k] = v
 	}
 
 	w.WriteJson(trails)
@@ -297,7 +299,6 @@ func (a *TrailsApp) handle_gettrail(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	trail.FactoryState = bsonUnquoteMap(&trail.FactoryState)
-
 	w.WriteJson(trail)
 }
 
@@ -506,6 +507,8 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 		fmt.Printf("Error updating last-touched for trail in poststep; not failing because step was written: %s\n", trail.Id.Hex())
 	}
 
+	newStep.State = bsonUnquoteMap(&newStep.State)
+
 	w.WriteJson(newStep)
 }
 
@@ -560,10 +563,10 @@ func (a *TrailsApp) handle_getsteps(w rest.ResponseWriter, r *rest.Request) {
 	}
 	coll.Find(query).Sort("-rev").All(&steps)
 
-	for _, v := range steps {
+	for k, v := range steps {
 		v.State = bsonUnquoteMap(&v.State)
+		steps[k] = v
 	}
-
 	w.WriteJson(steps)
 }
 
@@ -605,7 +608,6 @@ func (a *TrailsApp) handle_getstep(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	step.State = bsonUnquoteMap(&step.State)
-
 	w.WriteJson(step)
 }
 
@@ -713,9 +715,7 @@ func (a *TrailsApp) handle_putstepstate(w rest.ResponseWriter, r *rest.Request) 
 		return
 	}
 
-	escapedMap := bsonQuoteMap(&stateMap)
-
-	step.State = escapedMap
+	step.State = bsonQuoteMap(&stateMap)
 	step.StepTime = time.Now()
 	step.ProgressTime = time.Unix(0, 0)
 
@@ -728,6 +728,7 @@ func (a *TrailsApp) handle_putstepstate(w rest.ResponseWriter, r *rest.Request) 
 		return
 	}
 
+	step.State = bsonUnquoteMap(&step.State)
 	w.WriteJson(step.State)
 }
 
@@ -800,7 +801,6 @@ func (a *TrailsApp) get_trailsummary_one(trailId bson.ObjectId, owner string, co
 		"trail-id": trailId,
 		"owner":    owner,
 		"$and": []interface{}{
-			bson.D{{"progress.status", bson.M{"$ne": "NEW"}}},
 			bson.D{{"progress.status", bson.M{"$ne": "DONE"}}},
 		},
 	}
@@ -832,8 +832,6 @@ func (a *TrailsApp) get_trailsummary_one(trailId bson.ObjectId, owner string, co
 	if err != nil {
 		return summary, err
 	}
-
-	step.State = bsonUnquoteMap(&step.State)
 
 	summary.Rev = step.Rev
 	if summary.Status == "" || summary.Rev > summary.ProgressRev {
