@@ -561,7 +561,20 @@ func (a *TrailsApp) handle_getsteps(w rest.ResponseWriter, r *rest.Request) {
 			query["progress.status"] = m
 		}
 	}
-	coll.Find(query).Sort("-rev").All(&steps)
+
+	q := coll.Find(query).Sort("rev")
+
+	var err error
+	if authType == "DEVICE" {
+		err = q.Limit(1).All(&steps)
+	} else {
+		err = q.All(&steps)
+	}
+
+	if err != nil {
+		rest.Error(w, "Error getting trails step steps", http.StatusInternalServerError)
+		return
+	}
 
 	for k, v := range steps {
 		v.State = bsonUnquoteMap(&v.State)
