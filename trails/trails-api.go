@@ -340,7 +340,7 @@ func (a *TrailsApp) handle_gettrailpvrinfo(w rest.ResponseWriter, r *rest.Reques
 	jsonGet := utils.GetApiEndpoint("/trails/" + getId + "/steps/" + strconv.Itoa(step.Rev) + "/state")
 	postUrl := utils.GetApiEndpoint("/trails/" + getId + "/steps")
 	postFields := []string{"commit-msg"}
-	postFieldsOpt := []string{}
+	postFieldsOpt := []string{"rev"}
 
 	remoteInfo := pvrapi.PvrRemote{
 		RemoteSpec:         "pvr-pantahub-1",
@@ -397,7 +397,7 @@ func (a *TrailsApp) handle_getsteppvrinfo(w rest.ResponseWriter, r *rest.Request
 		revId + "/state")
 
 	postUrl := utils.GetApiEndpoint("/trails/" + getId + "/steps")
-	postFields := []string{"commit-msg"}
+	postFields := []string{"msg"}
 	postFieldsOpt := []string{}
 
 	remoteInfo := pvrapi.PvrRemote{
