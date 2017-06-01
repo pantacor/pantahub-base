@@ -45,6 +45,7 @@ package trails
 //   - consider enforcing sequential processing of steps to have a clean tail?
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"pvr/api"
@@ -413,6 +414,26 @@ func (a *TrailsApp) handle_getsteppvrinfo(w rest.ResponseWriter, r *rest.Request
 	w.WriteJson(remoteInfo)
 }
 
+func (a *TrailsApp) get_latest_steprev(trailId bson.ObjectId) (int, error) {
+	collSteps := a.mgoSession.DB("").C("pantahub_steps")
+
+	if collSteps == nil {
+		return -1, errors.New("bad database connetivity")
+	}
+
+	step := &Step{}
+
+	err := collSteps.Find(bson.M{"trail-id": trailId}).Sort("-rev").Limit(1).One(step)
+
+	if err != nil {
+		return -1, err
+	}
+	if step == nil {
+		return -1, errors.New("no step found for trail: " + trailId.Hex())
+	}
+	return step.Rev, err
+}
+
 //
 // POST /trails/:id/steps
 //  post a new step to the head of the trail. You must include the correct Rev
@@ -467,6 +488,17 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 	newStep := Step{}
 	previousStep := Step{}
 	r.DecodeJsonPayload(&newStep)
+
+	if newStep.Rev == -1 {
+		newStep.Rev, err = a.get_latest_steprev(bson.ObjectIdHex(trailId))
+		newStep.Rev += 1
+	}
+
+	if err != nil {
+		rest.Error(w, "Error auto appending step 1 " + err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	stepId := trailId + "-" + strconv.Itoa(newStep.Rev-1)
 
 	err = collSteps.Find(bson.M{"_id": stepId}).One(&previousStep)
