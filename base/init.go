@@ -28,6 +28,7 @@ import (
 
 	"pantahub-base/auth"
 	"pantahub-base/devices"
+	"pantahub-base/logs"
 	"pantahub-base/objects"
 	"pantahub-base/plog"
 	"pantahub-base/trails"
@@ -122,6 +123,13 @@ func DoInit() {
 			Realm: "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
 		}, session)
 		http.Handle("/plog/", http.StripPrefix("/plog", app.Api.MakeHandler()))
+	}
+	{
+		app := logs.New(&jwt.JWTMiddleware{
+			Key:   []byte("secret key"),
+			Realm: "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
+		}, session)
+		http.Handle("/logs/", http.StripPrefix("/logs", app.Api.MakeHandler()))
 	}
 
 	if !objects.PantahubS3Production() {
