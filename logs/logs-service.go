@@ -133,7 +133,6 @@ func (a *LogsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 
 	sorts := strings.Split(sortParam, ",")
 	for _, v := range sorts {
-		log.Println("asdas: " + v)
 		switch v1 := strings.TrimPrefix(v, "-"); v1 {
 		case "lvl":
 			fallthrough
@@ -149,10 +148,7 @@ func (a *LogsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 			arr = append(arr, v)
 		}
 	}
-
 	sortStr := strings.Join(arr, ",")
-
-	log.Printf("Sortstring: %s\n", sortStr)
 
 	collLogs := a.mgoSession.DB("").C("pantahub_logs")
 
@@ -190,8 +186,6 @@ func (a *LogsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, "Error with Database count", http.StatusInternalServerError)
 		return
 	}
-
-	log.Printf("count: %d", result.Count)
 
 	entries := []LogsEntry{}
 	err = q.Skip(startParamInt).Limit(pageParamInt).All(&entries)
