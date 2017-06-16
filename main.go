@@ -19,8 +19,8 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"pantahub-base/base"
-	"pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/base"
+	"gitlab.com/pantacor/pantahub-base/utils"
 )
 
 func main() {

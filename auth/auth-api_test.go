@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"net/url"
-	"pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils"
 
 	"github.com/StephanDollberg/go-json-rest-middleware-jwt"
 	"github.com/go-resty/resty"

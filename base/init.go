@@ -26,13 +26,13 @@ import (
 	"strings"
 	"time"
 
-	"pantahub-base/auth"
-	"pantahub-base/devices"
-	"pantahub-base/logs"
-	"pantahub-base/objects"
-	"pantahub-base/plog"
-	"pantahub-base/trails"
-	"pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/auth"
+	"gitlab.com/pantacor/pantahub-base/devices"
+	"gitlab.com/pantacor/pantahub-base/logs"
+	"gitlab.com/pantacor/pantahub-base/objects"
+	"gitlab.com/pantacor/pantahub-base/plog"
+	"gitlab.com/pantacor/pantahub-base/trails"
+	"gitlab.com/pantacor/pantahub-base/utils"
 
 	"github.com/StephanDollberg/go-json-rest-middleware-jwt"
 )

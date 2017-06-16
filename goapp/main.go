@@ -16,7 +16,7 @@
 package main
 
 import (
-	"pantahub-base/base"
+	"gitlab.com/pantacor/pantahub-base/base"
 
 	"google.golang.org/appengine"
 )

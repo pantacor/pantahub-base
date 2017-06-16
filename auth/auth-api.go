@@ -18,8 +18,8 @@ package auth
 import (
 	"strings"
 
-	"pantahub-base/devices"
-	"pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/devices"
+	"gitlab.com/pantacor/pantahub-base/utils"
 
 	"fmt"
 	"net/http"
