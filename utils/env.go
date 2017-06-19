@@ -18,25 +18,74 @@ package utils
 import "os"
 
 const (
+	// Pantahub JWT Secret. THIS MUST BE SET TO SOMETHING SECRET!!
+	// default: "THIS MUST BE CHANGED"
+	ENV_PANTAHUB_JWT_SECRET = "PANTAHUB_JWT_SECRET"
+
+	// Host you want clients to reach this server under
+	// default: localhost
 	ENV_PANTAHUB_HOST       = "PANTAHUB_HOST"
+
+	// Port you want to make this server available under
+	// default: 12365 for http and 12366 for https
 	ENV_PANTAHUB_PORT       = "PANTAHUB_PORT"
+
+	// Default scheme to use for urls pointing at this server when we encode
+	// them in json or redirect (e.g. for auth)
+	// default: http
 	ENV_PANTAHUB_SCHEME     = "PANTAHUB_SCHEME"
+
+	// XXX: not used
 	ENV_PANTAHUB_APIVERSION = "PANTAHUB_APIVERSION"
+
+	// Authentication endpoint to point clients to that need access tokens
+	// or need more privileged access tokens.
+	// default: $PANTAHUB_SCHEME://$PANTAHUB_HOST:$PANTAHUB_PORT/auth
 	ENV_PANTAHUB_AUTH       = "PH_AUTH"
 
+	// port to listen to on for http on internal interfaces
+	// default: 12365
 	ENV_PANTAHUB_PORT_INT     = "PANTAHUB_PORT_INT"
+
+	// port to listen to on for https on internal interfaces
+	// default: 12366
 	ENV_PANTAHUB_PORT_INT_TLS = "PANTAHUB_PORT_INT_TLS"
 
+	// Hostname for mongodb connection
+	// default: localhost
 	ENV_MONGO_HOST          = "MONGO_HOST"
+
+	// Port for mongodb connection
+	// default: 27017
 	ENV_MONGO_PORT          = "MONGO_PORT"
+
+	// Database name for mongodb connection
+	// default: pantabase-serv
 	ENV_MONGO_DB            = "MONGO_DB"
+
+	// Database user for mongodb connection
+	// default: <none>
 	ENV_MONGO_USER          = "MONGO_USER"
+
+	// Database password for mongodb connection
+	// default: <none>
 	ENV_MONGO_PASS          = "MONGO_PASS"
+
+	// SMTP host to use for sending mails
+	// default: <none>
 	ENV_SMTP_HOST           = "SMTP_HOST"
+
+	// SMTP port to use for sending mails
+	// default: <none>
 	ENV_SMTP_PORT           = "SMTP_PORT"
+
+	// SMTP user to use for sending mails
+	// default: <none>
 	ENV_SMTP_USER           = "SMTP_USER"
+
+	// SMTP pass to use for sending mails
+	// default: <none>
 	ENV_SMTP_PASS           = "SMTP_PASS"
-	ENV_PANTAHUB_JWT_SECRET = "PANTAHUB_JWT_SECRET"
 )
 
 var defaultEnvs = map[string]string{
