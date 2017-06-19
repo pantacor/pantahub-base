@@ -131,6 +131,22 @@ const (
 )
 ```
 
+# APIs
+
+The following APIs are currently included and documented:
+
+ * [Auth API](auth/README.md)
+ * [Devices API](devices/README.md)
+ * [Trails API](trails/README.md)
+ * [Logs API](logs/README.md)
+
+
+# PVR
+
+The most convenient way to interface with pantahub for a subset of its features is through the ```pvr``` tool.
+
+See https://gitlab.com/pantacor/pvr for more features.
+
 # Docker
 
 Convenience docker builds are available in gcr.io/pantahub-registry/pantahub-base
