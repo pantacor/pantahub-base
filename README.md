@@ -1,33 +1,156 @@
 
-## native
+Pantahub Base APIs reference implementation.
 
-TO build raw:
+# Prepare
 
-1. install go
-2. create a workspace (mkdir workspace)
-3. set GOPATH to that directory (e.g. GOPATH=$PWD/workspace)
-4. mkdir src/
-5. clone this pantahub-base repo to src/
-   git clone ... src/
-6. cd src/pantahub-base
-7. go get
-8. go build
+ * get a reasonable fresh golang engine and install it
+ * Install a mongodb database locally or get credentials for hosted instance
+ * Decide where you want to store the objects. By default we store objects in
+   $CWD/../local-s3/ folder; you can use environment variables (see below)
+   to adjust this
+
+# Build
+
+```
+$ go get -v u gitlab.com/pantacor/pantahub-base
+...
+
+$ go build -o ~/bin/pantahub-base gitlab.com/pantacor/pantahub-base
+...
+``` 
 
 
-## docker
+# Run
 
-TO build docker:
+```
+$ pantahub-base
+mongodb connect: mongodb://localhost:27017/pantabase-serv
+S3 Development Path: ../local-s3/
+2017/06/19 21:56:04 Serving @ https://127.0.0.1:12366/
+2017/06/19 21:56:04 Serving @ http://127.0.0.1:12365/
+2017/06/19 21:56:04 Serving @ https://::1:12366/
+2017/06/19 21:56:04 Serving @ http://::1:12365/
+2017/06/19 21:56:04 Serving @ https://10.42.0.1:12366/
+2017/06/19 21:56:04 Serving @ http://10.42.0.1:12365/
+2017/06/19 21:56:04 Serving @ https://fe80::90a9:7a0:a5d5:f808:12366/
+2017/06/19 21:56:04 Serving @ http://fe80::90a9:7a0:a5d5:f808:12365/
+2017/06/19 21:56:04 Serving @ https://192.168.178.75:12366/
+2017/06/19 21:56:04 Serving @ http://192.168.178.75:12365/
+2017/06/19 21:56:04 Serving @ https://2a02:2028:66c:1201:3bae:315f:3ad8:c6ee:12366/
+2017/06/19 21:56:04 Serving @ http://2a02:2028:66c:1201:3bae:315f:3ad8:c6ee:12365/
+2017/06/19 21:56:04 Serving @ https://fe80::f64a:6b7d:ede:b208:12366/
+2017/06/19 21:56:04 Serving @ http://fe80::f64a:6b7d:ede:b208:12365/
+2017/06/19 21:56:04 Serving @ https://172.18.0.1:12366/
+2017/06/19 21:56:04 Serving @ http://172.18.0.1:12365/
+2017/06/19 21:56:04 Serving @ https://fe80::42:82ff:fea9:63a4:12366/
+2017/06/19 21:56:04 Serving @ http://fe80::42:82ff:fea9:63a4:12365/
+2017/06/19 21:56:04 Serving @ https://172.17.0.1:12366/
+2017/06/19 21:56:04 Serving @ http://172.17.0.1:12365/
+2017/06/19 21:56:04 Serving @ https://fe80::42:97ff:fef7:9daa:12366/
+2017/06/19 21:56:04 Serving @ http://fe80::42:97ff:fef7:9daa:12365/
+2017/06/19 21:56:04 Serving @ https://fe80::5491:a3ff:fed7:c798:12366/
+2017/06/19 21:56:04 Serving @ http://fe80::5491:a3ff:fed7:c798:12365/
+2017/06/19 21:56:04 Serving @ https://fe80::c0a3:b4ff:fe0d:e3b8:12366/
+2017/06/19 21:56:04 Serving @ http://fe80::c0a3:b4ff:fe0d:e3b8:12365/
+```
 
-docker build -t pantahub-base .
+# Configure
 
-TO run in docker:
-docker run --rm --env-file docker.env -it --name pantahub-base pantahub-serv pantahub-serv
+We currently support the environment variables you can find in utils/env.go:
 
-## mongo setup for docker access
+```
+const (
+	// Pantahub JWT Secret. THIS MUST BE SET TO SOMETHING SECRET!!
+	// default: "THIS MUST BE CHANGED"
+	ENV_PANTAHUB_JWT_SECRET = "PANTAHUB_JWT_SECRET"
 
-configure mongo to listen on iface for docker:
-check out what IP docker0 interface has for you and add it to the comma
-separated list in /etc/mongodb.conf bind_ip field, like:
+	// Host you want clients to reach this server under
+	// default: localhost
+	ENV_PANTAHUB_HOST       = "PANTAHUB_HOST"
 
-bind_ip = 127.0.0.1,172.17.0.1
+	// Port you want to make this server available under
+	// default: 12365 for http and 12366 for https
+	ENV_PANTAHUB_PORT       = "PANTAHUB_PORT"
+
+	// Default scheme to use for urls pointing at this server when we encode
+	// them in json or redirect (e.g. for auth)
+	// default: http
+	ENV_PANTAHUB_SCHEME     = "PANTAHUB_SCHEME"
+
+	// XXX: not used
+	ENV_PANTAHUB_APIVERSION = "PANTAHUB_APIVERSION"
+
+	// Authentication endpoint to point clients to that need access tokens
+	// or need more privileged access tokens.
+	// default: $PANTAHUB_SCHEME://$PANTAHUB_HOST:$PANTAHUB_PORT/auth
+	ENV_PANTAHUB_AUTH       = "PH_AUTH"
+
+	// port to listen to on for http on internal interfaces
+	// default: 12365
+	ENV_PANTAHUB_PORT_INT     = "PANTAHUB_PORT_INT"
+
+	// port to listen to on for https on internal interfaces
+	// default: 12366
+	ENV_PANTAHUB_PORT_INT_TLS = "PANTAHUB_PORT_INT_TLS"
+
+	// Hostname for mongodb connection
+	// default: localhost
+	ENV_MONGO_HOST          = "MONGO_HOST"
+
+	// Port for mongodb connection
+	// default: 27017
+	ENV_MONGO_PORT          = "MONGO_PORT"
+
+	// Database name for mongodb connection
+	// default: pantabase-serv
+	ENV_MONGO_DB            = "MONGO_DB"
+
+	// Database user for mongodb connection
+	// default: <none>
+	ENV_MONGO_USER          = "MONGO_USER"
+
+	// Database password for mongodb connection
+	// default: <none>
+	ENV_MONGO_PASS          = "MONGO_PASS"
+
+	// SMTP host to use for sending mails
+	// default: <none>
+	ENV_SMTP_HOST           = "SMTP_HOST"
+
+	// SMTP port to use for sending mails
+	// default: <none>
+	ENV_SMTP_PORT           = "SMTP_PORT"
+
+	// SMTP user to use for sending mails
+	// default: <none>
+	ENV_SMTP_USER           = "SMTP_USER"
+
+	// SMTP pass to use for sending mails
+	// default: <none>
+	ENV_SMTP_PASS           = "SMTP_PASS"
+)
+```
+
+# Docker
+
+Convenience docker builds are available in gcr.io/pantahub-registry/pantahub-base
+
+To run the latest:
+
+```
+docker run -it --rm -v/path/to/storage:/opt/ph/local-s3 pantahub-base
+```
+
+# Build your own Docker
+
+Want to build your own docker images? Check out https://gitlab.com/pantacor/pantahub-containers/
+and the readmes there
+
+# Kubernetes
+
+Check our example deployment manifest in https://gitlab.com/pantacor/pantahub-containers/api/k8s directory.
+
+# Issues/Support:
+
+Please use Issue trackers on gitlab.
 
