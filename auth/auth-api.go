@@ -35,6 +35,7 @@ var passwords = map[string]string{
 	"admin":    "admin",
 	"user1":    "user1",
 	"user2":    "user2",
+	"examples":    "examples",
 	"service1": "service1",
 	"service2": "service2",
 	"service3": "service3",
@@ -59,6 +60,12 @@ var payloads = map[string]map[string]interface{}{
 		"type":  "USER",
 		"nick":  "user2",
 		"prn":   "prn:pantahub.com:auth:/user2",
+	},
+	"examples": map[string]interface{}{
+		"roles": "user",
+		"type":  "USER",
+		"nick":  "examples",
+		"prn":   "prn:pantahub.com:auth:/examples",
 	},
 	"service1": map[string]interface{}{
 		"roles": "service",
