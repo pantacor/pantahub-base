@@ -84,12 +84,13 @@ func (f FileUploadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func DoInit() {
 
 	phAuth := utils.GetEnv(utils.ENV_PANTAHUB_AUTH)
+	jwtSecret := utils.GetEnv(utils.ENV_PANTAHUB_JWT_SECRET)
 
 	session, _ := utils.GetMongoSession()
 
 	{
 		app := auth.New(&jwt.JWTMiddleware{
-			Key:        []byte("secret key"),
+			Key:        []byte(jwtSecret),
 			Realm:      "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
 			Timeout:    time.Minute * 60,
 			MaxRefresh: time.Hour * 24,
@@ -98,35 +99,35 @@ func DoInit() {
 	}
 	{
 		app := objects.New(&jwt.JWTMiddleware{
-			Key:   []byte("secret key"),
+			Key:   []byte(jwtSecret),
 			Realm: "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
 		}, session)
 		http.Handle("/objects/", http.StripPrefix("/objects", app.Api.MakeHandler()))
 	}
 	{
 		app := devices.New(&jwt.JWTMiddleware{
-			Key:   []byte("secret key"),
+			Key:   []byte(jwtSecret),
 			Realm: "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
 		}, session)
 		http.Handle("/devices/", http.StripPrefix("/devices", app.Api.MakeHandler()))
 	}
 	{
 		app := trails.New(&jwt.JWTMiddleware{
-			Key:   []byte("secret key"),
+			Key:   []byte(jwtSecret),
 			Realm: "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
 		}, session)
 		http.Handle("/trails/", http.StripPrefix("/trails", app.Api.MakeHandler()))
 	}
 	{
 		app := plog.New(&jwt.JWTMiddleware{
-			Key:   []byte("secret key"),
+			Key:   []byte(jwtSecret),
 			Realm: "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
 		}, session)
 		http.Handle("/plog/", http.StripPrefix("/plog", app.Api.MakeHandler()))
 	}
 	{
 		app := logs.New(&jwt.JWTMiddleware{
-			Key:   []byte("secret key"),
+			Key:   []byte(jwtSecret),
 			Realm: "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
 		}, session)
 		http.Handle("/logs/", http.StripPrefix("/logs", app.Api.MakeHandler()))
