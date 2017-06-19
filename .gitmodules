@@ -1,0 +1,3 @@
+[submodule "vendor/pvr"]
+	path = vendor/pvr
+	url = https://gitlab.com/pantacor/pvr
