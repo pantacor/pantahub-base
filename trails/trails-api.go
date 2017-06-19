@@ -48,13 +48,13 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"pvr/api"
 	"strconv"
 	"strings"
 	"time"
 
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pvr/api"
 
 	"github.com/StephanDollberg/go-json-rest-middleware-jwt"
 	"github.com/ant0ine/go-json-rest/rest"
