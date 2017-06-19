@@ -138,7 +138,9 @@ Convenience docker builds are available in gcr.io/pantahub-registry/pantahub-bas
 To run the latest:
 
 ```
-docker run -it --rm -v/path/to/storage:/opt/ph/local-s3 pantahub-base
+docker run -it --rm \
+	-v/path/to/storage:/opt/ph/local-s3 \
+	gcr.io/pantahub-registry/pantahub-base:latest
 ```
 
 # Build your own Docker
