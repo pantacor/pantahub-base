@@ -19,7 +19,7 @@ type HealthzApp struct {
 type Response struct {
 	ErrorCode int           `json:"code"`
 	Duration  time.Duration `json:"duration"`
-	Start     time.Time     `json:"start=-time"`
+	Start     time.Time     `json:"start-time"`
 }
 
 func (a *HealthzApp) handle_healthz(w rest.ResponseWriter, r *rest.Request) {
