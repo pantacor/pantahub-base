@@ -90,6 +90,10 @@ const (
 	// SMTP pass to use for sending mails
 	// default: <none>
 	ENV_SMTP_PASS = "SMTP_PASS"
+
+	// PANTAHUB_S3PATH for backing storage
+	// default: ../local-s3/
+	ENV_PANTAHUB_S3PATH = "PANTAHUB_S3PATH"
 )
 
 var defaultEnvs = map[string]string{
@@ -116,7 +120,8 @@ var defaultEnvs = map[string]string{
 	ENV_SMTP_USER: "XXX",
 	ENV_SMTP_PASS: "XXX",
 
-	ENV_PANTAHUB_AUTH: "https://localhost:12366/auth",
+	ENV_PANTAHUB_AUTH:   "https://localhost:12366/auth",
+	ENV_PANTAHUB_S3PATH: "../local-s3/",
 }
 
 func GetEnv(key string) string {

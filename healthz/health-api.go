@@ -3,6 +3,8 @@ package healthz
 import (
 	"net/http"
 
+	"os"
+	"path"
 	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
@@ -35,19 +37,25 @@ func (a *HealthzApp) handle_healthz(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
+	// check DB
 	collection := a.mgoSession.DB("").C("pantahub_devices")
-
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
-
 	var val interface{}
-
 	err := collection.Find(bson.M{}).One(val)
-
 	if err != nil {
 		rest.Error(w, "Error with Database query", http.StatusInternalServerError)
+		return
+	}
+	// check storage
+	s3Path := utils.GetEnv(utils.ENV_PANTAHUB_S3PATH)
+
+	_, err = os.Stat(path.Join(s3Path, "HEALTHZ.txt"))
+
+	if err != nil {
+		rest.Error(w, "Error getting stats of HEALTHZ.txt on local-s3 storage", http.StatusInternalServerError)
 		return
 	}
 

@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 
@@ -66,7 +65,7 @@ var pantahubS3Production bool
 var pantahubHttpsUrl string
 
 func init() {
-	pantahubS3Path = os.Getenv("PANTAHUB_S3PATH")
+	pantahubS3Path = utils.GetEnv(utils.ENV_PANTAHUB_S3PATH)
 
 	if pantahubS3Path == "production" {
 		pantahubS3Production = true
