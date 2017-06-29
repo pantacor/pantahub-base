@@ -28,6 +28,7 @@ import (
 
 	"gitlab.com/pantacor/pantahub-base/auth"
 	"gitlab.com/pantacor/pantahub-base/devices"
+	"gitlab.com/pantacor/pantahub-base/healthz"
 	"gitlab.com/pantacor/pantahub-base/logs"
 	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/plog"
@@ -131,6 +132,11 @@ func DoInit() {
 			Realm: "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
 		}, session)
 		http.Handle("/logs/", http.StripPrefix("/logs", app.Api.MakeHandler()))
+	}
+
+	{
+		app := healthz.New(session)
+		http.Handle("/healthz/", http.StripPrefix("/healthz", app.Api.MakeHandler()))
 	}
 
 	if !objects.PantahubS3Production() {
