@@ -323,6 +323,17 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *DevicesApp {
 	// we dont use default stack because we dont want content type enforcement
 	app.Api.Use(&rest.AccessLogApacheMiddleware{})
 	app.Api.Use(rest.DefaultCommonStack...)
+	app.Api.Use(&rest.CorsMiddleware{
+		RejectNonCorsRequests: false,
+		OriginValidator: func(origin string, request *rest.Request) bool {
+			return true
+		},
+		AllowedMethods: []string{"GET", "POST", "PUT", "OPTIONS"},
+		AllowedHeaders: []string{
+			"Accept", "Content-Type", "X-Custom-Header", "Origin", "Authorization"},
+		AccessControlAllowCredentials: true,
+		AccessControlMaxAge:           3600,
+	})
 
 	// no authentication needed for /login
 	app.Api.Use(&rest.IfMiddleware{
