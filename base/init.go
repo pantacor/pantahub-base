@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"gitlab.com/pantacor/pantahub-base/auth"
+	"gitlab.com/pantacor/pantahub-base/dash"
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/healthz"
 	"gitlab.com/pantacor/pantahub-base/logs"
@@ -137,6 +138,14 @@ func DoInit() {
 	{
 		app := healthz.New(session)
 		http.Handle("/healthz/", http.StripPrefix("/healthz", app.Api.MakeHandler()))
+	}
+
+	{
+		app := dash.New(&jwt.JWTMiddleware{
+			Key:   []byte(jwtSecret),
+			Realm: "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
+		}, session)
+		http.Handle("/dash/", http.StripPrefix("/dash", app.Api.MakeHandler()))
 	}
 
 	if !objects.PantahubS3Production() {
