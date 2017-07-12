@@ -167,13 +167,13 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 	newTrail.Owner = owner.(string)
 	newTrail.Device = device.(string)
 	newTrail.LastInSync = time.Time{}
-	newTrail.FactoryState = bsonQuoteMap(&initialState)
+	newTrail.FactoryState = utils.BsonQuoteMap(&initialState)
 
 	newStep := Step{}
 	newStep.Id = newTrail.Id.Hex() + "-0"
 	newStep.TrailId = newTrail.Id
 	newStep.Rev = 0
-	newStep.State = bsonQuoteMap(&initialState)
+	newStep.State = utils.BsonQuoteMap(&initialState)
 	newStep.Owner = newTrail.Owner
 	newStep.Device = newTrail.Device
 	newStep.CommitMsg = "Factory State (rev 0)"
@@ -208,7 +208,7 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	newTrail.FactoryState = bsonUnquoteMap(&newTrail.FactoryState)
+	newTrail.FactoryState = utils.BsonUnquoteMap(&newTrail.FactoryState)
 	w.WriteJson(newTrail)
 }
 
@@ -252,7 +252,7 @@ func (a *TrailsApp) handle_gettrails(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	for k, v := range trails {
-		v.FactoryState = bsonUnquoteMap(&v.FactoryState)
+		v.FactoryState = utils.BsonUnquoteMap(&v.FactoryState)
 		trails[k] = v
 	}
 
@@ -299,7 +299,7 @@ func (a *TrailsApp) handle_gettrail(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	trail.FactoryState = bsonUnquoteMap(&trail.FactoryState)
+	trail.FactoryState = utils.BsonUnquoteMap(&trail.FactoryState)
 	w.WriteJson(trail)
 }
 
@@ -495,7 +495,7 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if err != nil {
-		rest.Error(w, "Error auto appending step 1 " + err.Error(), http.StatusInternalServerError)
+		rest.Error(w, "Error auto appending step 1 "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -522,7 +522,7 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 	newStep.TrailId = trail.Id
 	newStep.StepTime = time.Now()
 	newStep.ProgressTime = time.Unix(0, 0)
-	newStep.State = bsonQuoteMap(&newStep.State)
+	newStep.State = utils.BsonQuoteMap(&newStep.State)
 
 	err = collSteps.Insert(newStep)
 
@@ -539,7 +539,7 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 		fmt.Printf("Error updating last-touched for trail in poststep; not failing because step was written: %s\n", trail.Id.Hex())
 	}
 
-	newStep.State = bsonUnquoteMap(&newStep.State)
+	newStep.State = utils.BsonUnquoteMap(&newStep.State)
 
 	w.WriteJson(newStep)
 }
@@ -609,7 +609,7 @@ func (a *TrailsApp) handle_getsteps(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	for k, v := range steps {
-		v.State = bsonUnquoteMap(&v.State)
+		v.State = utils.BsonUnquoteMap(&v.State)
 		steps[k] = v
 	}
 	w.WriteJson(steps)
@@ -652,7 +652,7 @@ func (a *TrailsApp) handle_getstep(w rest.ResponseWriter, r *rest.Request) {
 		coll.Find(bson.M{"_id": trailId + "-" + rev, "owner": owner}).One(&step)
 	}
 
-	step.State = bsonUnquoteMap(&step.State)
+	step.State = utils.BsonUnquoteMap(&step.State)
 	w.WriteJson(step)
 }
 
@@ -691,27 +691,7 @@ func (a *TrailsApp) handle_getstepstate(w rest.ResponseWriter, r *rest.Request) 
 		coll.Find(bson.M{"_id": trailId + "-" + rev, "owner": owner}).One(&step)
 	}
 
-	w.WriteJson(bsonUnquoteMap(&step.State))
-}
-
-func bsonQuoteMap(m *map[string]interface{}) map[string]interface{} {
-	escapedMap := map[string]interface{}{}
-	for k, v := range *m {
-		nk := strings.Replace(k, ".", "\uFF2E", -1)
-		// fmt.Printf("klen: %d nklen: %d\n", len([]byte(k)), len([]byte(nk)))
-		escapedMap[nk] = v
-	}
-	return escapedMap
-}
-
-func bsonUnquoteMap(m *map[string]interface{}) map[string]interface{} {
-	escapedMap := map[string]interface{}{}
-	for k, v := range *m {
-		nk := strings.Replace(k, "\uFF2E", ".", -1)
-		// fmt.Printf("klen: %d nklen: %d\n", len([]byte(k)), len([]byte(nk)))
-		escapedMap[nk] = v
-	}
-	return escapedMap
+	w.WriteJson(utils.BsonUnquoteMap(&step.State))
 }
 
 //
@@ -760,7 +740,7 @@ func (a *TrailsApp) handle_putstepstate(w rest.ResponseWriter, r *rest.Request) 
 		return
 	}
 
-	step.State = bsonQuoteMap(&stateMap)
+	step.State = utils.BsonQuoteMap(&stateMap)
 	step.StepTime = time.Now()
 	step.ProgressTime = time.Unix(0, 0)
 
@@ -773,7 +753,7 @@ func (a *TrailsApp) handle_putstepstate(w rest.ResponseWriter, r *rest.Request) 
 		return
 	}
 
-	step.State = bsonUnquoteMap(&step.State)
+	step.State = utils.BsonUnquoteMap(&step.State)
 	w.WriteJson(step.State)
 }
 
