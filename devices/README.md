@@ -92,23 +92,23 @@ challenge=duly-helped-bat
 ```
 3. as a logged in user with TOKEN you claim the device through a simple PUT
 ```
-http POST localhost:12365/devices/ secret="mysec1"
+http PUT localhost:12365/devices/59669139632d7234e2703610?challenge=$challenge Authorization:"Bearer $TOKEN"
 HTTP/1.1 200 OK
-Content-Length: 286
+Content-Length: 309
 Content-Type: application/json; charset=utf-8
-Date: Wed, 12 Jul 2017 21:14:34 GMT
+Date: Wed, 12 Jul 2017 21:15:49 GMT
 X-Powered-By: go-json-rest
 
 {
-    "challenge": "duly-helped-bat",
+    "challenge": "",
     "device-meta": {},
     "id": "59669139632d7234e2703610",
     "nick": "immortal_worm",
-    "owner": "",
+    "owner": "prn:pantahub.com:auth:/user1",
     "prn": "prn:::devices:/59669139632d7234e2703610",
     "secret": "mysec1",
-    "time-created": "2017-07-12T23:14:33.97805159+02:00",
-    "time-modified": "0001-01-01T00:00:00Z",
+    "time-created": "2017-07-12T23:14:33.978+02:00",
+    "time-modified": "2017-07-12T23:15:49.078077992+02:00",
     "user-meta": {}
 }
 ```
