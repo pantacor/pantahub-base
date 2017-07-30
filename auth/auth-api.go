@@ -31,87 +31,140 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-var passwords = map[string]string{
-	"admin":    "admin",
-	"user1":    "user1",
-	"user2":    "user2",
-	"examples":    "examples",
-	"service1": "service1",
-	"service2": "service2",
-	"service3": "service3",
-	"device1":  "device1",
-	"device2":  "device2",
+var accounts = map[string]Account{
+	"prn:pantahub.com:auth:/admin": Account{
+		Type:         ACCOUNT_TYPE_ADMIN,
+		Prn:          "prn:pantahub.com:auth:/admin",
+		Nick:         "admin",
+		Email:        "no-reply@accounts.pantahub.com",
+		TimeCreated:  time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
+		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
+		Password:     "admin",
+	},
+	"prn:pantahub.com:auth:/user1": Account{
+		Type:         ACCOUNT_TYPE_USER,
+		Prn:          "prn:pantahub.com:auth:/user1",
+		Nick:         "user1",
+		Email:        "no-reply@accounts.pantahub.com",
+		TimeCreated:  time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
+		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
+		Password:     "user1",
+	},
+	"prn:pantahub.com:auth:/user2": Account{
+		Type:         ACCOUNT_TYPE_USER,
+		Prn:          "prn:pantahub.com:auth:/user2",
+		Nick:         "user2",
+		Email:        "no-reply@accounts.pantahub.com",
+		TimeCreated:  time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
+		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
+		Password:     "user2",
+	},
+	"prn:pantahub.com:auth:/user3": Account{
+		Type:         ACCOUNT_TYPE_USER,
+		Prn:          "prn:pantahub.com:auth:/user3",
+		Nick:         "user3",
+		Email:        "no-reply@accounts.pantahub.com",
+		TimeCreated:  time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
+		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
+		Password:     "user3",
+	},
+	"prn:pantahub.com:auth:/device1": Account{
+		Type:         ACCOUNT_TYPE_DEVICE,
+		Prn:          "prn:pantahub.com:auth:/device1",
+		Nick:         "device1",
+		Email:        "no-reply@accounts.pantahub.com",
+		TimeCreated:  time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
+		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
+		Password:     "device1",
+	},
+	"prn:pantahub.com:auth:/device2": Account{
+		Type:         ACCOUNT_TYPE_DEVICE,
+		Prn:          "prn:pantahub.com:auth:/device2",
+		Nick:         "device2",
+		Email:        "no-reply@accounts.pantahub.com",
+		TimeCreated:  time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
+		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
+		Password:     "device2",
+	},
+	"prn:pantahub.com:auth:/service1": Account{
+		Type:         ACCOUNT_TYPE_SERVICE,
+		Prn:          "prn:pantahub.com:auth:/service1",
+		Nick:         "service1",
+		Email:        "no-reply@accounts.pantahub.com",
+		TimeCreated:  time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
+		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
+		Password:     "service1",
+	},
+	"prn:pantahub.com:auth:/service2": Account{
+		Type:         ACCOUNT_TYPE_SERVICE,
+		Prn:          "prn:pantahub.com:auth:/service2",
+		Nick:         "service2",
+		Email:        "no-reply@accounts.pantahub.com",
+		TimeCreated:  time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
+		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
+		Password:     "service2",
+	},
+	"prn:pantahub.com:auth:/service3": Account{
+		Type:         ACCOUNT_TYPE_SERVICE,
+		Prn:          "prn:pantahub.com:auth:/service3",
+		Nick:         "service3",
+		Email:        "no-reply@accounts.pantahub.com",
+		TimeCreated:  time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
+		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
+		Password:     "service3",
+	},
 }
 
-var payloads = map[string]map[string]interface{}{
-	"admin": map[string]interface{}{
-		"roles": "admin",
-		"type":  "USER",
-		"prn":   "prn:pantahub.com:auth:/admin",
-	},
-	"user1": map[string]interface{}{
-		"roles": "user",
-		"type":  "USER",
-		"nick":  "user1",
-		"prn":   "prn:pantahub.com:auth:/user1",
-	},
-	"user2": map[string]interface{}{
-		"roles": "user",
-		"type":  "USER",
-		"nick":  "user2",
-		"prn":   "prn:pantahub.com:auth:/user2",
-	},
-	"examples": map[string]interface{}{
-		"roles": "user",
-		"type":  "USER",
-		"nick":  "examples",
-		"prn":   "prn:pantahub.com:auth:/examples",
-	},
-	"service1": map[string]interface{}{
-		"roles": "service",
-		"type":  "SERVICE",
-		"prn":   "prn:pantahub.com:auth:/service1",
-	},
-	"service2": map[string]interface{}{
-		"roles": "service",
-		"type":  "SERVICE",
-		"prn":   "prn:pantahub.com:auth:/service2",
-	},
-	"service3": map[string]interface{}{
-		"roles": "user",
-		"type":  "SERVICE",
-		"prn":   "prn:pantahub.com:auth:/service3",
-	},
-	"device1": map[string]interface{}{
-		"roles": "device",
-		"type":  "DEVICE",
-		"prn":   "prn:pantahub.com:auth:/device1",
-		"owner": "prn:pantahub.com:auth:/user1",
-	},
-	"device2": map[string]interface{}{
-		"roles": "device",
-		"type":  "DEVICE",
-		"prn":   "prn:pantahub.com:auth:/device2",
-		"owner": "prn:pantahub.com:auth:/user2",
-	},
+func AccountToPayload(account Account) map[string]interface{} {
+	result := map[string]interface{}{}
+
+	switch account.Type {
+	case ACCOUNT_TYPE_ADMIN:
+		result["roles"] = "admin"
+		result["type"] = "USER"
+		break
+	case ACCOUNT_TYPE_USER:
+		result["roles"] = "admin"
+		result["type"] = "USER"
+		break
+	case ACCOUNT_TYPE_DEVICE:
+		result["roles"] = "device"
+		result["type"] = "DEVICE"
+		break
+	case ACCOUNT_TYPE_SERVICE:
+		result["roles"] = "service"
+		result["type"] = "SERVICE"
+		break
+	default:
+		panic("Must not reach this!")
+		return nil
+	}
+
+	result["nick"] = account.Nick
+	result["prn"] = account.Prn
+
+	return result
 }
 
 type AccountType string
 
 const (
-	ACCOUNT_TYPE_USER = AccountType("USER")
-	ACCOUNT_TYPE_ORG  = AccountType("ORG")
+	ACCOUNT_TYPE_ADMIN   = AccountType("ADMIN")
+	ACCOUNT_TYPE_DEVICE  = AccountType("DEVICE")
+	ACCOUNT_TYPE_ORG     = AccountType("ORG")
+	ACCOUNT_TYPE_SERVICE = AccountType("SERVICE")
+	ACCOUNT_TYPE_USER    = AccountType("USER")
 )
 
 type Account struct {
-	Id bson.ObjectId `json:"id" bson:"_id"`
+	Id bson.ObjectId `json:"-" bson:"_id"`
 
 	Type  AccountType `json:"type" bson:"type"`
 	Email string      `json:"email" bson:"email"`
 	Nick  string      `json:"nick" bson:"nick"`
 	Prn   string      `json:"prn" bson:"prn"`
 
-	Password  string `json:"password" bson:"password"`
+	Password  string `json:"-" bson:"password"`
 	Challenge string `json:"-" bson:"challenge"`
 
 	TimeCreated  time.Time `json:"time-created" bson:"time-created"`
@@ -181,6 +234,41 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 	utils.SendVerification(newAccount.Email, newAccount.Id.Hex(), newAccount.Challenge, urlPrefix)
 
 	w.WriteJson(newAccount)
+}
+
+func (a *AuthApp) handle_getprofile(w rest.ResponseWriter, r *rest.Request) {
+	jwtClaims := r.Env["JWT_PAYLOAD"].(map[string]interface{})
+
+	accountPrn := jwtClaims["prn"].(string)
+	fmt.Println("ACCOUNT: " + accountPrn)
+
+	if accountPrn == "" {
+		rest.Error(w, "Not logged in", http.StatusPreconditionFailed)
+		return
+	}
+
+	var account Account
+	var ok bool
+
+	if account, ok = accounts[accountPrn]; !ok {
+		col := a.mgoSession.DB("").C("pantahub_accounts")
+
+		err := col.Find(bson.M{"prn": accountPrn}).One(&account)
+
+		if err != nil {
+			switch err.(type) {
+			case *mgo.QueryError:
+				qErr := err.(*mgo.QueryError)
+				rest.Error(w, "Query Error: "+qErr.Error(), http.StatusInternalServerError)
+				break
+			default:
+				rest.Error(w, "Account "+err.Error(), http.StatusInternalServerError)
+				break
+			}
+		}
+	}
+
+	w.WriteJson(account)
 }
 
 func (a *AuthApp) handle_verify(w rest.ResponseWriter, r *rest.Request) {
@@ -268,27 +356,37 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 		if userId == "" || password == "" {
 			return false
 		}
-		if passwords[userId] != "" && passwords[userId] == password {
-			return true
+
+		if !strings.HasPrefix(userId, "prn:") {
+			userId = "prn:pantahub.com:auth:/" + userId
 		}
-		if strings.HasPrefix(userId, "prn:::devices:") {
-			return app.deviceAuth(userId, password)
+
+		if plm, ok := accounts[userId]; !ok {
+			if strings.HasPrefix(userId, "prn:::devices:") {
+				return app.deviceAuth(userId, password)
+			} else {
+				return app.accountAuth(userId, password)
+			}
 		} else {
-			return app.accountAuth(userId, password)
+			return plm.Password == password
 		}
 		return false
 	}
 
 	jwtMiddleware.PayloadFunc = func(userId string) map[string]interface{} {
 
-		if plm, ok := payloads[userId]; !ok {
+		if !strings.HasPrefix(userId, "prn:") {
+			userId = "prn:pantahub.com:auth:/" + userId
+		}
+
+		if plm, ok := accounts[userId]; !ok {
 			if strings.HasPrefix(userId, "prn:::devices:") {
-				return *app.devicePayload(userId)
+				return app.devicePayload(userId)
 			} else {
-				return *app.accountPayload(userId)
+				return app.userPayload(userId)
 			}
 		} else {
-			return plm
+			return AccountToPayload(plm)
 		}
 		return map[string]interface{}{}
 	}
@@ -319,6 +417,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 
 	// /login /auth_status and /refresh_token endpoints
 	api_router, _ := rest.MakeRouter(
+		rest.Get("/", app.handle_getprofile),
 		rest.Post("/login", app.jwt_middleware.LoginHandler),
 		rest.Get("/auth_status", handle_auth),
 		rest.Get("/login", app.jwt_middleware.RefreshHandler),
@@ -330,7 +429,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 	return app
 }
 
-func (a *AuthApp) getAccount(idEmailNick string) (Account, error) {
+func (a *AuthApp) getAccount(prnEmailNick string) (Account, error) {
 
 	var (
 		err     error
@@ -343,14 +442,12 @@ func (a *AuthApp) getAccount(idEmailNick string) (Account, error) {
 	//  - id (pure and with prn format
 	//  - email
 	//  - nick
-	if utils.IsEmail(idEmailNick) {
-		err = c.Find(bson.M{"email": idEmailNick}).One(&account)
-	} else if utils.IsNick(idEmailNick) {
-		err = c.Find(bson.M{"nick": idEmailNick}).One(&account)
+	if utils.IsEmail(prnEmailNick) {
+		err = c.Find(bson.M{"email": prnEmailNick}).One(&account)
+	} else if utils.IsNick(prnEmailNick) {
+		err = c.Find(bson.M{"nick": prnEmailNick}).One(&account)
 	} else {
-		id := utils.PrnGetId(idEmailNick)
-		mgoId := bson.ObjectIdHex(id)
-		err = c.FindId(mgoId).One(&account)
+		err = c.Find(bson.M{"prn": prnEmailNick}).One(&account)
 	}
 
 	return account, err
@@ -385,7 +482,7 @@ func (a *AuthApp) accountAuth(idEmailNick string, secret string) bool {
 	return false
 }
 
-func (a *AuthApp) accountPayload(idEmailNick string) *map[string]interface{} {
+func (a *AuthApp) userPayload(idEmailNick string) map[string]interface{} {
 
 	var (
 		err     error
@@ -400,14 +497,9 @@ func (a *AuthApp) accountPayload(idEmailNick string) *map[string]interface{} {
 		return nil
 	}
 
-	val := map[string]interface{}{
-		"roles": "users",
-		"type":  account.Type,
-		"nick":  account.Nick,
-		"prn":   account.Prn,
-	}
+	val := AccountToPayload(account)
 
-	return &val
+	return val
 }
 
 func (a *AuthApp) deviceAuth(deviceId string, secret string) bool {
@@ -425,7 +517,7 @@ func (a *AuthApp) deviceAuth(deviceId string, secret string) bool {
 	return false
 }
 
-func (a *AuthApp) devicePayload(deviceId string) *map[string]interface{} {
+func (a *AuthApp) devicePayload(deviceId string) map[string]interface{} {
 
 	c := a.mgoSession.DB("").C("pantahub_devices")
 
@@ -446,5 +538,5 @@ func (a *AuthApp) devicePayload(deviceId string) *map[string]interface{} {
 		"owner": device.Owner,
 	}
 
-	return &val
+	return val
 }
