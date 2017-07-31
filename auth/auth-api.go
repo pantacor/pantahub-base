@@ -361,7 +361,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 
 	err = app.mgoSession.DB("").C("pantahub_accounts").EnsureIndex(index)
 	if err != nil {
-		log.Println("Error setting up index for pantahub_logs: " + err.Error())
+		log.Println("Error setting up index for pantahub_accounts: " + err.Error())
 		return nil
 	}
 
