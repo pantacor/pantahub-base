@@ -16,6 +16,7 @@
 package devices
 
 import (
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -457,6 +458,19 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *DevicesApp {
 	app := new(DevicesApp)
 	app.jwt_middleware = jwtMiddleware
 	app.mgoSession = session
+
+	index := mgo.Index{
+		Key:        []string{"nick"},
+		Unique:     true,
+		Background: true,
+		Sparse:     false,
+	}
+
+	err := app.mgoSession.DB("").C("pantahub_devices").EnsureIndex(index)
+	if err != nil {
+		log.Println("Error setting up index for pantahub_devices: " + err.Error())
+		return nil
+	}
 
 	app.Api = rest.NewApi()
 	// we dont use default stack because we dont want content type enforcement

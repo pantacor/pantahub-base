@@ -22,6 +22,7 @@ import (
 	"gitlab.com/pantacor/pantahub-base/utils"
 
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -232,7 +233,6 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	utils.SendVerification(newAccount.Email, newAccount.Id.Hex(), newAccount.Challenge, urlPrefix)
-
 	w.WriteJson(newAccount)
 }
 
@@ -349,6 +349,19 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 	err = app.mgoSession.DB("").C("pantahub_accounts").EnsureIndex(index)
 	if err != nil {
 		fmt.Println("Error setting up index for pantahub_accounts: " + err.Error())
+		return nil
+	}
+
+	index = mgo.Index{
+		Key:        []string{"nick"},
+		Unique:     true,
+		Background: true,
+		Sparse:     false,
+	}
+
+	err = app.mgoSession.DB("").C("pantahub_accounts").EnsureIndex(index)
+	if err != nil {
+		log.Println("Error setting up index for pantahub_logs: " + err.Error())
 		return nil
 	}
 
