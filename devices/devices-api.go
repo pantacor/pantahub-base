@@ -17,6 +17,7 @@ package devices
 
 import (
 	"log"
+	"math/rand"
 	"net/http"
 	"strings"
 	"time"
@@ -29,6 +30,11 @@ import (
 
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
+
+func init() {
+	// seed this for petname as dustin dropped our patch upstream... moo
+	rand.Seed(time.Now().Unix())
+}
 
 type DevicesApp struct {
 	jwt_middleware *jwt.JWTMiddleware
@@ -203,7 +209,12 @@ func (a *DevicesApp) handle_postdevice(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
-	collection.UpsertId(mgoid, newDevice)
+	_, err := collection.UpsertId(mgoid, newDevice)
+
+	if err != nil {
+		rest.Error(w, "Error creating device "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	w.WriteJson(newDevice)
 }
