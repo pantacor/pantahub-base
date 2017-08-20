@@ -69,6 +69,15 @@ var accounts = map[string]Account{
 		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
 		Password:     "user3",
 	},
+	"prn:pantahub.com:auth:/examples": Account{
+		Type:         ACCOUNT_TYPE_USER,
+		Prn:          "prn:pantahub.com:auth:/user3",
+		Nick:         "examples",
+		Email:        "no-reply@accounts.pantahub.com",
+		TimeCreated:  time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
+		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
+		Password:     "examples",
+	},
 	"prn:pantahub.com:auth:/device1": Account{
 		Type:         ACCOUNT_TYPE_DEVICE,
 		Prn:          "prn:pantahub.com:auth:/device1",
