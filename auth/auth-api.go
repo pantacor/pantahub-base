@@ -242,6 +242,9 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	utils.SendVerification(newAccount.Email, newAccount.Id.Hex(), newAccount.Challenge, urlPrefix)
+
+	newAccount.Password = ""
+	newAccount.Challenge = ""
 	w.WriteJson(newAccount)
 }
 
