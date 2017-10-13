@@ -30,6 +30,7 @@ func SendVerification(email, id, u string, urlPrefix string) bool {
 	portStr := GetEnv(ENV_SMTP_PORT)
 	user := GetEnv(ENV_SMTP_USER)
 	pass := GetEnv(ENV_SMTP_PASS)
+	regEmail := GetEnv(ENV_REG_EMAIL)
 	port, err := strconv.Atoi(portStr)
 
 	if err != nil {
@@ -37,20 +38,23 @@ func SendVerification(email, id, u string, urlPrefix string) bool {
 		return false
 	}
 
-	body := "To verify your account, please click on the link: <a href=\"" + link +
+	body := "A user has requested access. If you want him to get access, send him thef ollowing text with link:" +
+		"\n\nTo: " + email + "\n\n\n\nTo verify your account, please click on the link: <a href=\"" + link +
 		"\">" + link + "</a><br><br>Best Regards,<br><br>" +
 		"A. Sack and R. Mendoza (Pantacor Founders)"
 
 	msg := gomail.NewMessage()
 	msg.SetAddressHeader("From", "hubpanta@gmail.com", "Pantahub Registration Desk")
-	msg.SetHeader("To", email)
-	msg.SetHeader("Subject", "Account Verification for api.pantahub.com")
+	msg.SetHeader("To", regEmail)
+	msg.SetHeader("Subject", "Account Verification <"+email+"> for api.pantahub.com")
 	msg.SetBody("text/html", body)
 	m := gomail.NewDialer(host, port, user, pass)
 	if err := m.DialAndSend(msg); err != nil {
 		fmt.Println("ERROR sending email - " + err.Error())
 		fmt.Println("Body not sent: \n\t" + body)
 		return false
+	} else {
+		fmt.Println("send message")
 	}
 	return true
 }
