@@ -174,8 +174,8 @@ type Account struct {
 	Nick  string      `json:"nick" bson:"nick"`
 	Prn   string      `json:"prn" bson:"prn"`
 
-	Password  string `json:"-" bson:"password"`
-	Challenge string `json:"-" bson:"challenge"`
+	Password  string `json:"password,omitempty" bson:"password"`
+	Challenge string `json:"challenge,omitempty" bson:"challenge"`
 
 	TimeCreated  time.Time `json:"time-created" bson:"time-created"`
 	TimeModified time.Time `json:"time-modified" bson:"time-modified"`
@@ -263,6 +263,9 @@ func (a *AuthApp) handle_getprofile(w rest.ResponseWriter, r *rest.Request) {
 		col := a.mgoSession.DB("").C("pantahub_accounts")
 
 		err := col.Find(bson.M{"prn": accountPrn}).One(&account)
+		// always unset credentials so we dont end up sending them out
+		account.Password = ""
+		account.Challenge = ""
 
 		if err != nil {
 			switch err.(type) {
@@ -320,6 +323,9 @@ func (a *AuthApp) handle_verify(w rest.ResponseWriter, r *rest.Request) {
 	newAccount.TimeModified = time.Now()
 	collection.UpsertId(newAccount.Id, newAccount)
 
+	// always wipe secrets before sending over wire
+	newAccount.Password = ""
+	newAccount.Challenge = ""
 	w.WriteJson(newAccount)
 }
 
@@ -512,6 +518,8 @@ func (a *AuthApp) userPayload(idEmailNick string) map[string]interface{} {
 	)
 
 	account, err = a.getAccount(idEmailNick)
+	account.Password = ""
+	account.Challenge = ""
 
 	// error with db or not found -> log and fail
 	if err != nil {
