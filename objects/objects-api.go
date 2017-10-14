@@ -298,6 +298,59 @@ func (a *ObjectsApp) handle_getobject(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(filesObjWithAccess)
 }
 
+func (a *ObjectsApp) handle_getobjectfile(w rest.ResponseWriter, r *rest.Request) {
+
+	// XXX: refactor: dupe code with getobject with getobject
+	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["owner"]
+	if !ok {
+		owner, ok = r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+		// XXX: find right error
+		if !ok {
+			rest.Error(w, "You need to be logged in as USER or DEVICE with owner", http.StatusForbidden)
+			return
+		}
+	}
+
+	collection := a.mgoSession.DB("").C("pantahub_objects")
+
+	if collection == nil {
+		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+
+	ownerStr, ok := owner.(string)
+
+	if !ok {
+		// XXX: find right error
+		rest.Error(w, "Invalid Access", http.StatusForbidden)
+		return
+	}
+
+	objId := r.PathParam("id")
+	storageId := MakeStorageId(ownerStr, objId)
+
+	var filesObj Object
+	err := collection.FindId(storageId).One(&filesObj)
+
+	if err != nil {
+		rest.Error(w, "No Access", http.StatusForbidden)
+		return
+	}
+
+	// XXX: fixme; needs delegation of authorization for device accessing its resources
+	// could be subscriptions, but also something else
+	if filesObj.Owner != owner {
+		rest.Error(w, "No Access", http.StatusForbidden)
+		return
+	}
+	filesObjWithAccess := a.makeObjAccessible(filesObj, storageId)
+
+	url := filesObjWithAccess.SignedGetUrl
+
+	w.Header().Add("Location", url)
+	w.WriteHeader(http.StatusFound)
+}
+
 func (a *ObjectsApp) handle_getobjects(w rest.ResponseWriter, r *rest.Request) {
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
@@ -409,6 +462,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *ObjectsApp {
 		rest.Get("/", app.handle_getobjects),
 		rest.Post("/", app.handle_postobject),
 		rest.Get("/:id", app.handle_getobject),
+		rest.Get("/:id/blob", app.handle_getobjectfile),
 		rest.Put("/:id", app.handle_putobject),
 		rest.Delete("/:id", app.handle_deleteobject),
 	)
