@@ -235,7 +235,7 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	urlPrefix := utils.GetEnv(utils.ENV_PANTAHUB_SCHEME) + "://" + utils.GetEnv(utils.ENV_PANTAHUB_HOST)
+	urlPrefix := utils.GetEnv(utils.ENV_PANTAHUB_SCHEME) + "://" + utils.GetEnv(utils.ENV_PANTAHUB_HOST_WWW)
 	if utils.GetEnv(utils.ENV_PANTAHUB_PORT) != "" {
 		urlPrefix += ":"
 		urlPrefix += utils.GetEnv(utils.ENV_PANTAHUB_PORT)

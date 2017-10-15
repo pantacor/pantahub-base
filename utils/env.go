@@ -26,6 +26,10 @@ const (
 	// default: localhost
 	ENV_PANTAHUB_HOST = "PANTAHUB_HOST"
 
+	// Host you want clients to reach the web-interface
+	// default: localhost
+	ENV_PANTAHUB_HOST_WWW = "PANTAHUB_HOST_WWW"
+
 	// Port you want to make this server available under
 	// default: 12365 for http and 12366 for https
 	ENV_PANTAHUB_PORT = "PANTAHUB_PORT"
@@ -104,6 +108,7 @@ var defaultEnvs = map[string]string{
 	ENV_PANTAHUB_JWT_SECRET: "YOU MUST CHANGE THIS",
 
 	ENV_PANTAHUB_HOST:       "localhost",
+	ENV_PANTAHUB_HOST_WWW:   "localhost",
 	ENV_PANTAHUB_PORT:       "12365",
 	ENV_PANTAHUB_SCHEME:     "http",
 	ENV_PANTAHUB_APIVERSION: "", // XXX: needs to move to v0 at least for release

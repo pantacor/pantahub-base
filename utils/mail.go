@@ -46,7 +46,7 @@ func SendVerification(email, id, u string, urlPrefix string) bool {
 	msg := gomail.NewMessage()
 	msg.SetAddressHeader("From", "hubpanta@gmail.com", "Pantahub Registration Desk")
 	msg.SetHeader("To", regEmail)
-	msg.SetHeader("Subject", "Account Verification <"+email+"> for api.pantahub.com")
+	msg.SetHeader("Subject", "Account Verification <"+email+"> for www.pantahub.com")
 	msg.SetBody("text/html", body)
 	m := gomail.NewDialer(host, port, user, pass)
 	if err := m.DialAndSend(msg); err != nil {
