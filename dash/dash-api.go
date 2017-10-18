@@ -64,10 +64,11 @@ type SubscriptionInfo struct {
 }
 
 type DeviceInfo struct {
-	Nick    string `json:"nick"`
-	Prn     string `json:"prn"`
-	Message string `json:"message"`
-	Type    string `json:"type"`
+	DeviceId bson.ObjectId `json:"device-id"`
+	Nick     string        `json:"nick"`
+	Prn      string        `json:"prn"`
+	Message  string        `json:"message"`
+	Type     string        `json:"type"`
 }
 
 type Summary struct {
@@ -225,6 +226,7 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 		dInfo.Message = "Device changed at " + v.LastTouched.String()
 		dInfo.Type = "INFO"
 		dInfo.Nick = dev.Nick
+		dInfo.DeviceId = dev.Id
 		summary.TopDevices = append(summary.TopDevices, dInfo)
 	}
 
