@@ -311,7 +311,7 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if callerIsDevice && newDevice.IsPublic != isPublic {
-		rest.Error(w, "Device cann change its own 'public' state", http.StatusForbidden)
+		rest.Error(w, "Device cannot change its own 'public' state", http.StatusForbidden)
 		return
 	}
 
