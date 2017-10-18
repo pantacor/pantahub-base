@@ -51,6 +51,7 @@ type Device struct {
 	TimeCreated  time.Time              `json:"time-created"`
 	TimeModified time.Time              `json:"time-modified"`
 	Challenge    string                 `json:"challenge"`
+	IsPublic     bool                   `json:"public"`
 	UserMeta     map[string]interface{} `json:"user-meta" bson:"user-meta"`
 	DeviceMeta   map[string]interface{} `json:"device-meta" bson:"device-meta"`
 }
@@ -263,6 +264,7 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 	owner := newDevice.Owner
 	challenge := newDevice.Challenge
 	challengeVal := r.FormValue("challenge")
+	isPublic := newDevice.IsPublic
 	userMeta := utils.BsonUnquoteMap(&newDevice.UserMeta)
 	deviceMeta := utils.BsonUnquoteMap(&newDevice.DeviceMeta)
 
@@ -305,6 +307,11 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 
 	if newDevice.Secret == "" {
 		rest.Error(w, "Empty Secret not allowed for devices in PUT", http.StatusForbidden)
+		return
+	}
+
+	if callerIsDevice && newDevice.IsPublic != isPublic {
+		rest.Error(w, "Device cann change its own 'public' state", http.StatusForbidden)
 		return
 	}
 
