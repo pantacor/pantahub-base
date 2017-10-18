@@ -259,6 +259,11 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 
 	err := collection.FindId(bson.ObjectIdHex(putId)).One(&newDevice)
 
+	if err != nil {
+		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
+		return
+	}
+
 	prn := newDevice.Prn
 	timeCreated := newDevice.TimeCreated
 	owner := newDevice.Owner
@@ -267,11 +272,6 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 	isPublic := newDevice.IsPublic
 	userMeta := utils.BsonUnquoteMap(&newDevice.UserMeta)
 	deviceMeta := utils.BsonUnquoteMap(&newDevice.DeviceMeta)
-
-	if err != nil {
-		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
-		return
-	}
 
 	if callerIsDevice && newDevice.Prn != authId {
 		rest.Error(w, "Not Device Accessible Resource Id", http.StatusForbidden)
@@ -405,6 +405,118 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(device)
 }
 
+func (a *DevicesApp) handle_putpublic(w rest.ResponseWriter, r *rest.Request) {
+
+	newDevice := Device{}
+
+	putId := r.PathParam("id")
+
+	authId, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	if !ok {
+		// XXX: find right error
+		rest.Error(w, "You need to be logged in.", http.StatusForbidden)
+		return
+	}
+
+	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+
+	if !ok {
+		// XXX: find right error
+		rest.Error(w, "You need to be logged in with a known authentication type.", http.StatusForbidden)
+		return
+	}
+
+	if authType == "DEVICE" {
+		rest.Error(w, "Devices cannot change their own public state.", http.StatusForbidden)
+		return
+	}
+
+	collection := a.mgoSession.DB("").C("pantahub_devices")
+
+	if collection == nil {
+		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+
+	err := collection.FindId(bson.ObjectIdHex(putId)).One(&newDevice)
+	if err != nil {
+		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
+		return
+	}
+
+	if newDevice.Owner != "" && newDevice.Owner != authId {
+		rest.Error(w, "Not User Accessible Resource Id", http.StatusForbidden)
+		return
+	}
+
+	newDevice.IsPublic = true
+	newDevice.TimeModified = time.Now()
+
+	_, err = collection.UpsertId(newDevice.Id, newDevice)
+	if err != nil {
+		rest.Error(w, "Error updating device public state", http.StatusForbidden)
+		return
+	}
+
+	w.WriteJson(newDevice)
+}
+
+func (a *DevicesApp) handle_deletepublic(w rest.ResponseWriter, r *rest.Request) {
+
+	newDevice := Device{}
+
+	putId := r.PathParam("id")
+
+	authId, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	if !ok {
+		// XXX: find right error
+		rest.Error(w, "You need to be logged in.", http.StatusForbidden)
+		return
+	}
+
+	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+
+	if !ok {
+		// XXX: find right error
+		rest.Error(w, "You need to be logged in with a known authentication type.", http.StatusForbidden)
+		return
+	}
+
+	if authType == "DEVICE" {
+		rest.Error(w, "Devices cannot change their own public state.", http.StatusForbidden)
+		return
+	}
+
+	collection := a.mgoSession.DB("").C("pantahub_devices")
+
+	if collection == nil {
+		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+
+	err := collection.FindId(bson.ObjectIdHex(putId)).One(&newDevice)
+	if err != nil {
+		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
+		return
+	}
+
+	if newDevice.Owner != "" && newDevice.Owner != authId {
+		rest.Error(w, "Not User Accessible Resource Id", http.StatusForbidden)
+		return
+	}
+
+	newDevice.IsPublic = false
+	newDevice.TimeModified = time.Now()
+
+	_, err = collection.UpsertId(newDevice.Id, newDevice)
+	if err != nil {
+		rest.Error(w, "Error updating device public state", http.StatusForbidden)
+		return
+	}
+
+	w.WriteJson(newDevice)
+}
+
 type ModelError struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
@@ -529,6 +641,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *DevicesApp {
 		rest.Post("/", app.handle_postdevice),
 		rest.Get("/:id", app.handle_getdevice),
 		rest.Put("/:id", app.handle_putdevice),
+		rest.Put("/:id/public", app.handle_putpublic),
+		rest.Delete("/:id/public", app.handle_deletepublic),
 		rest.Put("/:id/user-meta", app.handle_putuserdata),
 		rest.Put("/:id/device-meta", app.handle_putdevicedata),
 		rest.Delete("/:id", app.handle_deletedevice),
