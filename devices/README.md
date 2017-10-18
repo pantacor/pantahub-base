@@ -249,3 +249,43 @@ X-Powered-By: go-json-rest
 
 ```
 
+# Share your device with the world; mark it as public
+
+To mark device as public you can either update the public field
+using a full PUT on the device you you can use the convenience
+endpoint ```/devices/:id/public```:
+
+```
+http PUT localhost:12365/devices/$DEVICEID/public Authorization:" Bearer $TOKEN"
+HTTP/1.1 200 OK
+Content-Length: 329
+Content-Type: application/json; charset=utf-8
+Date: Wed, 18 Oct 2017 20:09:55 GMT
+X-Powered-By: go-json-rest
+
+{
+...
+    "public": true,
+...
+}
+```
+
+# Unshare your devices; unmark them public
+
+If you change your mind simply use the DELETE method on the public endpoint:
+
+```
+http PUT localhost:12365/devices/$DEVICEID/public Authorization:" Bearer $TOKEN"
+HTTP/1.1 200 OK
+Content-Length: 330
+Content-Type: application/json; charset=utf-8
+Date: Wed, 18 Oct 2017 20:09:52 GMT
+X-Powered-By: go-json-rest
+
+{
+...
+    "public": false,
+...
+}
+```
+
