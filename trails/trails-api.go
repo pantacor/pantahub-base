@@ -971,20 +971,17 @@ func (a *TrailsApp) handle_gettrailsummary(w rest.ResponseWriter, r *rest.Reques
 	trails := make([]Trail, 0)
 	collTrails.Find(bson.M{"owner": owner}).All(&trails)
 
-	summaries := make([]TrailSummary, len(trails))
-
-	for i, v := range trails {
-		summaries[i], _ = a.get_trailsummary_one(v.Id, owner.(string), collSteps)
-		summaries[i].TrailTouchedTime = v.LastTouched
-
+	summaries := []TrailSummary{}
+	for _, v := range trails {
+		s, _ := a.get_trailsummary_one(v.Id, owner.(string), collSteps)
 		device := devices.Device{}
-		err := collDevices.Find(bson.M{"_id": summaries[i].DeviceId}).One(&device)
+		err := collDevices.Find(bson.M{"_id": s.DeviceId}).One(&device)
 		if err != nil {
-			rest.Error(w, "Error getting device record for id "+summaries[i].DeviceId.Hex(),
-				http.StatusInternalServerError)
-			return
+			continue
 		}
-		summaries[i].DeviceNick = device.Nick
+		s.TrailTouchedTime = v.LastTouched
+		s.DeviceNick = device.Nick
+		summaries = append(summaries, s)
 	}
 	w.WriteJson(summaries)
 }
