@@ -28,6 +28,7 @@ func GetMongoSession() (*mgo.Session, error) {
 	mongoPort := GetEnv(ENV_MONGO_PORT)
 	mongoUser := GetEnv(ENV_MONGO_USER)
 	mongoPass := GetEnv(ENV_MONGO_PASS)
+	mongoRs := GetEnv(ENV_MONGO_RS)
 
 	mongoCreds := ""
 	if mongoUser != "" {
@@ -35,6 +36,10 @@ func GetMongoSession() (*mgo.Session, error) {
 	}
 
 	mongoConnect := "mongodb://" + mongoCreds + mongoHost + ":" + mongoPort + "/" + mongoDb
+
+	if mongoRs != "" {
+		mongoConnect = mongoConnect + "?replicaSet=rs0"
+	}
 	fmt.Println("mongodb connect: " + mongoConnect)
 
 	return mgo.Dial(mongoConnect)

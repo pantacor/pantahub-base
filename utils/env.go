@@ -75,6 +75,10 @@ const (
 	// default: <none>
 	ENV_MONGO_PASS = "MONGO_PASS"
 
+	// Database password for mongodb connection
+	// default: <none>
+	ENV_MONGO_RS = "MONGO_RS"
+
 	// Service Account Admin Secret to use
 	// default: <none> (Required!)
 	ENV_PANTAHUB_SA_ADMIN_SECRET = "PANTAHUB_SA_ADMIN_SECRET"
@@ -121,6 +125,7 @@ var defaultEnvs = map[string]string{
 	ENV_MONGO_USER: "",
 	ENV_MONGO_PASS: "",
 	ENV_MONGO_PORT: "27017",
+	ENV_MONGO_RS: "", // replicaSet; needed if connecting to multiple hosts
 
 	ENV_PANTAHUB_SA_ADMIN_SECRET: "",
 
