@@ -109,6 +109,7 @@ type TrailSummary struct {
 	Rev              int           `json:"revision"`
 	ProgressRev      int           `json:"progress-revision"`
 	Progress         int           `json:"progress"`   // progress number. steps or 1-100
+	IsPublic         bool          `json:"public"`
 	StatusMsg        string        `json:"status-msg"` // message of progress status
 	Status           string        `json:"status"`     // status code
 	StepTime         time.Time     `json:"step-time" bson:"step-time"`
@@ -981,6 +982,7 @@ func (a *TrailsApp) handle_gettrailsummary(w rest.ResponseWriter, r *rest.Reques
 		}
 		s.TrailTouchedTime = v.LastTouched
 		s.DeviceNick = device.Nick
+		s.IsPublic = device.IsPublic
 		summaries = append(summaries, s)
 	}
 	w.WriteJson(summaries)
