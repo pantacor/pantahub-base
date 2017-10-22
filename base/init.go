@@ -84,8 +84,20 @@ func (f FileUploadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	r.URL = r.URL.ResolveReference(p)
 
 	if r.Method == "GET" {
+		if objClaims.Method != http.MethodGet {
+			fmt.Println("Invalid objClaims Method; not GET (" + objClaims.Method + ")")
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+
 		w.Header().Add("Content-Disposition", "attachment; filename=\""+objClaims.DispositionName+"\"")
 		f.fileServer.ServeHTTP(w, r)
+		return
+	}
+
+	if objClaims.Method != http.MethodPut {
+		fmt.Println("Invalid objClaims Method; not PUT (" + objClaims.Method + ")")
+		w.WriteHeader(http.StatusForbidden)
 		return
 	}
 

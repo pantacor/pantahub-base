@@ -25,10 +25,12 @@ type ObjectAccessClaims struct {
 	jwt.StandardClaims
 	DispositionName string
 	Size            int64
+	Method          string
 }
 
 func NewObjectAccessToken(
 	name string,
+	method string,
 	size int64,
 	issuer string,
 	subject string,
@@ -45,6 +47,7 @@ func NewObjectAccessToken(
 		},
 		DispositionName: name,
 		Size:            size,
+		Method:          method,
 	}
 
 	o := &ObjectAccessToken{}
@@ -54,13 +57,14 @@ func NewObjectAccessToken(
 
 func NewObjectAccessForSec(
 	name string,
+	method string,
 	size int64,
 	issuer string,
 	subject string,
 	audience string,
 	validSec int64) *ObjectAccessToken {
 	timeNow := time.Now().Unix()
-	return NewObjectAccessToken(name, size, issuer, subject,
+	return NewObjectAccessToken(name, method, size, issuer, subject,
 		audience, timeNow, timeNow+validSec)
 }
 

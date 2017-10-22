@@ -47,7 +47,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -782,6 +784,64 @@ func (a *TrailsApp) handle_getstepsobjects(w rest.ResponseWriter, r *rest.Reques
 	w.WriteJson(&objectsWithAccess)
 }
 
+func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Request) {
+
+	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	if !ok {
+		// XXX: find right error
+		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		return
+	}
+
+	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+
+	coll := a.mgoSession.DB("").C("pantahub_steps")
+
+	if coll == nil {
+		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+
+	step := Step{}
+
+	trailId := r.PathParam("id")
+	rev := r.PathParam("rev")
+
+	if authType == "DEVICE" {
+		coll.Find(bson.M{"_id": trailId + "-" + rev, "device": owner}).One(&step)
+	} else if authType == "USER" {
+		coll.Find(bson.M{"_id": trailId + "-" + rev, "owner": owner}).One(&step)
+	}
+
+	newObject := objects.Object{}
+	r.DecodeJsonPayload(&newObject)
+
+	newObject.Owner = step.Owner
+
+	collection := a.mgoSession.DB("").C("pantahub_objects")
+
+	if collection == nil {
+		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+
+	storageId := objects.MakeStorageId(newObject.Owner, newObject.Sha)
+	newObject.StorageId = storageId
+	newObject.Id = newObject.Sha
+	fmt.Println("storeid: " + storageId)
+
+	err := collection.Insert(newObject)
+
+	if err != nil {
+		w.WriteHeader(http.StatusConflict)
+		w.Header().Add("X-PH-Error", "Error inserting object into database "+err.Error())
+	}
+
+	issuerUrl := utils.GetApiEndpoint("/objects")
+	newObjectWithAccess := objects.MakeObjAccessible(issuerUrl, owner.(string), newObject, storageId)
+	w.WriteJson(newObjectWithAccess)
+}
+
 func (a *TrailsApp) handle_getstepsobject(w rest.ResponseWriter, r *rest.Request) {
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
@@ -1199,6 +1259,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *TrailsApp {
 		AccessControlAllowCredentials: true,
 		AccessControlMaxAge:           3600,
 	})
+	app.Api.Use(&utils.URLCleanMiddleware{})
 
 	// no authentication needed for /login
 	app.Api.Use(&rest.IfMiddleware{
@@ -1225,6 +1286,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *TrailsApp {
 		rest.Get("/:id/steps/:rev/.pvrremote", app.handle_getsteppvrinfo),
 		rest.Get("/:id/steps/:rev/state", app.handle_getstepstate),
 		rest.Get("/:id/steps/:rev/objects", app.handle_getstepsobjects),
+		rest.Post("/:id/steps/:rev/objects", app.handle_poststepsobject),
 		rest.Get("/:id/steps/:rev/objects/:obj", app.handle_getstepsobject),
 		rest.Put("/:id/steps/:rev/state", app.handle_putstepstate),
 		rest.Put("/:id/steps/:rev/progress", app.handle_putstepprogress),
