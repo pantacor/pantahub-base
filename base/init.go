@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -66,10 +67,28 @@ func (d FileUploadServer) OpenForWrite(name string) (*os.File, error) {
 
 func (f FileUploadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
+	dirName := filepath.Dir(r.URL.Path)
+	fileBase := filepath.Base(r.URL.Path)
+
+	tok, err := objects.NewFromValidToken(fileBase)
+
+	if err != nil {
+		fmt.Println("Invalid local-s3 request (" + fileBase + "): " + err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	objClaims := tok.Token.Claims.(*objects.ObjectAccessClaims)
+	storageId := objClaims.Audience
+	p, _ := url.Parse(path.Join(dirName, storageId))
+	r.URL = r.URL.ResolveReference(p)
+
 	if r.Method == "GET" {
+		w.Header().Add("Content-Disposition", "attachment; filename=\""+objClaims.DispositionName+"\"")
 		f.fileServer.ServeHTTP(w, r)
 		return
 	}
+
 	file, err := f.OpenForWrite(r.URL.Path)
 
 	if err != nil {
@@ -80,7 +99,15 @@ func (f FileUploadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer file.Close()
 	defer r.Body.Close()
 
-	io.Copy(file, r.Body)
+	written, err := io.CopyN(file, r.Body, objClaims.Size)
+
+	if written != objClaims.Size {
+		fmt.Println("WARNING: file upload size mismatch with claim")
+	}
+	if err != nil {
+		fmt.Println("ERROR: error syncing file upload to disk: " + err.Error())
+	}
+
 }
 
 func DoInit() {

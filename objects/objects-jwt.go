@@ -1,6 +1,7 @@
 package objects
 
 import (
+	"errors"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -20,18 +21,30 @@ type ObjectAccessToken struct {
 	*jwt.Token
 }
 
+type ObjectAccessClaims struct {
+	jwt.StandardClaims
+	DispositionName string
+	Size            int64
+}
+
 func NewObjectAccessToken(
+	name string,
+	size int64,
 	issuer string,
 	subject string,
 	audience string,
 	issuedAt int64,
 	expiresAt int64) *ObjectAccessToken {
-	claims := jwt.StandardClaims{
-		Issuer:    issuer,
-		Subject:   subject,
-		Audience:  audience,
-		IssuedAt:  time.Now().Unix(),
-		ExpiresAt: time.Now().Unix() + expiresAt,
+	claims := ObjectAccessClaims{
+		StandardClaims: jwt.StandardClaims{
+			Issuer:    issuer,
+			Subject:   subject,
+			Audience:  audience,
+			IssuedAt:  issuedAt,
+			ExpiresAt: expiresAt,
+		},
+		DispositionName: name,
+		Size:            size,
 	}
 
 	o := &ObjectAccessToken{}
@@ -40,22 +53,35 @@ func NewObjectAccessToken(
 }
 
 func NewObjectAccessForSec(
+	name string,
+	size int64,
 	issuer string,
 	subject string,
 	audience string,
 	validSec int64) *ObjectAccessToken {
 	timeNow := time.Now().Unix()
-	return NewObjectAccessToken(issuer, subject, audience, timeNow, timeNow+validSec)
+	return NewObjectAccessToken(name, size, issuer, subject,
+		audience, timeNow, timeNow+validSec)
 }
 
-func (o *ObjectAccessToken) LoadValidToken(encodedToken string) (*jwt.Token, error) {
-	tok, err := jwt.Parse(encodedToken, func(*jwt.Token) (interface{}, error) {
-		return utils.GetEnv(utils.ENV_PANTAHUB_JWT_OBJECT_SECRET), nil
+func NewFromValidToken(encodedToken string) (*ObjectAccessToken, error) {
+	claim := ObjectAccessClaims{}
+	tok, err := jwt.ParseWithClaims(encodedToken, &claim, func(*jwt.Token) (interface{}, error) {
+		return []byte(utils.GetEnv(utils.ENV_PANTAHUB_JWT_OBJECT_SECRET)), nil
 	})
 
-	return tok, err
+	if err != nil {
+		return nil, err
+	}
+
+	if !tok.Valid {
+		return nil, errors.New("Invalid Token")
+	}
+
+	objTok := &ObjectAccessToken{Token: tok}
+	return objTok, nil
 }
 
-func (o *ObjectAccessToken) Sign(token *jwt.Token) (string, error) {
-	return o.SignedString(utils.GetEnv(utils.ENV_PANTAHUB_JWT_OBJECT_SECRET))
+func (o *ObjectAccessToken) Sign() (string, error) {
+	return o.SignedString([]byte(utils.GetEnv(utils.ENV_PANTAHUB_JWT_OBJECT_SECRET)))
 }

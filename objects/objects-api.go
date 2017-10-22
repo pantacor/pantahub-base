@@ -140,7 +140,8 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 		w.Header().Add("X-PH-Error", "Error inserting object into database "+err.Error())
 	}
 
-	newObjectWithAccess := a.makeObjAccessible(newObject, storageId)
+	issuerUrl := utils.GetApiEndpoint("/objects")
+	newObjectWithAccess := MakeObjAccessible(issuerUrl, ownerStr, newObject, storageId)
 	w.WriteJson(newObjectWithAccess)
 }
 
@@ -194,7 +195,7 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(newObject)
 }
 
-func (a *ObjectsApp) makeObjAccessible(obj Object, storageId string) ObjectWithAccess {
+func MakeObjAccessible(Issuer string, Subject string, obj Object, storageId string) ObjectWithAccess {
 	filesObjWithAccess := ObjectWithAccess{}
 	filesObjWithAccess.Object = obj
 
@@ -220,13 +221,27 @@ func (a *ObjectsApp) makeObjAccessible(obj Object, storageId string) ObjectWithA
 		filesObjWithAccess.Now = strconv.FormatInt(req.Time.Unix(), 10)
 		filesObjWithAccess.ExpireTime = strconv.FormatInt(int64(req.ExpireTime.Seconds()), 10)
 	} else {
-		filesObjWithAccess.SignedGetUrl = PantahubS3DevUrl() + "/local-s3/" + storageId
-		filesObjWithAccess.SignedPutUrl = PantahubS3DevUrl() + "/local-s3/" + storageId
-
 		timeNow := time.Now()
 		filesObjWithAccess.Now = strconv.FormatInt(timeNow.Unix(), 10)
-		duration, _ := time.ParseDuration("15m")
-		filesObjWithAccess.ExpireTime = strconv.FormatInt(timeNow.Add(duration).Unix(), 10)
+		filesObjWithAccess.ExpireTime = strconv.FormatInt(15, 10)
+
+		size, err := strconv.ParseInt(obj.Size, 10, 64)
+		if err != nil {
+			fmt.Print("INTERNAL ERROR (size parsing) local-s3: " + err.Error())
+			filesObjWithAccess.SignedGetUrl = PantahubS3DevUrl() + "/local-s3/INTERNAL-ERROR"
+			filesObjWithAccess.SignedPutUrl = PantahubS3DevUrl() + "/local-s3/INTERNAL-ERROR"
+			return filesObjWithAccess
+		}
+		objAccessTok := NewObjectAccessForSec(obj.ObjectName, size, Issuer, Subject, storageId, 60)
+		tok, err := objAccessTok.Sign()
+		if err != nil {
+			fmt.Print("INTERNAL ERROR local-s3: " + err.Error())
+			filesObjWithAccess.SignedGetUrl = PantahubS3DevUrl() + "/local-s3/INTERNAL-ERROR"
+			filesObjWithAccess.SignedPutUrl = PantahubS3DevUrl() + "/local-s3/INTERNAL-ERROR"
+		} else {
+			filesObjWithAccess.SignedGetUrl = PantahubS3DevUrl() + "/local-s3/" + tok
+			filesObjWithAccess.SignedPutUrl = PantahubS3DevUrl() + "/local-s3/" + tok
+		}
 	}
 	return filesObjWithAccess
 }
@@ -275,7 +290,9 @@ func (a *ObjectsApp) handle_getobject(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, "No Access", http.StatusForbidden)
 		return
 	}
-	filesObjWithAccess := a.makeObjAccessible(filesObj, storageId)
+
+	issuerUrl := utils.GetApiEndpoint("/objects")
+	filesObjWithAccess := MakeObjAccessible(issuerUrl, ownerStr, filesObj, storageId)
 
 	w.WriteJson(filesObjWithAccess)
 }
@@ -325,7 +342,9 @@ func (a *ObjectsApp) handle_getobjectfile(w rest.ResponseWriter, r *rest.Request
 		rest.Error(w, "No Access", http.StatusForbidden)
 		return
 	}
-	filesObjWithAccess := a.makeObjAccessible(filesObj, storageId)
+
+	issuerUrl := utils.GetApiEndpoint("/objects")
+	filesObjWithAccess := MakeObjAccessible(issuerUrl, ownerStr, filesObj, storageId)
 
 	url := filesObjWithAccess.SignedGetUrl
 
