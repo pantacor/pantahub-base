@@ -20,7 +20,11 @@ import "os"
 const (
 	// Pantahub JWT Secret. THIS MUST BE SET TO SOMETHING SECRET!!
 	// default: "THIS MUST BE CHANGED"
-	ENV_PANTAHUB_JWT_SECRET = "PANTAHUB_JWT_SECRET"
+	ENV_PANTAHUB_JWT_AUTH_SECRET = "PANTAHUB_JWT_SECRET"
+
+	// Pantahub JWT Secret. THIS MUST BE SET TO SOMETHING SECRET!!
+	// default: "THIS MUST BE CHANGED"
+	ENV_PANTAHUB_JWT_OBJECT_SECRET = "PANTAHUB_JWT_OBJECT_SECRET"
 
 	// Host you want clients to reach this server under
 	// default: localhost
@@ -109,7 +113,8 @@ const (
 )
 
 var defaultEnvs = map[string]string{
-	ENV_PANTAHUB_JWT_SECRET: "YOU MUST CHANGE THIS",
+	ENV_PANTAHUB_JWT_AUTH_SECRET:   "YOU MUST CHANGE THIS",
+	ENV_PANTAHUB_JWT_OBJECT_SECRET: "YOU MUST CHANGE THIS",
 
 	ENV_PANTAHUB_HOST:       "localhost",
 	ENV_PANTAHUB_HOST_WWW:   "localhost",
@@ -125,7 +130,7 @@ var defaultEnvs = map[string]string{
 	ENV_MONGO_USER: "",
 	ENV_MONGO_PASS: "",
 	ENV_MONGO_PORT: "27017",
-	ENV_MONGO_RS: "", // replicaSet; needed if connecting to multiple hosts
+	ENV_MONGO_RS:   "", // replicaSet; needed if connecting to multiple hosts
 
 	ENV_PANTAHUB_SA_ADMIN_SECRET: "",
 
