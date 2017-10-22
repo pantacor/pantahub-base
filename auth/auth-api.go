@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/StephanDollberg/go-json-rest-middleware-jwt"
@@ -423,6 +424,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 	}
 
 	app.Api = rest.NewApi()
+	app.Api.Use(&rest.AccessLogApacheMiddleware{Logger: log.New(os.Stdout, "auth|", 0)})
 	app.Api.Use(rest.DefaultDevStack...)
 	app.Api.Use(&rest.CorsMiddleware{
 		RejectNonCorsRequests: false,

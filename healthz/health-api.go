@@ -3,6 +3,7 @@ package healthz
 import (
 	"net/http"
 
+	"log"
 	"os"
 	"path"
 	"time"
@@ -72,7 +73,7 @@ func New(session *mgo.Session) *HealthzApp {
 
 	app.Api = rest.NewApi()
 	// we dont use default stack because we dont want content type enforcement
-	app.Api.Use(&rest.AccessLogApacheMiddleware{})
+	app.Api.Use(&rest.AccessLogApacheMiddleware{Logger: log.New(os.Stdout, "health|", 0)})
 	app.Api.Use(rest.DefaultCommonStack...)
 
 	saAdminSecret := utils.GetEnv(utils.ENV_PANTAHUB_SA_ADMIN_SECRET)

@@ -20,7 +20,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -441,7 +443,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *ObjectsApp {
 
 	app.Api = rest.NewApi()
 	// we dont use default stack because we dont want content type enforcement
-	app.Api.Use(&rest.AccessLogApacheMiddleware{})
+	app.Api.Use(&rest.AccessLogApacheMiddleware{Logger: log.New(os.Stdout, "objects|", 0)})
 	app.Api.Use(rest.DefaultCommonStack...)
 	app.Api.Use(&rest.CorsMiddleware{
 		RejectNonCorsRequests: false,
