@@ -780,6 +780,102 @@ func (a *TrailsApp) handle_getstepsobjects(w rest.ResponseWriter, r *rest.Reques
 	w.WriteJson(&objectsWithAccess)
 }
 
+func (a *TrailsApp) handle_getstepsobject(w rest.ResponseWriter, r *rest.Request) {
+
+	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	if !ok {
+		// XXX: find right error
+		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		return
+	}
+
+	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+
+	coll := a.mgoSession.DB("").C("pantahub_steps")
+
+	if coll == nil {
+		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+
+	step := Step{}
+
+	trailId := r.PathParam("id")
+	rev := r.PathParam("rev")
+	objIdParam := r.PathParam("obj")
+
+	if authType == "DEVICE" {
+		coll.Find(bson.M{"_id": trailId + "-" + rev, "device": owner}).One(&step)
+	} else if authType == "USER" {
+		coll.Find(bson.M{"_id": trailId + "-" + rev, "owner": owner}).One(&step)
+	}
+
+	stateU := utils.BsonUnquoteMap(&step.State)
+
+	var objWithAccess *objects.ObjectWithAccess
+
+	for k, v := range stateU {
+		_, ok := v.(string)
+
+		if !ok {
+			// we found a json element
+			continue
+		}
+
+		if k == "#spec" {
+			continue
+		}
+
+		collection := a.mgoSession.DB("").C("pantahub_objects")
+
+		if collection == nil {
+			rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+			return
+		}
+
+		callingPrincipalStr, ok := owner.(string)
+		if !ok {
+			// XXX: find right error
+			rest.Error(w, "Invalid Access", http.StatusForbidden)
+			return
+		}
+
+		objId := v.(string)
+
+		if objIdParam != objId {
+			continue
+		}
+
+		storageId := objects.MakeStorageId(step.Owner, objId)
+
+		var newObject objects.Object
+		err := collection.FindId(storageId).One(&newObject)
+
+		if err != nil {
+			rest.Error(w, "Not Accessible Resource Id: "+storageId+" ERR: "+err.Error(), http.StatusForbidden)
+			return
+		}
+
+		if newObject.Owner != callingPrincipalStr {
+			rest.Error(w, "Invalid Object Access", http.StatusForbidden)
+			return
+		}
+
+		newObject.ObjectName = k
+
+		issuerUrl := utils.GetApiEndpoint("/trails")
+		tmp := objects.MakeObjAccessible(issuerUrl, callingPrincipalStr, newObject, storageId)
+		objWithAccess = &tmp
+		break
+	}
+
+	if objWithAccess != nil {
+		w.WriteJson(&objWithAccess)
+	} else {
+		rest.Error(w, "Invalid Object", http.StatusForbidden)
+	}
+}
+
 //
 // ## PUT /trails/:id/steps/:rev/state
 //   put step state (only if not yet consumed)
@@ -1127,6 +1223,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *TrailsApp {
 		rest.Get("/:id/steps/:rev/.pvrremote", app.handle_getsteppvrinfo),
 		rest.Get("/:id/steps/:rev/state", app.handle_getstepstate),
 		rest.Get("/:id/steps/:rev/objects", app.handle_getstepsobjects),
+		rest.Get("/:id/steps/:rev/objects/:obj", app.handle_getstepsobject),
 		rest.Put("/:id/steps/:rev/state", app.handle_putstepstate),
 		rest.Put("/:id/steps/:rev/progress", app.handle_putstepprogress),
 		rest.Get("/:id/summary", app.handle_gettrailstepsummary),
