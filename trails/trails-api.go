@@ -339,7 +339,7 @@ func (a *TrailsApp) handle_gettrailpvrinfo(w rest.ResponseWriter, r *rest.Reques
 		return
 	}
 
-	oe := utils.GetApiEndpoint("/objects")
+	oe := utils.GetApiEndpoint("/trails/" + getId + "/steps/" + strconv.Itoa(step.Rev) + "/objects")
 	jsonGet := utils.GetApiEndpoint("/trails/" + getId + "/steps/" + strconv.Itoa(step.Rev) + "/state")
 	postUrl := utils.GetApiEndpoint("/trails/" + getId + "/steps")
 	postFields := []string{"commit-msg"}
@@ -394,7 +394,9 @@ func (a *TrailsApp) handle_getsteppvrinfo(w rest.ResponseWriter, r *rest.Request
 		return
 	}
 
-	oe := utils.GetApiEndpoint("/objects")
+	oe := utils.GetApiEndpoint("/trails/" + getId + "/steps/" +
+		revId + "/objects")
+
 	jsonUrl := utils.GetApiEndpoint("/trails/" + getId + "/steps/" +
 		revId + "/state")
 
