@@ -22,8 +22,8 @@ package trails
 // ## Trail API Overview
 //
 // A trail represents a RESTful device state management endpoint optimized for
-// highly asynchronous configuration management as found in edge compute device
-// world.
+// high latency, asynchronous configuration management as found in the problem
+// space of management of edge compute device world.
 //
 //  XXX: add proper API high level doc here (deleted outdated content)
 //       handler func inline doc should stay up to date though...
@@ -53,6 +53,7 @@ import (
 	"time"
 
 	"gitlab.com/pantacor/pantahub-base/devices"
+	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pvr/api"
 
@@ -108,7 +109,7 @@ type TrailSummary struct {
 	DeviceNick       string        `json:"device-nick"`
 	Rev              int           `json:"revision"`
 	ProgressRev      int           `json:"progress-revision"`
-	Progress         int           `json:"progress"`   // progress number. steps or 1-100
+	Progress         int           `json:"progress"` // progress number. steps or 1-100
 	IsPublic         bool          `json:"public"`
 	StatusMsg        string        `json:"status-msg"` // message of progress status
 	Status           string        `json:"status"`     // status code
@@ -394,7 +395,6 @@ func (a *TrailsApp) handle_getsteppvrinfo(w rest.ResponseWriter, r *rest.Request
 	}
 
 	oe := utils.GetApiEndpoint("/objects")
-
 	jsonUrl := utils.GetApiEndpoint("/trails/" + getId + "/steps/" +
 		revId + "/state")
 
@@ -693,6 +693,91 @@ func (a *TrailsApp) handle_getstepstate(w rest.ResponseWriter, r *rest.Request) 
 	}
 
 	w.WriteJson(utils.BsonUnquoteMap(&step.State))
+}
+
+func (a *TrailsApp) handle_getstepsobjects(w rest.ResponseWriter, r *rest.Request) {
+
+	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	if !ok {
+		// XXX: find right error
+		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		return
+	}
+
+	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+
+	coll := a.mgoSession.DB("").C("pantahub_steps")
+
+	if coll == nil {
+		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+
+	step := Step{}
+
+	trailId := r.PathParam("id")
+	rev := r.PathParam("rev")
+
+	if authType == "DEVICE" {
+		coll.Find(bson.M{"_id": trailId + "-" + rev, "device": owner}).One(&step)
+	} else if authType == "USER" {
+		coll.Find(bson.M{"_id": trailId + "-" + rev, "owner": owner}).One(&step)
+	}
+
+	var objectsWithAccess []objects.ObjectWithAccess
+	objectsWithAccess = make([]objects.ObjectWithAccess, 0)
+
+	stateU := utils.BsonUnquoteMap(&step.State)
+
+	for k, v := range stateU {
+		_, ok := v.(string)
+
+		if !ok {
+			// we found a json element
+			continue
+		}
+
+		if k == "#spec" {
+			continue
+		}
+
+		collection := a.mgoSession.DB("").C("pantahub_objects")
+
+		if collection == nil {
+			rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+			return
+		}
+
+		callingPrincipalStr, ok := owner.(string)
+		if !ok {
+			// XXX: find right error
+			rest.Error(w, "Invalid Access", http.StatusForbidden)
+			return
+		}
+
+		objId := v.(string)
+		storageId := objects.MakeStorageId(step.Owner, objId)
+
+		var newObject objects.Object
+		err := collection.FindId(storageId).One(&newObject)
+
+		if err != nil {
+			rest.Error(w, "Not Accessible Resource Id: "+storageId+" ERR: "+err.Error(), http.StatusForbidden)
+			return
+		}
+
+		if newObject.Owner != callingPrincipalStr {
+			rest.Error(w, "Invalid Object Access", http.StatusForbidden)
+			return
+		}
+
+		newObject.ObjectName = k
+
+		issuerUrl := utils.GetApiEndpoint("/trails")
+		objWithAccess := objects.MakeObjAccessible(issuerUrl, callingPrincipalStr, newObject, storageId)
+		objectsWithAccess = append(objectsWithAccess, objWithAccess)
+	}
+	w.WriteJson(&objectsWithAccess)
 }
 
 //
@@ -1041,6 +1126,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *TrailsApp {
 		rest.Get("/:id/steps/:rev", app.handle_getstep),
 		rest.Get("/:id/steps/:rev/.pvrremote", app.handle_getsteppvrinfo),
 		rest.Get("/:id/steps/:rev/state", app.handle_getstepstate),
+		rest.Get("/:id/steps/:rev/objects", app.handle_getstepsobjects),
 		rest.Put("/:id/steps/:rev/state", app.handle_putstepstate),
 		rest.Put("/:id/steps/:rev/progress", app.handle_putstepprogress),
 		rest.Get("/:id/summary", app.handle_gettrailstepsummary),
