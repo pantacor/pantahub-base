@@ -38,7 +38,7 @@ func GetMongoSession() (*mgo.Session, error) {
 	mongoConnect := "mongodb://" + mongoCreds + mongoHost + ":" + mongoPort + "/" + mongoDb
 
 	if mongoRs != "" {
-		mongoConnect = mongoConnect + "?replicaSet=rs0"
+		mongoConnect = mongoConnect + "?replicaSet=" + mongoRs
 	}
 	fmt.Println("mongodb connect: " + mongoConnect)
 
