@@ -271,6 +271,8 @@ func (a *TrailsApp) handle_gettrails(w rest.ResponseWriter, r *rest.Request) {
 //
 func (a *TrailsApp) handle_gettrail(w rest.ResponseWriter, r *rest.Request) {
 
+	var err error
+
 	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
 	if !ok {
 		// XXX: find right error
@@ -290,9 +292,16 @@ func (a *TrailsApp) handle_gettrail(w rest.ResponseWriter, r *rest.Request) {
 	getId := r.PathParam("id")
 	trail := Trail{}
 
-	var err error
+	isPublic, err := a.isTrailPublic(getId)
 
-	if authType == "DEVICE" {
+	if err != nil {
+		rest.Error(w, "Error getting publid trail", http.StatusInternalServerError)
+		return
+	}
+
+	if isPublic {
+		err = coll.Find(bson.M{"_id": getId}).One(&trail)
+	} else if authType == "DEVICE" {
 		err = coll.Find(bson.M{"_id": getId, "device": owner}).One(&trail)
 	} else if authType == "USER" {
 		err = coll.Find(bson.M{"_id": getId, "owner": owner}).One(&trail)
@@ -304,10 +313,13 @@ func (a *TrailsApp) handle_gettrail(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	trail.FactoryState = utils.BsonUnquoteMap(&trail.FactoryState)
+
 	w.WriteJson(trail)
 }
 
 func (a *TrailsApp) handle_gettrailpvrinfo(w rest.ResponseWriter, r *rest.Request) {
+
+	var err error
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
 	if !ok {
@@ -328,9 +340,17 @@ func (a *TrailsApp) handle_gettrailpvrinfo(w rest.ResponseWriter, r *rest.Reques
 	getId := r.PathParam("id")
 	step := Step{}
 
-	var err error
+	isPublic, err := a.isTrailPublic(getId)
+
+	if err != nil {
+		rest.Error(w, "Error getting trail public", http.StatusInternalServerError)
+		return
+	}
+
 	//	get last step
-	if authType == "DEVICE" {
+	if isPublic {
+		err = coll.Find(bson.M{"trail-id": bson.ObjectIdHex(getId)}).Sort("-rev").One(&step)
+	} else if authType == "DEVICE" {
 		err = coll.Find(bson.M{"device": owner, "trail-id": bson.ObjectIdHex(getId)}).Sort("-rev").One(&step)
 	} else if authType == "USER" {
 		err = coll.Find(bson.M{"owner": owner, "trail-id": bson.ObjectIdHex(getId)}).Sort("-rev").One(&step)
@@ -362,6 +382,8 @@ func (a *TrailsApp) handle_gettrailpvrinfo(w rest.ResponseWriter, r *rest.Reques
 
 func (a *TrailsApp) handle_getsteppvrinfo(w rest.ResponseWriter, r *rest.Request) {
 
+	var err error
+
 	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
 	if !ok {
 		// XXX: find right error
@@ -383,9 +405,17 @@ func (a *TrailsApp) handle_getsteppvrinfo(w rest.ResponseWriter, r *rest.Request
 	stepId := getId + "-" + revId
 	step := Step{}
 
-	var err error
-	//	get step and check right to access
-	if authType == "DEVICE" {
+	isPublic, err := a.isTrailPublic(getId)
+
+	if err != nil {
+		rest.Error(w, "Error getting trail public", http.StatusInternalServerError)
+		return
+	}
+
+	//	get last step
+	if isPublic {
+		err = coll.Find(bson.M{"_id": stepId}).One(&step)
+	} else if authType == "DEVICE" {
 		err = coll.Find(bson.M{"device": owner, "_id": stepId}).One(&step)
 	} else if authType == "USER" {
 		err = coll.Find(bson.M{"owner": owner, "_id": stepId}).One(&step)
@@ -450,6 +480,8 @@ func (a *TrailsApp) get_latest_steprev(trailId bson.ObjectId) (int, error) {
 //
 func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 
+	var err error
+
 	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
 	if !ok {
 		// XXX: find right error
@@ -468,8 +500,6 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 
 	trailId := r.PathParam("id")
 	trail := Trail{}
-
-	var err error
 
 	if authType == "USER" {
 		err = collTrails.Find(bson.M{"_id": bson.ObjectIdHex(trailId), "owner": owner}).One(&trail)
@@ -581,7 +611,17 @@ func (a *TrailsApp) handle_getsteps(w rest.ResponseWriter, r *rest.Request) {
 
 	trailId := r.PathParam("id")
 	query := bson.M{}
-	if authType == "DEVICE" {
+
+	isPublic, err := a.isTrailPublic(trailId)
+
+	if err != nil {
+		rest.Error(w, "Error getting trail public", http.StatusInternalServerError)
+		return
+	}
+
+	if isPublic {
+		query = bson.M{"trail-id": bson.ObjectIdHex(trailId), "progress.status": "NEW"}
+	} else if authType == "DEVICE" {
 		query = bson.M{"trail-id": bson.ObjectIdHex(trailId), "device": owner, "progress.status": "NEW"}
 	} else if authType == "USER" {
 		query = bson.M{"trail-id": bson.ObjectIdHex(trailId), "owner": owner, "progress.status": bson.M{"$ne": "DONE"}}
@@ -601,7 +641,6 @@ func (a *TrailsApp) handle_getsteps(w rest.ResponseWriter, r *rest.Request) {
 
 	q := coll.Find(query).Sort("rev")
 
-	var err error
 	if authType == "DEVICE" {
 		err = q.Limit(1).All(&steps)
 	} else {
@@ -644,7 +683,7 @@ func (a *TrailsApp) handle_getstep(w rest.ResponseWriter, r *rest.Request) {
 	isPublic, err := a.isTrailPublic(trailId)
 
 	if err != nil {
-		rest.Error(w, "Error getting is public", http.StatusInternalServerError)
+		rest.Error(w, "Error getting trail public", http.StatusInternalServerError)
 	}
 
 	coll := a.mgoSession.DB("").C("pantahub_steps")
@@ -681,9 +720,6 @@ func (a *TrailsApp) handle_getstep(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	step.State = utils.BsonUnquoteMap(&step.State)
-	if owner != step.Device || owner != step.Owner {
-		step.StepProgress = StepProgress{}
-	}
 
 	w.WriteJson(step)
 }
@@ -695,6 +731,8 @@ func (a *TrailsApp) handle_getstep(w rest.ResponseWriter, r *rest.Request) {
 //   just the raw data of a step without metainfo...
 //
 func (a *TrailsApp) handle_getstepstate(w rest.ResponseWriter, r *rest.Request) {
+
+	var err error
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
 	if !ok {
@@ -717,7 +755,16 @@ func (a *TrailsApp) handle_getstepstate(w rest.ResponseWriter, r *rest.Request) 
 	trailId := r.PathParam("id")
 	rev := r.PathParam("rev")
 
-	if authType == "DEVICE" {
+	isPublic, err := a.isTrailPublic(trailId)
+
+	if err != nil {
+		rest.Error(w, "Error getting trail public", http.StatusInternalServerError)
+		return
+	}
+
+	if isPublic {
+		coll.Find(bson.M{"_id": trailId + "-" + rev}).One(&step)
+	} else if authType == "DEVICE" {
 		coll.Find(bson.M{"_id": trailId + "-" + rev, "device": owner}).One(&step)
 	} else if authType == "USER" {
 		coll.Find(bson.M{"_id": trailId + "-" + rev, "owner": owner}).One(&step)
@@ -749,7 +796,16 @@ func (a *TrailsApp) handle_getstepsobjects(w rest.ResponseWriter, r *rest.Reques
 	trailId := r.PathParam("id")
 	rev := r.PathParam("rev")
 
-	if authType == "DEVICE" {
+	isPublic, err := a.isTrailPublic(trailId)
+
+	if err != nil {
+		rest.Error(w, "Error getting trail public", http.StatusInternalServerError)
+		return
+	}
+
+	if isPublic {
+		coll.Find(bson.M{"_id": trailId + "-" + rev}).One(&step)
+	} else if authType == "DEVICE" {
 		coll.Find(bson.M{"_id": trailId + "-" + rev, "device": owner}).One(&step)
 	} else if authType == "USER" {
 		coll.Find(bson.M{"_id": trailId + "-" + rev, "owner": owner}).One(&step)
@@ -797,7 +853,7 @@ func (a *TrailsApp) handle_getstepsobjects(w rest.ResponseWriter, r *rest.Reques
 			return
 		}
 
-		if newObject.Owner != callingPrincipalStr {
+		if newObject.Owner != step.Owner {
 			rest.Error(w, "Invalid Object Access", http.StatusForbidden)
 			return
 		}
@@ -974,7 +1030,15 @@ func (a *TrailsApp) handle_getstepsobject(w rest.ResponseWriter, r *rest.Request
 	rev := r.PathParam("rev")
 	objIdParam := r.PathParam("obj")
 
-	if authType == "DEVICE" {
+	isPublic, err := a.isTrailPublic(trailId)
+	if err != nil {
+		rest.Error(w, "Error getting traitrailsIdl public", http.StatusInternalServerError)
+		return
+	}
+
+	if isPublic {
+		coll.Find(bson.M{"_id": trailId + "-" + rev}).One(&step)
+	} else if authType == "DEVICE" {
 		coll.Find(bson.M{"_id": trailId + "-" + rev, "device": owner}).One(&step)
 	} else if authType == "USER" {
 		coll.Find(bson.M{"_id": trailId + "-" + rev, "owner": owner}).One(&step)
@@ -1026,8 +1090,8 @@ func (a *TrailsApp) handle_getstepsobject(w rest.ResponseWriter, r *rest.Request
 			return
 		}
 
-		if newObject.Owner != callingPrincipalStr {
-			rest.Error(w, "Invalid Object Access", http.StatusForbidden)
+		if newObject.Owner != step.Owner {
+			rest.Error(w, "Invalid Object Access ("+newObject.Owner+":"+step.Owner+")", http.StatusForbidden)
 			return
 		}
 
@@ -1070,7 +1134,16 @@ func (a *TrailsApp) handle_getstepsobjectfile(w rest.ResponseWriter, r *rest.Req
 	rev := r.PathParam("rev")
 	objIdParam := r.PathParam("obj")
 
-	if authType == "DEVICE" {
+	isPublic, err := a.isTrailPublic(trailId)
+
+	if err != nil {
+		rest.Error(w, "Error getting trail public", http.StatusInternalServerError)
+		return
+	}
+
+	if isPublic {
+		coll.Find(bson.M{"_id": trailId + "-" + rev}).One(&step)
+	} else if authType == "DEVICE" {
 		coll.Find(bson.M{"_id": trailId + "-" + rev, "device": owner}).One(&step)
 	} else if authType == "USER" {
 		coll.Find(bson.M{"_id": trailId + "-" + rev, "owner": owner}).One(&step)
@@ -1122,7 +1195,7 @@ func (a *TrailsApp) handle_getstepsobjectfile(w rest.ResponseWriter, r *rest.Req
 			return
 		}
 
-		if newObject.Owner != callingPrincipalStr {
+		if newObject.Owner != step.Owner {
 			rest.Error(w, "Invalid Object Access", http.StatusForbidden)
 			return
 		}
