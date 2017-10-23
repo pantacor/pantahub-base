@@ -236,13 +236,15 @@ func MakeObjAccessible(Issuer string, Subject string, obj Object, storageId stri
 		urlStr, _ := req.Presign(15 * time.Minute)
 		filesObjWithAccess.SignedGetUrl = urlStr
 
-		// PUT URL
-		req, _ = svc.PutObjectRequest(&s3.PutObjectInput{
-			Bucket: aws.String("systemcloud-001"),
-			Key:    aws.String(storageId),
-		})
-		urlStr, _ = req.Presign(15 * time.Minute)
-		filesObjWithAccess.SignedPutUrl = urlStr
+		if Subject == obj.Owner {
+			// PUT URL
+			req, _ = svc.PutObjectRequest(&s3.PutObjectInput{
+				Bucket: aws.String("systemcloud-001"),
+				Key:    aws.String(storageId),
+			})
+			urlStr, _ = req.Presign(15 * time.Minute)
+			filesObjWithAccess.SignedPutUrl = urlStr
+		}
 
 		filesObjWithAccess.Now = strconv.FormatInt(req.Time.Unix(), 10)
 		filesObjWithAccess.ExpireTime = strconv.FormatInt(int64(req.ExpireTime.Seconds()), 10)
@@ -266,13 +268,16 @@ func MakeObjAccessible(Issuer string, Subject string, obj Object, storageId stri
 		} else {
 			filesObjWithAccess.SignedGetUrl = PantahubS3DevUrl() + "/local-s3/" + tokGet
 		}
-		objAccessTokPut := NewObjectAccessForSec(obj.ObjectName, http.MethodPut, size, Issuer, Subject, storageId, 60)
-		tokPut, err := objAccessTokPut.Sign()
-		if err != nil {
-			fmt.Print("INTERNAL ERROR local-s3: " + err.Error())
-			filesObjWithAccess.SignedPutUrl = PantahubS3DevUrl() + "/local-s3/INTERNAL-ERROR"
-		} else {
-			filesObjWithAccess.SignedPutUrl = PantahubS3DevUrl() + "/local-s3/" + tokPut
+		if Subject == obj.Owner {
+
+			objAccessTokPut := NewObjectAccessForSec(obj.ObjectName, http.MethodPut, size, Issuer, Subject, storageId, 60)
+			tokPut, err := objAccessTokPut.Sign()
+			if err != nil {
+				fmt.Print("INTERNAL ERROR local-s3: " + err.Error())
+				filesObjWithAccess.SignedPutUrl = PantahubS3DevUrl() + "/local-s3/INTERNAL-ERROR"
+			} else {
+				filesObjWithAccess.SignedPutUrl = PantahubS3DevUrl() + "/local-s3/" + tokPut
+			}
 		}
 	}
 	return filesObjWithAccess
