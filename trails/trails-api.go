@@ -639,6 +639,14 @@ func (a *TrailsApp) handle_getstep(w rest.ResponseWriter, r *rest.Request) {
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
 
+	trailId := r.PathParam("id")
+
+	isPublic, err := a.isTrailPublic(trailId)
+
+	if err != nil {
+		rest.Error(w, "Error getting is public", http.StatusInternalServerError)
+	}
+
 	coll := a.mgoSession.DB("").C("pantahub_steps")
 
 	if coll == nil {
@@ -647,17 +655,36 @@ func (a *TrailsApp) handle_getstep(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	step := Step{}
-
-	trailId := r.PathParam("id")
 	rev := r.PathParam("rev")
 
-	if authType == "DEVICE" {
-		coll.Find(bson.M{"_id": trailId + "-" + rev, "device": owner}).One(&step)
+	query := bson.M{"_id": trailId + "-" + rev}
+
+	if isPublic {
+		err = coll.Find(query).One(&step)
+	} else if authType == "DEVICE" {
+		query["device"] = owner
+		err = coll.Find(query).One(&step)
 	} else if authType == "USER" {
-		coll.Find(bson.M{"_id": trailId + "-" + rev, "owner": owner}).One(&step)
+		query["owner"] = owner
+		err = coll.Find(bson.M{"_id": trailId + "-" + rev, "owner": owner}).One(&step)
+	} else {
+		rest.Error(w, "No Access to step", http.StatusForbidden)
+		return
+	}
+
+	if err == mgo.ErrNotFound {
+		rest.Error(w, "Step not available", http.StatusNotFound)
+		return
+	} else if err != nil {
+		rest.Error(w, "No access", http.StatusInternalServerError)
+		return
 	}
 
 	step.State = utils.BsonUnquoteMap(&step.State)
+	if owner != step.Device || owner != step.Owner {
+		step.StepProgress = StepProgress{}
+	}
+
 	w.WriteJson(step)
 }
 
