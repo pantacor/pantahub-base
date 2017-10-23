@@ -272,7 +272,9 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	quotaObjects.Actual = float64(resp["total"].(float64)) / float64(uM)
+	fRound := float64(int64(float64(resp["total"].(float64))/float64(uM)*100)) / 100
+
+	quotaObjects.Actual = fRound
 	summary.Sub.QuotaStats[QUOTA_OBJECTS] = quotaObjects
 
 	w.WriteJson(summary)
