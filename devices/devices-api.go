@@ -388,18 +388,19 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	// XXX: fixme; needs delegation of authorization for device accessing its resources
-	// could be subscriptions, but also something else
-	if callerIsDevice && device.Prn != authId {
-		rest.Error(w, "No Access", http.StatusForbidden)
-		return
-	}
+	if !device.IsPublic {
+		// XXX: fixme; needs delegation of authorization for device accessing its resources
+		// could be subscriptions, but also something else
+		if callerIsDevice && device.Prn != authId {
+			rest.Error(w, "No Access", http.StatusForbidden)
+			return
+		}
 
-	if callerIsUser && device.Owner != authId {
-		rest.Error(w, "No Access", http.StatusForbidden)
-		return
+		if callerIsUser && device.Owner != authId {
+			rest.Error(w, "No Access", http.StatusForbidden)
+			return
+		}
 	}
-
 	device.UserMeta = utils.BsonUnquoteMap(&device.UserMeta)
 	device.DeviceMeta = utils.BsonUnquoteMap(&device.DeviceMeta)
 
