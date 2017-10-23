@@ -48,10 +48,10 @@ type Device struct {
 	Prn          string                 `json:"prn"`
 	Nick         string                 `json:"nick"`
 	Owner        string                 `json:"owner"`
-	Secret       string                 `json:"secret"`
+	Secret       string                 `json:"secret,omitempty"`
 	TimeCreated  time.Time              `json:"time-created"`
 	TimeModified time.Time              `json:"time-modified"`
-	Challenge    string                 `json:"challenge"`
+	Challenge    string                 `json:"challenge,omitempty"`
 	IsPublic     bool                   `json:"public"`
 	UserMeta     map[string]interface{} `json:"user-meta" bson:"user-meta"`
 	DeviceMeta   map[string]interface{} `json:"device-meta" bson:"device-meta"`
@@ -400,6 +400,9 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 			rest.Error(w, "No Access", http.StatusForbidden)
 			return
 		}
+	} else if !callerIsDevice && !callerIsUser {
+		device.Secret = ""
+		device.Challenge = ""
 	}
 	device.UserMeta = utils.BsonUnquoteMap(&device.UserMeta)
 	device.DeviceMeta = utils.BsonUnquoteMap(&device.DeviceMeta)
