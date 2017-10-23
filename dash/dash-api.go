@@ -259,23 +259,21 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 	err = oCol.Pipe([]bson.M{{"$match": bson.M{"owner": owner.(string)}},
 		{"$group": bson.M{"_id": "$owner", "total": bson.M{"$sum": "$sizeint"}}}}).One(&resp)
 
-	if err != nil {
-		rest.Error(w, "Error finding quota usage of disk "+err.Error(),
+	if err == nil {
+		quotaObjects := summary.Sub.QuotaStats[QUOTA_OBJECTS]
+		uM, err := units.ParseStrictBytes("1" + quotaObjects.Unit)
+		if err != nil {
+			rest.Error(w, "ERROR Quota Unit: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		fRound := float64(int64(float64(resp["total"].(float64))/float64(uM)*100)) / 100
+		quotaObjects.Actual = fRound
+		summary.Sub.QuotaStats[QUOTA_OBJECTS] = quotaObjects
+	} else if err != nil && err != mgo.ErrNotFound {
+		rest.Error(w, "Error finding quota usage of disk: "+err.Error(),
 			http.StatusInternalServerError)
 		return
 	}
-
-	quotaObjects := summary.Sub.QuotaStats[QUOTA_OBJECTS]
-	uM, err := units.ParseStrictBytes("1" + quotaObjects.Unit)
-	if err != nil {
-		rest.Error(w, "ERROR Quota Unit: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	fRound := float64(int64(float64(resp["total"].(float64))/float64(uM)*100)) / 100
-
-	quotaObjects.Actual = fRound
-	summary.Sub.QuotaStats[QUOTA_OBJECTS] = quotaObjects
 
 	w.WriteJson(summary)
 }
