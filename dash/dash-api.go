@@ -21,6 +21,7 @@ import (
 	"os"
 
 	"github.com/StephanDollberg/go-json-rest-middleware-jwt"
+	"github.com/alecthomas/units"
 	"github.com/ant0ine/go-json-rest/rest"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -54,8 +55,8 @@ type Plan struct {
 
 type Quota struct {
 	Name   QuotaType
-	Actual int64
-	Max    int64
+	Actual float64
+	Max    float64
 	Unit   string
 }
 
@@ -250,8 +251,29 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	quota := summary.Sub.QuotaStats[QUOTA_DEVICES]
-	quota.Actual = int64(deviceCount)
+	quota.Actual = float64(deviceCount)
 	summary.Sub.QuotaStats[QUOTA_DEVICES] = quota
+
+	// quota on disk
+	resp := bson.M{}
+	err = oCol.Pipe([]bson.M{{"$match": bson.M{"owner": owner.(string)}},
+		{"$group": bson.M{"_id": "$owner", "total": bson.M{"$sum": "$sizeint"}}}}).One(&resp)
+
+	if err != nil {
+		rest.Error(w, "Error finding quota usage of disk "+err.Error(),
+			http.StatusInternalServerError)
+		return
+	}
+
+	quotaObjects := summary.Sub.QuotaStats[QUOTA_OBJECTS]
+	uM, err := units.ParseStrictBytes("1" + quotaObjects.Unit)
+	if err != nil {
+		rest.Error(w, "ERROR Quota Unit: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	quotaObjects.Actual = float64(resp["total"].(float64)) / float64(uM)
+	summary.Sub.QuotaStats[QUOTA_OBJECTS] = quotaObjects
 
 	w.WriteJson(summary)
 }
