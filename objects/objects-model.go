@@ -12,6 +12,7 @@ type Object struct {
 	ObjectName  string `json:"objectname"`
 	Sha         string `json:"sha256sum"`
 	Size        string `json:"size"`
+	SizeInt     int64  `json:"sizeint"`
 	MimeType    string `json:"mime-type"`
 	initialized bool
 }

@@ -830,6 +830,7 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 	newObject.Id = newObject.Sha
 	fmt.Println("storeid: " + storageId)
 
+	objects.SyncObjectSizes(&newObject)
 	err := collection.Insert(newObject)
 
 	if err != nil {
@@ -837,7 +838,87 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 		w.Header().Add("X-PH-Error", "Error inserting object into database "+err.Error())
 	}
 
-	issuerUrl := utils.GetApiEndpoint("/objects")
+	issuerUrl := utils.GetApiEndpoint("/trails")
+	newObjectWithAccess := objects.MakeObjAccessible(issuerUrl, owner.(string), newObject, storageId)
+	w.WriteJson(newObjectWithAccess)
+}
+
+func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request) {
+
+	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	if !ok {
+		// XXX: find right error
+		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		return
+	}
+
+	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+
+	coll := a.mgoSession.DB("").C("pantahub_steps")
+
+	if coll == nil {
+		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+
+	step := Step{}
+	trailId := r.PathParam("id")
+	rev := r.PathParam("rev")
+	putId := r.PathParam("obj")
+
+	if authType == "DEVICE" {
+		coll.Find(bson.M{"_id": trailId + "-" + rev, "device": owner}).One(&step)
+	} else if authType == "USER" {
+		coll.Find(bson.M{"_id": trailId + "-" + rev, "owner": owner}).One(&step)
+	}
+
+	newObject := objects.Object{}
+	collection := a.mgoSession.DB("").C("pantahub_objects")
+
+	if collection == nil {
+		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+
+	storageId := objects.MakeStorageId(step.Owner, putId)
+	err := collection.FindId(storageId).One(&newObject)
+
+	if err != nil {
+		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
+		return
+	}
+
+	if newObject.Owner != step.Owner {
+		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
+		return
+	}
+
+	nId := newObject.Id
+	nOwner := newObject.Owner
+	nStorageId := newObject.StorageId
+	r.DecodeJsonPayload(&newObject)
+
+	if newObject.Id != nId {
+		rest.Error(w, "Illegal Call Parameter Id", http.StatusConflict)
+		return
+	}
+	if newObject.Owner != nOwner {
+		rest.Error(w, "Illegal Call Parameter Owner", http.StatusConflict)
+		return
+	}
+	if newObject.StorageId != nStorageId {
+		rest.Error(w, "Illegal Call Parameter StorageId", http.StatusConflict)
+		return
+	}
+
+	objects.SyncObjectSizes(&newObject)
+	_, err = collection.UpsertId(storageId, newObject)
+	if err != nil {
+		w.WriteHeader(http.StatusConflict)
+		w.Header().Add("X-PH-Error", "Error inserting object into database "+err.Error())
+	}
+
+	issuerUrl := utils.GetApiEndpoint("/trails")
 	newObjectWithAccess := objects.MakeObjAccessible(issuerUrl, owner.(string), newObject, storageId)
 	w.WriteJson(newObjectWithAccess)
 }

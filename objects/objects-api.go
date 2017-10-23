@@ -135,6 +135,7 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 	newObject.Id = newObject.Sha
 	fmt.Println("storeid: " + storageId)
 
+	SyncObjectSizes(&newObject)
 	err := collection.Insert(newObject)
 
 	if err != nil {
@@ -192,9 +193,32 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 	newObject.StorageId = storageId
 	newObject.Id = putId
 
+	SyncObjectSizes(&newObject)
+
 	collection.UpsertId(storageId, newObject)
 
 	w.WriteJson(newObject)
+}
+
+func SyncObjectSizes(obj *Object) {
+	var err error
+	var strInt64 int64
+
+	// if string is not set we go fro the int regardless
+	if obj.Size == "" {
+		obj.Size = fmt.Sprintf("%d", obj.SizeInt)
+		return
+	}
+	// now lets parse the string
+	strInt64, err = strconv.ParseInt(obj.Size, 10, 64)
+
+	// if we failed to parse it or if int value is set in object we use the int
+	if err != nil || obj.SizeInt != 0 {
+		obj.Size = fmt.Sprintf("%d", obj.SizeInt)
+	} else {
+		// all rest get the string variant
+		obj.SizeInt = strInt64
+	}
 }
 
 func MakeObjAccessible(Issuer string, Subject string, obj Object, storageId string) ObjectWithAccess {
