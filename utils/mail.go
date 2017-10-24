@@ -40,10 +40,12 @@ func SendVerification(email, id, u string, urlPrefix string) bool {
 	mg := mailgun.NewMailgun(mgDomain, mgApiKey, mgPubApiKey)
 	message := mg.NewMessage(
 		"postmaster@pantahub.com",
+		"Account Verification <"+email+"> for www.pantahub.com",
 		body,
 		regEmail)
 
 	resp, id, err := mg.Send(message)
+
 	if err != nil {
 		log.Print(err)
 		return false
