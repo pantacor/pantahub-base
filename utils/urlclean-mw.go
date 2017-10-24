@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -19,12 +18,9 @@ type URLCleanMiddleware struct{}
 func (mw *URLCleanMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.HandlerFunc {
 	return func(w rest.ResponseWriter, r *rest.Request) {
 		var err error
-		log.Println("Cleaning: " + r.URL.Path)
-		urlPath := strings.TrimSuffix(r.URL.Path, "/")
+		r.URL.Path = strings.TrimSuffix(r.URL.Path, "/")
+		r.URL, err = url.Parse(r.URL.String())
 
-		r.URL, err = url.Parse(urlPath)
-
-		log.Println("Cleaned: " + r.URL.Path)
 		if err != nil {
 			rest.Error(w, "Error cleaning trailing / from path", http.StatusInternalServerError)
 		}
