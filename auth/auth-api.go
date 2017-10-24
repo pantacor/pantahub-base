@@ -389,10 +389,6 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 			return false
 		}
 
-		if !strings.HasPrefix(userId, "prn:") {
-			userId = "prn:pantahub.com:auth:/" + userId
-		}
-
 		if plm, ok := accounts[userId]; !ok {
 			if strings.HasPrefix(userId, "prn:::devices:") {
 				return app.deviceAuth(userId, password)
