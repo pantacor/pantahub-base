@@ -286,7 +286,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *DashApp {
 
 	app.Api = rest.NewApi()
 	// we dont use default stack because we dont want content type enforcement
-	app.Api.Use(&rest.AccessLogApacheMiddleware{Logger: log.New(os.Stdout, "dash|", 0)})
+	app.Api.Use(&rest.AccessLogApacheMiddleware{Logger: log.New(os.Stdout,
+		"/dash:", log.Lshortfile)})
 	app.Api.Use(rest.DefaultCommonStack...)
 	app.Api.Use(&rest.CorsMiddleware{
 		RejectNonCorsRequests: false,

@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -370,7 +371,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *LogsApp {
 	app.Api = rest.NewApi()
 
 	// we dont use default stack because we dont want content type enforcement
-	app.Api.Use(&rest.AccessLogApacheMiddleware{})
+	app.Api.Use(&rest.AccessLogApacheMiddleware{Logger: log.New(os.Stdout,
+		"/logs:", log.Lshortfile)})
 	app.Api.Use(rest.DefaultCommonStack...)
 
 	// we allow calls from other domains to allow webapps; XXX: review

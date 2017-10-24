@@ -25,7 +25,9 @@ package plog
 // be available later or for users of organization accounts.
 //
 import (
+	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/StephanDollberg/go-json-rest-middleware-jwt"
@@ -99,7 +101,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *PlogApp {
 	app.Api = rest.NewApi()
 
 	// we dont use default stack because we dont want content type enforcement
-	app.Api.Use(&rest.AccessLogApacheMiddleware{})
+	app.Api.Use(&rest.AccessLogApacheMiddleware{Logger: log.New(os.Stdout,
+		"/plog:", log.Lshortfile)})
 	app.Api.Use(rest.DefaultCommonStack...)
 
 	// we allow calls from other domains to allow webapps; XXX: review
