@@ -403,10 +403,6 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 
 	jwtMiddleware.PayloadFunc = func(userId string) map[string]interface{} {
 
-		if !strings.HasPrefix(userId, "prn:") {
-			userId = "prn:pantahub.com:auth:/" + userId
-		}
-
 		if plm, ok := accounts[userId]; !ok {
 			if strings.HasPrefix(userId, "prn:::devices:") {
 				return app.devicePayload(userId)
