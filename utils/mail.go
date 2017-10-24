@@ -23,7 +23,7 @@ import (
 
 func SendVerification(email, id, u string, urlPrefix string) bool {
 
-	link := urlPrefix + "/auth/verify?id=" + id + "&challenge=" + u
+	link := urlPrefix + "/verify?id=" + id + "&challenge=" + u
 
 	mgDomain := GetEnv(ENV_MAILGUN_DOMAIN)
 	mgApiKey := GetEnv(ENV_MAILGUN_APIKEY)
