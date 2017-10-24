@@ -33,6 +33,8 @@ func SendVerification(email, id, u string, urlPrefix string) bool {
 	regEmail := GetEnv(ENV_REG_EMAIL)
 	port, err := strconv.Atoi(portStr)
 
+	fmt.Println("Sending Mail through SMTP HOST: " + host)
+
 	if err != nil {
 		fmt.Println("ERROR: Bad port - " + err.Error())
 		return false
@@ -44,7 +46,7 @@ func SendVerification(email, id, u string, urlPrefix string) bool {
 		"A. Sack and R. Mendoza (Pantacor Founders)"
 
 	msg := gomail.NewMessage()
-	msg.SetAddressHeader("From", "hubpanta@gmail.com", "Pantahub Registration Desk")
+	msg.SetAddressHeader("From", "postmaster@pantahub.com", "Pantahub Registration Desk")
 	msg.SetHeader("To", regEmail)
 	msg.SetHeader("Subject", "Account Verification <"+email+"> for www.pantahub.com")
 	msg.SetBody("text/html", body)
