@@ -38,8 +38,8 @@ func SendVerification(email, id, u string, urlPrefix string) bool {
 		"A. Sack and R. Mendoza (Pantacor Founders)"
 
 	mg := mailgun.NewMailgun(mgDomain, mgApiKey, mgPubApiKey)
-	message := mailgun.NewMessage(
-		"Pantahub Registration Desk <postmaster@pantahub.com>",
+	message := mg.NewMessage(
+		"postmaster@pantahub.com",
 		body,
 		regEmail)
 
