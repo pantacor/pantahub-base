@@ -385,11 +385,14 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 	}
 
 	jwtMiddleware.Authenticator = func(userId string, password string) bool {
+
 		if userId == "" || password == "" {
 			return false
 		}
 
-		if plm, ok := accounts[userId]; !ok {
+		testUserId := "prn:pantahub.com:auth:/" + userId
+
+		if plm, ok := accounts[testUserId]; !ok {
 			if strings.HasPrefix(userId, "prn:::devices:") {
 				return app.deviceAuth(userId, password)
 			} else {
@@ -403,7 +406,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 
 	jwtMiddleware.PayloadFunc = func(userId string) map[string]interface{} {
 
-		if plm, ok := accounts[userId]; !ok {
+		testUserId := "prn:pantahub.com:auth:/" + userId
+		if plm, ok := accounts[testUserId]; !ok {
 			if strings.HasPrefix(userId, "prn:::devices:") {
 				return app.devicePayload(userId)
 			} else {
