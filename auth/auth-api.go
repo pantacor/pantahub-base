@@ -213,7 +213,7 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	newAccount.Id = bson.NewObjectId()
-	newAccount.Prn = "prn:::accounts:/" + newAccount.Id.Hex()
+	newAccount.Prn = "prn:::accounts:/" + newAccount.Nick
 	newAccount.Challenge = utils.GenerateChallenge()
 	newAccount.TimeCreated = time.Now()
 	newAccount.Type = ACCOUNT_TYPE_USER // XXX: need org approach too
