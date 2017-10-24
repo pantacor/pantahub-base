@@ -95,12 +95,12 @@ var (
 			Quotas: map[QuotaType]Quota{
 				QUOTA_OBJECTS: Quota{
 					Name: QUOTA_OBJECTS,
-					Max:  5,
+					Max:  2,
 					Unit: "GiB",
 				},
 				QUOTA_BANDWIDTH: Quota{
 					Name: QUOTA_BANDWIDTH,
-					Max:  5,
+					Max:  2,
 					Unit: "GiB",
 				},
 				QUOTA_DEVICES: Quota{
@@ -236,9 +236,9 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 	summary.Prn = owner.(string)
 	summary.Nick = r.Env["JWT_PAYLOAD"].(map[string]interface{})["nick"].(string)
 	summary.Sub = SubscriptionInfo{
-		PlanId:     "VIP",
-		Billing:    STANDARD_PLANS["VIP"].Billing,
-		QuotaStats: copyMap(STANDARD_PLANS["VIP"].Quotas),
+		PlanId:     "AlphaTester",
+		Billing:    STANDARD_PLANS["AlphaTester"].Billing,
+		QuotaStats: copyMap(STANDARD_PLANS["AlphaTester"].Quotas),
 	}
 
 	deviceCount, err :=
