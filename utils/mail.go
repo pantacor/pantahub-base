@@ -16,47 +16,39 @@
 package utils
 
 import (
-	"fmt"
-	"strconv"
+	"log"
 
-	"gopkg.in/gomail.v2"
+	"gopkg.in/mailgun/mailgun-go.v1"
 )
 
 func SendVerification(email, id, u string, urlPrefix string) bool {
 
 	link := urlPrefix + "/auth/verify?id=" + id + "&challenge=" + u
 
-	host := GetEnv(ENV_SMTP_HOST)
-	portStr := GetEnv(ENV_SMTP_PORT)
-	user := GetEnv(ENV_SMTP_USER)
-	pass := GetEnv(ENV_SMTP_PASS)
+	mgDomain := GetEnv(ENV_MAILGUN_DOMAIN)
+	mgApiKey := GetEnv(ENV_MAILGUN_APIKEY)
+	mgPubApiKey := GetEnv(ENV_MAILGUN_PUBAPIKEY)
 	regEmail := GetEnv(ENV_REG_EMAIL)
-	port, err := strconv.Atoi(portStr)
 
-	fmt.Println("Sending Mail through SMTP HOST: " + host)
-
-	if err != nil {
-		fmt.Println("ERROR: Bad port - " + err.Error())
-		return false
-	}
+	log.Println("Sending Mail through MAILGUN: " + mgDomain)
 
 	body := "A user has requested access. If you want him to get access, send him thef ollowing text with link:" +
 		"\n\nTo: " + email + "\n\n\n\nTo verify your account, please click on the link: <a href=\"" + link +
 		"\">" + link + "</a><br><br>Best Regards,<br><br>" +
 		"A. Sack and R. Mendoza (Pantacor Founders)"
 
-	msg := gomail.NewMessage()
-	msg.SetAddressHeader("From", "postmaster@pantahub.com", "Pantahub Registration Desk")
-	msg.SetHeader("To", regEmail)
-	msg.SetHeader("Subject", "Account Verification <"+email+"> for www.pantahub.com")
-	msg.SetBody("text/html", body)
-	m := gomail.NewDialer(host, port, user, pass)
-	if err := m.DialAndSend(msg); err != nil {
-		fmt.Println("ERROR sending email - " + err.Error())
-		fmt.Println("Body not sent: \n\t" + body)
+	mg := mailgun.NewMailgun(mgDomain, mgApiKey, mgPubApiKey)
+	message := mailgun.NewMessage(
+		"Pantahub Registration Desk <postmaster@pantahub.com>",
+		body,
+		regEmail)
+
+	resp, id, err := mg.Send(message)
+	if err != nil {
+		log.Print(err)
 		return false
-	} else {
-		fmt.Println("send message")
 	}
+	log.Printf("ID: %s Resp: %s\n", id, resp)
+
 	return true
 }

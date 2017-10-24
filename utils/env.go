@@ -59,6 +59,18 @@ const (
 	// default: 12366
 	ENV_PANTAHUB_PORT_INT_TLS = "PANTAHUB_PORT_INT_TLS"
 
+	// mailgone domain
+	// default: <empty>
+	ENV_MAILGUN_DOMAIN = "MAILGUN_DOMAIN"
+
+	// mailgone api key
+	// default: <empty>
+	ENV_MAILGUN_APIKEY = "MAILGUN_APIKEY"
+
+	// mailgone pub api key
+	// default: <empty>
+	ENV_MAILGUN_PUBAPIKEY = "MAILGUN_PUBAPIKEY"
+
 	// Hostname for mongodb connection
 	// default: localhost
 	ENV_MONGO_HOST = "MONGO_HOST"
@@ -124,6 +136,10 @@ var defaultEnvs = map[string]string{
 
 	ENV_PANTAHUB_PORT_INT:     "12365",
 	ENV_PANTAHUB_PORT_INT_TLS: "12366",
+
+	ENV_MAILGUN_APIKEY:    "",
+	ENV_MAILGUN_DOMAIN:    "",
+	ENV_MAILGUN_PUBAPIKEY: "",
 
 	ENV_MONGO_HOST: "localhost",
 	ENV_MONGO_DB:   "pantabase-serv",
