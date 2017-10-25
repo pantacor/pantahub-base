@@ -502,7 +502,7 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 	trail := Trail{}
 
 	if authType == "USER" {
-		err = collTrails.Find(bson.M{"_id": bson.ObjectIdHex(trailId), "owner": owner}).One(&trail)
+		err = collTrails.Find(bson.M{"_id": bson.ObjectIdHex(trailId)}).One(&trail)
 	} else {
 		rest.Error(w, "Need to be logged in as USER to post trail steps", http.StatusForbidden)
 		return
@@ -510,6 +510,11 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 
 	if err != nil {
 		rest.Error(w, "No resource access possible", http.StatusInternalServerError)
+		return
+	}
+
+	if trail.Owner != owner {
+		rest.Error(w, "No access", http.StatusForbidden)
 		return
 	}
 
@@ -890,10 +895,19 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 	trailId := r.PathParam("id")
 	rev := r.PathParam("rev")
 
-	if authType == "DEVICE" {
-		coll.Find(bson.M{"_id": trailId + "-" + rev, "device": owner}).One(&step)
-	} else if authType == "USER" {
-		coll.Find(bson.M{"_id": trailId + "-" + rev, "owner": owner}).One(&step)
+	if authType != "DEVICE" && authType != "USER" {
+		rest.Error(w, "Unknown AuthType", http.StatusBadRequest)
+		return
+	}
+
+	err := coll.Find(bson.M{"_id": trailId + "-" + rev}).One(&step)
+
+	if authType == "DEVICE" && step.Device != owner {
+		rest.Error(w, "No access for device", http.StatusForbidden)
+		return
+	} else if authType == "USER" && step.Owner != owner {
+		rest.Error(w, "No access for user", http.StatusForbidden)
+		return
 	}
 
 	newObject := objects.Object{}
@@ -911,10 +925,9 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 	storageId := objects.MakeStorageId(newObject.Owner, newObject.Sha)
 	newObject.StorageId = storageId
 	newObject.Id = newObject.Sha
-	fmt.Println("storeid: " + storageId)
 
 	objects.SyncObjectSizes(&newObject)
-	err := collection.Insert(newObject)
+	err = collection.Insert(newObject)
 
 	if err != nil {
 		w.WriteHeader(http.StatusConflict)
@@ -949,10 +962,19 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 	rev := r.PathParam("rev")
 	putId := r.PathParam("obj")
 
-	if authType == "DEVICE" {
-		coll.Find(bson.M{"_id": trailId + "-" + rev, "device": owner}).One(&step)
-	} else if authType == "USER" {
-		coll.Find(bson.M{"_id": trailId + "-" + rev, "owner": owner}).One(&step)
+	if authType != "DEVICE" && authType != "USER" {
+		rest.Error(w, "Unknown AuthType", http.StatusBadRequest)
+		return
+	}
+
+	err := coll.Find(bson.M{"_id": trailId + "-" + rev}).One(&step)
+
+	if authType == "DEVICE" && step.Device != owner {
+		rest.Error(w, "No access for device", http.StatusForbidden)
+		return
+	} else if authType == "USER" && step.Owner != owner {
+		rest.Error(w, "No access for user", http.StatusForbidden)
+		return
 	}
 
 	newObject := objects.Object{}
@@ -964,7 +986,7 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 	}
 
 	storageId := objects.MakeStorageId(step.Owner, putId)
-	err := collection.FindId(storageId).One(&newObject)
+	err = collection.FindId(storageId).One(&newObject)
 
 	if err != nil {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
@@ -1250,11 +1272,15 @@ func (a *TrailsApp) handle_putstepstate(w rest.ResponseWriter, r *rest.Request) 
 		return
 	}
 
-	err := coll.Find(bson.M{"_id": trailId + "-" + rev, "owner": owner, "progress.status": "NEW"}).One(&step)
+	err := coll.Find(bson.M{"_id": trailId + "-" + rev, "progress.status": "NEW"}).One(&step)
 
 	if err != nil {
 		rest.Error(w, "Error with accessing data: "+err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	if step.Owner != owner {
+		rest.Error(w, "No write access to step state", http.StatusForbidden)
 	}
 
 	stateMap := map[string]interface{}{}
