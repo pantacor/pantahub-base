@@ -173,6 +173,11 @@ func copyMap(m map[QuotaType]Quota) map[QuotaType]Quota {
 	return newMap
 }
 
+type DiskQuotaResult struct {
+	Id    string  `json:"id" bson:"_id"`
+	Total float64 `json:"total"`
+}
+
 func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
 	if !ok {
@@ -255,7 +260,7 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 	summary.Sub.QuotaStats[QUOTA_DEVICES] = quota
 
 	// quota on disk
-	resp := bson.M{}
+	resp := DiskQuotaResult{}
 	err = oCol.Pipe([]bson.M{{"$match": bson.M{"owner": owner.(string)}},
 		{"$group": bson.M{"_id": "$owner", "total": bson.M{"$sum": "$sizeint"}}}}).One(&resp)
 
@@ -266,7 +271,7 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 			rest.Error(w, "ERROR Quota Unit: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		fRound := float64(int64(float64(resp["total"].(float64))/float64(uM)*100)) / 100
+		fRound := float64(int64(float64(resp.Total)/float64(uM)*100)) / 100
 		quotaObjects.Actual = fRound
 		summary.Sub.QuotaStats[QUOTA_OBJECTS] = quotaObjects
 	} else if err != nil && err != mgo.ErrNotFound {
