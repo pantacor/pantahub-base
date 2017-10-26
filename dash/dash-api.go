@@ -224,7 +224,11 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 	for _, v := range mostRecentDeviceTrails {
 		var dev devices.Device
 		err = dCol.Find(bson.M{"owner": owner, "prn": v.Device}).One(&dev)
-		if err != nil {
+		if err == mgo.ErrNotFound {
+			// XXX: for now we skip devices that have trail but not device (e.g. deleted);
+			// but its wrong. need to fix that we display 5 active devices in all cases
+			continue
+		} else if err != nil {
 			rest.Error(w, "Error finding device for top device summary "+err.Error(),
 				http.StatusInternalServerError)
 			return
