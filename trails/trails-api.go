@@ -927,6 +927,30 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 	newObject.Id = newObject.Sha
 
 	objects.SyncObjectSizes(&newObject)
+
+	result, err := objects.CalcUsageAfterPost(newObject.Owner, a.mgoSession, bson.ObjectId(newObject.Id), newObject.SizeInt)
+
+	if err != nil {
+		log.Println("Error to calc diskquota: " + err.Error())
+		rest.Error(w, "Error posting object", http.StatusInternalServerError)
+		return
+	}
+
+	quota, err := objects.GetDiskQuota(newObject.Owner)
+
+	if err != nil {
+		log.Println("Error get diskquota setting: " + err.Error())
+		rest.Error(w, "Error to calc quota", http.StatusInternalServerError)
+		return
+	}
+
+	if result.Total > quota {
+		rest.Error(w, "Quota exceeded; delete some objects or request a quota bump from team@pantahub.com",
+			http.StatusPreconditionFailed)
+	}
+
+	collection.UpsertId(storageId, newObject)
+
 	err = collection.Insert(newObject)
 
 	if err != nil {
@@ -1017,6 +1041,28 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 	}
 
 	objects.SyncObjectSizes(&newObject)
+
+	result, err := objects.CalcUsageAfterPut(newObject.Owner, a.mgoSession, bson.ObjectId(newObject.Id), newObject.SizeInt)
+
+	if err != nil {
+		log.Println("Error to calc diskquota: " + err.Error())
+		rest.Error(w, "Error posting object", http.StatusInternalServerError)
+		return
+	}
+
+	quota, err := objects.GetDiskQuota(newObject.Owner)
+
+	if err != nil {
+		log.Println("Error get diskquota setting: " + err.Error())
+		rest.Error(w, "Error to calc quota", http.StatusInternalServerError)
+		return
+	}
+
+	if result.Total > quota {
+		rest.Error(w, "Quota exceeded; delete some objects or request a quota bump from team@pantahub.com",
+			http.StatusPreconditionFailed)
+	}
+
 	_, err = collection.UpsertId(storageId, newObject)
 	if err != nil {
 		w.WriteHeader(http.StatusConflict)

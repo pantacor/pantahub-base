@@ -144,7 +144,7 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	quota, err := getDiskQuota(ownerStr)
+	quota, err := GetDiskQuota(ownerStr)
 
 	if err != nil {
 		log.Println("Error to calc diskquota: " + err.Error())
@@ -226,7 +226,7 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	quota, err := getDiskQuota(ownerStr)
+	quota, err := GetDiskQuota(ownerStr)
 
 	if err != nil {
 		log.Println("Error get diskquota setting: " + err.Error())
@@ -244,7 +244,7 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(newObject)
 }
 
-func getDiskQuota(prn string) (float64, error) {
+func GetDiskQuota(prn string) (float64, error) {
 	uM, err := units.ParseStrictBytes("2GiB")
 	if err != nil {
 		return 0, err
