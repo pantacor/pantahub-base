@@ -1,10 +1,10 @@
 package objects
 
-/*
 import (
-	"context"
+	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 )
-*/
+
 type Object struct {
 	Id          string `json:"id" bson:"id"`
 	StorageId   string `json:"storage-id" bson:"_id"`
@@ -23,6 +23,48 @@ type ObjectWithAccess struct {
 	SignedGetUrl string `json:"signed-geturl"`
 	Now          string `json:"now"`
 	ExpireTime   string `json:"expire-time"`
+}
+
+type DiskQuotaUsageResult struct {
+	Id    string  `json:"id" bson:"_id"`
+	Total float64 `json:"total"`
+}
+
+func CalcUsageAfterPost(owner string, mgoSession *mgo.Session,
+	objectId bson.ObjectId,
+	newSize int64) (*DiskQuotaUsageResult, error) {
+
+	oCol := mgoSession.DB("").C("pantahub_objects")
+	resp := DiskQuotaUsageResult{}
+	err := oCol.Pipe([]bson.M{{"$match": bson.M{"owner": owner}},
+		{"$group": bson.M{"_id": "$owner", "total": bson.M{"$sum": "$sizeint"}}}}).One(&resp)
+
+	if err != nil {
+		return nil, err
+	}
+
+	resp.Total = resp.Total + float64(newSize)
+
+	return &resp, nil
+}
+
+func CalcUsageAfterPut(owner string, mgoSession *mgo.Session,
+	objectId bson.ObjectId,
+	newSize int64) (*DiskQuotaUsageResult, error) {
+
+	oCol := mgoSession.DB("").C("pantahub_objects")
+	resp := DiskQuotaUsageResult{}
+	// match all objects, but leave out the one we replace
+	err := oCol.Pipe([]bson.M{{"$match": bson.M{"owner": owner, "_id": bson.M{"$ne": objectId}}},
+		{"$group": bson.M{"_id": "$owner", "total": bson.M{"$sum": "$sizeint"}}}}).One(&resp)
+
+	if err != nil {
+		return nil, err
+	}
+
+	resp.Total = resp.Total + float64(newSize)
+
+	return &resp, nil
 }
 
 /*
