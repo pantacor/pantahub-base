@@ -81,6 +81,11 @@ type Summary struct {
 	TopDevices []DeviceInfo     `json:"top-devices"`
 }
 
+type DiskQuotaUsageResult struct {
+	Id    string  `json:"id" bson:"_id"`
+	Total float64 `json:"total"`
+}
+
 const (
 	QUOTA_OBJECTS     = QuotaType("OBJECTS")
 	QUOTA_BANDWIDTH   = QuotaType("BANDWIDTH")
@@ -173,11 +178,6 @@ func copyMap(m map[QuotaType]Quota) map[QuotaType]Quota {
 	return newMap
 }
 
-type DiskQuotaResult struct {
-	Id    string  `json:"id" bson:"_id"`
-	Total float64 `json:"total"`
-}
-
 func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
 	if !ok {
@@ -264,7 +264,7 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 	summary.Sub.QuotaStats[QUOTA_DEVICES] = quota
 
 	// quota on disk
-	resp := DiskQuotaResult{}
+	resp := DiskQuotaUsageResult{}
 	err = oCol.Pipe([]bson.M{{"$match": bson.M{"owner": owner.(string)}},
 		{"$group": bson.M{"_id": "$owner", "total": bson.M{"$sum": "$sizeint"}}}}).One(&resp)
 
