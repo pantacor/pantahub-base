@@ -134,7 +134,6 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 	storageId := MakeStorageId(ownerStr, newObject.Sha)
 	newObject.StorageId = storageId
 	newObject.Id = newObject.Sha
-	fmt.Println("storeid: " + storageId)
 
 	SyncObjectSizes(&newObject)
 
@@ -148,11 +147,14 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 	quota, err := getDiskQuota(ownerStr)
 
 	if err != nil {
+		log.Println("Error to calc diskquota: " + err.Error())
 		rest.Error(w, "Error to calc quota", http.StatusInternalServerError)
 		return
 	}
 
 	if result.Total > quota {
+
+		log.Println("Quota exceeded in post object.")
 		rest.Error(w, "Quota exceeded; delete some objects or request a quota bump from team@pantahub.com",
 			http.StatusPreconditionFailed)
 	}
@@ -219,6 +221,7 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 	result, err := CalcUsageAfterPut(ownerStr, a.mgoSession, bson.ObjectId(putId), newObject.SizeInt)
 
 	if err != nil {
+		log.Println("Error to calc diskquota: " + err.Error())
 		rest.Error(w, "Error posting object", http.StatusInternalServerError)
 		return
 	}
@@ -226,6 +229,7 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 	quota, err := getDiskQuota(ownerStr)
 
 	if err != nil {
+		log.Println("Error get diskquota setting: " + err.Error())
 		rest.Error(w, "Error to calc quota", http.StatusInternalServerError)
 		return
 	}
