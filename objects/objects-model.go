@@ -31,8 +31,7 @@ type DiskQuotaUsageResult struct {
 }
 
 func CalcUsageAfterPost(owner string, mgoSession *mgo.Session,
-	objectId bson.ObjectId,
-	newSize int64) (*DiskQuotaUsageResult, error) {
+	objectId bson.ObjectId, newSize int64) (*DiskQuotaUsageResult, error) {
 
 	oCol := mgoSession.DB("").C("pantahub_objects")
 	resp := DiskQuotaUsageResult{}
@@ -49,8 +48,7 @@ func CalcUsageAfterPost(owner string, mgoSession *mgo.Session,
 }
 
 func CalcUsageAfterPut(owner string, mgoSession *mgo.Session,
-	objectId bson.ObjectId,
-	newSize int64) (*DiskQuotaUsageResult, error) {
+	objectId bson.ObjectId, newSize int64) (*DiskQuotaUsageResult, error) {
 
 	oCol := mgoSession.DB("").C("pantahub_objects")
 	resp := DiskQuotaUsageResult{}

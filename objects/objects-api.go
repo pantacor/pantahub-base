@@ -26,14 +26,15 @@ import (
 	"strconv"
 	"time"
 
-	"gitlab.com/pantacor/pantahub-base/utils"
-
 	"github.com/StephanDollberg/go-json-rest-middleware-jwt"
+	"github.com/alecthomas/units"
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"gitlab.com/pantacor/pantahub-base/utils"
 	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 )
 
 type ObjectsApp struct {
@@ -136,7 +137,27 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 	fmt.Println("storeid: " + storageId)
 
 	SyncObjectSizes(&newObject)
-	err := collection.Insert(newObject)
+
+	result, err := CalcUsageAfterPost(ownerStr, a.mgoSession, bson.ObjectId(newObject.Id), newObject.SizeInt)
+
+	if err != nil {
+		rest.Error(w, "Error posting object", http.StatusInternalServerError)
+		return
+	}
+
+	quota, err := getDiskQuota(ownerStr)
+
+	if err != nil {
+		rest.Error(w, "Error to calc quota", http.StatusInternalServerError)
+		return
+	}
+
+	if result.Total > quota {
+		rest.Error(w, "Quota exceeded; delete some objects or request a quota bump from team@pantahub.com",
+			http.StatusPreconditionFailed)
+	}
+
+	err = collection.Insert(newObject)
 
 	if err != nil {
 		w.WriteHeader(http.StatusConflict)
@@ -195,9 +216,37 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 
 	SyncObjectSizes(&newObject)
 
+	result, err := CalcUsageAfterPut(ownerStr, a.mgoSession, bson.ObjectId(putId), newObject.SizeInt)
+
+	if err != nil {
+		rest.Error(w, "Error posting object", http.StatusInternalServerError)
+		return
+	}
+
+	quota, err := getDiskQuota(ownerStr)
+
+	if err != nil {
+		rest.Error(w, "Error to calc quota", http.StatusInternalServerError)
+		return
+	}
+
+	if result.Total > quota {
+		rest.Error(w, "Quota exceeded; delete some objects or request a quota bump from team@pantahub.com",
+			http.StatusPreconditionFailed)
+	}
+
 	collection.UpsertId(storageId, newObject)
 
 	w.WriteJson(newObject)
+}
+
+func getDiskQuota(prn string) (float64, error) {
+	uM, err := units.ParseStrictBytes("2GiB")
+	if err != nil {
+		return 0, err
+	}
+
+	return float64(uM), err
 }
 
 func SyncObjectSizes(obj *Object) {
