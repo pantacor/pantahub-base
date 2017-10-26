@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	OBJECT_TOKEN_VALID_SEC = 60
+	OBJECT_TOKEN_VALID_SEC = 86400
 )
 
 type ObjectAccessToken struct {
