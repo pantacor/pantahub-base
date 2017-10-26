@@ -126,6 +126,23 @@ var accounts = map[string]Account{
 	},
 }
 
+func init() {
+	// if in production we disable all fixed accounts
+	if os.Getenv("PANTAHUB_PRODUCTION") == "" {
+		return
+	}
+
+	for k, v := range accounts {
+		passwordOverwrite := os.Getenv("PANTAHUB_DEMOACCOUNTS_PASSWORD_" + v.Nick)
+		if passwordOverwrite == "" {
+			delete(accounts, k)
+		} else {
+			v.Password = passwordOverwrite
+			accounts[k] = v
+		}
+	}
+}
+
 func AccountToPayload(account Account) map[string]interface{} {
 	result := map[string]interface{}{}
 
