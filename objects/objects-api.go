@@ -245,7 +245,15 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 }
 
 func GetDiskQuota(prn string) (float64, error) {
-	uM, err := units.ParseStrictBytes("2GiB")
+
+	quota := "2GiB"
+
+	// hack until account plans are properly implemented
+	if prn == "prn:pantahub.com:auth:/user1" {
+		quota = "25GiB"
+	}
+
+	uM, err := units.ParseStrictBytes(quota)
 	if err != nil {
 		return 0, err
 	}
