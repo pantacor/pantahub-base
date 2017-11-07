@@ -71,9 +71,7 @@ func (mw *JWTMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFu
 		mw.Timeout = time.Hour
 	}
 	if mw.Authenticator == nil {
-		mw.Authenticator = func(userId string, password string) bool {
-			return false
-		}
+		log.Fatal("Authenticator is required")
 	}
 	if mw.Authorizator == nil {
 		mw.Authorizator = func(userId string, request *rest.Request) bool {
@@ -168,7 +166,6 @@ func (mw *JWTMiddleware) LoginHandler(writer rest.ResponseWriter, request *rest.
 		return
 	}
 
-	writer.Header().Add("X-Auth-AccessToken", tokenString)
 	writer.WriteJson(resultToken{Token: tokenString})
 }
 
@@ -227,22 +224,10 @@ func (mw *JWTMiddleware) RefreshHandler(writer rest.ResponseWriter, request *res
 		return
 	}
 
-	writer.Header().Add("X-Auth-AccessToken", tokenString)
 	writer.WriteJson(resultToken{Token: tokenString})
-}
-
-type ModelError struct {
-   Code int `json:"code"`
-   Message string `json:"message"`
 }
 
 func (mw *JWTMiddleware) unauthorized(writer rest.ResponseWriter) {
 	writer.Header().Set("WWW-Authenticate", "JWT realm="+mw.Realm)
-	err := ModelError{}
-
-	err.Code = http.StatusUnauthorized
-	err.Message = "Not Authorized"
-
-	writer.WriteHeader(401)
-	writer.WriteJson(err)
+	rest.Error(writer, "Not Authorized", http.StatusUnauthorized)
 }
