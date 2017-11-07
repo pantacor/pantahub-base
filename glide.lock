@@ -1,0 +1,72 @@
+hash: 06c066380a817e6272c2af432ea58bcc15d45f3bebc94230f2c53826069a4c10
+updated: 2017-11-07T14:50:32.501262705+01:00
+imports:
+- name: github.com/alecthomas/units
+  version: 2efee857e7cfd4f3d0138cc3cbb1b4966962b93a
+- name: github.com/ant0ine/go-json-rest
+  version: ce4b71cdf7ba29ef443d704bd923f5bbf281ee30
+  subpackages:
+  - rest
+  - rest/trie
+- name: github.com/asaskevich/govalidator
+  version: 73945b6115bfbbcc57d89b7316e28109364124e1
+- name: github.com/aws/aws-sdk-go
+  version: b9e9981b543687c6fbfd064eaa0f7b69f5fdefd7
+  subpackages:
+  - aws
+  - aws/awserr
+  - aws/awsutil
+  - aws/client
+  - aws/client/metadata
+  - aws/corehandlers
+  - aws/credentials
+  - aws/credentials/ec2rolecreds
+  - aws/credentials/endpointcreds
+  - aws/credentials/stscreds
+  - aws/defaults
+  - aws/ec2metadata
+  - aws/endpoints
+  - aws/request
+  - aws/session
+  - aws/signer/v4
+  - internal/shareddefaults
+  - private/protocol
+  - private/protocol/query
+  - private/protocol/query/queryutil
+  - private/protocol/rest
+  - private/protocol/restxml
+  - private/protocol/xml/xmlutil
+  - service/s3
+  - service/sts
+- name: github.com/dgrijalva/jwt-go
+  version: dbeaa9332f19a944acb5736b4456cfcc02140e29
+- name: github.com/dustinkirkland/golang-petname
+  version: d3c2ba80e75eeef10c5cf2fc76d2c809637376b3
+- name: github.com/go-ini/ini
+  version: f280b3ba517bf5fc98922624f21fb0e7a92adaec
+- name: github.com/jmespath/go-jmespath
+  version: bd40a432e4c76585ef6b72d3fd96fb9b6dc7b68d
+- name: github.com/pkg/errors
+  version: f15c970de5b76fac0b59abb32d62c17cc7bed265
+- name: github.com/StephanDollberg/go-json-rest-middleware-jwt
+  version: be2a0500d9b32741c6823e55c27b4a79151272eb
+- name: gitlab.com/pantacor/pvr
+  version: 16997ebde0fbcc9e54a8ac453a1bd6408bb086a0
+  subpackages:
+  - api
+- name: gopkg.in/mailgun/mailgun-go.v1
+  version: a4002e2df2e8ca2da6a6fbb4a72871b504e49f50
+- name: gopkg.in/mgo.v2
+  version: 3f83fa5005286a7fe593b055f0d7771a7dce4655
+  subpackages:
+  - bson
+  - internal/json
+  - internal/sasl
+  - internal/scram
+testImports:
+- name: github.com/go-resty/resty
+  version: 9ac9c42358f7c3c69ac9f8610e8790d7c338e85d
+- name: golang.org/x/net
+  version: 01c190206fbdffa42f334f4b2bf2220f50e64920
+  subpackages:
+  - publicsuffix
