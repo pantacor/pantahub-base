@@ -164,6 +164,7 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusConflict)
 		w.Header().Add("X-PH-Error", "Error inserting object into database "+err.Error())
+		// we return anyway with the already available info about this object
 	}
 
 	issuerUrl := utils.GetApiEndpoint("/objects")

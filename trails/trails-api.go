@@ -949,13 +949,12 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 			http.StatusPreconditionFailed)
 	}
 
-	collection.UpsertId(storageId, newObject)
-
 	err = collection.Insert(newObject)
 
 	if err != nil {
 		w.WriteHeader(http.StatusConflict)
 		w.Header().Add("X-PH-Error", "Error inserting object into database "+err.Error())
+		// we return anyway with the already available info about this object
 	}
 
 	issuerUrl := utils.GetApiEndpoint("/trails")
