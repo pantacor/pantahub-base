@@ -16,7 +16,7 @@
 package utils
 
 import (
-	"fmt"
+	"log"
 
 	"gopkg.in/mgo.v2"
 )
@@ -40,7 +40,7 @@ func GetMongoSession() (*mgo.Session, error) {
 	if mongoRs != "" {
 		mongoConnect = mongoConnect + "?replicaSet=" + mongoRs
 	}
-	fmt.Println("mongodb connect: " + mongoConnect)
+	log.Println("Will connect to mongodb with: " + mongoConnect)
 
 	return mgo.Dial(mongoConnect)
 }
