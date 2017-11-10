@@ -17,7 +17,7 @@ package base
 
 import (
 	"errors"
-	"fmt"
+	"log"
 	"io"
 	"net/http"
 	"net/url"
@@ -73,7 +73,7 @@ func (f FileUploadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	tok, err := objects.NewFromValidToken(fileBase)
 
 	if err != nil {
-		fmt.Println("Invalid local-s3 request (" + fileBase + "): " + err.Error())
+		log.Println("Invalid local-s3 request (" + fileBase + "): " + err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -85,7 +85,7 @@ func (f FileUploadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == "GET" {
 		if objClaims.Method != http.MethodGet {
-			fmt.Println("Invalid objClaims Method; not GET (" + objClaims.Method + ")")
+			log.Println("Invalid objClaims Method; not GET (" + objClaims.Method + ")")
 			w.WriteHeader(http.StatusForbidden)
 			return
 		}
@@ -96,7 +96,7 @@ func (f FileUploadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if objClaims.Method != http.MethodPut {
-		fmt.Println("Invalid objClaims Method; not PUT (" + objClaims.Method + ")")
+		log.Println("Invalid objClaims Method; not PUT (" + objClaims.Method + ")")
 		w.WriteHeader(http.StatusForbidden)
 		return
 	}
@@ -114,10 +114,10 @@ func (f FileUploadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	written, err := io.CopyN(file, r.Body, objClaims.Size)
 
 	if written != objClaims.Size {
-		fmt.Println("WARNING: file upload size mismatch with claim")
+		log.Println("WARNING: file upload size mismatch with claim")
 	}
 	if err != nil {
-		fmt.Println("ERROR: error syncing file upload to disk: " + err.Error())
+		log.Println("ERROR: error syncing file upload to disk: " + err.Error())
 	}
 
 }
@@ -188,7 +188,7 @@ func DoInit() {
 	}
 
 	if !objects.PantahubS3Production() {
-		fmt.Println("S3 Development Path: " + objects.PantahubS3Path())
+		log.Println("S3 Development Path: " + objects.PantahubS3Path())
 		fserver := FileUploadServer{fileServer: http.FileServer(http.Dir(objects.PantahubS3Path())), directory: objects.PantahubS3Path()}
 		http.Handle("/local-s3/", http.StripPrefix("/local-s3", &fserver))
 	}
