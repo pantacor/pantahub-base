@@ -23,7 +23,6 @@ func BsonQuoteMap(m *map[string]interface{}) map[string]interface{} {
 	escapedMap := map[string]interface{}{}
 	for k, v := range *m {
 		nk := strings.Replace(k, ".", "\uFF2E", -1)
-		// fmt.Printf("klen: %d nklen: %d\n", len([]byte(k)), len([]byte(nk)))
 		escapedMap[nk] = v
 	}
 	return escapedMap
@@ -33,7 +32,6 @@ func BsonUnquoteMap(m *map[string]interface{}) map[string]interface{} {
 	escapedMap := map[string]interface{}{}
 	for k, v := range *m {
 		nk := strings.Replace(k, "\uFF2E", ".", -1)
-		// fmt.Printf("klen: %d nklen: %d\n", len([]byte(k)), len([]byte(nk)))
 		escapedMap[nk] = v
 	}
 	return escapedMap
