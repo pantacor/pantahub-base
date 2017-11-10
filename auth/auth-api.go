@@ -369,7 +369,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 	}
 	err := app.mgoSession.DB("").C("pantahub_accounts").EnsureIndex(index)
 	if err != nil {
-		log.Fatal("Error setting up index for pantahub_accounts: " + err.Error())
+		log.Fatalln("Error setting up index for pantahub_accounts: " + err.Error())
 		return nil
 	}
 
@@ -382,7 +382,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 	}
 	err = app.mgoSession.DB("").C("pantahub_accounts").EnsureIndex(index)
 	if err != nil {
-		log.Fatal("Error setting up index for pantahub_accounts: " + err.Error())
+		log.Fatalln("Error setting up index for pantahub_accounts: " + err.Error())
 		return nil
 	}
 
@@ -395,7 +395,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 
 	err = app.mgoSession.DB("").C("pantahub_accounts").EnsureIndex(index)
 	if err != nil {
-		log.Fatal("Error setting up index for pantahub_accounts: " + err.Error())
+		log.Fatalln("Error setting up index for pantahub_accounts: " + err.Error())
 		return nil
 	}
 
