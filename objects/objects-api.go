@@ -317,7 +317,7 @@ func MakeObjAccessible(Issuer string, Subject string, obj Object, storageId stri
 
 		size, err := strconv.ParseInt(obj.Size, 10, 64)
 		if err != nil {
-			fmt.Print("INTERNAL ERROR (size parsing) local-s3: " + err.Error())
+			log.Println("INTERNAL ERROR (size parsing) local-s3: " + err.Error())
 			filesObjWithAccess.SignedGetUrl = PantahubS3DevUrl() + "/local-s3/INTERNAL-ERROR"
 			filesObjWithAccess.SignedPutUrl = PantahubS3DevUrl() + "/local-s3/INTERNAL-ERROR"
 			return filesObjWithAccess
@@ -325,7 +325,7 @@ func MakeObjAccessible(Issuer string, Subject string, obj Object, storageId stri
 		objAccessTokGet := NewObjectAccessForSec(obj.ObjectName, http.MethodGet, size, Issuer, Subject, storageId, 60)
 		tokGet, err := objAccessTokGet.Sign()
 		if err != nil {
-			fmt.Print("INTERNAL ERROR local-s3: " + err.Error())
+			log.Println("INTERNAL ERROR local-s3: " + err.Error())
 			filesObjWithAccess.SignedGetUrl = PantahubS3DevUrl() + "/local-s3/INTERNAL-ERROR"
 		} else {
 			filesObjWithAccess.SignedGetUrl = PantahubS3DevUrl() + "/local-s3/" + tokGet
@@ -335,7 +335,7 @@ func MakeObjAccessible(Issuer string, Subject string, obj Object, storageId stri
 			objAccessTokPut := NewObjectAccessForSec(obj.ObjectName, http.MethodPut, size, Issuer, Subject, storageId, 60)
 			tokPut, err := objAccessTokPut.Sign()
 			if err != nil {
-				fmt.Print("INTERNAL ERROR local-s3: " + err.Error())
+				log.Println("INTERNAL ERROR local-s3: " + err.Error())
 				filesObjWithAccess.SignedPutUrl = PantahubS3DevUrl() + "/local-s3/INTERNAL-ERROR"
 			} else {
 				filesObjWithAccess.SignedPutUrl = PantahubS3DevUrl() + "/local-s3/" + tokPut
