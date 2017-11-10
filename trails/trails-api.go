@@ -46,7 +46,6 @@ package trails
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -248,7 +247,7 @@ func (a *TrailsApp) handle_gettrails(w rest.ResponseWriter, r *rest.Request) {
 	if authType == "DEVICE" {
 		coll.Find(bson.M{"device": owner}).All(&trails)
 		if len(trails) > 1 {
-			fmt.Println("WARNING: more than one trail in db for device - bad DB: " + owner.(string))
+			log.Println("WARNING: more than one trail in db for device - bad DB: " + owner.(string))
 			trails = trails[0:1]
 		}
 	} else if authType == "USER" {
@@ -552,8 +551,6 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 	// XXX: introduce step diffs here and store them precalced
 
 	newStep.Id = trail.Id.Hex() + "-" + strconv.Itoa(newStep.Rev)
-	fmt.Printf("newStep.Id: %s\n", newStep.Id)
-
 	newStep.Owner = trail.Owner
 	newStep.Device = trail.Device
 	newStep.StepProgress = StepProgress{
@@ -576,7 +573,7 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 
 	if err != nil {
 		// XXX: figure how to be better on error cases here...
-		fmt.Printf("Error updating last-touched for trail in poststep; not failing because step was written: %s\n", trail.Id.Hex())
+		log.Printf("Error updating last-touched for trail in poststep; not failing because step was written: %s\n  => ERROR: %s\n ", trail.Id.Hex(), err.Error())
 	}
 
 	newStep.State = utils.BsonUnquoteMap(&newStep.State)
@@ -1409,7 +1406,7 @@ func (a *TrailsApp) handle_putstepprogress(w rest.ResponseWriter, r *rest.Reques
 
 	if err != nil {
 		// XXX: figure how to be better on error cases here...
-		fmt.Printf("Error updating last-touched for trail in poststepprogress; not failing because step was written: %s\n", trailId)
+		log.Printf("Error updating last-touched for trail in poststepprogress; not failing because step was written: %s\n", trailId)
 	}
 
 	w.WriteJson(stepProgress)
