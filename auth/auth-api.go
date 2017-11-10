@@ -21,7 +21,6 @@ import (
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/utils"
 
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -270,7 +269,6 @@ func (a *AuthApp) handle_getprofile(w rest.ResponseWriter, r *rest.Request) {
 	jwtClaims := r.Env["JWT_PAYLOAD"].(map[string]interface{})
 
 	accountPrn := jwtClaims["prn"].(string)
-	fmt.Println("ACCOUNT: " + accountPrn)
 
 	if accountPrn == "" {
 		rest.Error(w, "Not logged in", http.StatusPreconditionFailed)
@@ -371,7 +369,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 	}
 	err := app.mgoSession.DB("").C("pantahub_accounts").EnsureIndex(index)
 	if err != nil {
-		fmt.Println("Error setting up index for pantahub_accounts: " + err.Error())
+		log.Fatal("Error setting up index for pantahub_accounts: " + err.Error())
 		return nil
 	}
 
@@ -384,7 +382,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 	}
 	err = app.mgoSession.DB("").C("pantahub_accounts").EnsureIndex(index)
 	if err != nil {
-		fmt.Println("Error setting up index for pantahub_accounts: " + err.Error())
+		log.Fatal("Error setting up index for pantahub_accounts: " + err.Error())
 		return nil
 	}
 
@@ -397,7 +395,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 
 	err = app.mgoSession.DB("").C("pantahub_accounts").EnsureIndex(index)
 	if err != nil {
-		log.Println("Error setting up index for pantahub_accounts: " + err.Error())
+		log.Fatal("Error setting up index for pantahub_accounts: " + err.Error())
 		return nil
 	}
 
@@ -511,7 +509,6 @@ func (a *AuthApp) accountAuth(idEmailNick string, secret string) bool {
 
 	// error with db or not found -> log and fail
 	if err != nil {
-		fmt.Println("ERROR finding account: " + err.Error())
 		return false
 	}
 
@@ -542,7 +539,6 @@ func (a *AuthApp) userPayload(idEmailNick string) map[string]interface{} {
 
 	// error with db or not found -> log and fail
 	if err != nil {
-		fmt.Println("ERROR finding account: " + err.Error())
 		return nil
 	}
 
