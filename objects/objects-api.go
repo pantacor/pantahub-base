@@ -330,8 +330,8 @@ func MakeObjAccessible(Issuer string, Subject string, obj Object, storageId stri
 		} else {
 			filesObjWithAccess.SignedGetUrl = PantahubS3DevUrl() + "/local-s3/" + tokGet
 		}
-		if Subject == obj.Owner {
 
+		if Subject == obj.Owner {
 			objAccessTokPut := NewObjectAccessForSec(obj.ObjectName, http.MethodPut, size, Issuer, Subject, storageId, 60)
 			tokPut, err := objAccessTokPut.Sign()
 			if err != nil {
