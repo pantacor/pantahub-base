@@ -56,10 +56,10 @@ import (
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/utils"
-	"gitlab.com/pantacor/pvr/api"
 
 	"github.com/StephanDollberg/go-json-rest-middleware-jwt"
 	"github.com/ant0ine/go-json-rest/rest"
+	pvrapi "gitlab.com/pantacor/pvr/api"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
