@@ -17,8 +17,8 @@ package base
 
 import (
 	"errors"
-	"log"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	jwt "github.com/StephanDollberg/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/auth"
 	"gitlab.com/pantacor/pantahub-base/dash"
 	"gitlab.com/pantacor/pantahub-base/devices"
@@ -36,13 +37,15 @@ import (
 	"gitlab.com/pantacor/pantahub-base/plog"
 	"gitlab.com/pantacor/pantahub-base/trails"
 	"gitlab.com/pantacor/pantahub-base/utils"
-
-	"github.com/StephanDollberg/go-json-rest-middleware-jwt"
 )
 
 type FileUploadServer struct {
 	fileServer http.Handler
 	directory  string
+}
+
+func falseAuthenticator(userId string, password string) bool {
+	return false
 }
 
 func (d FileUploadServer) OpenForWrite(name string) (*os.File, error) {
@@ -140,36 +143,41 @@ func DoInit() {
 	}
 	{
 		app := objects.New(&jwt.JWTMiddleware{
-			Key:   []byte(jwtSecret),
-			Realm: "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
+			Key:           []byte(jwtSecret),
+			Realm:         "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
+			Authenticator: falseAuthenticator,
 		}, session)
 		http.Handle("/objects/", http.StripPrefix("/objects", app.Api.MakeHandler()))
 	}
 	{
 		app := devices.New(&jwt.JWTMiddleware{
-			Key:   []byte(jwtSecret),
-			Realm: "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
+			Key:           []byte(jwtSecret),
+			Realm:         "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
+			Authenticator: falseAuthenticator,
 		}, session)
 		http.Handle("/devices/", http.StripPrefix("/devices", app.Api.MakeHandler()))
 	}
 	{
 		app := trails.New(&jwt.JWTMiddleware{
-			Key:   []byte(jwtSecret),
-			Realm: "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
+			Key:           []byte(jwtSecret),
+			Realm:         "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
+			Authenticator: falseAuthenticator,
 		}, session)
 		http.Handle("/trails/", http.StripPrefix("/trails", app.Api.MakeHandler()))
 	}
 	{
 		app := plog.New(&jwt.JWTMiddleware{
-			Key:   []byte(jwtSecret),
-			Realm: "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
+			Key:           []byte(jwtSecret),
+			Realm:         "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
+			Authenticator: falseAuthenticator,
 		}, session)
 		http.Handle("/plog/", http.StripPrefix("/plog", app.Api.MakeHandler()))
 	}
 	{
 		app := logs.New(&jwt.JWTMiddleware{
-			Key:   []byte(jwtSecret),
-			Realm: "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
+			Key:           []byte(jwtSecret),
+			Realm:         "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
+			Authenticator: falseAuthenticator,
 		}, session)
 		http.Handle("/logs/", http.StripPrefix("/logs", app.Api.MakeHandler()))
 	}
@@ -178,11 +186,11 @@ func DoInit() {
 		app := healthz.New(session)
 		http.Handle("/healthz/", http.StripPrefix("/healthz", app.Api.MakeHandler()))
 	}
-
 	{
 		app := dash.New(&jwt.JWTMiddleware{
-			Key:   []byte(jwtSecret),
-			Realm: "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
+			Key:           []byte(jwtSecret),
+			Realm:         "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
+			Authenticator: falseAuthenticator,
 		}, session)
 		http.Handle("/dash/", http.StripPrefix("/dash", app.Api.MakeHandler()))
 	}
