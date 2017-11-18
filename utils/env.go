@@ -18,6 +18,9 @@ package utils
 import "os"
 
 const (
+	// Pantahub Product Name (branding)
+	ENV_PANTAHUB_PRODUCTNAME = "PANTAHUB_PRODUCTNAME"
+
 	// Pantahub JWT Secret. THIS MUST BE SET TO SOMETHING SECRET!!
 	// default: "THIS MUST BE CHANGED"
 	ENV_PANTAHUB_JWT_AUTH_SECRET = "PANTAHUB_JWT_SECRET"
@@ -59,10 +62,6 @@ const (
 	// Set elasticsearch basic auth password
 	// default: ""
 	ENV_ELASTIC_PASSWORD = "ELASTIC_PASSWORD"
-
-	// Set elasticsearch bearer auth token
-	// default: ""
-	ENV_ELASTIC_BASIC = "ELASTIC_BASIC"
 
 	// Set elasticsearch bearer auth token
 	// default: ""
@@ -151,6 +150,8 @@ const (
 )
 
 var defaultEnvs = map[string]string{
+	ENV_PANTAHUB_PRODUCTNAME: "pantahub-personal",
+
 	ENV_PANTAHUB_JWT_AUTH_SECRET:   "YOU MUST CHANGE THIS",
 	ENV_PANTAHUB_JWT_OBJECT_SECRET: "YOU MUST CHANGE THIS",
 
@@ -179,7 +180,6 @@ var defaultEnvs = map[string]string{
 	ENV_ELASTIC_URL:      "",
 	ENV_ELASTIC_USERNAME: "",
 	ENV_ELASTIC_PASSWORD: "",
-	ENV_ELASTIC_BASIC:    "",
 	ENV_ELASTIC_BEARER:   "",
 
 	// health
