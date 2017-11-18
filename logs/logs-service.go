@@ -13,11 +13,15 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
-package logs
 
+// Package logs provides the abstract logging infrastructure for pantahub
+// logging endpoint as well as backends for elastic and mgo.
+//
 // Logs offers a simple logging service for Pantahub powered devices and apps.
 // To post new log entries use the POST method on the main endpoint
 // To page through log entries and sort etc. check the GET method
+package logs
+
 //
 import (
 	"encoding/json"
@@ -35,14 +39,24 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-type LogsApp struct {
+type logsApp struct {
 	jwt_middleware *jwt.JWTMiddleware
 	Api            *rest.Api
 	mgoSession     *mgo.Session
 }
 
+// LogsFilter uses a prototype LogsEntry instance to filter
+// the values. It honours the string fields: Device, Owner,
+// Source, Level and Text, where a non-empty field will
+// make the backend filter results by the field.
+type LogsFilter LogsEntry
+
+// LogsSort is about a map of sort fields prefixed with '-'
+// if the order of this field should be descending (like mgo)
+type LogsSort []string
+
 type LogsEntry struct {
-	Id          bson.ObjectId `json:"id" bson:"_id,omitempty"`
+	Id          bson.ObjectId `json:"id,omitempty" bson:"_id,omitempty"`
 	Device      string        `json:"dev" bson:"dev"`
 	Owner       string        `json:"own" bson:"own"`
 	TimeCreated time.Time     `json:"time-created" bson:"time-created"`
@@ -58,6 +72,11 @@ type LogsPager struct {
 	Page    int         `json:"page"`
 	Count   int         `json:"count"`
 	Entries []LogsEntry `json:"entries"`
+}
+
+type LogsBackend interface {
+	getLogs(start int, page int, query *LogsFilter, sort *LogsSort) (*LogsPager, error)
+	doLog(e []*LogsEntry) error
 }
 
 //
@@ -82,7 +101,7 @@ type LogsPager struct {
 //     - sort: comman list of items of "tsec,tnano,device,src,lvl,time-created"
 //             you can use - on each individual item to reverse order
 //
-func (a *LogsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
+func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 
 	var result LogsPager
 	var err error
@@ -204,7 +223,7 @@ func (a *LogsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 //
 // ## POST /logs/
 //   Post one or many log entries as an error of LogEntry
-func (a *LogsApp) handle_postlogs(w rest.ResponseWriter, r *rest.Request) {
+func (a *logsApp) handle_postlogs(w rest.ResponseWriter, r *rest.Request) {
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
 
@@ -279,9 +298,9 @@ func (a *LogsApp) handle_postlogs(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(newEntries)
 }
 
-func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *LogsApp {
+func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *logsApp {
 
-	app := new(LogsApp)
+	app := new(logsApp)
 	app.jwt_middleware = jwtMiddleware
 	app.mgoSession = session
 
