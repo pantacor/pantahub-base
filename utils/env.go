@@ -144,6 +144,10 @@ const (
 	// PANTAHUB_S3PATH for backing storage
 	// default: ../local-s3/
 	ENV_PANTAHUB_S3PATH = "PANTAHUB_S3PATH"
+
+	// enable resty client debugging if env is set
+	// default: ""
+	ENV_RESTY_DEBUG = "RESTY_DEBUG"
 )
 
 var defaultEnvs = map[string]string{
@@ -191,6 +195,9 @@ var defaultEnvs = map[string]string{
 	// pantahub internal envs
 	ENV_PANTAHUB_AUTH:   "https://localhost:12366/auth",
 	ENV_PANTAHUB_S3PATH: "../local-s3/",
+
+	// resty REST client configs
+	ENV_RESTY_DEBUG: "",
 }
 
 func GetEnv(key string) string {
