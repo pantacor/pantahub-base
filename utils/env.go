@@ -46,6 +46,28 @@ const (
 	// XXX: not used
 	ENV_PANTAHUB_APIVERSION = "PANTAHUB_APIVERSION"
 
+	// Set elasticsearch base URL
+	// default: https://es5.pantahub.com
+	ENV_ELASTIC_URL = "ELASTIC_URL"
+
+	// Set elasticsearch basic auth username; if set
+	// a Basic auth token will be generated for you from
+	// ELASTIC_USERNAME & ELASTIC_PASSWORD
+	// default: ""
+	ENV_ELASTIC_USERNAME = "ELASTIC_USERNAME"
+
+	// Set elasticsearch basic auth password
+	// default: ""
+	ENV_ELASTIC_PASSWORD = "ELASTIC_PASSWORD"
+
+	// Set elasticsearch bearer auth token
+	// default: ""
+	ENV_ELASTIC_BASIC = "ELASTIC_BASIC"
+
+	// Set elasticsearch bearer auth token
+	// default: ""
+	ENV_ELASTIC_BEARER = "ELASTIC_BEARER"
+
 	// Authentication endpoint to point clients to that need access tokens
 	// or need more privileged access tokens.
 	// default: $PANTAHUB_SCHEME://$PANTAHUB_HOST:$PANTAHUB_PORT/auth
@@ -137,6 +159,7 @@ var defaultEnvs = map[string]string{
 	ENV_PANTAHUB_PORT_INT:     "12365",
 	ENV_PANTAHUB_PORT_INT_TLS: "12366",
 
+	// mailgun support for mail
 	ENV_MAILGUN_APIKEY:    "",
 	ENV_MAILGUN_DOMAIN:    "",
 	ENV_MAILGUN_PUBAPIKEY: "",
@@ -148,14 +171,24 @@ var defaultEnvs = map[string]string{
 	ENV_MONGO_PORT: "27017",
 	ENV_MONGO_RS:   "", // replicaSet; needed if connecting to multiple hosts
 
+	// elastic search access
+	ENV_ELASTIC_URL:      "",
+	ENV_ELASTIC_USERNAME: "",
+	ENV_ELASTIC_PASSWORD: "",
+	ENV_ELASTIC_BASIC:    "",
+	ENV_ELASTIC_BEARER:   "",
+
+	// health
 	ENV_PANTAHUB_SA_ADMIN_SECRET: "",
 
+	// smtp config (we stopped supporting this in favour of mailgun for launch)
 	ENV_SMTP_HOST: "localhost",
 	ENV_SMTP_PORT: "25",
 	ENV_SMTP_USER: "XXX",
 	ENV_SMTP_PASS: "XXX",
 	ENV_REG_EMAIL: "admin@pantacor.com",
 
+	// pantahub internal envs
 	ENV_PANTAHUB_AUTH:   "https://localhost:12366/auth",
 	ENV_PANTAHUB_S3PATH: "../local-s3/",
 }
