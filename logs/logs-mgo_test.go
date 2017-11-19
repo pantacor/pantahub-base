@@ -27,7 +27,7 @@ import (
 	"time"
 )
 
-func TestElasticDoLog(t *testing.T) {
+func TestMongoDoLog(t *testing.T) {
 	logs := []*LogsEntry{
 		&LogsEntry{
 			Device:      "testdevice",
@@ -61,7 +61,7 @@ func TestElasticDoLog(t *testing.T) {
 		},
 	}
 
-	err := elasticTestLogger.postLogs(logs)
+	err := mgoTestLogger.postLogs(logs)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
