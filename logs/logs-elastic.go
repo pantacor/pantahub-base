@@ -161,7 +161,7 @@ func (s *elasticLogger) postLogs(e []*LogsEntry) error {
 	var buf bytes.Buffer
 
 	timeRecv := time.Now()
-	index := fmt.Sprintf("pantahub-%.4d%.2d%.2d", timeRecv.Year(), timeRecv.Month(), timeRecv.Day())
+	index := fmt.Sprintf(s.elasticIndexPrefix+"-%.4d%.2d%.2d", timeRecv.Year(), timeRecv.Month(), timeRecv.Day())
 
 	bulkPostURL, err := url.Parse("_bulk")
 	if err != nil {
