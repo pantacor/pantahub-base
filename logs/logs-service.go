@@ -271,11 +271,17 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *logsApp {
 
 	app.backend, err = NewElasticLogger()
 
+	if err == nil {
+		err = app.backend.register()
+	}
 	if err != nil {
 		log.Println("INFO: Elastic Logger failed to start: " + err.Error())
 		log.Println("INFO: Elastic Logger not available; trying other options ...")
 
 		app.backend, err = NewMgoLogger(session)
+		if err == nil {
+			err = app.backend.register()
+		}
 	} else {
 		log.Println("INFO: Elastic Logger started.")
 	}
