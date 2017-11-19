@@ -172,7 +172,7 @@ func (s *elasticLogger) postLogs(e []*LogsEntry) error {
 
 	for _, v := range e {
 		// write the bulkd op)
-		m := bson.M{"index": bson.M{"_index": index, "_type": "pantavisor"}}
+		m := bson.M{"index": bson.M{"_index": index, "_type": "pv"}}
 		data, err := json.Marshal(&m)
 		if err != nil {
 			return err
