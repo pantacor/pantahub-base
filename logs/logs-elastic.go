@@ -256,7 +256,7 @@ func newElasticLogger() (*elasticLogger, error) {
 		"mappings": bson.M{
 			"pv": bson.M{
 				"_source": bson.M{
-					"enabled": false,
+					"enabled": true,
 				},
 				"properties": bson.M{
 					"hostname": bson.M{
