@@ -149,6 +149,74 @@ func (s *elasticLogger) unregister(deleteIndex bool) error {
 	return nil
 }
 
+func (s *elasticLogger) getLogs(start int, page int, query LogsFilter, sort LogsSort) (*LogsPager, error) {
+	return nil, errors.New("WARNING: getLogs for elastic logger not yet implemented.")
+}
+
+func (s *elasticLogger) postLogs(e []*LogsEntry) error {
+	if !s.works {
+		return errors.New("logger not initialized/works")
+	}
+
+	var buf bytes.Buffer
+
+	timeRecv := time.Now()
+	index := fmt.Sprintf("pantahub-%.4d%.2d%.2d", timeRecv.Year(), timeRecv.Month(), timeRecv.Day())
+
+	bulkPostURL, err := url.Parse("_bulk")
+	if err != nil {
+		return err
+	}
+
+	postURL := s.elasticURL.ResolveReference(bulkPostURL)
+
+	for _, v := range e {
+		// write the bulkd op)
+		m := bson.M{"index": bson.M{"_index": index, "_type": "pantavisor"}}
+		data, err := json.Marshal(&m)
+		if err != nil {
+			return err
+		}
+		_, err = buf.Write(data)
+		if err != nil {
+			return err
+		}
+		err = buf.WriteByte(byte('\n'))
+		if err != nil {
+			return err
+		}
+
+		// write the entry to insert
+		data, err = json.Marshal(v)
+		if err != nil {
+			return err
+		}
+		_, err = buf.Write(data)
+		if err != nil {
+			return err
+		}
+		err = buf.WriteByte(byte('\n'))
+		if err != nil {
+			return err
+		}
+	}
+
+	response, err := s.r().
+		SetBody(string(buf.Bytes())).
+		SetHeader("Content-Type", "application/x-ndjson").
+		Post(postURL.String())
+
+	if err != nil {
+		return err
+	}
+
+	if response.StatusCode() != http.StatusOK {
+		return errors.New("WARNING: elasticsearch log entry failed " + response.Status() + "\nReturned Body: " + string(response.Body()))
+	}
+
+	return nil
+}
+
 // NewElasticLogger uses environment settings to
 // to initialize the elastic logger.
 //
@@ -225,77 +293,4 @@ func newElasticLogger() (*elasticLogger, error) {
 		},
 	}
 	return defaultLogger, nil
-}
-
-func DoLog(e []*LogsEntry) error {
-	return defaultLogger.doLog(e)
-}
-
-func (s *elasticLogger) getLogs(start int, page int, query *LogsFilter, sort *LogsSort) (*LogsPager, error) {
-
-	return nil, nil
-}
-
-func (s *elasticLogger) doLog(e []*LogsEntry) error {
-	if !s.works {
-		return errors.New("logger not initialized/works")
-	}
-
-	var buf bytes.Buffer
-
-	timeRecv := time.Now()
-	index := fmt.Sprintf("pantahub-%.4d%.2d%.2d", timeRecv.Year(), timeRecv.Month(), timeRecv.Day())
-
-	bulkPostURL, err := url.Parse("_bulk")
-	if err != nil {
-		return err
-	}
-
-	postURL := s.elasticURL.ResolveReference(bulkPostURL)
-
-	for _, v := range e {
-		// write the bulkd op)
-		m := bson.M{"index": bson.M{"_index": index, "_type": "pantavisor"}}
-		data, err := json.Marshal(&m)
-		if err != nil {
-			return err
-		}
-		_, err = buf.Write(data)
-		if err != nil {
-			return err
-		}
-		err = buf.WriteByte(byte('\n'))
-		if err != nil {
-			return err
-		}
-
-		// write the entry to insert
-		data, err = json.Marshal(v)
-		if err != nil {
-			return err
-		}
-		_, err = buf.Write(data)
-		if err != nil {
-			return err
-		}
-		err = buf.WriteByte(byte('\n'))
-		if err != nil {
-			return err
-		}
-	}
-
-	response, err := s.r().
-		SetBody(string(buf.Bytes())).
-		SetHeader("Content-Type", "application/x-ndjson").
-		Post(postURL.String())
-
-	if err != nil {
-		return err
-	}
-
-	if response.StatusCode() != http.StatusOK {
-		return errors.New("WARNING: elasticsearch log entry failed " + response.Status() + "\nReturned Body: " + string(response.Body()))
-	}
-
-	return nil
 }
