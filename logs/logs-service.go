@@ -43,13 +43,14 @@ type logsApp struct {
 	jwt_middleware *jwt.JWTMiddleware
 	Api            *rest.Api
 	mgoSession     *mgo.Session
+	backend        LogsBackend
 }
 
 // LogsFilter uses a prototype LogsEntry instance to filter
 // the values. It honours the string fields: Device, Owner,
 // Source, Level and Text, where a non-empty field will
 // make the backend filter results by the field.
-type LogsFilter LogsEntry
+type LogsFilter *LogsEntry
 
 // LogsSort is about a map of sort fields prefixed with '-'
 // if the order of this field should be descending (like mgo)
@@ -75,8 +76,10 @@ type LogsPager struct {
 }
 
 type LogsBackend interface {
-	getLogs(start int, page int, query *LogsFilter, sort *LogsSort) (*LogsPager, error)
-	doLog(e []*LogsEntry) error
+	getLogs(start int, page int, query LogsFilter, sort LogsSort) (*LogsPager, error)
+	postLogs(e []*LogsEntry) error
+	register() error
+	unregister(deleteIndices bool) error
 }
 
 //
@@ -98,12 +101,12 @@ type LogsBackend interface {
 //     - src: comma separated list of sources
 //
 //   Sorting Parameters:
-//     - sort: comman list of items of "tsec,tnano,device,src,lvl,time-created"
+//     - sort: common list of items of "tsec,tnano,device,src,lvl,time-created"
 //             you can use - on each individual item to reverse order
 //
 func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 
-	var result LogsPager
+	var result *LogsPager
 	var err error
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
@@ -125,12 +128,6 @@ func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 	startParam := r.FormValue("start")
 	pageParam := r.FormValue("page")
 
-	sourceParam := r.FormValue("src")
-	deviceParam := r.FormValue("dev")
-	levelParam := r.FormValue("lvl")
-
-	sortParam := r.FormValue("sort")
-
 	startParamInt := 0
 	if startParam != "" {
 		startParamInt, err = strconv.Atoi(startParam)
@@ -149,7 +146,19 @@ func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	arr := make([]string, 0)
+	sourceParam := r.FormValue("src")
+	deviceParam := r.FormValue("dev")
+	levelParam := r.FormValue("lvl")
+
+	filter := &LogsEntry{
+		Owner:     own.(string),
+		LogLevel:  levelParam,
+		LogSource: sourceParam,
+		Device:    deviceParam,
+	}
+
+	logsSort := LogsSort{}
+	sortParam := r.FormValue("sort")
 
 	sorts := strings.Split(sortParam, ",")
 	for _, v := range sorts {
@@ -165,57 +174,16 @@ func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 		case "time-created":
 			fallthrough
 		case "src":
-			arr = append(arr, v)
+			logsSort = append(logsSort, v)
 		}
 	}
-	sortStr := strings.Join(arr, ",")
 
-	collLogs := a.mgoSession.DB("").C("pantahub_logs")
-
-	if collLogs == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
-	}
-
-	findFilter := bson.M{
-		"own": own,
-	}
-
-	if levelParam != "" {
-		findFilter["lvl"] = levelParam
-	}
-	if deviceParam != "" {
-		findFilter["dev"] = deviceParam
-	}
-	if sourceParam != "" {
-		findFilter["src"] = sourceParam
-	}
-
-	if sortStr == "" {
-		sortStr =
-			"-time-created"
-	}
-
-	q := collLogs.Find(findFilter).Sort(sortStr)
-
-	result.Count, err = q.Count()
-	result.Start = startParamInt
-	result.Page = pageParamInt
+	result, err = a.backend.getLogs(startParamInt, pageParamInt, filter, logsSort)
 
 	if err != nil {
-		rest.Error(w, "Error with Database count", http.StatusInternalServerError)
+		rest.Error(w, "ERROR: getting logs failed "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	entries := []LogsEntry{}
-	err = q.Skip(startParamInt).Limit(pageParamInt).All(&entries)
-
-	if err != nil {
-		rest.Error(w, "Error with Database count", http.StatusInternalServerError)
-		return
-	}
-
-	result.Entries = entries
 
 	w.WriteJson(result)
 }
@@ -246,7 +214,7 @@ func (a *logsApp) handle_postlogs(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	entries := make([]LogsEntry, 1)
+	entries := make([]*LogsEntry, 1)
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -255,7 +223,7 @@ func (a *logsApp) handle_postlogs(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	err = json.Unmarshal(body, &entries)
+	err = json.Unmarshal(body, entries)
 
 	// if array parse fail, we try direct...
 	if err != nil {
@@ -269,14 +237,7 @@ func (a *logsApp) handle_postlogs(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	collLogs := a.mgoSession.DB("").C("pantahub_logs")
-
-	if collLogs == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
-	}
-
-	newEntries := []LogsEntry{}
+	newEntries := []*LogsEntry{}
 
 	for _, v := range entries {
 		v.Id = bson.NewObjectId()
@@ -286,13 +247,15 @@ func (a *logsApp) handle_postlogs(w rest.ResponseWriter, r *rest.Request) {
 		if v.LogLevel == "" {
 			v.LogLevel = "INFO"
 		}
-		err := collLogs.Insert(&v)
-		if err != nil {
-			rest.Error(w, "Error inserting log entry", http.StatusForbidden)
-			return
-		}
 		newEntries = append(newEntries, v)
 		log.Println("inserted: " + v.Id.Hex())
+	}
+
+	err = a.backend.postLogs(newEntries)
+	if err != nil {
+		rest.Error(w, "Error posting logs "+err.Error(), http.StatusInternalServerError)
+		log.Println("ERROR: Error posting logs " + err.Error())
+		return
 	}
 
 	w.WriteJson(newEntries)
@@ -300,91 +263,26 @@ func (a *logsApp) handle_postlogs(w rest.ResponseWriter, r *rest.Request) {
 
 func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *logsApp {
 
+	var err error
+
 	app := new(logsApp)
 	app.jwt_middleware = jwtMiddleware
 	app.mgoSession = session
 
-	app.mgoSession = session
+	app.backend, err = NewElasticLogger()
 
-	index := mgo.Index{
-		Key:        []string{"own"},
-		Unique:     false,
-		DropDups:   true,
-		Background: true, // See notes.
-		Sparse:     false,
-	}
-
-	err := app.mgoSession.DB("").C("pantahub_logs").EnsureIndex(index)
 	if err != nil {
-		log.Println("Error setting up index for pantahub_logs: " + err.Error())
-		return nil
+		log.Println("INFO: Elastic Logger failed to start: " + err.Error())
+		log.Println("INFO: Elastic Logger not available; trying other options ...")
+
+		app.backend, err = NewMgoLogger(session)
+	} else {
+		log.Println("INFO: Elastic Logger started.")
 	}
 
-	index = mgo.Index{
-		Key:        []string{"dev"},
-		Unique:     false,
-		DropDups:   true,
-		Background: true, // See notes.
-		Sparse:     false,
-	}
-	err = app.mgoSession.DB("").C("pantahub_logs").EnsureIndex(index)
 	if err != nil {
-		log.Println("Error setting up index for pantahub_logs: " + err.Error())
-		return nil
-	}
-
-	index = mgo.Index{
-		Key:        []string{"time-created"},
-		Unique:     false,
-		DropDups:   true,
-		Background: true, // See notes.
-		Sparse:     false,
-	}
-	err = app.mgoSession.DB("").C("pantahub_logs").EnsureIndex(index)
-	if err != nil {
-		log.Println("Error setting up index for pantahub_logs: " + err.Error())
-		return nil
-	}
-
-	index = mgo.Index{
-		Key:        []string{"tsec", "tnano"},
-		Unique:     false,
-		DropDups:   true,
-		Background: true, // See notes.
-		Sparse:     false,
-	}
-	err = app.mgoSession.DB("").C("pantahub_logs").EnsureIndex(index)
-	if err != nil {
-		log.Println("Error setting up index for pantahub_logs: " + err.Error())
-		return nil
-	}
-
-	index = mgo.Index{
-		Key:        []string{"lvl"},
-		Unique:     false,
-		DropDups:   true,
-		Background: true, // See notes.
-		Sparse:     false,
-	}
-
-	err = app.mgoSession.DB("").C("pantahub_logs").EnsureIndex(index)
-	if err != nil {
-		log.Println("Error setting up index for pantahub_logs: " + err.Error())
-		return nil
-	}
-
-	index = mgo.Index{
-		Key:        []string{"dev", "own", "time-created"},
-		Unique:     false,
-		DropDups:   true,
-		Background: true, // See notes.
-		Sparse:     false,
-	}
-
-	err = app.mgoSession.DB("").C("pantahub_logs").EnsureIndex(index)
-	if err != nil {
-		log.Println("Error setting up index for pantahub_logs: " + err.Error())
-		return nil
+		log.Println("ERROR: Final Logger also failed to start: " + err.Error())
+		log.Println("INFO: will log to stdout now ...")
 	}
 
 	app.Api = rest.NewApi()
