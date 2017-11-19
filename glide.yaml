@@ -26,6 +26,5 @@ import:
 - package: gopkg.in/mgo.v2
   subpackages:
   - bson
-testImport:
 - package: github.com/go-resty/resty
   version: ~1.0.0

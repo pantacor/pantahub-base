@@ -1,3 +1,37 @@
+Release v1.12.30 (2017-11-17)
+===
+
+### Service Client Updates
+* `service/application-autoscaling`: Updates service API and documentation
+* `service/dms`: Updates service API, documentation, and paginators
+  * Support for migration task assessment. Support for data validation after the migration.
+* `service/elasticloadbalancingv2`: Updates service API and documentation
+* `aws/endpoints`: Updated Regions and Endpoints metadata.
+* `service/rds`: Updates service API and documentation
+  * Amazon RDS now supports importing MySQL databases by using backup files from Amazon S3.
+* `service/s3`: Updates service API
+  * Added ORC to the supported S3 Inventory formats.
+
+### SDK Bugs
+* `private/protocol/restjson`: Define JSONValue marshaling for body and querystring ([#1640](https://github.com/aws/aws-sdk-go/pull/1640))
+  * Adds support for APIs which use JSONValue for body and querystring targets.
+  * Fixes [#1636](https://github.com/aws/aws-sdk-go/issues/1636)
+Release v1.12.29 (2017-11-16)
+===
+
+### Service Client Updates
+* `service/application-autoscaling`: Updates service API and documentation
+* `service/ec2`: Updates service API
+  * You are now able to create and launch EC2 x1e smaller instance sizes
+* `service/glue`: Updates service API and documentation
+  * API update for AWS Glue. New crawler configuration attribute enables customers to specify crawler behavior. New XML classifier enables classification of XML data.
+* `service/opsworkscm`: Updates service API, documentation, and waiters
+  * Documentation updates for OpsWorks-cm: a new feature, OpsWorks for Puppet Enterprise, that allows users to create and manage OpsWorks-hosted Puppet Enterprise servers.
+* `service/organizations`: Updates service API, documentation, and paginators
+  * This release adds APIs that you can use to enable and disable integration with AWS services designed to work with AWS Organizations. This integration allows the AWS service to perform operations on your behalf on all of the accounts in your organization. Although you can use these APIs yourself, we recommend that you instead use the commands provided in the other AWS service to enable integration with AWS Organizations.
+* `service/route53`: Updates service API and documentation
+  * You can use Route 53's GetAccountLimit/GetHostedZoneLimit/GetReusableDelegationSetLimit APIs to view your current limits (including custom set limits) on Route 53 resources such as hosted zones and health checks. These APIs also return the number of each resource you're currently using to enable comparison against your current limits.
+
 Release v1.12.28 (2017-11-15)
 ===
 
