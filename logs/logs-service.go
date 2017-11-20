@@ -61,8 +61,8 @@ type LogsEntry struct {
 	Device      string        `json:"dev" bson:"dev"`
 	Owner       string        `json:"own" bson:"own"`
 	TimeCreated time.Time     `json:"time-created" bson:"time-created"`
-	LogTSec     int           `json:"tsec" bson:"tsec"`
-	LogTNano    int           `json:"tnano" bson:"tnano"`
+	LogTSec     int64         `json:"tsec" bson:"tsec"`
+	LogTNano    int64         `json:"tnano" bson:"tnano"`
 	LogSource   string        `json:"src" bson:"src"`
 	LogLevel    string        `json:"lvl" bson:"lvl"`
 	LogText     string        `json:"msg" bson:"msg"`
@@ -248,7 +248,6 @@ func (a *logsApp) handle_postlogs(w rest.ResponseWriter, r *rest.Request) {
 			v.LogLevel = "INFO"
 		}
 		newEntries = append(newEntries, v)
-		log.Println("inserted: " + v.Id.Hex())
 	}
 
 	err = a.backend.postLogs(newEntries)
