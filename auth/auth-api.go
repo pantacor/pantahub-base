@@ -164,7 +164,6 @@ func AccountToPayload(account Account) map[string]interface{} {
 		break
 	default:
 		panic("Must not reach this!")
-		return nil
 	}
 
 	result["nick"] = account.Nick
@@ -416,7 +415,6 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 		} else {
 			return plm.Password == password
 		}
-		return false
 	}
 
 	jwtMiddleware.PayloadFunc = func(userId string) map[string]interface{} {
@@ -431,7 +429,6 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 		} else {
 			return AccountToPayload(plm)
 		}
-		return map[string]interface{}{}
 	}
 
 	app.Api = rest.NewApi()
