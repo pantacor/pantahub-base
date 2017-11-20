@@ -41,6 +41,13 @@ var (
 	defaultLogger *elasticLogger
 )
 
+type elasticLogEntry struct {
+	*LogsEntry
+
+	TimeEvent  time.Time `json:"timeevent"`
+	TimeRecord time.Time `json:"timerecord"`
+}
+
 type elasticLogger struct {
 	elasticBaseURL       string
 	elasticURL           *url.URL
@@ -186,8 +193,14 @@ func (s *elasticLogger) postLogs(e []*LogsEntry) error {
 			return err
 		}
 
+		eventTime := time.Unix(v.LogTSec, v.LogTNano)
+		ve := elasticLogEntry{
+			LogsEntry:  v,
+			TimeEvent:  eventTime,
+			TimeRecord: v.TimeCreated,
+		}
 		// write the entry to insert
-		data, err = json.Marshal(v)
+		data, err = json.Marshal(ve)
 		if err != nil {
 			return err
 		}
