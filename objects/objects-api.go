@@ -140,6 +140,7 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 	result, err := CalcUsageAfterPost(ownerStr, a.mgoSession, bson.ObjectId(newObject.Id), newObject.SizeInt)
 
 	if err != nil {
+		log.Printf("ERROR: CalcUsageAfterPost failed: %s\n", err.Error())
 		rest.Error(w, "Error posting object", http.StatusInternalServerError)
 		return
 	}
