@@ -39,7 +39,11 @@ func CalcUsageAfterPost(owner string, mgoSession *mgo.Session,
 		{"$group": bson.M{"_id": "$owner", "total": bson.M{"$sum": "$sizeint"}}}}).One(&resp)
 
 	if err != nil {
-		return nil, err
+		// we bail if we receive any error, but ErrNotFound which happens if user
+		// does not own any objects yet
+		if err != mgo.ErrNotFound {
+			return nil, err
+		}
 	}
 
 	resp.Total = resp.Total + float64(newSize)
