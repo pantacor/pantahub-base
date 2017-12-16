@@ -35,5 +35,5 @@ func init() {
 // create a *resty.Request honouring global client settings configurable
 // through environments.
 func R() *resty.Request {
-	return resty.SetDebug(debugEnabled).R()
+	return resty.SetDebug(debugEnabled).SetAllowGetMethodPayload(true).R()
 }
