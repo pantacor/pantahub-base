@@ -231,6 +231,7 @@ func (a *logsApp) handle_postlogs(w rest.ResponseWriter, r *rest.Request) {
 
 	// if array parse fail, we try direct...
 	if err != nil {
+		log.Println("WARN: cannot parse request body for log entries array: " + err.Error())
 		err = json.Unmarshal(body, &entries[0])
 	}
 
