@@ -113,7 +113,7 @@ func (s *mgoLogger) unregister(delete bool) error {
 	return nil
 }
 
-func (s *mgoLogger) getLogs(start int, page int, query LogsFilter, sort LogsSort) (*LogsPager, error) {
+func (s *mgoLogger) getLogs(start int64, page int64, query LogsFilter, sort LogsSort) (*LogsPager, error) {
 	var result LogsPager
 	var err error
 
@@ -124,10 +124,11 @@ func (s *mgoLogger) getLogs(start int, page int, query LogsFilter, sort LogsSort
 		return nil, errors.New("Couldnt instantiate mgo connection for collection " + s.mgoCollection)
 	}
 
-	findFilter := bson.M{
-		"own": query.Owner,
-	}
+	findFilter := bson.M{}
 
+	if query.Owner != "" {
+		findFilter["own"] = query.Owner
+	}
 	if query.LogLevel != "" {
 		findFilter["lvl"] = query.LogLevel
 	}
@@ -146,7 +147,8 @@ func (s *mgoLogger) getLogs(start int, page int, query LogsFilter, sort LogsSort
 
 	q := collLogs.Find(findFilter).Sort(sortStr)
 
-	result.Count, err = q.Count()
+	count, err := q.Count()
+	result.Count = int64(count)
 	result.Start = start
 	result.Page = page
 
@@ -154,8 +156,8 @@ func (s *mgoLogger) getLogs(start int, page int, query LogsFilter, sort LogsSort
 		return nil, err
 	}
 
-	entries := []LogsEntry{}
-	err = q.Skip(start).Limit(page).All(&entries)
+	entries := []*LogsEntry{}
+	err = q.Skip(int(start)).Limit(int(page)).All(&entries)
 
 	if err != nil {
 		return nil, err

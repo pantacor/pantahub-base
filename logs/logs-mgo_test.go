@@ -14,57 +14,140 @@
 //   limitations under the License.
 //
 
-// Package logs provides the abstract logging infrastructure for pantahub
-// logging endpoint as well as backends for elastic and mgo.
-//
-// Logs offers a simple logging service for Pantahub powered devices and apps.
-// To post new log entries use the POST method on the main endpoint
-// To page through log entries and sort etc. check the GET method
 package logs
 
 import (
+	"log"
+	"os"
 	"testing"
 	"time"
+
+	"gitlab.com/pantacor/pantahub-base/utils"
 )
 
-func TestMongoDoLog(t *testing.T) {
-	logs := []*LogsEntry{
-		&LogsEntry{
-			Device:      "testdevice",
-			Owner:       "testowner",
-			TimeCreated: time.Now(),
-			LogTSec:     100,
-			LogTNano:    0,
-			LogSource:   "testsource",
-			LogLevel:    "TESTLEVEL",
-			LogText:     "Test Log Text",
-		},
-		&LogsEntry{
-			Device:      "testdevice",
-			Owner:       "testowner",
-			TimeCreated: time.Now(),
-			LogTSec:     101,
-			LogTNano:    0,
-			LogSource:   "testsource",
-			LogLevel:    "TESTLEVEL",
-			LogText:     "Test Log Text 1",
-		},
-		&LogsEntry{
-			Device:      "testdevice",
-			Owner:       "testowner",
-			TimeCreated: time.Now(),
-			LogTSec:     101,
-			LogTNano:    1,
-			LogSource:   "testsource",
-			LogLevel:    "TESTLEVEL",
-			LogText:     "Test Log Text 2",
-		},
+var mgoTestLogger *mgoLogger
+
+func setupMongo(t *testing.T) error {
+
+	var err error
+
+	mgoSession, err := utils.GetMongoSession()
+
+	if err != nil {
+		log.Println("error initiating mgoSession " + err.Error())
+		os.Exit(1)
 	}
 
+	mgoTestLogger, err = newMgoLogger(mgoSession)
+
+	if err != nil {
+		log.Println("error initiating mgoTestLogger " + err.Error())
+		return err
+	}
+
+	mgoTestLogger.mgoCollection = "pantahub_testindex_log"
+
+	return nil
+}
+
+func setupElastic(t *testing.T) error {
+
+	var err error
+
+	elasticTestLogger, err = newElasticLogger()
+
+	if err != nil {
+		log.Println("error initiating elasticTestLogger " + err.Error())
+		return err
+	}
+
+	elasticTestLogger.syncWrites = true
+
+	err = elasticTestLogger.register()
+	if err != nil {
+		log.Println("error registering elasticTestLogger " + err.Error())
+
+		return err
+	}
+
+	return nil
+}
+
+func teardownMongo(t *testing.T) error {
+	var err error
+
+	err = mgoTestLogger.unregister(true)
+	if err != nil {
+		log.Println("WARN: error unregistering mgoTestLogger " + err.Error())
+	}
+
+	mgoTestLogger = nil
+
+	return nil
+}
+
+func teardownElastic(t *testing.T) error {
+	var err error
+
+	err = elasticTestLogger.unregister(true)
+	if err != nil {
+		log.Println("WARN: error unregistering elasticTestLogger " + err.Error())
+	}
+
+	elasticTestLogger = nil
+
+	return nil
+}
+
+func doLog() error {
+
+	logs := genLogs(LogsEntry{
+		Device:      "testdevice",
+		Owner:       "testowner",
+		TimeCreated: time.Now(),
+		LogTSec:     0,
+		LogTNano:    0,
+		LogSource:   "testsource",
+		LogLevel:    "TESTLEVEL",
+		LogText:     "Test Log Text",
+	}, 3)
+
 	err := mgoTestLogger.postLogs(logs)
+	return err
+}
+
+func testMongoDoLog(t *testing.T) {
+	err := doLog()
+	if err != nil {
+		t.Errorf("do Log fails: %s", err.Error())
+		t.Fail()
+	}
+}
+
+func testMongoGetLog(t *testing.T) {
+
+	err := doLog()
+	if err != nil {
+		t.Errorf("do Log fails: %s", err.Error())
+		t.Fail()
+	}
+
+	filter := &LogsEntry{}
+	sort := LogsSort{}
+	pager, err := mgoTestLogger.getLogs(0, -1, filter, sort)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
 		t.Fail()
 	}
+
+	if pager.Count != 3 {
+		t.Errorf("pager.Count should be 3, not %d", pager.Count)
+		t.Fail()
+	}
+}
+
+func TestMgo(t *testing.T) {
+	subRunSetupTeardown("A=1", t, testMongoDoLog)
+	subRunSetupTeardown("A=2", t, testMongoGetLog)
 }

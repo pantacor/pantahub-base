@@ -30,11 +30,13 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"reflect"
 	"time"
 
 	"github.com/go-resty/resty"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gopkg.in/mgo.v2/bson"
+	elastic "gopkg.in/olivere/elastic.v5"
 )
 
 var (
@@ -57,6 +59,7 @@ type elasticLogger struct {
 	elasticIndexPrefix   string
 	works                bool
 	template             bson.M
+	syncWrites           bool
 }
 
 func (s *elasticLogger) r() *resty.Request {
@@ -156,8 +159,74 @@ func (s *elasticLogger) unregister(deleteIndex bool) error {
 	return nil
 }
 
-func (s *elasticLogger) getLogs(start int, page int, query LogsFilter, sort LogsSort) (*LogsPager, error) {
-	return nil, errors.New("WARNING: getLogs for elastic logger not yet implemented.")
+func (s *elasticLogger) getLogs(start int64, page int64, query LogsFilter, sort LogsSort) (*LogsPager, error) {
+	queryFmt := fmt.Sprintf(s.elasticIndexPrefix + "-*/pv/_search")
+
+	queryURL, err := url.Parse(queryFmt)
+
+	if err != nil {
+		return nil, err
+	}
+
+	queryURI := s.elasticURL.ResolveReference(queryURL)
+
+	q := elastic.NewBoolQuery()
+
+	if query.Owner != "" {
+		q = q.Must(elastic.NewTermQuery("own", query.Owner))
+	}
+
+	if query.Device != "" {
+		q = q.Must(elastic.NewTermQuery("dev", query.Device))
+	}
+
+	querySource, err := q.Source()
+
+	if err != nil {
+		return nil, err
+	}
+
+	queryJSON := map[string]interface{}{
+		"size":  page,
+		"from":  start,
+		"query": querySource,
+	}
+
+	response, err := s.r().SetBody(&queryJSON).Get(queryURI.String())
+
+	if err != nil {
+		return nil, err
+	}
+
+	if response.StatusCode() != http.StatusOK {
+		errStr := fmt.Sprintf("WARN: getLogs call failed: %d - %s\n", response.StatusCode(), response.Status())
+		return nil, errors.New(errStr)
+	}
+
+	var elasticResult elastic.SearchResult
+
+	body := response.Body()
+	err = json.Unmarshal(body, &elasticResult)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var pagerResult LogsPager
+
+	pagerResult.Count = elasticResult.TotalHits()
+	pagerResult.Start = start
+	pagerResult.Page = int64(len(elasticResult.Hits.Hits))
+
+	prototype := LogsEntry{}
+	arr := elasticResult.Each(reflect.TypeOf(&prototype))
+
+	for _, v := range arr {
+		pagerResult.Entries = append(pagerResult.Entries, v.(*LogsEntry))
+	}
+	pagerResult.Count = int64(len(arr))
+
+	return &pagerResult, nil
 }
 
 func (s *elasticLogger) postLogs(e []*LogsEntry) error {
@@ -170,7 +239,12 @@ func (s *elasticLogger) postLogs(e []*LogsEntry) error {
 	timeRecv := time.Now()
 	index := fmt.Sprintf(s.elasticIndexPrefix+"-%.4d%.2d%.2d", timeRecv.Year(), timeRecv.Month(), timeRecv.Day())
 
-	bulkPostURL, err := url.Parse("_bulk")
+	buildURLStr := "_bulk"
+
+	if s.syncWrites {
+		buildURLStr = buildURLStr + "?refresh=wait_for"
+	}
+	bulkPostURL, err := url.Parse(buildURLStr)
 	if err != nil {
 		return err
 	}
@@ -227,6 +301,10 @@ func (s *elasticLogger) postLogs(e []*LogsEntry) error {
 		return errors.New("WARNING: elasticsearch log entry failed " + response.Status() + "\nReturned Body: " + string(response.Body()))
 	}
 
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -264,7 +342,8 @@ func newElasticLogger() (*elasticLogger, error) {
 	defaultLogger.template = bson.M{
 		"index_patterns": defaultLogger.elasticIndexPrefix + "-*",
 		"settings": bson.M{
-			"number_of_shards": 5,
+			"number_of_shards":   5,
+			"number_of_replicas": 0,
 		},
 		"mappings": bson.M{
 			"pv": bson.M{
@@ -272,8 +351,8 @@ func newElasticLogger() (*elasticLogger, error) {
 					"enabled": true,
 				},
 				"properties": bson.M{
-					"hostname": bson.M{
-						"type": "text",
+					"host": bson.M{
+						"type": "keyword",
 					},
 					"lvl": bson.M{
 						"type": "keyword",
@@ -281,10 +360,10 @@ func newElasticLogger() (*elasticLogger, error) {
 					"plat": bson.M{
 						"type": "keyword",
 					},
-					"source": bson.M{
+					"src": bson.M{
 						"type": "keyword",
 					},
-					"message": bson.M{
+					"msg": bson.M{
 						"type": "text",
 					},
 					"timeevent": bson.M{
@@ -295,11 +374,11 @@ func newElasticLogger() (*elasticLogger, error) {
 						"type":   "date",
 						"format": "strict_date_optional_time||epoch_millis",
 					},
-					"owner": bson.M{
-						"type": "text",
+					"own": bson.M{
+						"type": "keyword",
 					},
-					"device": bson.M{
-						"type": "text",
+					"dev": bson.M{
+						"type": "keyword",
 					},
 				},
 			},

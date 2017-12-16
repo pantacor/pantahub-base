@@ -58,25 +58,25 @@ type LogsSort []string
 
 type LogsEntry struct {
 	Id          bson.ObjectId `json:"id,omitempty" bson:"_id,omitempty"`
-	Device      string        `json:"dev" bson:"dev"`
-	Owner       string        `json:"own" bson:"own"`
-	TimeCreated time.Time     `json:"time-created" bson:"time-created"`
-	LogTSec     int64         `json:"tsec" bson:"tsec"`
-	LogTNano    int64         `json:"tnano" bson:"tnano"`
-	LogSource   string        `json:"src" bson:"src"`
-	LogLevel    string        `json:"lvl" bson:"lvl"`
-	LogText     string        `json:"msg" bson:"msg"`
+	Device      string        `json:"dev,omitempty" bson:"dev"`
+	Owner       string        `json:"own,omitempty" bson:"own"`
+	TimeCreated time.Time     `json:"time-created,omitempty" bson:"time-created"`
+	LogTSec     int64         `json:"tsec,omitempty" bson:"tsec"`
+	LogTNano    int64         `json:"tnano,omitempty" bson:"tnano"`
+	LogSource   string        `json:"src,omitempty" bson:"src"`
+	LogLevel    string        `json:"lvl,omitempty" bson:"lvl"`
+	LogText     string        `json:"msg,omitempty" bson:"msg"`
 }
 
 type LogsPager struct {
-	Start   int         `json:"start"`
-	Page    int         `json:"page"`
-	Count   int         `json:"count"`
-	Entries []LogsEntry `json:"entries"`
+	Start   int64        `json:"start"`
+	Page    int64        `json:"page"`
+	Count   int64        `json:"count"`
+	Entries []*LogsEntry `json:"entries"`
 }
 
 type LogsBackend interface {
-	getLogs(start int, page int, query LogsFilter, sort LogsSort) (*LogsPager, error)
+	getLogs(start int64, page int64, query LogsFilter, sort LogsSort) (*LogsPager, error)
 	postLogs(e []*LogsEntry) error
 	register() error
 	unregister(deleteIndices bool) error
@@ -128,18 +128,22 @@ func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 	startParam := r.FormValue("start")
 	pageParam := r.FormValue("page")
 
-	startParamInt := 0
+	startParamInt := int64(0)
 	if startParam != "" {
-		startParamInt, err = strconv.Atoi(startParam)
+		var p int
+		p, err = strconv.Atoi(startParam)
+		startParamInt = int64(p)
 	}
 	if err != nil {
 		rest.Error(w, "Bad 'start' parameter", http.StatusBadRequest)
 		return
 	}
 
-	pageParamInt := 50
+	pageParamInt := int64(50)
 	if pageParam != "" {
-		pageParamInt, err = strconv.Atoi(pageParam)
+		var p int
+		p, err = strconv.Atoi(pageParam)
+		pageParamInt = int64(p)
 	}
 	if err != nil {
 		rest.Error(w, "Bad 'page' parameter", http.StatusBadRequest)

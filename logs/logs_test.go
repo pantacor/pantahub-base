@@ -26,65 +26,37 @@ import (
 	"log"
 	"os"
 	"testing"
-
-	"gitlab.com/pantacor/pantahub-base/utils"
 )
 
 var elasticTestLogger *elasticLogger
-var mgoTestLogger *mgoLogger
+
+func subRunSetupTeardown(name string, t *testing.T, f func(t *testing.T)) {
+	setupMongo(t)
+	f(t)
+	teardownMongo(t)
+}
+
+func subRunSetupTeardownElastic(name string, t *testing.T, f func(t *testing.T)) {
+	setupElastic(t)
+	f(t)
+	teardownElastic(t)
+}
+
+func genLogs(proto LogsEntry, count int) []*LogsEntry {
+
+	logs := []*LogsEntry{}
+
+	for i := 0; i < count; i++ {
+		instance := proto
+		instance.LogTSec = 100 + int64(i)
+		logs = append(logs, &instance)
+	}
+	return logs
+}
 
 func TestMain(m *testing.M) {
-	var err error
-
-	elasticTestLogger, err = newElasticLogger()
-
-	if err != nil {
-		log.Println("error initiating elasticTestLogger " + err.Error())
-		os.Exit(1)
-	}
-
-	elasticTestLogger.elasticIndexPrefix = "pantahub_testindex"
-	err = elasticTestLogger.register()
-	if err != nil {
-		log.Println("error registering elasticTestLogger " + err.Error())
-		os.Exit(2)
-	}
-
-	mgoSession, err := utils.GetMongoSession()
-
-	if err != nil {
-		log.Println("error initiating mgoSession " + err.Error())
-		os.Exit(1)
-	}
-
-	mgoTestLogger, err = newMgoLogger(mgoSession)
-
-	if err != nil {
-		log.Println("error initiating mgoTestLogger " + err.Error())
-		os.Exit(1)
-	}
-
-	mgoTestLogger.mgoCollection = "pantahub_testindex_log"
-
-	err = mgoTestLogger.register()
-	if err != nil {
-		log.Println("error registering mgoTestLogger " + err.Error())
-		os.Exit(2)
-	}
 
 	exitCode := m.Run()
-
-	err = mgoTestLogger.unregister(true)
-	if err != nil {
-		log.Println("error unregistering mgoTestLogger " + err.Error())
-		os.Exit(3)
-	}
-
-	err = elasticTestLogger.unregister(true)
-	if err != nil {
-		log.Println("error unregistering elasticTestLogger " + err.Error())
-		os.Exit(4)
-	}
 
 	if exitCode != 0 {
 		log.Printf("error running tests %d\n", exitCode)

@@ -14,12 +14,6 @@
 //   limitations under the License.
 //
 
-// Package logs provides the abstract logging infrastructure for pantahub
-// logging endpoint as well as backends for elastic and mgo.
-//
-// Logs offers a simple logging service for Pantahub powered devices and apps.
-// To post new log entries use the POST method on the main endpoint
-// To page through log entries and sort etc. check the GET method
 package logs
 
 import (
@@ -27,39 +21,17 @@ import (
 	"time"
 )
 
-func TestElasticDoLog(t *testing.T) {
-	logs := []*LogsEntry{
-		&LogsEntry{
-			Device:      "testdevice",
-			Owner:       "testowner",
-			TimeCreated: time.Now(),
-			LogTSec:     100,
-			LogTNano:    0,
-			LogSource:   "testsource",
-			LogLevel:    "TESTLEVEL",
-			LogText:     "Test Log Text",
-		},
-		&LogsEntry{
-			Device:      "testdevice",
-			Owner:       "testowner",
-			TimeCreated: time.Now(),
-			LogTSec:     101,
-			LogTNano:    0,
-			LogSource:   "testsource",
-			LogLevel:    "TESTLEVEL",
-			LogText:     "Test Log Text 1",
-		},
-		&LogsEntry{
-			Device:      "testdevice",
-			Owner:       "testowner",
-			TimeCreated: time.Now(),
-			LogTSec:     101,
-			LogTNano:    1,
-			LogSource:   "testsource",
-			LogLevel:    "TESTLEVEL",
-			LogText:     "Test Log Text 2",
-		},
-	}
+func testElasticDoLog(t *testing.T) {
+	logs := genLogs(LogsEntry{
+		Device:      "testdevice",
+		Owner:       "testowner",
+		TimeCreated: time.Now(),
+		LogTSec:     0,
+		LogTNano:    0,
+		LogSource:   "testsource",
+		LogLevel:    "TESTLEVEL",
+		LogText:     "Test Log Text",
+	}, 3)
 
 	err := elasticTestLogger.postLogs(logs)
 
@@ -67,4 +39,61 @@ func TestElasticDoLog(t *testing.T) {
 		t.Errorf("do Log fails: %s", err.Error())
 		t.Fail()
 	}
+}
+
+func testElasticDoGetLogs(t *testing.T) {
+	logs := genLogs(LogsEntry{
+		Device:      "testdevice",
+		Owner:       "testowner",
+		TimeCreated: time.Now(),
+		LogTSec:     100,
+		LogTNano:    0,
+		LogSource:   "testsource",
+		LogLevel:    "TESTLEVEL",
+		LogText:     "Test Log Text",
+	}, 3)
+
+	err := elasticTestLogger.postLogs(logs)
+
+	if err != nil {
+		t.Errorf("do Log fails: %s", err.Error())
+		t.Fail()
+	}
+
+	filter := &LogsEntry{}
+	sort := LogsSort{}
+	pager, err := elasticTestLogger.getLogs(0, 3, filter, sort)
+
+	if err != nil {
+		t.Errorf("do Log fails: %s", err.Error())
+		t.Fail()
+	} else if pager.Count != 3 {
+		t.Errorf("pager.Count should be 3, not %d", pager.Count)
+		t.Fail()
+	}
+
+	pager, err = elasticTestLogger.getLogs(1, 3, filter, sort)
+
+	if err != nil {
+		t.Errorf("do Log fails: %s", err.Error())
+		t.Fail()
+	} else if pager.Count != 2 {
+		t.Errorf("pager.Count should be 2, not %d", pager.Count)
+		t.Fail()
+	}
+
+	pager, err = elasticTestLogger.getLogs(1, 1, filter, sort)
+
+	if err != nil {
+		t.Errorf("do Log fails: %s", err.Error())
+		t.Fail()
+	} else if pager.Count != 1 {
+		t.Errorf("pager.Count should be 1, not %d", pager.Count)
+		t.Fail()
+	}
+}
+
+func TestElastic(t *testing.T) {
+	//subRunSetupTeardownElastic("A=1", t, testElasticDoLog)
+	subRunSetupTeardownElastic("A=2", t, testElasticDoGetLogs)
 }
