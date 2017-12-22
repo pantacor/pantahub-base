@@ -229,7 +229,7 @@ func (s *elasticLogger) getLogs(start int64, page int64, query LogsFilter, sort 
 	return &pagerResult, nil
 }
 
-func (s *elasticLogger) postLogs(e []*LogsEntry) error {
+func (s *elasticLogger) postLogs(e []LogsEntry) error {
 	if !s.works {
 		return errors.New("logger not initialized/works")
 	}
@@ -269,7 +269,7 @@ func (s *elasticLogger) postLogs(e []*LogsEntry) error {
 
 		eventTime := time.Unix(v.LogTSec, v.LogTNano)
 		ve := elasticLogEntry{
-			LogsEntry:  v,
+			LogsEntry:  &v,
 			TimeEvent:  eventTime,
 			TimeRecord: v.TimeCreated,
 		}

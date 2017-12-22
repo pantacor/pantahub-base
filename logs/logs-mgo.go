@@ -167,7 +167,7 @@ func (s *mgoLogger) getLogs(start int64, page int64, query LogsFilter, sort Logs
 	return &result, nil
 }
 
-func (s *mgoLogger) postLogs(e []*LogsEntry) error {
+func (s *mgoLogger) postLogs(e []LogsEntry) error {
 	collLogs := s.mgoSession.DB("").C(s.mgoCollection)
 
 	if collLogs == nil {

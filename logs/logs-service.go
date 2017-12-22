@@ -77,7 +77,7 @@ type LogsPager struct {
 
 type LogsBackend interface {
 	getLogs(start int64, page int64, query LogsFilter, sort LogsSort) (*LogsPager, error)
-	postLogs(e []*LogsEntry) error
+	postLogs(e []LogsEntry) error
 	register() error
 	unregister(deleteIndices bool) error
 }
@@ -218,7 +218,7 @@ func (a *logsApp) handle_postlogs(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	entries := make([]*LogsEntry, 1)
+	entries := make([]LogsEntry, 1)
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -242,7 +242,7 @@ func (a *logsApp) handle_postlogs(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	newEntries := []*LogsEntry{}
+	newEntries := []LogsEntry{}
 
 	for _, v := range entries {
 		v.Id = bson.NewObjectId()
