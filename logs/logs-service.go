@@ -238,7 +238,7 @@ func (a *logsApp) handle_postlogs(w rest.ResponseWriter, r *rest.Request) {
 	// if all fail, we bail...
 	if err != nil {
 		rest.Error(w, "Error parsing request", http.StatusBadRequest)
-		log.Println("Error parsing request: " + err.Error())
+		log.Println("Error parsing request:" + string(body) + "\n=> giving up with " + err.Error())
 		return
 	}
 
