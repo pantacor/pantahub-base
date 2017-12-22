@@ -33,7 +33,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/StephanDollberg/go-json-rest-middleware-jwt"
+	jwt "github.com/StephanDollberg/go-json-rest-middleware-jwt"
 	"github.com/ant0ine/go-json-rest/rest"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
