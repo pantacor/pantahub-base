@@ -170,30 +170,42 @@ func (s *elasticLogger) getLogs(start int64, page int64, query LogsFilter, sort 
 
 	queryURI := s.elasticURL.ResolveReference(queryURL)
 
+	// build query part
 	q := elastic.NewBoolQuery()
-
 	if query.Owner != "" {
 		q = q.Must(elastic.NewTermQuery("own", query.Owner))
 	}
-
 	if query.Device != "" {
 		q = q.Must(elastic.NewTermQuery("dev", query.Device))
 	}
 
-	querySource, err := q.Source()
+	// build search
+	searchS := elastic.NewSearchSource().
+		From(int(start)).
+		Size(int(page)).
+		Query(q)
 
+		// lets do the sort part
+	for _, v := range sort {
+		var asc bool
+		if v[0] == '-' {
+			asc = false
+		} else {
+			asc = true
+		}
+		// always strip the + and -
+		if v[0] == '+' || v[0] == '-' {
+			v = v[1:]
+		}
+		searchS = searchS.Sort(v, asc)
+	}
+
+	searchBody, err := searchS.Source()
 	if err != nil {
 		return nil, err
 	}
 
-	queryJSON := map[string]interface{}{
-		"size":  page,
-		"from":  start,
-		"query": querySource,
-	}
-
-	response, err := s.r().SetBody(&queryJSON).Get(queryURI.String())
-
+	response, err := s.r().SetBody(searchBody).Get(queryURI.String())
 	if err != nil {
 		return nil, err
 	}
