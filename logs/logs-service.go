@@ -227,7 +227,7 @@ func (a *logsApp) handle_postlogs(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	err = json.Unmarshal(body, entries)
+	err = json.Unmarshal(body, &entries)
 
 	// if array parse fail, we try direct...
 	if err != nil {
