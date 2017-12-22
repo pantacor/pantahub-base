@@ -192,6 +192,24 @@ func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(result)
 }
 
+func unmarshalBody(body []byte) ([]LogsEntry, error) {
+	entries := make([]LogsEntry, 1)
+
+	err := json.Unmarshal(body, &entries)
+
+	// if array parse fail, we try direct...
+	if err != nil {
+		err = json.Unmarshal(body, &entries[0])
+	}
+
+	// if all fail, we bail...
+	if err != nil {
+		return nil, err
+	}
+
+	return entries, nil
+}
+
 //
 // ## POST /logs/
 //   Post one or many log entries as an error of LogEntry
@@ -218,27 +236,16 @@ func (a *logsApp) handle_postlogs(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	entries := make([]LogsEntry, 1)
-
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		rest.Error(w, "Error reading body", http.StatusBadRequest)
-		log.Println("Error reading body: " + err.Error())
+		rest.Error(w, "Error reading logs body", http.StatusBadRequest)
 		return
 	}
 
-	err = json.Unmarshal(body, &entries)
+	entries, err := unmarshalBody(body)
 
-	// if array parse fail, we try direct...
 	if err != nil {
-		log.Println("WARN: cannot parse request body for log entries array: " + err.Error())
-		err = json.Unmarshal(body, &entries[0])
-	}
-
-	// if all fail, we bail...
-	if err != nil {
-		rest.Error(w, "Error parsing request", http.StatusBadRequest)
-		log.Println("Error parsing request:" + string(body) + "\n=> giving up with " + err.Error())
+		rest.Error(w, "Error parsing logs body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
