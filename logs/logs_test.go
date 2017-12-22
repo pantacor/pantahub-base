@@ -42,14 +42,14 @@ func subRunSetupTeardownElastic(name string, t *testing.T, f func(t *testing.T))
 	teardownElastic(t)
 }
 
-func genLogs(proto LogsEntry, count int) []*LogsEntry {
+func genLogs(proto LogsEntry, count int) []LogsEntry {
 
-	logs := []*LogsEntry{}
+	logs := []LogsEntry{}
 
 	for i := 0; i < count; i++ {
 		instance := proto
 		instance.LogTSec = 100 + int64(i)
-		logs = append(logs, &instance)
+		logs = append(logs, instance)
 	}
 	return logs
 }
