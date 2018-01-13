@@ -305,7 +305,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *logsApp {
 	app.Api = rest.NewApi()
 
 	// we dont use default stack because we dont want content type enforcement
-	app.Api.Use(&rest.AccessLogApacheMiddleware{Logger: log.New(os.Stdout,
+	app.Api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
 		"/logs:", log.Lshortfile)})
 	app.Api.Use(rest.DefaultCommonStack...)
 

@@ -30,7 +30,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/StephanDollberg/go-json-rest-middleware-jwt"
+	jwt "github.com/StephanDollberg/go-json-rest-middleware-jwt"
 	"github.com/ant0ine/go-json-rest/rest"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -101,7 +101,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *PlogApp {
 	app.Api = rest.NewApi()
 
 	// we dont use default stack because we dont want content type enforcement
-	app.Api.Use(&rest.AccessLogApacheMiddleware{Logger: log.New(os.Stdout,
+	app.Api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
 		"/plog:", log.Lshortfile)})
 	app.Api.Use(rest.DefaultCommonStack...)
 

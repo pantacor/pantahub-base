@@ -53,11 +53,11 @@ import (
 	"strings"
 	"time"
 
+	jwt "github.com/StephanDollberg/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/utils"
 
-	"github.com/StephanDollberg/go-json-rest-middleware-jwt"
 	"github.com/ant0ine/go-json-rest/rest"
 	pvrapi "gitlab.com/pantacor/pvr/api"
 	"gopkg.in/mgo.v2"
@@ -1594,7 +1594,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *TrailsApp {
 	app.Api = rest.NewApi()
 
 	// we dont use default stack because we dont want content type enforcement
-	app.Api.Use(&rest.AccessLogApacheMiddleware{Logger: log.New(os.Stdout,
+	app.Api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
 		"/trails:", log.Lshortfile)})
 	app.Api.Use(rest.DefaultCommonStack...)
 	app.Api.Use(&rest.CorsMiddleware{

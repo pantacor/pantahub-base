@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/StephanDollberg/go-json-rest-middleware-jwt"
+	jwt "github.com/StephanDollberg/go-json-rest-middleware-jwt"
 	"github.com/ant0ine/go-json-rest/rest"
 	petname "github.com/dustinkirkland/golang-petname"
 	"gopkg.in/mgo.v2"
@@ -609,7 +609,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *DevicesApp {
 
 	app.Api = rest.NewApi()
 	// we dont use default stack because we dont want content type enforcement
-	app.Api.Use(&rest.AccessLogApacheMiddleware{Logger: log.New(os.Stdout,
+	app.Api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
 		"/devices:", log.Lshortfile)})
 	app.Api.Use(rest.DefaultCommonStack...)
 	app.Api.Use(&rest.CorsMiddleware{
