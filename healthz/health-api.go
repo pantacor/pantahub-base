@@ -41,12 +41,14 @@ func (a *HealthzApp) handle_healthz(w rest.ResponseWriter, r *rest.Request) {
 	// check DB
 	collection := a.mgoSession.DB("").C("pantahub_devices")
 	if collection == nil {
+		log.Println("ERROR: with database connectivity: " + err.Error())
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 	var val interface{}
 	err := collection.Find(bson.M{}).One(val)
 	if err != nil {
+		log.Println("ERROR: with database query: " + err.Error())
 		rest.Error(w, "Error with Database query", http.StatusInternalServerError)
 		return
 	}
@@ -56,6 +58,7 @@ func (a *HealthzApp) handle_healthz(w rest.ResponseWriter, r *rest.Request) {
 	_, err = os.Stat(path.Join(s3Path, "HEALTHZ.txt"))
 
 	if err != nil {
+		log.Println("ERROR: getting stats of HEALTHZ.txt on local-s3 storage: " + err.Error())
 		rest.Error(w, "Error getting stats of HEALTHZ.txt on local-s3 storage", http.StatusInternalServerError)
 		return
 	}
