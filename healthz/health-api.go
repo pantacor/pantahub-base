@@ -41,7 +41,6 @@ func (a *HealthzApp) handle_healthz(w rest.ResponseWriter, r *rest.Request) {
 	// check DB
 	collection := a.mgoSession.DB("").C("pantahub_devices")
 	if collection == nil {
-		log.Println("ERROR: with database connectivity: " + err.Error())
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
