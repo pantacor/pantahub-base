@@ -114,8 +114,7 @@ func (f FileUploadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer file.Close()
 	defer r.Body.Close()
 
-	buf := make([]byte, 1024*256)
-	written, err := io.CopyBuffer(file, r.Body, buf)
+	written, err := io.Copy(file, r.Body)
 
 	if written != objClaims.Size {
 		log.Println("WARNING: file upload size mismatch with claim")
