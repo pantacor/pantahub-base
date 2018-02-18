@@ -17,17 +17,10 @@ package utils
 
 import (
 	"math/rand"
-	"strings"
 	"time"
 
 	"github.com/asaskevich/govalidator"
 )
-
-// XXX: make this a nice prn helper tool
-func PrnGetId(prn string) string {
-	idx := strings.Index(prn, "/")
-	return prn[idx+1 : len(prn)]
-}
 
 func IsNick(nick string) bool {
 	l := len(nick)
