@@ -323,7 +323,7 @@ func MakeObjAccessible(Issuer string, Subject string, obj Object, storageId stri
 			filesObjWithAccess.SignedPutUrl = PantahubS3DevUrl() + "/local-s3/INTERNAL-ERROR"
 			return filesObjWithAccess
 		}
-		objAccessTokGet := NewObjectAccessForSec(obj.ObjectName, http.MethodGet, size, Issuer, Subject, storageId, 60)
+		objAccessTokGet := NewObjectAccessForSec(obj.ObjectName, http.MethodGet, size, Issuer, Subject, storageId, OBJECT_TOKEN_VALID_SEC)
 		tokGet, err := objAccessTokGet.Sign()
 		if err != nil {
 			log.Println("INTERNAL ERROR local-s3: " + err.Error())
@@ -333,7 +333,7 @@ func MakeObjAccessible(Issuer string, Subject string, obj Object, storageId stri
 		}
 
 		if Subject == obj.Owner {
-			objAccessTokPut := NewObjectAccessForSec(obj.ObjectName, http.MethodPut, size, Issuer, Subject, storageId, 60)
+			objAccessTokPut := NewObjectAccessForSec(obj.ObjectName, http.MethodPut, size, Issuer, Subject, storageId, OBJECT_TOKEN_VALID_SEC)
 			tokPut, err := objAccessTokPut.Sign()
 			if err != nil {
 				log.Println("INTERNAL ERROR local-s3: " + err.Error())
