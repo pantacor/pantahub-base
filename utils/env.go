@@ -120,6 +120,19 @@ const (
 	// default: <none> (Required!)
 	ENV_PANTAHUB_SA_ADMIN_SECRET = "PANTAHUB_SA_ADMIN_SECRET"
 
+	// Comma Separated List of PRNs of users that have pantahub admin role
+	// default: <none> (Required for Production!)
+	ENV_PANTAHUB_ADMIN_SECRET = "PANTAHUB_ADMIN_SECRET"
+
+	// Comma Separated List of PRNs of users that have pantahub admin role
+	// default: <none>
+	ENV_PANTAHUB_ADMINS = "PANTAHUB_ADMINS"
+
+	// Comma Separated List of PRNs of users that have pantahub subscription admin
+	// role
+	// default: <none>
+	ENV_PANTAHUB_SUBSCRIPTION_ADMINS = "PANTAHUB_SUBSCRIPTION_ADMINS"
+
 	// SMTP host to use for sending mails
 	// default: <none>
 	ENV_SMTP_HOST = "SMTP_HOST"
@@ -182,8 +195,13 @@ var defaultEnvs = map[string]string{
 	ENV_ELASTIC_PASSWORD: "",
 	ENV_ELASTIC_BEARER:   "",
 
-	// health
+	// secrets - required!!
 	ENV_PANTAHUB_SA_ADMIN_SECRET: "",
+	ENV_PANTAHUB_ADMIN_SECRET:    "",
+
+	// roles/admins
+	ENV_PANTAHUB_ADMINS:              "prn:pantahub.com:auth:/admin",
+	ENV_PANTAHUB_SUBSCRIPTION_ADMINS: "",
 
 	// smtp config (we stopped supporting this in favour of mailgun for launch)
 	ENV_SMTP_HOST: "localhost",
