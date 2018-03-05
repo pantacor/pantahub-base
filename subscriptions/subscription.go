@@ -197,12 +197,6 @@ func (i SubscriptionMgo) UpdatePlan(issuer utils.Prn, plan utils.Prn, attrs map[
 		}
 	}
 
-	if attrs == nil {
-		i.Attributes = SubscriptionProperties[plan].(map[string]interface{})
-	} else {
-		i.Attributes = attrs
-	}
-
 	i.LastModified = i.service.Now()
 	err := i.service.Save(i)
 
