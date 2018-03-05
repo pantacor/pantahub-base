@@ -21,7 +21,7 @@ const (
 	SubscriptionTypeLocked    = utils.Prn("prn::subscriptions:LOCKED")
 	SubscriptionTypePrefix    = utils.Prn("prn::subscriptions:/")
 	SubscriptionTypeFree      = utils.Prn(SubscriptionTypePrefix + "FREE")
-	SubscriptionTypeVIP       = utils.Prn(SubscriptionTypePrefix + "/VIP")
+	SubscriptionTypeVIP       = utils.Prn(SubscriptionTypePrefix + "VIP")
 )
 
 type Subscription interface {
