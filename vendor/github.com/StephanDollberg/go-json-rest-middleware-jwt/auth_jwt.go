@@ -154,7 +154,13 @@ func (mw *JWTMiddleware) LoginHandler(writer rest.ResponseWriter, request *rest.
 		}
 	}
 
-	token.Claims["id"] = loginVals.Username
+	// allow payload func to overload user id; like in case
+	// where login username will get normalized to a canonical
+	// id format. (e.g. username=mynick => internal id: mynick@mail.tld)
+	_, ok := token.Claims["id"]
+	if !ok {
+		token.Claims["id"] = loginVals.Username
+	}
 	token.Claims["exp"] = time.Now().Add(mw.Timeout).Unix()
 	if mw.MaxRefresh != 0 {
 		token.Claims["orig_iat"] = time.Now().Unix()

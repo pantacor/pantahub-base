@@ -166,6 +166,7 @@ func AccountToPayload(account Account) map[string]interface{} {
 		panic("Must not reach this!")
 	}
 
+	result["id"] = account.Prn
 	result["nick"] = account.Nick
 	result["prn"] = account.Prn
 
