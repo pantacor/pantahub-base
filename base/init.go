@@ -35,6 +35,7 @@ import (
 	"gitlab.com/pantacor/pantahub-base/logs"
 	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/plog"
+	"gitlab.com/pantacor/pantahub-base/subscriptions"
 	"gitlab.com/pantacor/pantahub-base/trails"
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
@@ -132,6 +133,10 @@ func DoInit() {
 
 	session, _ := utils.GetMongoSession()
 
+	adminUsers := utils.GetSubscriptionAdmins()
+	subService := subscriptions.NewService(session, utils.Prn("prn::subscriptions:"),
+		adminUsers, subscriptions.SubscriptionProperties)
+
 	{
 		app := auth.New(&jwt.JWTMiddleware{
 			Key:        []byte(jwtSecret),
@@ -191,8 +196,16 @@ func DoInit() {
 			Key:           []byte(jwtSecret),
 			Realm:         "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
 			Authenticator: falseAuthenticator,
-		}, session)
+		}, subService, session)
 		http.Handle("/dash/", http.StripPrefix("/dash", app.Api.MakeHandler()))
+	}
+	{
+		app := subscriptions.NewResty(&jwt.JWTMiddleware{
+			Key:           []byte(jwtSecret),
+			Realm:         "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
+			Authenticator: falseAuthenticator,
+		}, subService, session)
+		http.Handle("/subscriptions/", http.StripPrefix("/subscriptions", app.MakeHandler()))
 	}
 
 	if !objects.PantahubS3Production() {

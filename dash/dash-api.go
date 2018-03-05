@@ -19,6 +19,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 
 	jwt "github.com/StephanDollberg/go-json-rest-middleware-jwt"
 	"github.com/alecthomas/units"
@@ -27,13 +28,16 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	"gitlab.com/pantacor/pantahub-base/devices"
+	"gitlab.com/pantacor/pantahub-base/subscriptions"
 	"gitlab.com/pantacor/pantahub-base/trails"
+	"gitlab.com/pantacor/pantahub-base/utils"
 )
 
 type DashApp struct {
 	jwt_middleware *jwt.JWTMiddleware
 	Api            *rest.Api
 	mgoSession     *mgo.Session
+	subService     subscriptions.SubscriptionService
 }
 
 type QuotaType string
@@ -94,6 +98,12 @@ const (
 )
 
 var (
+	StandardBilling = BillingInfo{
+		Type:      "Monthly",
+		AmountDue: 0,
+		Currency:  "USD",
+		VatRegion: "World",
+	}
 	STANDARD_PLANS = map[string]Plan{
 		"AlphaTester": Plan{
 			Name: "AlphaTester",
@@ -170,11 +180,45 @@ type ModelError struct {
 	Message string `json:"message"`
 }
 
-func copyMap(m map[QuotaType]Quota) map[QuotaType]Quota {
+func copySubToDashMap(sub subscriptions.Subscription) map[QuotaType]Quota {
 	newMap := map[QuotaType]Quota{}
-	for k, v := range m {
-		newMap[k] = v
+
+	deviceQuota := sub.GetProperty(string(QUOTA_DEVICES))
+	deviceQuotaI, err := strconv.ParseFloat(deviceQuota.(string), 64)
+
+	if err != nil {
+		log.Printf("WARNING: subscription (%s) with illegal deviceQuota value: %s\n",
+			sub.GetPrn(), deviceQuota)
+		deviceQuotaI = 0
 	}
+	newMap[QUOTA_DEVICES] = Quota{
+		Name: QUOTA_DEVICES,
+		Max:  float64(deviceQuotaI),
+		Unit: "Piece",
+	}
+	objectsQuota := sub.GetProperty(string(QUOTA_OBJECTS))
+	objectsQuotaI, err := units.ParseStrictBytes(objectsQuota.(string))
+	if err != nil {
+		objectsQuotaI = 0
+	}
+	objectsQuotaG := units.Base2Bytes(objectsQuotaI) / units.Gibibyte
+	newMap[QUOTA_OBJECTS] = Quota{
+		Name: QUOTA_OBJECTS,
+		Max:  float64(objectsQuotaG),
+		Unit: "GiB",
+	}
+	networkQuota := sub.GetProperty(string(QUOTA_BANDWIDTH))
+	networkQuotaI, err := units.ParseStrictBytes(networkQuota.(string))
+	if err != nil {
+		objectsQuotaI = 0
+	}
+	networkQuotaG := units.Base2Bytes(networkQuotaI) / units.GiB
+	newMap[QUOTA_BANDWIDTH] = Quota{
+		Name: QUOTA_BANDWIDTH,
+		Max:  float64(networkQuotaG),
+		Unit: "GiB",
+	}
+
 	return newMap
 }
 
@@ -244,10 +288,29 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 
 	summary.Prn = owner.(string)
 	summary.Nick = r.Env["JWT_PAYLOAD"].(map[string]interface{})["nick"].(string)
+
+	sub, err := a.subService.LoadBySubject(utils.Prn(owner.(string)))
+	if err != nil && err != mgo.ErrNotFound {
+		rest.Error(w, "Error finding subscription for summary "+err.Error(),
+			http.StatusInternalServerError)
+		return
+	}
+	if err == mgo.ErrNotFound {
+		sub = a.subService.GetDefaultSubscription(utils.Prn(owner.(string)))
+	}
+
+	plan := sub.GetPlan()
+	prnInfo, err := plan.GetInfo()
+	if err != nil {
+		rest.Error(w, "Error parsing plan "+err.Error(),
+			http.StatusInternalServerError)
+		return
+	}
+
 	summary.Sub = SubscriptionInfo{
-		PlanId:     "AlphaTester",
+		PlanId:     prnInfo.Resource,
 		Billing:    STANDARD_PLANS["AlphaTester"].Billing,
-		QuotaStats: copyMap(STANDARD_PLANS["AlphaTester"].Quotas),
+		QuotaStats: copySubToDashMap(sub),
 	}
 
 	deviceCount, err :=
@@ -287,11 +350,14 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(summary)
 }
 
-func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *DashApp {
+func New(jwtMiddleware *jwt.JWTMiddleware,
+	subService subscriptions.SubscriptionService,
+	session *mgo.Session) *DashApp {
 
 	app := new(DashApp)
 	app.jwt_middleware = jwtMiddleware
 	app.mgoSession = session
+	app.subService = subService
 
 	app.Api = rest.NewApi()
 	// we dont use default stack because we dont want content type enforcement

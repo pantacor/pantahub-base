@@ -26,6 +26,8 @@ import (
 	"strconv"
 	"time"
 
+	"gitlab.com/pantacor/pantahub-base/subscriptions"
+
 	jwt "github.com/StephanDollberg/go-json-rest-middleware-jwt"
 	"github.com/alecthomas/units"
 	"github.com/ant0ine/go-json-rest/rest"
@@ -41,8 +43,10 @@ type ObjectsApp struct {
 	jwt_middleware *jwt.JWTMiddleware
 	Api            *rest.Api
 	mgoSession     *mgo.Session
-	awsS3Bucket    string
-	awsRegion      string
+	subService     subscriptions.SubscriptionService
+
+	awsS3Bucket string
+	awsRegion   string
 }
 
 var pantahubS3Path string
@@ -145,7 +149,7 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	quota, err := GetDiskQuota(ownerStr)
+	quota, err := a.GetDiskQuota(ownerStr)
 
 	if err != nil {
 		log.Println("Error to calc diskquota: " + err.Error())
@@ -228,7 +232,7 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	quota, err := GetDiskQuota(ownerStr)
+	quota, err := a.GetDiskQuota(ownerStr)
 
 	if err != nil {
 		log.Println("Error get diskquota setting: " + err.Error())
@@ -246,14 +250,16 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(newObject)
 }
 
-func GetDiskQuota(prn string) (float64, error) {
+func (a *ObjectsApp) GetDiskQuota(prn string) (float64, error) {
 
-	quota := "2GiB"
-
-	// hack until account plans are properly implemented
-	if prn == "prn:pantahub.com:auth:/user1" {
-		quota = "25GiB"
+	sub, err := a.subService.LoadBySubject(utils.Prn(prn))
+	if err == mgo.ErrNotFound {
+		sub = a.subService.GetDefaultSubscription(utils.Prn(prn))
+	} else if err != nil {
+		return 0, err
 	}
+
+	quota := sub.GetProperty("OBJECTS").(string)
 
 	uM, err := units.ParseStrictBytes(quota)
 	if err != nil {
@@ -523,11 +529,13 @@ func (a *ObjectsApp) handle_deleteobject(w rest.ResponseWriter, r *rest.Request)
 	w.WriteJson(newObject)
 }
 
-func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *ObjectsApp {
+func New(jwtMiddleware *jwt.JWTMiddleware, subService subscriptions.SubscriptionService,
+	session *mgo.Session) *ObjectsApp {
 
 	app := new(ObjectsApp)
 	app.jwt_middleware = jwtMiddleware
 	app.mgoSession = session
+	app.subService = subService
 
 	// XXX: allow config through env
 	app.awsS3Bucket = "systemcloud-001"
