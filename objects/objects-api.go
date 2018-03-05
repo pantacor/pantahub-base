@@ -269,6 +269,12 @@ func (a *ObjectsApp) GetDiskQuota(prn string) (float64, error) {
 	return float64(uM), err
 }
 
+var defaultObjectsApp *ObjectsApp
+
+func GetDiskQuota(prn string) (float64, error) {
+	return defaultObjectsApp.GetDiskQuota(prn)
+}
+
 func SyncObjectSizes(obj *Object) {
 	var err error
 	var strInt64 int64
@@ -533,6 +539,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, subService subscriptions.Subscription
 	session *mgo.Session) *ObjectsApp {
 
 	app := new(ObjectsApp)
+	if defaultObjectsApp == nil {
+		defaultObjectsApp = app
+	}
 	app.jwt_middleware = jwtMiddleware
 	app.mgoSession = session
 	app.subService = subService

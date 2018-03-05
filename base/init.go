@@ -151,7 +151,7 @@ func DoInit() {
 			Key:           []byte(jwtSecret),
 			Realm:         "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
 			Authenticator: falseAuthenticator,
-		}, session)
+		}, subService, session)
 		http.Handle("/objects/", http.StripPrefix("/objects", app.Api.MakeHandler()))
 	}
 	{
