@@ -19,7 +19,7 @@ const (
 	SubscriptionTypeCustom    = utils.Prn("prn::subscriptions:CUSTOM")
 	SubscriptionTypeCancelled = utils.Prn("prn::subscriptions:CANCELLED")
 	SubscriptionTypeLocked    = utils.Prn("prn::subscriptions:LOCKED")
-	SubscriptionTypePrefix    = utils.Prn("prn::subscriptions:/")
+	SubscriptionTypePrefix    = utils.Prn("prn::subscriptions:")
 	SubscriptionTypeFree      = utils.Prn(SubscriptionTypePrefix + "FREE")
 	SubscriptionTypeVIP       = utils.Prn(SubscriptionTypePrefix + "VIP")
 )
