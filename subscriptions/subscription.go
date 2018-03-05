@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	collectionSubscription = "pantabase_subscription"
+	collectionSubscription = "pantahub_subscriptions"
 
 	SubscriptionTypeCustom    = utils.Prn("prn::subscriptions:CUSTOM")
 	SubscriptionTypeCancelled = utils.Prn("prn::subscriptions:CANCELLED")
