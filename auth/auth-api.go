@@ -433,7 +433,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 	}
 
 	app.Api = rest.NewApi()
-	app.Api.Use(&rest.AccessLogApacheMiddleware{Logger: log.New(os.Stdout,
+	app.Api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
 		"/auth:", log.Lshortfile)})
 	app.Api.Use(rest.DefaultDevStack...)
 	app.Api.Use(&rest.CorsMiddleware{
