@@ -164,7 +164,7 @@ func NewResty(jwtMiddleware *jwt.JWTMiddleware, subscriptionService Subscription
 
 	// we dont use default stack because we dont want content type enforcement
 	app.api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
-		"/trails:", log.Lshortfile)})
+		"/subscriptions:", log.Lshortfile)})
 	app.api.Use(rest.DefaultCommonStack...)
 	app.api.Use(&rest.CorsMiddleware{
 		RejectNonCorsRequests: false,
