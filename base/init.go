@@ -133,6 +133,10 @@ func DoInit() {
 
 	session, _ := utils.GetMongoSession()
 
+	adminUsers := utils.GetSubscriptionAdmins()
+	subService := subscriptions.NewService(session, utils.Prn("prn::subscriptions:"),
+		adminUsers, subscriptions.SubscriptionProperties)
+
 	{
 		app := auth.New(&jwt.JWTMiddleware{
 			Key:        []byte(jwtSecret),
@@ -192,7 +196,7 @@ func DoInit() {
 			Key:           []byte(jwtSecret),
 			Realm:         "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
 			Authenticator: falseAuthenticator,
-		}, session)
+		}, subService, session)
 		http.Handle("/dash/", http.StripPrefix("/dash", app.Api.MakeHandler()))
 	}
 	{
@@ -200,7 +204,7 @@ func DoInit() {
 			Key:           []byte(jwtSecret),
 			Realm:         "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
 			Authenticator: falseAuthenticator,
-		}, session)
+		}, subService, session)
 		http.Handle("/subscriptions/", http.StripPrefix("/subscriptions", app.MakeHandler()))
 	}
 

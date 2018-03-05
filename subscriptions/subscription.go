@@ -89,12 +89,14 @@ type SubscriptionMgo struct {
 var (
 	SubscriptionProperties = map[utils.Prn]interface{}{
 		SubscriptionTypeFree: map[string]interface{}{
-			"storage": "2GiB",
-			"network": "2GiB",
+			"OBJECTS":   "2GiB",
+			"BANDWIDTH": "2GiB",
+			"DEVICES":   "25",
 		},
 		SubscriptionTypeVIP: map[string]interface{}{
-			"storage": "20GiB",
-			"network": "10GiB",
+			"OBJECTS":   "20GiB",
+			"BANDWIDTH": "10GiB",
+			"DEVICES":   "100",
 		},
 	}
 )

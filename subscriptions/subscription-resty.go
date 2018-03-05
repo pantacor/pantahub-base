@@ -155,14 +155,11 @@ func (s *SubscriptionsApp) MakeHandler() http.Handler {
 	return s.api.MakeHandler()
 }
 
-func NewResty(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *SubscriptionsApp {
-
-	adminUsers := utils.GetSubscriptionAdmins()
+func NewResty(jwtMiddleware *jwt.JWTMiddleware, subscriptionService SubscriptionService, session *mgo.Session) *SubscriptionsApp {
 
 	app := new(SubscriptionsApp)
 	app.jwt_middleware = jwtMiddleware
-	app.service = NewService(session, utils.Prn("prn::subscriptions:"),
-		adminUsers, SubscriptionProperties)
+	app.service = subscriptionService
 	app.api = rest.NewApi()
 
 	// we dont use default stack because we dont want content type enforcement

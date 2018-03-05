@@ -41,6 +41,9 @@ type SubscriptionService interface {
 	// Load subscription by ID
 	LoadBySubject(subject utils.Prn) (Subscription, error)
 
+	// Load subscription by ID
+	GetDefaultSubscription(subject utils.Prn) Subscription
+
 	// List subscription by owning "subject"
 	List(Subject utils.Prn, start, page int) (SubscriptionPage, error)
 
@@ -57,6 +60,17 @@ type subscriptionService struct {
 	admins     []utils.Prn
 	types      map[utils.Prn]interface{}
 }
+
+var (
+	defaultSubscriptionID = bson.NewObjectId().Hex()
+	defaultSubscription   = SubscriptionMgo{
+		ID:         defaultSubscriptionID,
+		Prn:        utils.Prn("prn::subscriptions:/" + defaultSubscriptionID),
+		Issuer:     utils.Prn("prn::auth:/admin"),
+		Type:       SubscriptionTypeFree,
+		Attributes: SubscriptionProperties[SubscriptionTypeFree].(map[string]interface{}),
+	}
+)
 
 // New createsa a new Subscription. If subType is a known subscription
 // type PRN, we will use the properties savesd for that sub type instead
@@ -116,6 +130,15 @@ func (i subscriptionService) LoadBySubject(subject utils.Prn) (Subscription, err
 
 	s.service = i
 	return &s, nil
+}
+
+func (i subscriptionService) GetDefaultSubscription(subject utils.Prn) Subscription {
+	sub := defaultSubscription
+	sub.service = i
+	defaultSubscription.LastModified = i.Now()
+	defaultSubscription.TimeCreated = defaultSubscription.LastModified
+	defaultSubscription.Subject = subject
+	return sub
 }
 
 func (i subscriptionService) List(subject utils.Prn,
