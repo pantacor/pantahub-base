@@ -95,10 +95,16 @@ func (i subscriptionService) New(subject utils.Prn,
 	// look up attributes to see if we have some.
 	attrs, ok := SubscriptionProperties[s.Type]
 	if !ok {
-		// if no such default property exist, set what was provided as parameter
-		s.Attributes = attributes
-	} else {
+		return nil, errors.New("No such subscription plan available: " + string(s.Type))
+	}
+
+	if attrs != nil {
 		s.Attributes = attrs.(map[string]interface{})
+	}
+
+	// all custom overwrites
+	for k, v := range s.Attributes {
+		s.Attributes[k] = v
 	}
 
 	err := i.mgoSession.DB("").C(collectionSubscription).Insert(s)

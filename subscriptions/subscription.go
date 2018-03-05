@@ -7,6 +7,7 @@
 package subscriptions
 
 import (
+	"errors"
 	"math"
 	"time"
 
@@ -98,6 +99,13 @@ var (
 			"BANDWIDTH": "10GiB",
 			"DEVICES":   "100",
 		},
+		SubscriptionTypeLocked:    nil,
+		SubscriptionTypeCancelled: nil,
+		SubscriptionTypeCustom: map[string]interface{}{
+			"OBJECTS":   "0GiB",
+			"BANDWIDTH": "0GiB",
+			"DEVICES":   "0",
+		},
 	}
 )
 
@@ -186,15 +194,15 @@ func (i SubscriptionMgo) UpdatePlan(issuer utils.Prn, plan utils.Prn, attrs map[
 	// look up attributes to see if we have some.
 	subAttrs, ok := SubscriptionProperties[plan]
 	if !ok {
-		// if no such default property exist, set what was provided as parameter
-		i.Attributes = attrs
-	} else {
-		i.Attributes = subAttrs.(map[string]interface{})
+		return errors.New("No such subscription plan available: " + string(plan))
+	}
 
-		// all custom overwrites
-		for k, v := range attrs {
-			i.Attributes[k] = v
-		}
+	if subAttrs != nil {
+		i.Attributes = subAttrs.(map[string]interface{})
+	}
+	// all custom overwrites
+	for k, v := range attrs {
+		i.Attributes[k] = v
 	}
 
 	i.LastModified = i.service.Now()
