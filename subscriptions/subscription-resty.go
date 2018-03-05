@@ -20,9 +20,9 @@ type SubscriptionsApp struct {
 }
 
 type SubscriptionReq struct {
-	Subject utils.Prn
-	Plan    utils.Prn
-	Attrs   map[string]interface{}
+	Subject utils.Prn              `json:"subject"`
+	Plan    utils.Prn              `json:"plan"`
+	Attrs   map[string]interface{} `json:"attrs"`
 }
 
 func (s *SubscriptionsApp) get(w rest.ResponseWriter, r *rest.Request) {
