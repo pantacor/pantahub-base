@@ -50,13 +50,21 @@ func setup(t *testing.T) {
 }
 
 func newTestService() SubscriptionService {
-	return NewService(mgoSession, utils.Prn("prn:pantahub.com:base:/"),
+	wrappedService := NewService(mgoSession, utils.Prn("prn:pantahub.com:base:/"),
 		[]utils.Prn{
 			"prn::auth:/admin",
 			"prn::auth:/admin2",
 		},
 		SubscriptionProperties,
 	)
+
+	svc := wrappedService.(*subscriptionService)
+
+	wrapper := subscriptionServiceTest{
+		subscriptionService: *svc,
+		now:                 time.Now(),
+	}
+	return wrapper
 }
 
 func testNewSubscription(t *testing.T) {
@@ -524,4 +532,49 @@ func TestList(t *testing.T) {
 		return
 	}
 	t.Run("subscription-list", testList)
+}
+
+type subscriptionServiceTest struct {
+	subscriptionService
+	now time.Time
+}
+
+func (i subscriptionServiceTest) Now() time.Time {
+	return i.now
+}
+
+func TestPeriod(t *testing.T) {
+	setup(t)
+
+	sService := newTestService()
+	sub, err := sService.New(utils.Prn("prn::auth:/user1"),
+		utils.Prn("prn::auth:/admin1"), SubscriptionTypeCustom, bson.M{})
+
+	if err != nil {
+		t.Errorf("error creating subscription: %s", err.Error())
+		t.Fail()
+		return
+	}
+
+	now := sService.Now()
+	nowMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	start := sub.GetPeriodStart()
+
+	if !nowMonth.Equal(start) {
+		t.Errorf("period start does not equal nowMonth: %s != %s ", start.String(), nowMonth.String())
+		t.Fail()
+	}
+
+	nextMonth := time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, time.UTC)
+	end := sub.GetPeriodEnd()
+	if !nextMonth.Equal(end) {
+		t.Errorf("period start does not equal nowMonth: %s != %s ", start.String(), nowMonth.String())
+		t.Fail()
+	}
+
+	progress := sub.GetPeriodProgression()
+	if progress < 0 || progress > 1.0 {
+		t.Errorf("period progress must be greater or equal than zero or smaller or equal than 1.0, not %f ", progress)
+		t.Fail()
+	}
 }

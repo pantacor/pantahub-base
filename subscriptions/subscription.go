@@ -7,6 +7,7 @@
 package subscriptions
 
 import (
+	"math"
 	"time"
 
 	"gitlab.com/pantacor/pantahub-base/utils"
@@ -31,6 +32,11 @@ type Subscription interface {
 	GetSubject() utils.Prn
 	GetService() utils.Prn
 	GetTimeModified() time.Time
+	GetTimeCreated() time.Time
+
+	GetPeriodStart() time.Time
+	GetPeriodEnd() time.Time
+	GetPeriodProgression() float64
 
 	HasProperty(key string) bool
 	GetProperty(key string) interface{}
@@ -70,6 +76,9 @@ type SubscriptionMgo struct {
 
 	// the time this subscription was modified.
 	LastModified time.Time `json:"last-modified" bson:"last-modified"`
+
+	// the time this subscription was modified.
+	TimeCreated time.Time `json:"time-created" bson:"time-created"`
 
 	// History log in cronological order (earliest first) . Max history is not implemented rightnow..
 	History []SubscriptionMgo `json:"history,omitempty", bson:"history,omitempty"`
@@ -128,6 +137,30 @@ func (i SubscriptionMgo) GetHistory() []Subscription {
 func (i SubscriptionMgo) GetTimeModified() time.Time {
 	return i.LastModified
 }
+
+func (i SubscriptionMgo) GetTimeCreated() time.Time {
+	return i.TimeCreated
+}
+
+func (i SubscriptionMgo) GetPeriodStart() time.Time {
+	now := i.service.Now().UTC()
+	return time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+}
+
+func (i SubscriptionMgo) GetPeriodEnd() time.Time {
+	now := i.service.Now().UTC()
+	return time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, time.UTC)
+}
+
+func (i SubscriptionMgo) GetPeriodProgression() float64 {
+	start := i.GetPeriodStart()
+	end := i.GetPeriodEnd()
+	now := i.service.Now()
+	periodLenSec := end.Sub(start)
+	periodIn := now.Sub(start)
+	return math.Abs(float64(periodIn) / float64(periodLenSec))
+}
+
 func (i SubscriptionMgo) IsCancelled() bool {
 	return i.Type == SubscriptionTypeCancelled
 }
@@ -154,6 +187,7 @@ func (i SubscriptionMgo) UpdatePlan(issuer utils.Prn, plan utils.Prn, attrs map[
 		i.Attributes = attrs
 	}
 
+	i.LastModified = i.service.Now()
 	err := i.service.Save(i)
 
 	return err

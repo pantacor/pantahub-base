@@ -46,6 +46,9 @@ type SubscriptionService interface {
 
 	// Save subscription
 	Save(sub Subscription) error
+
+	// Now time
+	Now() time.Time
 }
 
 type subscriptionService struct {
@@ -72,7 +75,8 @@ func (i subscriptionService) New(subject utils.Prn,
 	s.Service = i.servicePrn
 	s.Issuer = issuer
 	s.Type = subType
-	s.LastModified = time.Now()
+	s.LastModified = i.Now()
+	s.TimeCreated = s.LastModified
 
 	// look up attributes to see if we have some.
 	attrs, ok := SubscriptionProperties[s.Type]
@@ -185,6 +189,10 @@ func (i subscriptionService) Save(sub Subscription) error {
 		return err
 	}
 	return nil
+}
+
+func (i subscriptionService) Now() time.Time {
+	return time.Now()
 }
 
 func (i subscriptionService) ensureIndices() error {
