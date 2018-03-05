@@ -141,7 +141,7 @@ func testNewSubscriptionWithDefaults(t *testing.T) {
 		t.Fail()
 		return
 	}
-	if !sub1.HasProperty("network") {
+	if !sub1.HasProperty("BANDWIDTH") {
 		t.Errorf("Subscription must have network property")
 		t.Fail()
 		return
@@ -149,7 +149,7 @@ func testNewSubscriptionWithDefaults(t *testing.T) {
 
 	m := SubscriptionProperties[SubscriptionTypeFree].(map[string]interface{})
 
-	if sub1.GetProperty("network") != m["network"] {
+	if sub1.GetProperty("BANDWIDTH") != m["BANDWIDTH"] {
 		t.Errorf("Subscription must have network property")
 		t.Fail()
 		return
