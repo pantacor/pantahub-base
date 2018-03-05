@@ -183,6 +183,20 @@ func (i SubscriptionMgo) UpdatePlan(issuer utils.Prn, plan utils.Prn, attrs map[
 	i.Issuer = issuer
 	i.Type = plan
 
+	// look up attributes to see if we have some.
+	subAttrs, ok := SubscriptionProperties[plan]
+	if !ok {
+		// if no such default property exist, set what was provided as parameter
+		i.Attributes = attrs
+	} else {
+		i.Attributes = subAttrs.(map[string]interface{})
+
+		// all custom overwrites
+		for k, v := range attrs {
+			i.Attributes[k] = v
+		}
+	}
+
 	if attrs == nil {
 		i.Attributes = SubscriptionProperties[plan].(map[string]interface{})
 	} else {
