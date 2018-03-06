@@ -39,6 +39,7 @@ Then you can create or update the subscription plan for any given prn using the 
 
 ```
 http PUT https://api.pantahub.com/subscriptions/admin/subscription \
+	subject=prn:::accounts:/XXXXXXXXXXXXXXXXXXX \
 	plan=prn::subscriptions:VIP \
 	Authorization:" Bearer: $TOK"
 ```
@@ -55,6 +56,7 @@ You can overwrite default properties of plan through a json map that you can pas
 
 ```
 http PUT https://api.pantahub.com/subscriptions/admin/subscription \
+	subject=prn:::accounts:/XXXXXXXXXXXXXXXXXXX \
 	plan=prn::subscriptions:VIP \
 	attrs:='{"BANDWIDTH": "100GiB"}' \
 	Authorization:" Bearer: $TOK"
