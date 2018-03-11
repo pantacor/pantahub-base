@@ -355,7 +355,7 @@ func newElasticLogger() (*elasticLogger, error) {
 		"index_patterns": defaultLogger.elasticIndexPrefix + "-*",
 		"settings": bson.M{
 			"number_of_shards":   5,
-			"number_of_replicas": 0,
+			"number_of_replicas": 1,
 		},
 		"mappings": bson.M{
 			"pv": bson.M{
