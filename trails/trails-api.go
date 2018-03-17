@@ -845,10 +845,17 @@ func (a *TrailsApp) handle_getstepsobjects(w rest.ResponseWriter, r *rest.Reques
 		}
 
 		objId := v.(string)
-		storageId := objects.MakeStorageId(step.Owner, objId)
+		sha, err := utils.DecodeSha256HexString(objId)
+
+		if err != nil {
+			rest.Error(w, "Get Steps Object id must be a valid sha256", http.StatusBadRequest)
+			return
+		}
+
+		storageId := objects.MakeStorageId(step.Owner, sha)
 
 		var newObject objects.Object
-		err := collection.FindId(storageId).One(&newObject)
+		err = collection.FindId(storageId).One(&newObject)
 
 		if err != nil {
 			rest.Error(w, "Not Accessible Resource Id: "+storageId+" ERR: "+err.Error(), http.StatusForbidden)
@@ -919,7 +926,14 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 		return
 	}
 
-	storageId := objects.MakeStorageId(newObject.Owner, newObject.Sha)
+	sha, err := utils.DecodeSha256HexString(newObject.Sha)
+
+	if err != nil {
+		rest.Error(w, "Post Steps Object id must be a valid sha256", http.StatusBadRequest)
+		return
+	}
+
+	storageId := objects.MakeStorageId(newObject.Owner, sha)
 	newObject.StorageId = storageId
 	newObject.Id = newObject.Sha
 
@@ -1005,7 +1019,14 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 		return
 	}
 
-	storageId := objects.MakeStorageId(step.Owner, putId)
+	sha, err := utils.DecodeSha256HexString(putId)
+
+	if err != nil {
+		rest.Error(w, "Put Trails Steps Object id must be a valid sha256", http.StatusBadRequest)
+		return
+	}
+
+	storageId := objects.MakeStorageId(step.Owner, sha)
 	err = collection.FindId(storageId).One(&newObject)
 
 	if err != nil {
@@ -1144,10 +1165,17 @@ func (a *TrailsApp) handle_getstepsobject(w rest.ResponseWriter, r *rest.Request
 			continue
 		}
 
-		storageId := objects.MakeStorageId(step.Owner, objId)
+		sha, err := utils.DecodeSha256HexString(objId)
+
+		if err != nil {
+			rest.Error(w, "Get Trails Steps Object id must be a valid sha256", http.StatusBadRequest)
+			return
+		}
+
+		storageId := objects.MakeStorageId(step.Owner, sha)
 
 		var newObject objects.Object
-		err := collection.FindId(storageId).One(&newObject)
+		err = collection.FindId(storageId).One(&newObject)
 
 		if err != nil {
 			rest.Error(w, "Not Accessible Resource Id: "+storageId+" ERR: "+err.Error(), http.StatusForbidden)
@@ -1249,10 +1277,17 @@ func (a *TrailsApp) handle_getstepsobjectfile(w rest.ResponseWriter, r *rest.Req
 			continue
 		}
 
-		storageId := objects.MakeStorageId(step.Owner, objId)
+		sha, err := utils.DecodeSha256HexString(objId)
+
+		if err != nil {
+			rest.Error(w, "Get Trails Steps Object File by ID must be a valid sha256", http.StatusBadRequest)
+			return
+		}
+
+		storageId := objects.MakeStorageId(step.Owner, sha)
 
 		var newObject objects.Object
-		err := collection.FindId(storageId).One(&newObject)
+		err = collection.FindId(storageId).One(&newObject)
 
 		if err != nil {
 			rest.Error(w, "Not Accessible Resource Id: "+storageId+" ERR: "+err.Error(), http.StatusForbidden)

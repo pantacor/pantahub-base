@@ -16,6 +16,8 @@
 package base
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"io"
 	"log"
@@ -26,6 +28,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"gopkg.in/mgo.v2/bson"
 
 	jwt "github.com/StephanDollberg/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/auth"
@@ -49,17 +53,24 @@ func falseAuthenticator(userId string, password string) bool {
 	return false
 }
 
-func (d FileUploadServer) OpenForWrite(name string) (*os.File, error) {
+func (d FileUploadServer) MakePathForName(name string) (string, error) {
 	if filepath.Separator != '/' && strings.ContainsRune(name, filepath.Separator) ||
 		strings.Contains(name, "\x00") {
-		return nil, errors.New("http: invalid character in file path")
+		return "", errors.New("http: invalid character in file path")
 	}
 	dir := d.directory
 	if dir == "" {
 		dir = "."
 	}
 
-	fpath := filepath.Join(dir, filepath.FromSlash(path.Clean("/"+name)))
+	return filepath.Join(dir, filepath.FromSlash(path.Clean("/"+name))), nil
+}
+
+func (d FileUploadServer) OpenForWrite(name string) (*os.File, error) {
+	fpath, err := d.MakePathForName(name)
+	if err != nil {
+		return nil, err
+	}
 
 	f, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE, 0644)
 
@@ -105,25 +116,71 @@ func (f FileUploadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	file, err := f.OpenForWrite(r.URL.Path)
+	if objClaims.Sha == "" {
+		log.Println("Invalid objClaims Method; no Sha included")
+		w.WriteHeader(http.StatusBadRequest)
+	}
 
+	uniqueID := bson.NewObjectId().Hex()
+
+	file, err := f.OpenForWrite(objClaims.DispositionName + "." + uniqueID)
 	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
+		log.Println("ERROR: opening file for write: " + err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	finalName, err := f.MakePathForName(objClaims.DispositionName)
+	if err != nil {
+		log.Println("ERROR: creating filepath for write: " + err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	defer file.Close()
 	defer r.Body.Close()
 
-	written, err := io.CopyN(file, r.Body, objClaims.Size)
+	hasher := sha256.New()
+	fw := io.MultiWriter(file, hasher)
+	var sha []byte
+	var shaS string
 
-	if written != objClaims.Size {
-		log.Println("WARNING: file upload size mismatch with claim")
-	}
+	written, err := io.CopyN(fw, r.Body, objClaims.Size)
+
 	if err != nil {
 		log.Println("ERROR: error syncing file upload to disk: " + err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		goto fail
+	}
+	if written != objClaims.Size {
+		log.Println("WARNING: file upload size mismatch with claim")
+		w.WriteHeader(http.StatusBadRequest)
+		goto fail
 	}
 
+	sha = hasher.Sum(nil)
+	shaS = hex.EncodeToString(sha)
+
+	if shaS != objClaims.Sha {
+		log.Println("WARNING: file upload sha mismatch with claim")
+		w.WriteHeader(http.StatusBadRequest)
+		goto fail
+	}
+	file.Close()
+
+	err = os.Rename(file.Name(), finalName)
+
+	if err != nil {
+		log.Println("ERROR: failed to rename successfully and validated file after upload: " + err.Error())
+		goto fail
+	}
+
+	return
+fail:
+	file.Close()
+	err = os.Remove(file.Name())
+	if err != nil {
+		log.Println("ERROR: created file cannot be deleted: " + err.Error())
+	}
 }
 
 func DoInit() {

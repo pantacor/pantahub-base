@@ -99,8 +99,8 @@ func handle_auth(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(jwtClaims)
 }
 
-func MakeStorageId(owner string, sha string) string {
-	res := sha256.Sum256([]byte(owner + "/" + sha))
+func MakeStorageId(owner string, sha []byte) string {
+	res := sha256.Sum256(append([]byte(owner+"/"), sha...))
 	newSha := res[:]
 	hexRes := make([]byte, hex.EncodedLen(len(newSha)))
 	hex.Encode(hexRes, newSha)
@@ -135,7 +135,23 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	storageId := MakeStorageId(ownerStr, newObject.Sha)
+	// check preconditions
+	var sha []byte
+	var err error
+
+	if newObject.Sha == "" {
+		rest.Error(w, "Post New Object must set a sha", http.StatusBadRequest)
+		return
+	}
+
+	sha, err = utils.DecodeSha256HexString(newObject.Sha)
+
+	if err != nil {
+		rest.Error(w, "Post New Object sha must be a valid sha256", http.StatusBadRequest)
+		return
+	}
+
+	storageId := MakeStorageId(ownerStr, sha)
 	newObject.StorageId = storageId
 	newObject.Id = newObject.Sha
 
@@ -202,10 +218,17 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 	putId := r.PathParam("id")
-	storageId := MakeStorageId(ownerStr, putId)
 
-	err := collection.FindId(storageId).One(&newObject)
+	sha, err := utils.DecodeSha256HexString(putId)
 
+	if err != nil {
+		rest.Error(w, "Post New Object sha must be a valid sha256", http.StatusBadRequest)
+		return
+	}
+
+	storageId := MakeStorageId(ownerStr, sha)
+
+	err = collection.FindId(storageId).One(&newObject)
 	if err != nil {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
@@ -335,7 +358,8 @@ func MakeObjAccessible(Issuer string, Subject string, obj Object, storageId stri
 			filesObjWithAccess.SignedPutUrl = PantahubS3DevUrl() + "/local-s3/INTERNAL-ERROR"
 			return filesObjWithAccess
 		}
-		objAccessTokGet := NewObjectAccessForSec(obj.ObjectName, http.MethodGet, size, Issuer, Subject, storageId, OBJECT_TOKEN_VALID_SEC)
+
+		objAccessTokGet := NewObjectAccessForSec(obj.ObjectName, http.MethodGet, size, filesObjWithAccess.Sha, Issuer, Subject, storageId, OBJECT_TOKEN_VALID_SEC)
 		tokGet, err := objAccessTokGet.Sign()
 		if err != nil {
 			log.Println("INTERNAL ERROR local-s3: " + err.Error())
@@ -345,7 +369,7 @@ func MakeObjAccessible(Issuer string, Subject string, obj Object, storageId stri
 		}
 
 		if Subject == obj.Owner {
-			objAccessTokPut := NewObjectAccessForSec(obj.ObjectName, http.MethodPut, size, Issuer, Subject, storageId, OBJECT_TOKEN_VALID_SEC)
+			objAccessTokPut := NewObjectAccessForSec(obj.ObjectName, http.MethodPut, size, filesObjWithAccess.Sha, Issuer, Subject, storageId, OBJECT_TOKEN_VALID_SEC)
 			tokPut, err := objAccessTokPut.Sign()
 			if err != nil {
 				log.Println("INTERNAL ERROR local-s3: " + err.Error())
@@ -386,10 +410,17 @@ func (a *ObjectsApp) handle_getobject(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	objId := r.PathParam("id")
-	storageId := MakeStorageId(ownerStr, objId)
+	sha, err := utils.DecodeSha256HexString(objId)
+
+	if err != nil {
+		rest.Error(w, "Get New Object :id must be a valid sha256", http.StatusBadRequest)
+		return
+	}
+
+	storageId := MakeStorageId(ownerStr, sha)
 
 	var filesObj Object
-	err := collection.FindId(storageId).One(&filesObj)
+	err = collection.FindId(storageId).One(&filesObj)
 
 	if err != nil {
 		rest.Error(w, "No Access", http.StatusForbidden)
@@ -438,10 +469,16 @@ func (a *ObjectsApp) handle_getobjectfile(w rest.ResponseWriter, r *rest.Request
 	}
 
 	objId := r.PathParam("id")
-	storageId := MakeStorageId(ownerStr, objId)
+	sha, err := utils.DecodeSha256HexString(objId)
+
+	if err != nil {
+		rest.Error(w, "Post New Object sha must be a valid sha256", http.StatusBadRequest)
+		return
+	}
+	storageId := MakeStorageId(ownerStr, sha)
 
 	var filesObj Object
-	err := collection.FindId(storageId).One(&filesObj)
+	err = collection.FindId(storageId).One(&filesObj)
 
 	if err != nil {
 		rest.Error(w, "No Access", http.StatusForbidden)
@@ -522,7 +559,13 @@ func (a *ObjectsApp) handle_deleteobject(w rest.ResponseWriter, r *rest.Request)
 	}
 
 	delId := r.PathParam("id")
-	storageId := MakeStorageId(ownerStr, delId)
+	sha, err := utils.DecodeSha256HexString(delId)
+
+	if err != nil {
+		rest.Error(w, "Post New Object sha must be a valid sha256", http.StatusBadRequest)
+		return
+	}
+	storageId := MakeStorageId(ownerStr, sha)
 
 	newObject := Object{}
 

@@ -26,12 +26,16 @@ type ObjectAccessClaims struct {
 	DispositionName string
 	Size            int64
 	Method          string
+
+	// sha in hex encoding
+	Sha string
 }
 
 func NewObjectAccessToken(
 	name string,
 	method string,
 	size int64,
+	sha string,
 	issuer string,
 	subject string,
 	audience string,
@@ -48,6 +52,7 @@ func NewObjectAccessToken(
 		DispositionName: name,
 		Size:            size,
 		Method:          method,
+		Sha:             sha,
 	}
 
 	o := &ObjectAccessToken{}
@@ -59,12 +64,13 @@ func NewObjectAccessForSec(
 	name string,
 	method string,
 	size int64,
+	sha string,
 	issuer string,
 	subject string,
 	audience string,
 	validSec int64) *ObjectAccessToken {
 	timeNow := time.Now().Unix()
-	return NewObjectAccessToken(name, method, size, issuer, subject,
+	return NewObjectAccessToken(name, method, size, sha, issuer, subject,
 		audience, timeNow, timeNow+validSec)
 }
 
