@@ -1,5 +1,5 @@
 //
-// Copyright 2017  Pantacor Ltd.
+// Copyright 2017,2018  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@ import (
 
 	jwt "github.com/StephanDollberg/go-json-rest-middleware-jwt"
 	"github.com/ant0ine/go-json-rest/rest"
+	"gitlab.com/pantacor/pantahub-base/utils"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -103,6 +104,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *PlogApp {
 	// we dont use default stack because we dont want content type enforcement
 	app.Api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
 		"/plog:", log.Lshortfile)})
+	app.Api.Use(&utils.AccessLogFluentMiddleware{Prefix: "plog"})
 	app.Api.Use(rest.DefaultCommonStack...)
 
 	// we allow calls from other domains to allow webapps; XXX: review

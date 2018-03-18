@@ -35,6 +35,7 @@ import (
 
 	jwt "github.com/StephanDollberg/go-json-rest-middleware-jwt"
 	"github.com/ant0ine/go-json-rest/rest"
+	"gitlab.com/pantacor/pantahub-base/utils"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -307,6 +308,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *logsApp {
 	// we dont use default stack because we dont want content type enforcement
 	app.Api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
 		"/logs:", log.Lshortfile)})
+	app.Api.Use(&utils.AccessLogFluentMiddleware{Prefix: "logs"})
+
 	app.Api.Use(rest.DefaultCommonStack...)
 
 	// we allow calls from other domains to allow webapps; XXX: review

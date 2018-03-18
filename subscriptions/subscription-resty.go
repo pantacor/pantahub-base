@@ -1,3 +1,10 @@
+//
+// Package subscriptions offers simple subscription REST API to issue subscriptions
+// for services. In this file we define the rest frontend.
+//
+// (c) Pantacor Ltd, 2018
+// License: Apache 2.0 (see COPYRIGHT)
+//
 package subscriptions
 
 import (
@@ -165,6 +172,7 @@ func NewResty(jwtMiddleware *jwt.JWTMiddleware, subscriptionService Subscription
 	// we dont use default stack because we dont want content type enforcement
 	app.api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
 		"/subscriptions:", log.Lshortfile)})
+	app.api.Use(&utils.AccessLogFluentMiddleware{Prefix: "subscription"})
 	app.api.Use(rest.DefaultCommonStack...)
 	app.api.Use(&rest.CorsMiddleware{
 		RejectNonCorsRequests: false,

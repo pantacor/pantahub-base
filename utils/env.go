@@ -1,5 +1,5 @@
 //
-// Copyright 2017  Pantacor Ltd.
+// Copyright 2017,2018  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -66,6 +66,22 @@ const (
 	// Set elasticsearch bearer auth token
 	// default: ""
 	ENV_ELASTIC_BEARER = "ELASTIC_BEARER"
+
+	// Set Fluent port to send logs to
+	// default: "24224"
+	ENV_FLUENT_PORT = "FLUENT_PORT"
+
+	// Set Fluent host to send logs to
+	// default: "127.0.0.1"
+	ENV_FLUENT_HOST = "FLUENT_HOST"
+
+	// Set K8S NAMESPACE info
+	// default: "NA"
+	ENV_K8S_NAMESPACE = "K8S_NAMESPACE"
+
+	// Set HOSTNAME info
+	// default: "localhost"
+	ENV_HOSTNAME = "HOSTNAME"
 
 	// Authentication endpoint to point clients to that need access tokens
 	// or need more privileged access tokens.
@@ -177,6 +193,12 @@ var defaultEnvs = map[string]string{
 	ENV_PANTAHUB_PORT_INT:     "12365",
 	ENV_PANTAHUB_PORT_INT_TLS: "12366",
 
+	// K8S info
+	ENV_K8S_NAMESPACE: "NA",
+
+	// HOSTNAME
+	ENV_HOSTNAME: "localhost",
+
 	// mailgun support for mail
 	ENV_MAILGUN_APIKEY:    "",
 	ENV_MAILGUN_DOMAIN:    "",
@@ -194,6 +216,10 @@ var defaultEnvs = map[string]string{
 	ENV_ELASTIC_USERNAME: "",
 	ENV_ELASTIC_PASSWORD: "",
 	ENV_ELASTIC_BEARER:   "",
+
+	// fluent vars
+	ENV_FLUENT_PORT: "24224",
+	ENV_FLUENT_HOST: "127.0.0.1",
 
 	// secrets - required!!
 	ENV_PANTAHUB_SA_ADMIN_SECRET: "",

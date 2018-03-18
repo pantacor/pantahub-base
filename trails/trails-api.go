@@ -1,5 +1,5 @@
 //
-// Copyright 2017  Pantacor Ltd.
+// Copyright 2016-2018  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -1631,6 +1631,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *TrailsApp {
 	// we dont use default stack because we dont want content type enforcement
 	app.Api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
 		"/trails:", log.Lshortfile)})
+	app.Api.Use(&utils.AccessLogFluentMiddleware{Prefix: "trails"})
+
 	app.Api.Use(rest.DefaultCommonStack...)
 	app.Api.Use(&rest.CorsMiddleware{
 		RejectNonCorsRequests: false,

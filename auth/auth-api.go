@@ -1,5 +1,5 @@
 //
-// Copyright 2016,2017  Pantacor Ltd.
+// Copyright 2016-2018  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -435,6 +435,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 	app.Api = rest.NewApi()
 	app.Api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
 		"/auth:", log.Lshortfile)})
+	app.Api.Use(&utils.AccessLogFluentMiddleware{Prefix: "auth"})
 	app.Api.Use(rest.DefaultDevStack...)
 	app.Api.Use(&rest.CorsMiddleware{
 		RejectNonCorsRequests: false,

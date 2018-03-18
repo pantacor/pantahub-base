@@ -363,6 +363,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware,
 	// we dont use default stack because we dont want content type enforcement
 	app.Api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
 		"/dash:", log.Lshortfile)})
+	app.Api.Use(&utils.AccessLogFluentMiddleware{Prefix: "dash"})
+
 	app.Api.Use(rest.DefaultCommonStack...)
 	app.Api.Use(&rest.CorsMiddleware{
 		RejectNonCorsRequests: false,

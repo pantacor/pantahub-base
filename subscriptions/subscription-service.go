@@ -1,3 +1,4 @@
+//
 // Package subscriptions offers simple subscription REST API to issue subscriptions
 // for services. In this file we define the SubscriptionService interface and mongo
 // backed implementation.
