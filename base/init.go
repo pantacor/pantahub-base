@@ -123,13 +123,13 @@ func (f FileUploadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	uniqueID := bson.NewObjectId().Hex()
 
-	file, err := f.OpenForWrite(objClaims.DispositionName + "." + uniqueID)
+	file, err := f.OpenForWrite(storageId + "." + uniqueID)
 	if err != nil {
 		log.Println("ERROR: opening file for write: " + err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	finalName, err := f.MakePathForName(objClaims.DispositionName)
+	finalName, err := f.MakePathForName(storageId)
 	if err != nil {
 		log.Println("ERROR: creating filepath for write: " + err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
@@ -161,7 +161,7 @@ func (f FileUploadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	shaS = hex.EncodeToString(sha)
 
 	if shaS != objClaims.Sha {
-		log.Println("WARNING: file upload sha mismatch with claim")
+		log.Println("WARNING: file upload sha mismatch with claim: " + shaS + " != " + objClaims.Sha)
 		w.WriteHeader(http.StatusBadRequest)
 		goto fail
 	}
