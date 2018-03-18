@@ -100,7 +100,8 @@ func handle_auth(w rest.ResponseWriter, r *rest.Request) {
 }
 
 func MakeStorageId(owner string, sha []byte) string {
-	res := sha256.Sum256(append([]byte(owner+"/"), sha...))
+	shaStr := hex.EncodeToString(sha)
+	res := sha256.Sum256(append([]byte(owner + "/" + shaStr)))
 	newSha := res[:]
 	hexRes := make([]byte, hex.EncodedLen(len(newSha)))
 	hex.Encode(hexRes, newSha)
