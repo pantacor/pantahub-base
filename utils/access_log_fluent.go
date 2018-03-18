@@ -45,10 +45,15 @@ func (mw *AccessLogFluentMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.Han
 
 		host = GetEnv(ENV_FLUENT_HOST)
 
-		mw.Logger, err = fluent.New(fluent.Config{FluentPort: port, FluentHost: host})
-		if err != nil {
-			log.Fatalln("FATAL: cannot instantiate fluent logger: " + err.Error())
-			return nil
+		if host != "" {
+			mw.Logger, err = fluent.New(fluent.Config{FluentPort: port, FluentHost: host})
+			if err != nil {
+				log.Fatalln("FATAL: cannot instantiate fluent logger: " + err.Error())
+				return nil
+			}
+			log.Printf("INFO: fluent logging enabled for endpoint %s; %s: %s, %s: %d\n", mw.Prefix, ENV_FLUENT_HOST, host, ENV_FLUENT_PORT, port)
+		} else {
+			log.Printf("WARNING: fluent logging disabled for endpoint %s; set %s to enable it.\n", mw.Prefix, ENV_FLUENT_HOST)
 		}
 	}
 
@@ -73,6 +78,11 @@ func (mw *AccessLogFluentMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.Han
 	return func(w rest.ResponseWriter, r *rest.Request) {
 		// call the handler
 		h(w, r)
+
+		// if fluent logging is disabled in config, just do nothing...
+		if mw.Logger == nil {
+			return
+		}
 
 		logRec := mw.makeAccessLogFluentRecord(r)
 		logRec.ResponseSize = w.Count()
