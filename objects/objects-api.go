@@ -90,13 +90,29 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 
 	r.DecodeJsonPayload(&newObject)
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	var ownerStr string
+
+	caller, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in as a USER", http.StatusForbidden)
+		rest.Error(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
-	ownerStr, ok := owner.(string)
+	callerStr, ok := caller.(string)
+
+	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	if authType.(string) == "USER" {
+		ownerStr = callerStr
+	} else {
+		owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["owner"]
+		if !ok {
+			// XXX: find right error
+			rest.Error(w, "You need to be logged in as a USER or DEVICE", http.StatusForbidden)
+			return
+		}
+		ownerStr = owner.(string)
+	}
+
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "Invalid Access Token", http.StatusForbidden)
