@@ -18,7 +18,6 @@ package base
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -26,7 +25,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"gopkg.in/mgo.v2/bson"
@@ -53,21 +51,8 @@ func falseAuthenticator(userId string, password string) bool {
 	return false
 }
 
-func (d FileUploadServer) MakePathForName(name string) (string, error) {
-	if filepath.Separator != '/' && strings.ContainsRune(name, filepath.Separator) ||
-		strings.Contains(name, "\x00") {
-		return "", errors.New("http: invalid character in file path")
-	}
-	dir := d.directory
-	if dir == "" {
-		dir = "."
-	}
-
-	return filepath.Join(dir, filepath.FromSlash(path.Clean("/"+name))), nil
-}
-
 func (d FileUploadServer) OpenForWrite(name string) (*os.File, error) {
-	fpath, err := d.MakePathForName(name)
+	fpath, err := utils.MakeLocalS3PathForName(name)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +114,7 @@ func (f FileUploadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	finalName, err := f.MakePathForName(storageId)
+	finalName, err := utils.MakeLocalS3PathForName(storageId)
 	if err != nil {
 		log.Println("ERROR: creating filepath for write: " + err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
@@ -181,6 +166,12 @@ fail:
 	if err != nil {
 		log.Println("ERROR: created file cannot be deleted: " + err.Error())
 	}
+}
+
+var fserver *FileUploadServer
+
+func GetFileUploadServer() *FileUploadServer {
+	return fserver
 }
 
 func DoInit() {
@@ -265,10 +256,7 @@ func DoInit() {
 		http.Handle("/subscriptions/", http.StripPrefix("/subscriptions", app.MakeHandler()))
 	}
 
-	if !objects.PantahubS3Production() {
-		log.Println("S3 Development Path: " + objects.PantahubS3Path())
-		fserver := FileUploadServer{fileServer: http.FileServer(http.Dir(objects.PantahubS3Path())), directory: objects.PantahubS3Path()}
-		http.Handle("/local-s3/", http.StripPrefix("/local-s3", &fserver))
-	}
-
+	log.Println("S3 Path: " + objects.PantahubS3Path())
+	fserver = &FileUploadServer{fileServer: http.FileServer(http.Dir(objects.PantahubS3Path())), directory: objects.PantahubS3Path()}
+	http.Handle("/local-s3/", http.StripPrefix("/local-s3", fserver))
 }

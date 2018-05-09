@@ -31,9 +31,6 @@ import (
 	jwt "github.com/StephanDollberg/go-json-rest-middleware-jwt"
 	"github.com/alecthomas/units"
 	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -50,28 +47,11 @@ type ObjectsApp struct {
 }
 
 var pantahubS3Path string
-var pantahubS3Production bool
 var pantahubHttpsUrl string
 
 func init() {
 	pantahubS3Path = utils.GetEnv(utils.ENV_PANTAHUB_S3PATH)
-
-	if pantahubS3Path == "production" {
-		pantahubS3Production = true
-	} else {
-		pantahubS3Production = false
-	}
-
-	if pantahubS3Path == "" {
-		pantahubS3Path = "../local-s3/"
-	}
-
 	pantahubHost := utils.GetEnv(utils.ENV_PANTAHUB_HOST)
-
-	if pantahubHost == "" {
-		pantahubHost = "localhost"
-	}
-
 	pantahubPort := utils.GetEnv(utils.ENV_PANTAHUB_PORT)
 	pantahubScheme := utils.GetEnv(utils.ENV_PANTAHUB_SCHEME)
 
@@ -80,10 +60,6 @@ func init() {
 	if pantahubPort != "" {
 		pantahubHttpsUrl += ":" + pantahubPort
 	}
-}
-
-func PantahubS3Production() bool {
-	return pantahubS3Production
 }
 
 func PantahubS3Path() string {
@@ -184,10 +160,32 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 	err = collection.Insert(newObject)
 
 	if err != nil {
-		w.WriteHeader(http.StatusConflict)
-		w.Header().Add("X-PH-Error", "Error inserting object into database "+err.Error())
+		filePath, err := utils.MakeLocalS3PathForName(storageId)
+
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Header().Add("X-PH-Error", "Error Finding Path for Name"+err.Error())
+			return
+		}
+
+		_, err = os.Stat(filePath)
+
+		if err == nil {
+			w.WriteHeader(http.StatusConflict)
+			w.Header().Add("X-PH-Error", "Cannot insert existing object into database")
+			goto conflict
+		}
+
+		err = collection.UpdateId(newObject.StorageId, newObject)
+
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Header().Add("X-PH-Error", "Error updating previously failed object in database "+err.Error())
+			return
+		}
 		// we return anyway with the already available info about this object
 	}
+conflict:
 
 	issuerUrl := utils.GetApiEndpoint("/objects")
 	newObjectWithAccess := MakeObjAccessible(issuerUrl, ownerStr, newObject, storageId)
@@ -324,60 +322,35 @@ func MakeObjAccessible(Issuer string, Subject string, obj Object, storageId stri
 	filesObjWithAccess := ObjectWithAccess{}
 	filesObjWithAccess.Object = obj
 
-	if PantahubS3Production() {
-		svc := s3.New(session.New(&aws.Config{Region: aws.String("us-east-1")}))
+	timeNow := time.Now()
+	filesObjWithAccess.Now = strconv.FormatInt(timeNow.Unix(), 10)
+	filesObjWithAccess.ExpireTime = strconv.FormatInt(15, 10)
 
-		// GET URL
-		req, _ := svc.GetObjectRequest(&s3.GetObjectInput{
-			Bucket: aws.String("systemcloud-001"),
-			Key:    aws.String(storageId),
-		})
-		urlStr, _ := req.Presign(15 * time.Minute)
-		filesObjWithAccess.SignedGetUrl = urlStr
+	size, err := strconv.ParseInt(obj.Size, 10, 64)
+	if err != nil {
+		log.Println("INTERNAL ERROR (size parsing) local-s3: " + err.Error())
+		filesObjWithAccess.SignedGetUrl = PantahubS3DevUrl() + "/local-s3/INTERNAL-ERROR"
+		filesObjWithAccess.SignedPutUrl = PantahubS3DevUrl() + "/local-s3/INTERNAL-ERROR"
+		return filesObjWithAccess
+	}
 
-		if Subject == obj.Owner {
-			// PUT URL
-			req, _ = svc.PutObjectRequest(&s3.PutObjectInput{
-				Bucket: aws.String("systemcloud-001"),
-				Key:    aws.String(storageId),
-			})
-			urlStr, _ = req.Presign(15 * time.Minute)
-			filesObjWithAccess.SignedPutUrl = urlStr
-		}
-
-		filesObjWithAccess.Now = strconv.FormatInt(req.Time.Unix(), 10)
-		filesObjWithAccess.ExpireTime = strconv.FormatInt(int64(req.ExpireTime.Seconds()), 10)
+	objAccessTokGet := NewObjectAccessForSec(obj.ObjectName, http.MethodGet, size, filesObjWithAccess.Sha, Issuer, Subject, storageId, OBJECT_TOKEN_VALID_SEC)
+	tokGet, err := objAccessTokGet.Sign()
+	if err != nil {
+		log.Println("INTERNAL ERROR local-s3: " + err.Error())
+		filesObjWithAccess.SignedGetUrl = PantahubS3DevUrl() + "/local-s3/INTERNAL-ERROR"
 	} else {
-		timeNow := time.Now()
-		filesObjWithAccess.Now = strconv.FormatInt(timeNow.Unix(), 10)
-		filesObjWithAccess.ExpireTime = strconv.FormatInt(15, 10)
+		filesObjWithAccess.SignedGetUrl = PantahubS3DevUrl() + "/local-s3/" + tokGet
+	}
 
-		size, err := strconv.ParseInt(obj.Size, 10, 64)
-		if err != nil {
-			log.Println("INTERNAL ERROR (size parsing) local-s3: " + err.Error())
-			filesObjWithAccess.SignedGetUrl = PantahubS3DevUrl() + "/local-s3/INTERNAL-ERROR"
-			filesObjWithAccess.SignedPutUrl = PantahubS3DevUrl() + "/local-s3/INTERNAL-ERROR"
-			return filesObjWithAccess
-		}
-
-		objAccessTokGet := NewObjectAccessForSec(obj.ObjectName, http.MethodGet, size, filesObjWithAccess.Sha, Issuer, Subject, storageId, OBJECT_TOKEN_VALID_SEC)
-		tokGet, err := objAccessTokGet.Sign()
+	if Subject == obj.Owner {
+		objAccessTokPut := NewObjectAccessForSec(obj.ObjectName, http.MethodPut, size, filesObjWithAccess.Sha, Issuer, Subject, storageId, OBJECT_TOKEN_VALID_SEC)
+		tokPut, err := objAccessTokPut.Sign()
 		if err != nil {
 			log.Println("INTERNAL ERROR local-s3: " + err.Error())
-			filesObjWithAccess.SignedGetUrl = PantahubS3DevUrl() + "/local-s3/INTERNAL-ERROR"
+			filesObjWithAccess.SignedPutUrl = PantahubS3DevUrl() + "/local-s3/INTERNAL-ERROR"
 		} else {
-			filesObjWithAccess.SignedGetUrl = PantahubS3DevUrl() + "/local-s3/" + tokGet
-		}
-
-		if Subject == obj.Owner {
-			objAccessTokPut := NewObjectAccessForSec(obj.ObjectName, http.MethodPut, size, filesObjWithAccess.Sha, Issuer, Subject, storageId, OBJECT_TOKEN_VALID_SEC)
-			tokPut, err := objAccessTokPut.Sign()
-			if err != nil {
-				log.Println("INTERNAL ERROR local-s3: " + err.Error())
-				filesObjWithAccess.SignedPutUrl = PantahubS3DevUrl() + "/local-s3/INTERNAL-ERROR"
-			} else {
-				filesObjWithAccess.SignedPutUrl = PantahubS3DevUrl() + "/local-s3/" + tokPut
-			}
+			filesObjWithAccess.SignedPutUrl = PantahubS3DevUrl() + "/local-s3/" + tokPut
 		}
 	}
 	return filesObjWithAccess
