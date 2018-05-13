@@ -3,8 +3,11 @@ Pantahub Base APIs reference implementation.
 
 # Prepare
 
- * get a reasonable fresh golang engine and install it
+ * get a reasonable fresh golang engine (1.9++) and install it
  * Install a mongodb database locally or get credentials for hosted instance
+ * Install elasticsearch 6.x.x and start it using default settings
+ * Install fluentd or td-agent (on windows) and start it using with the config
+   include in pantahub-base source: fluentd.localhost.conf
  * Decide where you want to store the objects. By default we store objects in
    $CWD/../local-s3/ folder; you can use environment variables (see below)
    to adjust this
