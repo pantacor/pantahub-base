@@ -1,5 +1,5 @@
 //
-// Copyright 2017  Pantacor Ltd.
+// Copyright 2017, 2018  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -159,7 +159,8 @@ func (s *elasticLogger) unregister(deleteIndex bool) error {
 	return nil
 }
 
-func (s *elasticLogger) getLogs(start int64, page int64, query LogsFilter, sort LogsSort) (*LogsPager, error) {
+func (s *elasticLogger) getLogs(start int64, page int64, after *time.Time,
+	query LogsFilter, sort LogsSort) (*LogsPager, error) {
 	queryFmt := fmt.Sprintf(s.elasticIndexPrefix + "-*/pv/_search")
 
 	queryURL, err := url.Parse(queryFmt)
@@ -179,11 +180,15 @@ func (s *elasticLogger) getLogs(start int64, page int64, query LogsFilter, sort 
 		q = q.Must(elastic.NewTermQuery("dev", query.Device))
 	}
 
+	if after != nil {
+		q = q.Must(elastic.NewRangeQuery("time-created").Gt(after))
+	}
+
 	// build search
 	searchS := elastic.NewSearchSource().
+		Query(q).
 		From(int(start)).
-		Size(int(page)).
-		Query(q)
+		Size(int(page))
 
 		// lets do the sort part
 	for _, v := range sort {
@@ -199,6 +204,7 @@ func (s *elasticLogger) getLogs(start int64, page int64, query LogsFilter, sort 
 		}
 		searchS = searchS.Sort(v, asc)
 	}
+	searchS = searchS.Sort("_id", false)
 
 	searchBody, err := searchS.Source()
 	if err != nil {

@@ -1,9 +1,25 @@
+//
+// Copyright 2017, 2018  Pantacor Ltd.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+//
 package logs
 
 import (
 	"errors"
 	"log"
 	"strings"
+	"time"
 
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gopkg.in/mgo.v2"
@@ -113,7 +129,8 @@ func (s *mgoLogger) unregister(delete bool) error {
 	return nil
 }
 
-func (s *mgoLogger) getLogs(start int64, page int64, query LogsFilter, sort LogsSort) (*LogsPager, error) {
+func (s *mgoLogger) getLogs(start int64, page int64, after *time.Time,
+	query LogsFilter, sort LogsSort) (*LogsPager, error) {
 	var result LogsPager
 	var err error
 
@@ -137,6 +154,12 @@ func (s *mgoLogger) getLogs(start int64, page int64, query LogsFilter, sort Logs
 	}
 	if query.LogSource != "" {
 		findFilter["src"] = query.LogSource
+	}
+
+	if after != nil {
+		findFilter["time-created"] = bson.M{
+			"$gt": after,
+		}
 	}
 
 	// default sort by reverse time

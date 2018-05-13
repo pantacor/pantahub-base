@@ -77,7 +77,7 @@ type LogsPager struct {
 }
 
 type LogsBackend interface {
-	getLogs(start int64, page int64, query LogsFilter, sort LogsSort) (*LogsPager, error)
+	getLogs(start int64, page int64, after *time.Time, query LogsFilter, sort LogsSort) (*LogsPager, error)
 	postLogs(e []LogsEntry) error
 	register() error
 	unregister(deleteIndices bool) error
@@ -183,7 +183,19 @@ func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 		}
 	}
 
-	result, err = a.backend.getLogs(startParamInt, pageParamInt, filter, logsSort)
+	afterParam := r.FormValue("after")
+	var after *time.Time
+
+	if afterParam != "" {
+		t, err := time.Parse(time.RFC3339, afterParam)
+		if err != nil {
+			rest.Error(w, "ERROR: parsing 'after' date "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		after = &t
+	}
+
+	result, err = a.backend.getLogs(startParamInt, pageParamInt, after, filter, logsSort)
 
 	if err != nil {
 		rest.Error(w, "ERROR: getting logs failed "+err.Error(), http.StatusInternalServerError)

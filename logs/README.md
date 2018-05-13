@@ -87,9 +87,16 @@ As user you can navigate through your logs using the GET endpoint.
 Various parameters are available to restrict and sort your search.
 
 Paging:
-You can page using the start= and page= parameters. Start can either be
-a number or a time in format "tsec[.tnano]". Note that for time startline
-paging is not supported at the moment.
+You can page using the start= and page= parameters. Start has to be a number
+a number used as offset for paging.
+
+Streaming:
+You can implement poll streaming by using the "after" parameter which takes
+an RFC3399 formatted date/time as input and ensures that results will be
+considered only for new entries that were added to db after that date.
+Typically you would query for logs and then use the date of last item
+retrieved as after= parameter until you retrieve a new item.
+
 
 Example: Get log
 
@@ -139,8 +146,42 @@ X-Powered-By: go-json-rest
 
 ```
 
+Example (with after):
+
+```
+http GET "localhost:12365/logs/?after=2017-06-02T00:25:01.885%2B02:00 "Authorization:" Bearer $TOKEN"
+
+HTTP/1.1 200 OK
+Content-Length: 1999
+Content-Type: application/json; charset=utf-8
+Date: Sat, 03 Jun 2017 23:44:46 GMT
+X-Powered-By: go-json-rest
+
+{
+    "count": 1,
+    "entries": [
+        {
+            "dev": "prn:pantahub.com:auth:/device1",
+            "id": "59309891632d7256597b03d2",
+            "lvl": "INFO",
+            "msg": "MyMessage 4 single",
+            "own": "prn:pantahub.com:auth:/user1",
+            "src": "pantavisor.log",
+            "time-created": "2017-06-02T00:43:29.136+02:00",
+            "tnano": 121312212,
+            "tsec": 123213
+        }
+
+    ],
+    "page": 50,
+    "start": 0
+}
+
+```
+
+
 Sorting:
-You can sort	the logs by time-created.
+You can sort the logs by time-created.
 
 ```
 http GET 'localhost:12365/logs/?src=pantavisor.log&sort=-time-created' \
