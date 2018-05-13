@@ -212,7 +212,7 @@ var defaultEnvs = map[string]string{
 	ENV_MONGO_RS:   "", // replicaSet; needed if connecting to multiple hosts
 
 	// elastic search access
-	ENV_ELASTIC_URL:      "",
+	ENV_ELASTIC_URL:      "http://localhost:9200",
 	ENV_ELASTIC_USERNAME: "",
 	ENV_ELASTIC_PASSWORD: "",
 	ENV_ELASTIC_BEARER:   "",
