@@ -26,9 +26,10 @@ import (
 	"log"
 	"os"
 	"testing"
+	"time"
 )
 
-var elasticTestLogger *elasticLogger
+var timeBase = time.Date(2018, 01, 01, 01, 00, 00, 00, time.UTC)
 
 func subRunSetupTeardown(name string, t *testing.T, f func(t *testing.T)) {
 	setupMongo(t)
@@ -48,7 +49,8 @@ func genLogs(proto LogsEntry, count int) []LogsEntry {
 
 	for i := 0; i < count; i++ {
 		instance := proto
-		instance.LogTSec = 100 + int64(i)
+		instance.LogTSec = int64(100) + int64(i)
+		instance.TimeCreated = instance.TimeCreated.Add(time.Hour * time.Duration(i))
 		logs = append(logs, instance)
 	}
 	return logs

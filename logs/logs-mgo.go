@@ -170,6 +170,13 @@ func (s *mgoLogger) getLogs(start int64, page int64, after *time.Time,
 
 	q := collLogs.Find(findFilter).Sort(sortStr)
 
+	if start > 0 {
+		q = q.Skip(int(start))
+	}
+	if page > 0 {
+		q = q.Limit(int(page))
+	}
+
 	count, err := q.Count()
 	result.Count = int64(count)
 	result.Start = start

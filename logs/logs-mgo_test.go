@@ -20,7 +20,6 @@ import (
 	"log"
 	"os"
 	"testing"
-	"time"
 
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
@@ -50,29 +49,6 @@ func setupMongo(t *testing.T) error {
 	return nil
 }
 
-func setupElastic(t *testing.T) error {
-
-	var err error
-
-	elasticTestLogger, err = newElasticLogger()
-
-	if err != nil {
-		log.Println("error initiating elasticTestLogger " + err.Error())
-		return err
-	}
-
-	elasticTestLogger.syncWrites = true
-
-	err = elasticTestLogger.register()
-	if err != nil {
-		log.Println("error registering elasticTestLogger " + err.Error())
-
-		return err
-	}
-
-	return nil
-}
-
 func teardownMongo(t *testing.T) error {
 	var err error
 
@@ -86,25 +62,12 @@ func teardownMongo(t *testing.T) error {
 	return nil
 }
 
-func teardownElastic(t *testing.T) error {
-	var err error
-
-	err = elasticTestLogger.unregister(true)
-	if err != nil {
-		log.Println("WARN: error unregistering elasticTestLogger " + err.Error())
-	}
-
-	elasticTestLogger = nil
-
-	return nil
-}
-
 func doLog() error {
 
 	logs := genLogs(LogsEntry{
 		Device:      "testdevice",
 		Owner:       "testowner",
-		TimeCreated: time.Now(),
+		TimeCreated: timeBase,
 		LogTSec:     0,
 		LogTNano:    0,
 		LogSource:   "testsource",
@@ -124,7 +87,7 @@ func testMongoDoLog(t *testing.T) {
 	}
 }
 
-func testMongoGetLog(t *testing.T) {
+func testMongoGetLogs(t *testing.T) {
 
 	err := doLog()
 	if err != nil {
@@ -134,7 +97,7 @@ func testMongoGetLog(t *testing.T) {
 
 	filter := &LogsEntry{}
 	sort := LogsSort{}
-	pager, err := mgoTestLogger.getLogs(0, -1, filter, sort)
+	pager, err := mgoTestLogger.getLogs(0, -1, nil, filter, sort)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
@@ -147,7 +110,102 @@ func testMongoGetLog(t *testing.T) {
 	}
 }
 
+func testMongoDoGetLogs(t *testing.T) {
+	logs := genLogs(LogsEntry{
+		Device:      "testdevice",
+		Owner:       "testowner",
+		TimeCreated: timeBase,
+		LogTSec:     100,
+		LogTNano:    0,
+		LogSource:   "testsource",
+		LogLevel:    "TESTLEVEL",
+		LogText:     "Test Log Text",
+	}, 3)
+
+	err := mgoTestLogger.postLogs(logs)
+
+	if err != nil {
+		t.Errorf("do Log fails: %s", err.Error())
+		t.Fail()
+	}
+
+	filter := &LogsEntry{}
+	sort := LogsSort{}
+	pager, err := mgoTestLogger.getLogs(0, 3, nil, filter, sort)
+
+	if err != nil {
+		t.Errorf("do Log fails: %s", err.Error())
+		t.Fail()
+	} else if pager.Count != 3 {
+		t.Errorf("pager.Count should be 3, not %d", pager.Count)
+		t.Fail()
+	}
+
+	pager, err = mgoTestLogger.getLogs(1, 3, nil, filter, sort)
+
+	if err != nil {
+		t.Errorf("do Log fails: %s", err.Error())
+		t.Fail()
+	} else if pager.Count != 2 {
+		t.Errorf("pager.Count should be 2, not %d", pager.Count)
+		t.Fail()
+	}
+
+	pager, err = mgoTestLogger.getLogs(1, 1, nil, filter, sort)
+
+	if err != nil {
+		t.Errorf("do Log fails: %s", err.Error())
+		t.Fail()
+	} else if pager.Count != 1 {
+		t.Errorf("pager.Count should be 1, not %d", pager.Count)
+		t.Fail()
+	}
+}
+
+func testMongoDoGetLogsAfter(t *testing.T) {
+	logs := genLogs(LogsEntry{
+		Device:      "testdevice",
+		Owner:       "testowner",
+		TimeCreated: timeBase,
+		LogTSec:     100,
+		LogTNano:    0,
+		LogSource:   "testsource",
+		LogLevel:    "TESTLEVEL",
+		LogText:     "Test Log Text",
+	}, 3)
+
+	err := mgoTestLogger.postLogs(logs)
+
+	if err != nil {
+		t.Errorf("do Log fails: %s", err.Error())
+		t.Fail()
+	}
+
+	filter := &LogsEntry{}
+	sort := LogsSort{}
+	pager, err := mgoTestLogger.getLogs(0, 3, &timeBase, filter, sort)
+
+	if err != nil {
+		t.Errorf("do Log fails: %s", err.Error())
+		t.Fail()
+	} else if pager.Count != 2 {
+		t.Errorf("pager.Count should be 2, not %d", pager.Count)
+		t.Fail()
+	}
+
+	pager, err = mgoTestLogger.getLogs(1, 3, &timeBase, filter, sort)
+
+	if err != nil {
+		t.Errorf("do Log fails: %s", err.Error())
+		t.Fail()
+	} else if pager.Count != 1 {
+		t.Errorf("pager.Count should be 1, not %d", pager.Count)
+		t.Fail()
+	}
+}
+
 func TestMgo(t *testing.T) {
 	subRunSetupTeardown("A=1", t, testMongoDoLog)
-	subRunSetupTeardown("A=2", t, testMongoGetLog)
+	subRunSetupTeardown("A=2", t, testMongoGetLogs)
+	subRunSetupTeardown("A=3", t, testMongoDoGetLogs)
 }
