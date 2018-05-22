@@ -18,6 +18,7 @@ package auth
 import (
 	"strings"
 
+	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/utils"
 
@@ -32,133 +33,40 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-var accounts = map[string]Account{
-	"prn:pantahub.com:auth:/admin": Account{
-		Type:         ACCOUNT_TYPE_ADMIN,
-		Prn:          "prn:pantahub.com:auth:/admin",
-		Nick:         "admin",
-		Email:        "no-reply@accounts.pantahub.com",
-		TimeCreated:  time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
-		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
-		Password:     "admin",
-	},
-	"prn:pantahub.com:auth:/user1": Account{
-		Type:         ACCOUNT_TYPE_USER,
-		Prn:          "prn:pantahub.com:auth:/user1",
-		Nick:         "user1",
-		Email:        "no-reply@accounts.pantahub.com",
-		TimeCreated:  time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
-		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
-		Password:     "user1",
-	},
-	"prn:pantahub.com:auth:/user2": Account{
-		Type:         ACCOUNT_TYPE_USER,
-		Prn:          "prn:pantahub.com:auth:/user2",
-		Nick:         "user2",
-		Email:        "no-reply@accounts.pantahub.com",
-		TimeCreated:  time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
-		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
-		Password:     "user2",
-	},
-	"prn:pantahub.com:auth:/user3": Account{
-		Type:         ACCOUNT_TYPE_USER,
-		Prn:          "prn:pantahub.com:auth:/user3",
-		Nick:         "user3",
-		Email:        "no-reply@accounts.pantahub.com",
-		TimeCreated:  time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
-		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
-		Password:     "user3",
-	},
-	"prn:pantahub.com:auth:/examples": Account{
-		Type:         ACCOUNT_TYPE_USER,
-		Prn:          "prn:pantahub.com:auth:/user3",
-		Nick:         "examples",
-		Email:        "no-reply@accounts.pantahub.com",
-		TimeCreated:  time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
-		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
-		Password:     "examples",
-	},
-	"prn:pantahub.com:auth:/device1": Account{
-		Type:         ACCOUNT_TYPE_DEVICE,
-		Prn:          "prn:pantahub.com:auth:/device1",
-		Nick:         "device1",
-		Email:        "no-reply@accounts.pantahub.com",
-		TimeCreated:  time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
-		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
-		Password:     "device1",
-	},
-	"prn:pantahub.com:auth:/device2": Account{
-		Type:         ACCOUNT_TYPE_DEVICE,
-		Prn:          "prn:pantahub.com:auth:/device2",
-		Nick:         "device2",
-		Email:        "no-reply@accounts.pantahub.com",
-		TimeCreated:  time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
-		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
-		Password:     "device2",
-	},
-	"prn:pantahub.com:auth:/service1": Account{
-		Type:         ACCOUNT_TYPE_SERVICE,
-		Prn:          "prn:pantahub.com:auth:/service1",
-		Nick:         "service1",
-		Email:        "no-reply@accounts.pantahub.com",
-		TimeCreated:  time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
-		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
-		Password:     "service1",
-	},
-	"prn:pantahub.com:auth:/service2": Account{
-		Type:         ACCOUNT_TYPE_SERVICE,
-		Prn:          "prn:pantahub.com:auth:/service2",
-		Nick:         "service2",
-		Email:        "no-reply@accounts.pantahub.com",
-		TimeCreated:  time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
-		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
-		Password:     "service2",
-	},
-	"prn:pantahub.com:auth:/service3": Account{
-		Type:         ACCOUNT_TYPE_SERVICE,
-		Prn:          "prn:pantahub.com:auth:/service3",
-		Nick:         "service3",
-		Email:        "no-reply@accounts.pantahub.com",
-		TimeCreated:  time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
-		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
-		Password:     "service3",
-	},
-}
-
 func init() {
 	// if in production we disable all fixed accounts
 	if os.Getenv("PANTAHUB_PRODUCTION") == "" {
 		return
 	}
 
-	for k, v := range accounts {
+	for k, v := range accounts.DefaultAccounts {
 		passwordOverwrite := os.Getenv("PANTAHUB_DEMOACCOUNTS_PASSWORD_" + v.Nick)
 		if passwordOverwrite == "" {
-			delete(accounts, k)
+			delete(accounts.DefaultAccounts, k)
 		} else {
 			v.Password = passwordOverwrite
-			accounts[k] = v
+			accounts.DefaultAccounts[k] = v
 		}
 	}
 }
 
-func AccountToPayload(account Account) map[string]interface{} {
+func AccountToPayload(account accounts.Account) map[string]interface{} {
 	result := map[string]interface{}{}
 
 	switch account.Type {
-	case ACCOUNT_TYPE_ADMIN:
+	case accounts.ACCOUNT_TYPE_ADMIN:
 		result["roles"] = "admin"
 		result["type"] = "USER"
 		break
-	case ACCOUNT_TYPE_USER:
+	case accounts.ACCOUNT_TYPE_USER:
 		result["roles"] = "admin"
 		result["type"] = "USER"
 		break
-	case ACCOUNT_TYPE_DEVICE:
+	case accounts.ACCOUNT_TYPE_DEVICE:
 		result["roles"] = "device"
 		result["type"] = "DEVICE"
 		break
-	case ACCOUNT_TYPE_SERVICE:
+	case accounts.ACCOUNT_TYPE_SERVICE:
 		result["roles"] = "service"
 		result["type"] = "SERVICE"
 		break
@@ -183,28 +91,13 @@ const (
 	ACCOUNT_TYPE_USER    = AccountType("USER")
 )
 
-type Account struct {
-	Id bson.ObjectId `json:"-" bson:"_id"`
-
-	Type  AccountType `json:"type" bson:"type"`
-	Email string      `json:"email" bson:"email"`
-	Nick  string      `json:"nick" bson:"nick"`
-	Prn   string      `json:"prn" bson:"prn"`
-
-	Password  string `json:"password,omitempty" bson:"password"`
-	Challenge string `json:"challenge,omitempty" bson:"challenge"`
-
-	TimeCreated  time.Time `json:"time-created" bson:"time-created"`
-	TimeModified time.Time `json:"time-modified" bson:"time-modified"`
-}
-
 func handle_auth(w rest.ResponseWriter, r *rest.Request) {
 	jwtClaims := r.Env["JWT_PAYLOAD"]
 	w.WriteJson(jwtClaims)
 }
 
 func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
-	newAccount := Account{}
+	newAccount := accounts.Account{}
 
 	r.DecodeJsonPayload(&newAccount)
 
@@ -232,7 +125,7 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 	newAccount.Prn = "prn:::accounts:/" + newAccount.Id.Hex()
 	newAccount.Challenge = utils.GenerateChallenge()
 	newAccount.TimeCreated = time.Now()
-	newAccount.Type = ACCOUNT_TYPE_USER // XXX: need org approach too
+	newAccount.Type = accounts.ACCOUNT_TYPE_USER // XXX: need org approach too
 	newAccount.TimeModified = newAccount.TimeCreated
 
 	collection := a.mgoSession.DB("").C("pantahub_accounts")
@@ -275,10 +168,10 @@ func (a *AuthApp) handle_getprofile(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	var account Account
+	var account accounts.Account
 	var ok bool
 
-	if account, ok = accounts[accountPrn]; !ok {
+	if account, ok = accounts.DefaultAccounts[accountPrn]; !ok {
 		col := a.mgoSession.DB("").C("pantahub_accounts")
 
 		err := col.Find(bson.M{"prn": accountPrn}).One(&account)
@@ -304,7 +197,7 @@ func (a *AuthApp) handle_getprofile(w rest.ResponseWriter, r *rest.Request) {
 
 func (a *AuthApp) handle_verify(w rest.ResponseWriter, r *rest.Request) {
 
-	newAccount := Account{}
+	newAccount := accounts.Account{}
 
 	collection := a.mgoSession.DB("").C("pantahub_accounts")
 
@@ -407,7 +300,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 
 		testUserId := "prn:pantahub.com:auth:/" + userId
 
-		if plm, ok := accounts[testUserId]; !ok {
+		if plm, ok := accounts.DefaultAccounts[testUserId]; !ok {
 			if strings.HasPrefix(userId, "prn:::devices:") {
 				return app.deviceAuth(userId, password)
 			} else {
@@ -421,7 +314,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 	jwtMiddleware.PayloadFunc = func(userId string) map[string]interface{} {
 
 		testUserId := "prn:pantahub.com:auth:/" + userId
-		if plm, ok := accounts[testUserId]; !ok {
+		if plm, ok := accounts.DefaultAccounts[testUserId]; !ok {
 			if strings.HasPrefix(userId, "prn:::devices:") {
 				return app.devicePayload(userId)
 			} else {
@@ -473,11 +366,11 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 	return app
 }
 
-func (a *AuthApp) getAccount(prnEmailNick string) (Account, error) {
+func (a *AuthApp) getAccount(prnEmailNick string) (accounts.Account, error) {
 
 	var (
 		err     error
-		account Account
+		account accounts.Account
 	)
 
 	c := a.mgoSession.DB("").C("pantahub_accounts")
@@ -501,7 +394,7 @@ func (a *AuthApp) accountAuth(idEmailNick string, secret string) bool {
 
 	var (
 		err     error
-		account Account
+		account accounts.Account
 	)
 
 	account, err = a.getAccount(idEmailNick)
@@ -529,7 +422,7 @@ func (a *AuthApp) userPayload(idEmailNick string) map[string]interface{} {
 
 	var (
 		err     error
-		account Account
+		account accounts.Account
 	)
 
 	account, err = a.getAccount(idEmailNick)
