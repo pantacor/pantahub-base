@@ -170,6 +170,7 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 	newTrail.Owner = owner.(string)
 	newTrail.Device = device.(string)
 	newTrail.LastInSync = time.Time{}
+	newTrail.LastTouched = newTrail.LastInSync
 	newTrail.FactoryState = utils.BsonQuoteMap(&initialState)
 
 	newStep := Step{}
