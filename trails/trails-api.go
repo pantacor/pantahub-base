@@ -295,7 +295,7 @@ func (a *TrailsApp) handle_gettrail(w rest.ResponseWriter, r *rest.Request) {
 	isPublic, err := a.isTrailPublic(getId)
 
 	if err != nil {
-		rest.Error(w, "Error getting publid trail", http.StatusInternalServerError)
+		rest.Error(w, "Error getting public trail", http.StatusInternalServerError)
 		return
 	}
 
