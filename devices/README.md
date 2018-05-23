@@ -327,6 +327,6 @@ X-Powered-By: go-json-rest
 X-Runtime: 0.001955
 
 {
-    "Error": "Device unique constraint conflict"
+    "Error": "Device unique constraint violated"
 }
 ```

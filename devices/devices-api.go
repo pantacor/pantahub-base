@@ -582,7 +582,7 @@ func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) 
 	if patched {
 		_, err = collection.UpsertId(newDevice.Id, newDevice)
 		if mgo.IsDup(err) {
-			rest.Error(w, "Device unique constraint conflict", http.StatusConflict)
+			rest.Error(w, "Device unique constraint violated", http.StatusConflict)
 			return
 		} else if err != nil {
 			rest.Error(w, "Error updating patched device state", http.StatusForbidden)
