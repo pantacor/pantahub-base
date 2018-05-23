@@ -9,7 +9,7 @@ RUN go install -v ./...
 FROM alpine
 
 COPY env.default /opt/ph/bin/
-COPY --from=builder pantahub-base /opt/ph/bin/
+COPY --from=builder /go/bin/pantahub-base /opt/ph/bin/
 COPY pantahub-base-docker-run /opt/ph/bin/
 COPY localhost.cert.pem /opt/ph/bin/
 COPY localhost.key.pem /opt/ph/bin/
