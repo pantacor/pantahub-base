@@ -29,6 +29,7 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
+	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
 
@@ -410,6 +411,116 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(device)
 }
 
+func (a *DevicesApp) handle_getuserdevice(w rest.ResponseWriter, r *rest.Request) {
+
+	var device Device
+	var account accounts.Account
+
+	usernick := r.PathParam("usernick")
+	devicenick := r.PathParam("devicenick")
+
+	authId, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	if !ok {
+		// XXX: find right error
+		rest.Error(w, "You need to be logged in.", http.StatusForbidden)
+		return
+	}
+
+	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+
+	if !ok {
+		// XXX: find right error
+		rest.Error(w, "You need to be logged in with a known authentication type.", http.StatusForbidden)
+		return
+	}
+
+	callerIsUser := false
+	callerIsDevice := false
+
+	if authType == "DEVICE" {
+		callerIsDevice = true
+	} else if authType == "USER" {
+		callerIsUser = true
+	} else {
+		rest.Error(w, "You need to be logged in with either USER or DEVICE account type.", http.StatusForbidden)
+		return
+	}
+
+	// first check if we refer to a default accoutn
+	isDefaultAccount := false
+	for _, v := range accounts.DefaultAccounts {
+		if v.Nick == usernick {
+			account = v
+			isDefaultAccount = true
+			break
+		}
+	}
+
+	// if not a default, lets look for proper accounts in db...
+	if !isDefaultAccount {
+
+		collAccounts := a.mgoSession.DB("").C("pantahub_accounts")
+		if collAccounts == nil {
+			rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+			return
+		}
+
+		err := collAccounts.Find(bson.M{"nick": usernick}).One(&account)
+
+		if err == mgo.ErrNotFound {
+			log.Println("ERROR: error getting account by nick: " + err.Error())
+			rest.Error(w, "Not Found", http.StatusNotFound)
+			return
+		} else if err != nil {
+			log.Println("ERROR: error getting account by nick: " + err.Error())
+			rest.Error(w, "Internal Error", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	collDevices := a.mgoSession.DB("").C("pantahub_devices")
+
+	if collDevices == nil {
+		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+
+	err := collDevices.Find(bson.M{"nick": devicenick, "owner": account.Prn}).One(&device)
+
+	if err == mgo.ErrNotFound {
+		log.Println("ERROR: error getting device by nick: " + err.Error())
+		rest.Error(w, "Not Found", http.StatusNotFound)
+		return
+	} else if err != nil {
+		log.Println("ERROR: error getting device by nick: " + err.Error())
+		rest.Error(w, "Internal Error", http.StatusNotFound)
+		return
+	}
+
+	if !device.IsPublic {
+		// XXX: fixme; needs delegation of authorization for device accessing its resources
+		// could be subscriptions, but also something else
+		if callerIsDevice && device.Prn != authId {
+			rest.Error(w, "No Access", http.StatusForbidden)
+			return
+		}
+
+		if callerIsUser && device.Owner != authId {
+			rest.Error(w, "No Access", http.StatusForbidden)
+			return
+		}
+	} else if !callerIsDevice && !callerIsUser {
+		device.Challenge = ""
+	}
+
+	// we always hide the secret
+	device.Secret = ""
+	device.UserMeta = utils.BsonUnquoteMap(&device.UserMeta)
+	device.DeviceMeta = utils.BsonUnquoteMap(&device.DeviceMeta)
+
+	w.WriteJson(device)
+}
+
 func (a *DevicesApp) handle_putpublic(w rest.ResponseWriter, r *rest.Request) {
 
 	newDevice := Device{}
@@ -654,6 +765,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *DevicesApp {
 		rest.Put("/:id/user-meta", app.handle_putuserdata),
 		rest.Put("/:id/device-meta", app.handle_putdevicedata),
 		rest.Delete("/:id", app.handle_deletedevice),
+		// lookup by nick-path (np)
+		rest.Get("/np/:usernick/:devicenick", app.handle_getuserdevice),
 	)
 	app.Api.SetApp(api_router)
 
