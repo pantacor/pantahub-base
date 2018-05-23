@@ -1,8 +1,9 @@
-FROM golang as builder
+FROM golang:alpine as builder
 
 WORKDIR /go/src/gitlab.com/pantacor/pantahub-base
 COPY . .
 
+RUN apk update; apk add git
 RUN go get -d -v ./...
 RUN go install -v ./...
 
