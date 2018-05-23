@@ -521,6 +521,81 @@ func (a *DevicesApp) handle_getuserdevice(w rest.ResponseWriter, r *rest.Request
 	w.WriteJson(device)
 }
 
+func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) {
+
+	newDevice := Device{}
+
+	patchId := r.PathParam("id")
+
+	authId, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	if !ok {
+		// XXX: find right error
+		rest.Error(w, "You need to be logged in.", http.StatusForbidden)
+		return
+	}
+
+	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+
+	if !ok {
+		// XXX: find right error
+		rest.Error(w, "You need to be logged in with a known authentication type.", http.StatusForbidden)
+		return
+	}
+
+	if authType == "DEVICE" {
+		rest.Error(w, "Devices cannot change their own public state.", http.StatusForbidden)
+		return
+	}
+
+	collection := a.mgoSession.DB("").C("pantahub_devices")
+
+	if collection == nil {
+		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+
+	err := collection.FindId(bson.ObjectIdHex(patchId)).One(&newDevice)
+	if err != nil {
+		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
+		return
+	}
+
+	if newDevice.Owner == "" || newDevice.Owner != authId {
+		rest.Error(w, "Not User Accessible Resource Id", http.StatusForbidden)
+		return
+	}
+
+	patch := Device{}
+	patched := false
+
+	err = r.DecodeJsonPayload(&patch)
+
+	if err != nil {
+		rest.Error(w, "Internal Error (decode patch)", http.StatusInternalServerError)
+		return
+	}
+	if patch.Nick != "" {
+		newDevice.Nick = patch.Nick
+		patched = true
+	}
+
+	if patched {
+		_, err = collection.UpsertId(newDevice.Id, newDevice)
+		if mgo.IsDup(err) {
+			rest.Error(w, "Device unique constraint conflict", http.StatusConflict)
+			return
+		} else if err != nil {
+			rest.Error(w, "Error updating patched device state", http.StatusForbidden)
+			return
+		}
+	}
+
+	newDevice.Challenge = ""
+	newDevice.Secret = ""
+
+	w.WriteJson(newDevice)
+}
+
 func (a *DevicesApp) handle_putpublic(w rest.ResponseWriter, r *rest.Request) {
 
 	newDevice := Device{}
@@ -760,6 +835,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *DevicesApp {
 		rest.Post("/", app.handle_postdevice),
 		rest.Get("/:id", app.handle_getdevice),
 		rest.Put("/:id", app.handle_putdevice),
+		rest.Patch("/:id", app.handle_patchdevice),
 		rest.Put("/:id/public", app.handle_putpublic),
 		rest.Delete("/:id/public", app.handle_deletepublic),
 		rest.Put("/:id/user-meta", app.handle_putuserdata),

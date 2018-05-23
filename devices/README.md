@@ -288,4 +288,45 @@ X-Powered-By: go-json-rest
 ...
 }
 ```
+# Change device nick
 
+To change device nick, use the PATCH method on the device resource, e.g.
+
+```
+http PATCH localhost:12365/devices/$DEVICEID/ nick=mynewnick Authorization:" Bearer $TOKEN"
+
+HTTP/1.1 200 OK
+Content-Length: 273
+Content-Type: application/json; charset=utf-8
+Date: Wed, 23 May 2018 20:43:10 GMT
+X-Powered-By: go-json-rest
+X-Runtime: 0.000977
+
+{
+    "device-meta": {},
+    "id": "5aadaf259c8c9433706048ab",
+    "nick": "mynewnick",
+    "owner": "prn:pantahub.com:auth:/user1",
+    "prn": "prn:::devices:/XXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    "public": false,
+    "time-created": "2018-03-18T01:13:25.11+01:00",
+    "time-modified": "0001-01-01T00:00:00Z",
+    "user-meta": {}
+}
+```
+
+If nick is already taken, clients will get a 409 (Conflict) http status code:
+
+```
+http PATCH http://localhost:12365/devices/$DEVICE_ID Authorization:" Bearer $TOK" nick=already-taken
+HTTP/1.1 409 Conflict
+Content-Length: 45
+Content-Type: application/json; charset=utf-8
+Date: Wed, 23 May 2018 20:40:07 GMT
+X-Powered-By: go-json-rest
+X-Runtime: 0.001955
+
+{
+    "Error": "Device unique constraint conflict"
+}
+```
