@@ -15,6 +15,9 @@ build:
   script:
     - docker pull $CONTAINER_IMAGE:latest || true
     - docker build --cache-from $CONTAINER_IMAGE:latest --tag $CONTAINER_IMAGE:$CI_BUILD_REF --tag $CONTAINER_IMAGE:latest .
+    - test -n "$CI_BUILD_TAG" && docker tag $CONTAINER_IMAGE:$CI_BUILD_REF $CONTAINER_IMAGE:$CI_BUILD_TAG || true
     - docker push $CONTAINER_IMAGE:$CI_BUILD_REF
     - docker push $CONTAINER_IMAGE:latest
+    - test -n "$CI_BUILD_TAG" && docker push $CONTAINER_IMAGE:$CI_BUILD_TAG || true
+
 
