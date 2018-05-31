@@ -50,8 +50,8 @@ type Device struct {
 	Nick         string                 `json:"nick"`
 	Owner        string                 `json:"owner"`
 	Secret       string                 `json:"secret,omitempty"`
-	TimeCreated  time.Time              `json:"time-created"`
-	TimeModified time.Time              `json:"time-modified"`
+	TimeCreated  time.Time              `json:"time-created" bson:"timecreated"`
+	TimeModified time.Time              `json:"time-modified" bson:"timemodified"`
 	Challenge    string                 `json:"challenge,omitempty"`
 	IsPublic     bool                   `json:"public"`
 	UserMeta     map[string]interface{} `json:"user-meta" bson:"user-meta"`
@@ -108,7 +108,7 @@ func (a *DevicesApp) handle_putuserdata(w rest.ResponseWriter, r *rest.Request) 
 	}
 
 	err = collection.Update(bson.M{"_id": bsonId, "owner": owner.(string)},
-		bson.M{"$set": bson.M{"user-meta": data, "time-modified": time.Now()}})
+		bson.M{"$set": bson.M{"user-meta": data, "timemodified": time.Now()}})
 	if err != nil {
 		rest.Error(w, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
 		return
@@ -161,7 +161,7 @@ func (a *DevicesApp) handle_putdevicedata(w rest.ResponseWriter, r *rest.Request
 		return
 	}
 
-	err = collection.Update(bson.M{"_id": bsonId, "prn": owner.(string)}, bson.M{"$set": bson.M{"device-meta": data, "time-modified": time.Now()}})
+	err = collection.Update(bson.M{"_id": bsonId, "prn": owner.(string)}, bson.M{"$set": bson.M{"device-meta": data, "timemodified": time.Now()}})
 	if err != nil {
 		rest.Error(w, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
 		return
@@ -797,7 +797,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *DevicesApp {
 	}
 
 	index = mgo.Index{
-		Key:        []string{"time-modified"},
+		Key:        []string{"timemodified"},
 		Unique:     false,
 		Background: true,
 		Sparse:     false,
