@@ -107,7 +107,8 @@ func (a *DevicesApp) handle_putuserdata(w rest.ResponseWriter, r *rest.Request) 
 		return
 	}
 
-	err = collection.Update(bson.M{"_id": bsonId, "owner": owner.(string)}, bson.M{"$set": bson.M{"user-meta": data}})
+	err = collection.Update(bson.M{"_id": bsonId, "owner": owner.(string)},
+		bson.M{"$set": bson.M{"user-meta": data, "time-modified": time.Now()}})
 	if err != nil {
 		rest.Error(w, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
 		return
@@ -160,7 +161,7 @@ func (a *DevicesApp) handle_putdevicedata(w rest.ResponseWriter, r *rest.Request
 		return
 	}
 
-	err = collection.Update(bson.M{"_id": bsonId, "prn": owner.(string)}, bson.M{"$set": bson.M{"device-meta": data}})
+	err = collection.Update(bson.M{"_id": bsonId, "prn": owner.(string)}, bson.M{"$set": bson.M{"device-meta": data, "time-modified": time.Now()}})
 	if err != nil {
 		rest.Error(w, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
 		return
@@ -201,6 +202,7 @@ func (a *DevicesApp) handle_postdevice(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	newDevice.TimeCreated = time.Now()
+	newDevice.TimeModified = newDevice.TimeCreated
 
 	if newDevice.Nick == "" {
 		newDevice.Nick = petname.Generate(2, "_")
@@ -580,6 +582,7 @@ func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) 
 	}
 
 	if patched {
+		newDevice.TimeModified = time.Now()
 		_, err = collection.UpsertId(newDevice.Id, newDevice)
 		if mgo.IsDup(err) {
 			rest.Error(w, "Device unique constraint violated", http.StatusConflict)
@@ -788,6 +791,19 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *DevicesApp {
 	}
 
 	err := app.mgoSession.DB("").C("pantahub_devices").EnsureIndex(index)
+	if err != nil {
+		log.Println("Error setting up index for pantahub_devices: " + err.Error())
+		return nil
+	}
+
+	index = mgo.Index{
+		Key:        []string{"time-modified"},
+		Unique:     false,
+		Background: true,
+		Sparse:     false,
+	}
+
+	err = app.mgoSession.DB("").C("pantahub_devices").EnsureIndex(index)
 	if err != nil {
 		log.Println("Error setting up index for pantahub_devices: " + err.Error())
 		return nil
