@@ -92,6 +92,7 @@ type Step struct {
 	Rev          int                    `json:"rev"`
 	CommitMsg    string                 `json:"commit-msg" bson:"commit-msg"`
 	State        map[string]interface{} `json:"state"` // json blurb
+	StateSha     string                 `json:"state-sha"`
 	StepProgress StepProgress           `json:"progress" bson:"progress"`
 	StepTime     time.Time              `json:"step-time" bson:"step-time"`
 	ProgressTime time.Time              `json:"progress-time" bson:"progress-time"`
@@ -177,6 +178,12 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 	newStep.Id = newTrail.Id.Hex() + "-0"
 	newStep.TrailId = newTrail.Id
 	newStep.Rev = 0
+	stateSha, err := utils.StateSha(&initialState)
+	if err != nil {
+		rest.Error(w, "Error calculating state sha"+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	newStep.StateSha = stateSha
 	newStep.State = utils.BsonQuoteMap(&initialState)
 	newStep.Owner = newTrail.Owner
 	newStep.Device = newTrail.Device
@@ -192,7 +199,7 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 	// XXX: prototype: for production we need to prevent posting twice!!
-	err := collection.Insert(newTrail)
+	err = collection.Insert(newTrail)
 
 	if err != nil {
 		rest.Error(w, "Error inserting trail into database "+err.Error(), http.StatusInternalServerError)
@@ -560,7 +567,15 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 	newStep.TrailId = trail.Id
 	newStep.StepTime = time.Now()
 	newStep.ProgressTime = time.Unix(0, 0)
+
+	// IMPORTANT: statesha has to be before state as that will be escaped
+	newStep.StateSha, err = utils.StateSha(&newStep.State)
 	newStep.State = utils.BsonQuoteMap(&newStep.State)
+
+	if err != nil {
+		rest.Error(w, "Error calculating Sha "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	err = collSteps.Insert(newStep)
 
@@ -1368,6 +1383,7 @@ func (a *TrailsApp) handle_putstepstate(w rest.ResponseWriter, r *rest.Request) 
 		return
 	}
 
+	step.StateSha, err = utils.StateSha(&stateMap)
 	step.State = utils.BsonQuoteMap(&stateMap)
 	step.StepTime = time.Now()
 	step.ProgressTime = time.Unix(0, 0)
