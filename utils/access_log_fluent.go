@@ -53,7 +53,7 @@ func (mw *AccessLogFluentMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.Han
 			}
 			log.Printf("INFO: fluent logging enabled for endpoint %s; %s: %s, %s: %d\n", mw.Prefix, ENV_FLUENT_HOST, host, ENV_FLUENT_PORT, port)
 		} else {
-			log.Printf("WARNING: fluent logging disabled for endpoint %s; set %s to enable it.\n", mw.Prefix, ENV_FLUENT_HOST)
+			log.Printf("WARNING: fluent logging disabled for endpoint %s; set %s to enable it.\n\tTo enable fluentd, set at least FLUENTD_HOST environment", mw.Prefix, ENV_FLUENT_HOST)
 		}
 	}
 
