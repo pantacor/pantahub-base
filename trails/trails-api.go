@@ -585,7 +585,7 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	err = collTrails.Update(bson.M{"_id": trail.Id, "device": trail.Owner}, bson.M{"$set": bson.M{"last-touched": newStep.StepTime}})
+	err = collTrails.Update(bson.M{"_id": trail.Id}, bson.M{"$set": bson.M{"last-touched": newStep.StepTime}})
 
 	if err != nil {
 		// XXX: figure how to be better on error cases here...
