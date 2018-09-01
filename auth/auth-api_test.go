@@ -17,11 +17,14 @@ package auth
 
 import (
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"net/url"
+
+	"gitlab.com/pantacor/pantahub-base/testutils"
 	"gitlab.com/pantacor/pantahub-base/utils"
 
 	"github.com/StephanDollberg/go-json-rest-middleware-jwt"
@@ -39,7 +42,7 @@ var (
 
 func setUp(t *testing.T) {
 
-	mgoSession, err := utils.GetMongoSession()
+	mgoSession, err := utils.GetMongoSessionTest()
 
 	if err != nil {
 		t.Errorf("error getting mgoSession (%s)", err.Error())
@@ -51,11 +54,6 @@ func setUp(t *testing.T) {
 		Realm:      "pantahub services",
 		Timeout:    time.Minute * 60,
 		MaxRefresh: time.Hour * 24,
-	}
-
-	jwtMWR = &jwt.JWTMiddleware{
-		Key:   []byte("secret key"),
-		Realm: "pantahub services",
 	}
 
 	authApp := New(jwtMWA, mgoSession)
@@ -71,44 +69,6 @@ func setUp(t *testing.T) {
 }
 
 func tearDown(t *testing.T) {
-}
-
-func doLogin(t *testing.T) {
-
-	u := *serverUrl
-	u.Path = "/login"
-
-	res, err := resty.R().SetBody(map[string]string{
-		"username": "user1",
-		"password": "user1",
-	}).Post(u.String())
-
-	if err != nil {
-		t.Errorf("internal error calling test server " + err.Error())
-		t.Fail()
-	}
-
-	if res.StatusCode() != 200 {
-		t.Errorf("login without username/password must yield 200")
-		t.Fail()
-	}
-
-	var resMap map[string]interface{}
-
-	err = json.Unmarshal(res.Body(), &resMap)
-
-	if err != nil {
-		t.Errorf("Bad json returned from server for login " + err.Error())
-		t.Fail()
-	}
-
-	var ok bool
-
-	authTokenUser1, ok = resMap["token"].(string)
-	if !ok {
-		t.Errorf("Body contained no token: " + string(res.Body()))
-		t.Fail()
-	}
 }
 
 func testNoCredsLogin401(t *testing.T) {
@@ -179,8 +139,8 @@ func testRefreshToken(t *testing.T) {
 		t.Fail()
 	}
 
-	if res.StatusCode() != 200 {
-		t.Errorf("login without username/password must yield 200")
+	if res.StatusCode() != http.StatusOK {
+		t.Errorf("refresh token login without username/password must yield OK (200)")
 	}
 
 	var resMap map[string]interface{}
@@ -208,7 +168,7 @@ func TestAuthLogin(t *testing.T) {
 	t.Run("Wrong credentials 401", testBadCredsLogin401)
 	t.Run("Good Login", testGoodLogin)
 
-	doLogin(t)
+	authTokenUser1 = testutils.DoLogin(t, serverUrl, "user1", "user1")
 
 	t.Run("Refresh Token", testRefreshToken)
 

@@ -219,7 +219,9 @@ var defaultEnvs = map[string]string{
 
 	// fluent vars
 	ENV_FLUENT_PORT: "24224",
-	ENV_FLUENT_HOST: "127.0.0.1",
+
+	// disable by default; to enable set this env...
+	ENV_FLUENT_HOST: "",
 
 	// secrets - required!!
 	ENV_PANTAHUB_SA_ADMIN_SECRET: "",
