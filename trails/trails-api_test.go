@@ -201,13 +201,14 @@ func postStepsHash(t *testing.T) {
 		t.Fail()
 	}
 
+	// test canonicalization feature of json
 	if step.StateSha != step0Hash {
 		t.Errorf("state shas of step 0 and 1 differ (%s != %s): %s", step0Hash, step.StateSha, string(res.Body()))
 		t.Fail()
 	}
 }
 
-func TestTrails(t *testing.T) {
+func TestTrailsHash(t *testing.T) {
 	setUp(t)
 
 	t.Run("post state", postState)
