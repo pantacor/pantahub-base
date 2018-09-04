@@ -489,11 +489,16 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 
 	var err error
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["owner"]
+
+	// if not a device there wont be an owner; so we use the caller (aka prn)
 	if !ok {
-		// XXX: find right error
-		rest.Error(w, "You need to be logged in", http.StatusForbidden)
-		return
+		owner, ok = r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+		if !ok {
+			// XXX: find right error
+			rest.Error(w, "You need to be logged in as user or device", http.StatusForbidden)
+			return
+		}
 	}
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
@@ -508,7 +513,7 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 	trailId := r.PathParam("id")
 	trail := Trail{}
 
-	if authType == "USER" {
+	if authType == "USER" || authType == "DEVICE" {
 		err = collTrails.Find(bson.M{"_id": bson.ObjectIdHex(trailId)}).One(&trail)
 	} else {
 		rest.Error(w, "Need to be logged in as USER to post trail steps", http.StatusForbidden)
