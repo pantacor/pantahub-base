@@ -8,8 +8,8 @@ import (
 	cjson "github.com/gibson042/canonicaljson-go"
 )
 
-func DecodeSha256HexString(hexSha string) (sha []byte, err error) {
-	sha, err = hex.DecodeString(hexSha)
+func DecodeSha256HexString(shaString string) (sha []byte, err error) {
+	sha, err = hex.DecodeString(shaString)
 
 	if err == nil && len(sha) != sha256.Size {
 		err = errors.New("sha does not match expected length")
@@ -24,6 +24,16 @@ func StateSha(obj interface{}) (string, error) {
 		return "", err
 	}
 
-	sha := hex.EncodeToString(sha256.New().Sum(json))
+	shaHash := sha256.New()
+
+	_, err = shaHash.Write(json)
+
+	if err != nil {
+		return "", err
+	}
+
+	arr := make([]byte, sha256.Size)
+	arr = shaHash.Sum(arr[:0])
+	sha := hex.EncodeToString(arr)
 	return sha, err
 }
