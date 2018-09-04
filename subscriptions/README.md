@@ -41,7 +41,7 @@ Then you can create or update the subscription plan for any given prn using the 
 http PUT https://api.pantahub.com/subscriptions/admin/subscription \
 	subject=prn:::accounts:/XXXXXXXXXXXXXXXXXXX \
 	plan=prn::subscriptions:VIP \
-	Authorization:" Bearer: $TOK"
+	Authorization:" Bearer $TOK"
 ```
 
 Right now the following plans are available to choose from:
@@ -59,7 +59,7 @@ http PUT https://api.pantahub.com/subscriptions/admin/subscription \
 	subject=prn:::accounts:/XXXXXXXXXXXXXXXXXXX \
 	plan=prn::subscriptions:VIP \
 	attrs:='{"BANDWIDTH": "100GiB"}' \
-	Authorization:" Bearer: $TOK"
+	Authorization:" Bearer $TOK"
 ```
 
 The effects should be visible for users right away in the UI and on dash endpoint.
@@ -75,7 +75,7 @@ TOK1=`http POST https://api.pantahub.com/auth/login username=user1 password=YOUR
 Next you can get your subscription status through simple GET against the subscriptions main endpoint:
 
 ```
-ttp GET https://api2.pantahub.com/subscriptions/ Authorization:" Bearer $TOK1"
+http GET https://api2.pantahub.com/subscriptions/ Authorization:" Bearer $TOK1"
 HTTP/1.1 200 OK
 Connection: keep-alive
 Content-Encoding: gzip
