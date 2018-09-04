@@ -36,6 +36,9 @@ type SubscriptionService interface {
 		Type utils.Prn,
 		schema map[string]interface{}) (Subscription, error)
 
+	// Check if user prn is in admins set for this instance
+	IsAdmin(user utils.Prn) bool
+
 	// Load subscription by ID
 	Load(ID string) (Subscription, error)
 
@@ -67,7 +70,7 @@ var (
 	defaultSubscription   = SubscriptionMgo{
 		ID:         defaultSubscriptionID,
 		Prn:        utils.Prn("prn::subscriptions:/" + defaultSubscriptionID),
-		Issuer:     utils.Prn("prn::auth:/admin"),
+		Issuer:     utils.Prn("prn:pantahub.com:auth:/admin"),
 		Type:       SubscriptionTypeFree,
 		Attributes: SubscriptionProperties[SubscriptionTypeFree].(map[string]interface{}),
 	}
@@ -115,6 +118,15 @@ func (i subscriptionService) New(subject utils.Prn,
 
 	// initialize original from original values
 	return s, nil
+}
+
+func (i subscriptionService) IsAdmin(user utils.Prn) bool {
+	for _, v := range i.admins {
+		if v == user {
+			return true
+		}
+	}
+	return false
 }
 
 func (i subscriptionService) Load(ID string) (Subscription, error) {
@@ -237,7 +249,7 @@ func (i subscriptionService) ensureIndices() error {
 }
 
 // New creates a new mgo backed subscription service
-// Will use the default DB configured in mgo.Sessino provided as arg.
+// Will use the default DB configured in mgo.Session provided as arg.
 func NewService(session *mgo.Session,
 	servicePrn utils.Prn, admins []utils.Prn,
 	typeDefs map[utils.Prn]interface{}) SubscriptionService {

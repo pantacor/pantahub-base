@@ -107,6 +107,11 @@ func (s *SubscriptionsApp) put(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
+	if !s.service.IsAdmin(authInfo.Caller) {
+		rest.Error(w, "You need to have admin role for subscriptin service", http.StatusForbidden)
+		return
+	}
+
 	err := r.ParseForm()
 
 	if err != nil {
