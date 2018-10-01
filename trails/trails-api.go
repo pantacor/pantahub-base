@@ -115,6 +115,7 @@ type TrailSummary struct {
 	IsPublic         bool      `json:"public"`
 	StatusMsg        string    `json:"status-msg" bson:"status_msg"` // message of progress status
 	Status           string    `json:"status"`                       // status code
+	Timestamp        time.Time `json:"timestamp" bson:"timestamp"`   // greater of last seen and last modified
 	StepTime         time.Time `json:"step-time" bson:"step_time"`
 	ProgressTime     time.Time `json:"progress-time" bson:"progress_time"`
 	TrailTouchedTime time.Time `json:"trail-touched-time" bson:"trail_touched_time"`
