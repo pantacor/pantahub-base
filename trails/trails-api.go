@@ -92,7 +92,7 @@ type Step struct {
 	Rev          int                    `json:"rev"`
 	CommitMsg    string                 `json:"commit-msg" bson:"commit-msg"`
 	State        map[string]interface{} `json:"state"` // json blurb
-	StateSha     string                 `json:"state-sha"`
+	StateSha     string                 `json:"state-sha" bson:"statesha"`
 	StepProgress StepProgress           `json:"progress" bson:"progress"`
 	StepTime     time.Time              `json:"step-time" bson:"step-time"`
 	ProgressTime time.Time              `json:"progress-time" bson:"progress-time"`
