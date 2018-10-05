@@ -113,6 +113,7 @@ type TrailSummary struct {
 	ProgressRev      int       `json:"progress-revision" bson:"progress_revision"`
 	Progress         int       `json:"progress"` // progress number. steps or 1-100
 	IsPublic         bool      `json:"public"`
+	StateSha         string    `json:"state-sha" bson:"state_sha256"`
 	StatusMsg        string    `json:"status-msg" bson:"status_msg"` // message of progress status
 	Status           string    `json:"status"`                       // status code
 	Timestamp        time.Time `json:"timestamp" bson:"timestamp"`   // greater of last seen and last modified
