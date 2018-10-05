@@ -99,25 +99,26 @@ type Step struct {
 }
 
 type StepProgress struct {
-	Progress  int    `json:"progress"`   // progress number. steps or 1-100
-	StatusMsg string `json:"status-msg"` // message of progress status
-	Status    string `json:"status"`     // status code
-	Log       string `json:"log"`        // log if available
+	Progress  int    `json:"progress"`                    // progress number. steps or 1-100
+	StatusMsg string `json:"status-msg" bson:"statusmsg"` // message of progress status
+	Status    string `json:"status"`                      // status code
+	Log       string `json:"log"`                         // log if available
 }
 
 type TrailSummary struct {
-	DeviceId         bson.ObjectId `json:"deviceid"`
-	Device           string        `json:"device"`
-	DeviceNick       string        `json:"device-nick"`
-	Rev              int           `json:"revision"`
-	ProgressRev      int           `json:"progress-revision"`
-	Progress         int           `json:"progress"` // progress number. steps or 1-100
-	IsPublic         bool          `json:"public"`
-	StatusMsg        string        `json:"status-msg"` // message of progress status
-	Status           string        `json:"status"`     // status code
-	StepTime         time.Time     `json:"step-time" bson:"step-time"`
-	ProgressTime     time.Time     `json:"progress-time" bson:"progress-time"`
-	TrailTouchedTime time.Time     `json:"trail-touched-time" bson:"trail-touched-time"`
+	DeviceId         string    `json:"deviceid"`
+	Device           string    `json:"device"`
+	DeviceNick       string    `json:"device-nick" bson:"device_nick"`
+	Rev              int       `json:"revision"`
+	ProgressRev      int       `json:"progress-revision" bson:"progress_revision"`
+	Progress         int       `json:"progress"` // progress number. steps or 1-100
+	IsPublic         bool      `json:"public"`
+	StatusMsg        string    `json:"status-msg" bson:"status_msg"` // message of progress status
+	Status           string    `json:"status"`                       // status code
+	Timestamp        time.Time `json:"timestamp" bson:"timestamp"`   // greater of last seen and last modified
+	StepTime         time.Time `json:"step-time" bson:"step_time"`
+	ProgressTime     time.Time `json:"progress-time" bson:"progress_time"`
+	TrailTouchedTime time.Time `json:"trail-touched-time" bson:"trail_touched_time"`
 }
 
 func handle_auth(w rest.ResponseWriter, r *rest.Request) {
@@ -1495,7 +1496,7 @@ func (a *TrailsApp) get_trailsummary_one(trailId bson.ObjectId, owner string, co
 		summary.StepTime = step.StepTime
 		summary.Status = step.StepProgress.Status
 		summary.StatusMsg = step.StepProgress.StatusMsg
-		summary.DeviceId = step.TrailId
+		summary.DeviceId = step.TrailId.Hex()
 		summary.Device = step.Device
 	}
 
@@ -1515,7 +1516,7 @@ func (a *TrailsApp) get_trailsummary_one(trailId bson.ObjectId, owner string, co
 		summary.StepTime = step.StepTime
 		summary.Status = step.StepProgress.Status
 		summary.StatusMsg = step.StepProgress.StatusMsg
-		summary.DeviceId = step.TrailId
+		summary.DeviceId = step.TrailId.Hex()
 		summary.Device = step.Device
 	}
 	return summary, nil
@@ -1567,7 +1568,7 @@ func (a *TrailsApp) handle_gettrailstepsummary(w rest.ResponseWriter, r *rest.Re
 	device := devices.Device{}
 	err := collDevices.Find(bson.M{"_id": summary.DeviceId}).One(&device)
 	if err != nil {
-		rest.Error(w, "Error getting device record for id "+summary.DeviceId.Hex(),
+		rest.Error(w, "Error getting device record for id "+summary.DeviceId,
 			http.StatusInternalServerError)
 		return
 	}
@@ -1589,24 +1590,10 @@ func (a *TrailsApp) handle_gettrailsummary(w rest.ResponseWriter, r *rest.Reques
 		return
 	}
 
-	collSteps := a.mgoSession.DB("").C("pantahub_steps")
+	summaryCol := a.mgoSession.DB("pantabase_devicesummary").C("device_summary_short_new_v1")
 
-	if collSteps == nil {
+	if summaryCol == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
-	}
-
-	collTrails := a.mgoSession.DB("").C("pantahub_trails")
-
-	if collTrails == nil {
-		rest.Error(w, "Error with Database connectivity - trails", http.StatusInternalServerError)
-		return
-	}
-
-	collDevices := a.mgoSession.DB("").C("pantahub_devices")
-
-	if collDevices == nil {
-		rest.Error(w, "Error with Database connectivity - devices", http.StatusInternalServerError)
 		return
 	}
 
@@ -1616,23 +1603,10 @@ func (a *TrailsApp) handle_gettrailsummary(w rest.ResponseWriter, r *rest.Reques
 		rest.Error(w, "Need to be logged in as USER to get trail summary", http.StatusForbidden)
 		return
 	}
+	summaries := make([]TrailSummary, 0)
 
-	trails := make([]Trail, 0)
-	collTrails.Find(bson.M{"owner": owner}).All(&trails)
+	summaryCol.Find(bson.M{"owner": owner}).All(&summaries)
 
-	summaries := []TrailSummary{}
-	for _, v := range trails {
-		s, _ := a.get_trailsummary_one(v.Id, owner.(string), collSteps)
-		device := devices.Device{}
-		err := collDevices.Find(bson.M{"_id": s.DeviceId}).One(&device)
-		if err != nil {
-			continue
-		}
-		s.TrailTouchedTime = v.LastTouched
-		s.DeviceNick = device.Nick
-		s.IsPublic = device.IsPublic
-		summaries = append(summaries, s)
-	}
 	w.WriteJson(summaries)
 }
 
