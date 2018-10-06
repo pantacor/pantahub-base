@@ -1604,9 +1604,15 @@ func (a *TrailsApp) handle_gettrailsummary(w rest.ResponseWriter, r *rest.Reques
 		rest.Error(w, "Need to be logged in as USER to get trail summary", http.StatusForbidden)
 		return
 	}
-	summaries := make([]TrailSummary, 0)
 
-	summaryCol.Find(bson.M{"owner": owner}).All(&summaries)
+	sortParam := r.FormValue("sort")
+
+	if sortParam == "" {
+		sortParam = "-timestamp"
+	}
+
+	summaries := make([]TrailSummary, 0)
+	summaryCol.Find(bson.M{"owner": owner}).Sort(sortParam).All(&summaries)
 
 	w.WriteJson(summaries)
 }
