@@ -197,6 +197,10 @@ func (s *mgoLogger) getLogs(start int64, page int64, after *time.Time,
 	return &result, nil
 }
 
+func (s *mgoLogger) getLogsByCursor(nextCursor string) (*LogsPager, error) {
+	return nil, ErrCursorNotImplemented
+}
+
 func (s *mgoLogger) postLogs(e []LogsEntry) error {
 	collLogs := s.mgoSession.DB("").C(s.mgoCollection)
 

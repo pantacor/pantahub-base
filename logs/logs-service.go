@@ -25,6 +25,8 @@ package logs
 //
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -35,6 +37,7 @@ import (
 
 	jwt "github.com/StephanDollberg/go-json-rest-middleware-jwt"
 	"github.com/ant0ine/go-json-rest/rest"
+	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -70,17 +73,27 @@ type LogsEntry struct {
 }
 
 type LogsPager struct {
-	Start   int64        `json:"start"`
-	Page    int64        `json:"page"`
-	Count   int64        `json:"count"`
-	Entries []*LogsEntry `json:"entries"`
+	Start      int64        `json:"start"`
+	Page       int64        `json:"page"`
+	Count      int64        `json:"count"`
+	NextCursor string       `json:"next-cursor"`
+	Entries    []*LogsEntry `json:"entries"`
 }
 
 type LogsBackend interface {
 	getLogs(start int64, page int64, after *time.Time, query LogsFilter, sort LogsSort) (*LogsPager, error)
+	getLogsByCursor(nextCursor string) (*LogsPager, error)
 	postLogs(e []LogsEntry) error
 	register() error
 	unregister(deleteIndices bool) error
+}
+
+var ErrCursorTimedOut error = errors.New("Cursor Invalid or expired.")
+var ErrCursorNotImplemented error = errors.New("Cursor not supported by backend.")
+
+type LogsCursorClaim struct {
+	NextCursor string `json:"next-cursor"`
+	jwtgo.StandardClaims
 }
 
 //
@@ -202,7 +215,101 @@ func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
+	if result.NextCursor != "" {
+		jwtSecret := []byte(utils.GetEnv(utils.ENV_PANTAHUB_JWT_AUTH_SECRET))
+
+		claims := LogsCursorClaim{
+			NextCursor: result.NextCursor,
+			StandardClaims: jwtgo.StandardClaims{
+				ExpiresAt: time.Now().Add(time.Duration(time.Minute * 2)).Unix(),
+				IssuedAt:  time.Now().Unix(),
+				Audience:  own.(string),
+			},
+		}
+		token := jwtgo.NewWithClaims(jwtgo.SigningMethodHS256, claims)
+		ss, err := token.SignedString(jwtSecret)
+		if err != nil {
+			rest.Error(w, "ERROR: signing scrollid token: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		result.NextCursor = ss
+		fmt.Printf("%v %v", ss, err)
+	}
+
 	w.WriteJson(result)
+}
+
+func (a *logsApp) handle_getlogscursor(w rest.ResponseWriter, r *rest.Request) {
+
+	var err error
+
+	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+
+	if authType != "USER" {
+		rest.Error(w, "Need to be logged in as USER to get logs", http.StatusForbidden)
+		return
+	}
+
+	own, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	if !ok {
+		// XXX: find right error
+		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		return
+	}
+
+	r.ParseForm()
+
+	nextCursorJWT := r.FormValue("next-cursor")
+
+	token, err := jwtgo.ParseWithClaims(nextCursorJWT, &LogsCursorClaim{}, func(token *jwtgo.Token) (interface{}, error) {
+		return []byte(utils.GetEnv(utils.ENV_PANTAHUB_JWT_AUTH_SECRET)), nil
+	})
+
+	if err != nil {
+		rest.Error(w, "Error decoding JWT token for next-cursor: "+err.Error(), http.StatusForbidden)
+		return
+	}
+
+	if claims, ok := token.Claims.(*LogsCursorClaim); ok && token.Valid {
+		var result *LogsPager
+
+		caller := claims.StandardClaims.Audience
+		if caller != own {
+			rest.Error(w, "Calling user does not match owner of cursor-next", http.StatusForbidden)
+			return
+		}
+		nextCursor := claims.NextCursor
+
+		result, err = a.backend.getLogsByCursor(nextCursor)
+
+		if err != nil {
+			rest.Error(w, "ERROR: getting logs failed "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if result.NextCursor != "" {
+			jwtSecret := utils.GetEnv(utils.ENV_PANTAHUB_JWT_AUTH_SECRET)
+
+			claims := LogsCursorClaim{
+				NextCursor: result.NextCursor,
+				StandardClaims: jwtgo.StandardClaims{
+					ExpiresAt: time.Now().Add(time.Duration(time.Minute * 2)).Unix(),
+					IssuedAt:  time.Now().Unix(),
+					Audience:  own.(string),
+				},
+			}
+			token := jwtgo.NewWithClaims(jwtgo.SigningMethodHS256, claims)
+			ss, err := token.SignedString(jwtSecret)
+			result.NextCursor = ss
+			fmt.Printf("%v %v", ss, err)
+		}
+
+		w.WriteJson(result)
+		return
+	}
+
+	rest.Error(w, "Unexpected Code", http.StatusInternalServerError)
+	return
 }
 
 func unmarshalBody(body []byte) ([]LogsEntry, error) {
@@ -350,6 +457,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *logsApp {
 	//      API routers (bad rest.MakeRouter I suspect)
 	api_router, _ := rest.MakeRouter(
 		rest.Get("/", app.handle_getlogs),
+		rest.Get("/cursor", app.handle_getlogscursor),
 		rest.Post("/", app.handle_postlogs),
 	)
 	app.Api.SetApp(api_router)

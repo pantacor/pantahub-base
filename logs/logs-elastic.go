@@ -210,7 +210,12 @@ func (s *elasticLogger) getLogs(start int64, page int64, after *time.Time,
 		return nil, err
 	}
 
-	response, err := s.r().SetBody(searchBody).Get(queryURI.String())
+	// add scroll to query
+	q1 := queryURI.Query()
+	q1.Add("scroll", "1m")
+	queryURI.RawQuery = q1.Encode()
+
+	response, err := s.r().SetBody(searchBody).Post(queryURI.String())
 	if err != nil {
 		return nil, err
 	}
@@ -234,6 +239,61 @@ func (s *elasticLogger) getLogs(start int64, page int64, after *time.Time,
 	pagerResult.Count = elasticResult.TotalHits()
 	pagerResult.Start = start
 	pagerResult.Page = int64(len(elasticResult.Hits.Hits))
+	pagerResult.NextCursor = elasticResult.ScrollId
+
+	prototype := LogsEntry{}
+	arr := elasticResult.Each(reflect.TypeOf(&prototype))
+
+	for _, v := range arr {
+		pagerResult.Entries = append(pagerResult.Entries, v.(*LogsEntry))
+	}
+	pagerResult.Count = int64(len(arr))
+
+	return &pagerResult, nil
+}
+
+func (s *elasticLogger) getLogsByCursor(nextCursor string) (*LogsPager, error) {
+
+	queryFmt, values, err := elastic.ScrollBuildNextURL(false)
+	queryURL, err := url.Parse(queryFmt)
+	queryURL.RawQuery = values.Encode()
+
+	if err != nil {
+		return nil, err
+	}
+
+	queryURI := s.elasticURL.ResolveReference(queryURL)
+
+	searchBody, err := elastic.ScrollBuildBodyNext("1m", nextCursor)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := s.r().SetBody(searchBody).Post(queryURI.String())
+	if err != nil {
+		return nil, err
+	}
+
+	if response.StatusCode() != http.StatusOK {
+		errStr := fmt.Sprintf("WARN: getLogs call failed: %d - %s\n", response.StatusCode(), response.Status())
+		return nil, errors.New(errStr)
+	}
+
+	var elasticResult elastic.SearchResult
+
+	body := response.Body()
+	err = json.Unmarshal(body, &elasticResult)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var pagerResult LogsPager
+
+	pagerResult.Count = elasticResult.TotalHits()
+	pagerResult.Start = 0
+	pagerResult.Page = int64(len(elasticResult.Hits.Hits))
+	pagerResult.NextCursor = elasticResult.ScrollId
 
 	prototype := LogsEntry{}
 	arr := elasticResult.Each(reflect.TypeOf(&prototype))
