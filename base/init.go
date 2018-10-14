@@ -30,6 +30,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	jwt "github.com/StephanDollberg/go-json-rest-middleware-jwt"
+	"github.com/rs/cors"
 	"gitlab.com/pantacor/pantahub-base/auth"
 	"gitlab.com/pantacor/pantahub-base/dash"
 	"gitlab.com/pantacor/pantahub-base/devices"
@@ -257,6 +258,9 @@ func DoInit() {
 	}
 
 	log.Println("S3 Path: " + objects.PantahubS3Path())
-	fserver = &FileUploadServer{fileServer: http.FileServer(http.Dir(objects.PantahubS3Path())), directory: objects.PantahubS3Path()}
+	fservermux := &FileUploadServer{fileServer: http.FileServer(http.Dir(objects.PantahubS3Path())), directory: objects.PantahubS3Path()}
+	// default cors - allow GET and POST from all origins
+	fserver := cors.AllowAll().Handler(fservermux)
+
 	http.Handle("/local-s3/", http.StripPrefix("/local-s3", fserver))
 }
