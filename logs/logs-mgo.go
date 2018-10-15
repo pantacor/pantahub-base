@@ -130,9 +130,13 @@ func (s *mgoLogger) unregister(delete bool) error {
 }
 
 func (s *mgoLogger) getLogs(start int64, page int64, after *time.Time,
-	query LogsFilter, sort LogsSort) (*LogsPager, error) {
+	query LogsFilter, sort LogsSort, cursor bool) (*LogsPager, error) {
 	var result LogsPager
 	var err error
+
+	if cursor {
+		return nil, ErrCursorNotImplemented
+	}
 
 	sortStr := strings.Join(sort, ",")
 	collLogs := s.mgoSession.DB("").C(s.mgoCollection)

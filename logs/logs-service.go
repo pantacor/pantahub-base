@@ -76,12 +76,12 @@ type LogsPager struct {
 	Start      int64        `json:"start"`
 	Page       int64        `json:"page"`
 	Count      int64        `json:"count"`
-	NextCursor string       `json:"next-cursor"`
-	Entries    []*LogsEntry `json:"entries"`
+	NextCursor string       `json:"next-cursor,omitempty"`
+	Entries    []*LogsEntry `json:"entries,omitempty"`
 }
 
 type LogsBackend interface {
-	getLogs(start int64, page int64, after *time.Time, query LogsFilter, sort LogsSort) (*LogsPager, error)
+	getLogs(start int64, page int64, after *time.Time, query LogsFilter, sort LogsSort, cursor bool) (*LogsPager, error)
 	getLogsByCursor(nextCursor string) (*LogsPager, error)
 	postLogs(e []LogsEntry) error
 	register() error
@@ -208,7 +208,9 @@ func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 		after = &t
 	}
 
-	result, err = a.backend.getLogs(startParamInt, pageParamInt, after, filter, logsSort)
+	cursor := r.FormValue("cursor") != ""
+
+	result, err = a.backend.getLogs(startParamInt, pageParamInt, after, filter, logsSort, cursor)
 
 	if err != nil {
 		rest.Error(w, "ERROR: getting logs failed "+err.Error(), http.StatusInternalServerError)

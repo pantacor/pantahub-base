@@ -160,7 +160,7 @@ func (s *elasticLogger) unregister(deleteIndex bool) error {
 }
 
 func (s *elasticLogger) getLogs(start int64, page int64, after *time.Time,
-	query LogsFilter, sort LogsSort) (*LogsPager, error) {
+	query LogsFilter, sort LogsSort, cursor bool) (*LogsPager, error) {
 	queryFmt := fmt.Sprintf(s.elasticIndexPrefix + "-*/pv/_search")
 
 	queryURL, err := url.Parse(queryFmt)
@@ -210,10 +210,12 @@ func (s *elasticLogger) getLogs(start int64, page int64, after *time.Time,
 		return nil, err
 	}
 
-	// add scroll to query
-	q1 := queryURI.Query()
-	q1.Add("scroll", "1m")
-	queryURI.RawQuery = q1.Encode()
+	// add scroll to query; XXX: we need limits here for
+	if cursor {
+		q1 := queryURI.Query()
+		q1.Add("scroll", "1m")
+		queryURI.RawQuery = q1.Encode()
+	}
 
 	response, err := s.r().SetBody(searchBody).Post(queryURI.String())
 	if err != nil {
