@@ -20,6 +20,7 @@ import (
 	"os"
 
 	"github.com/urfave/cli"
+	"gitlab.com/pantacor/pvr/libpvr"
 )
 
 func CommandClaim() cli.Command {
@@ -38,7 +39,13 @@ func CommandClaim() cli.Command {
 				return cli.NewExitError(err, 1)
 			}
 
-			pvr, err := NewPvr(c.App, wd)
+			session, err := libpvr.NewSession(c.App)
+
+			if err != nil {
+				return cli.NewExitError(err, 4)
+			}
+
+			pvr, err := libpvr.NewPvr(session, wd)
 			if err != nil {
 				return cli.NewExitError(err, 2)
 			}
@@ -62,7 +69,7 @@ func CommandClaim() cli.Command {
 			}
 			challenge := c.String("challenge")
 
-			err = pvr.doClaim(deviceEndpoint, challenge)
+			err = pvr.DoClaim(deviceEndpoint, challenge)
 
 			if err != nil {
 				return cli.NewExitError("Error claiming device: "+err.Error(), 4)

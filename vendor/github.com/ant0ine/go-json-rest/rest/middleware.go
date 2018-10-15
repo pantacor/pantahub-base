@@ -2,8 +2,6 @@ package rest
 
 import (
 	"net/http"
-
-	"github.com/miolini/datacounter"
 )
 
 // HandlerFunc defines the handler function. It is the go-json-rest equivalent of http.HandlerFunc.
@@ -63,10 +61,8 @@ func adapterFunc(handler HandlerFunc) http.HandlerFunc {
 			map[string]interface{}{},
 		}
 
-		countingWriter := datacounter.NewResponseWriterCounter(origWriter)
-
 		writer := &responseWriter{
-			countingWriter,
+			origWriter,
 			false,
 		}
 

@@ -28,3 +28,4 @@ import:
   - bson
 - package: github.com/go-resty/resty
   version: ~1.0.0
+- package: gopkg.in/olivere/elastic.v5

@@ -1,5 +1,5 @@
 //
-// Copyright 2017  Pantacor Ltd.
+// Copyright 2017, 2018  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,9 +17,9 @@ package main
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/urfave/cli"
+	"gitlab.com/pantacor/pvr/libpvr"
 )
 
 func CommandRegister() cli.Command {
@@ -40,7 +40,7 @@ func CommandRegister() cli.Command {
 			p := c.String("pass")
 			e := c.String("email")
 
-			aEp := "https://api.pantahub.com/auth"
+			aEp := "https://api.pantahub.com"
 
 			if c.NArg() > 1 {
 				return cli.NewExitError("Only one argument (pantahub url) allowed. See --help.", 2)
@@ -48,17 +48,7 @@ func CommandRegister() cli.Command {
 				aEp = c.Args()[0]
 			}
 
-			wd, err := os.Getwd()
-			if err != nil {
-				return cli.NewExitError(err, 1)
-			}
-
-			pvr, err := NewPvr(c.App, wd)
-			if err != nil {
-				return cli.NewExitError(err, 2)
-			}
-
-			err = pvr.doRegister(aEp, e, u, p)
+			err := libpvr.DoRegister(aEp, e, u, p)
 
 			if err != nil {
 				return cli.NewExitError("Error Registering User: "+err.Error(), 3)
