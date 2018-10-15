@@ -26,7 +26,6 @@ package logs
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -235,7 +234,6 @@ func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 			return
 		}
 		result.NextCursor = ss
-		fmt.Printf("%v %v", ss, err)
 	}
 
 	w.WriteJson(result)
@@ -259,10 +257,25 @@ func (a *logsApp) handle_getlogscursor(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	r.ParseForm()
+	jsonBody := map[string]interface{}{}
+	err = r.DecodeJsonPayload(&jsonBody)
+	if err != nil {
+		rest.Error(w, "Error decoding json request body: "+err.Error(), http.StatusBadRequest)
+	}
 
-	nextCursorJWT := r.FormValue("next-cursor")
+	var nextCursorJWT string
+	nextCursor := jsonBody["next-cursor"]
+	if nextCursor == nil {
+		nextCursorJWT = ""
+	} else {
+		nextCursorJWT = nextCursor.(string)
+	}
+	// if body doesnt have the cursor lets try query
+	if nextCursorJWT == "" {
+		r.ParseForm()
+		nextCursorJWT = r.FormValue("next-cursor")
 
+	}
 	token, err := jwtgo.ParseWithClaims(nextCursorJWT, &LogsCursorClaim{}, func(token *jwtgo.Token) (interface{}, error) {
 		return []byte(utils.GetEnv(utils.ENV_PANTAHUB_JWT_AUTH_SECRET)), nil
 	})
@@ -281,7 +294,6 @@ func (a *logsApp) handle_getlogscursor(w rest.ResponseWriter, r *rest.Request) {
 			return
 		}
 		nextCursor := claims.NextCursor
-
 		result, err = a.backend.getLogsByCursor(nextCursor)
 
 		if err != nil {
@@ -290,7 +302,7 @@ func (a *logsApp) handle_getlogscursor(w rest.ResponseWriter, r *rest.Request) {
 		}
 
 		if result.NextCursor != "" {
-			jwtSecret := utils.GetEnv(utils.ENV_PANTAHUB_JWT_AUTH_SECRET)
+			jwtSecret := []byte(utils.GetEnv(utils.ENV_PANTAHUB_JWT_AUTH_SECRET))
 
 			claims := LogsCursorClaim{
 				NextCursor: result.NextCursor,
@@ -302,8 +314,11 @@ func (a *logsApp) handle_getlogscursor(w rest.ResponseWriter, r *rest.Request) {
 			}
 			token := jwtgo.NewWithClaims(jwtgo.SigningMethodHS256, claims)
 			ss, err := token.SignedString(jwtSecret)
+			if err != nil {
+				rest.Error(w, "ERROR: signing scrollid token: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
 			result.NextCursor = ss
-			fmt.Printf("%v %v", ss, err)
 		}
 
 		w.WriteJson(result)
@@ -460,6 +475,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *logsApp {
 	api_router, _ := rest.MakeRouter(
 		rest.Get("/", app.handle_getlogs),
 		rest.Get("/cursor", app.handle_getlogscursor),
+		rest.Post("/cursor", app.handle_getlogscursor),
 		rest.Post("/", app.handle_postlogs),
 	)
 	app.Api.SetApp(api_router)
