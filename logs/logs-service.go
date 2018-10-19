@@ -80,7 +80,8 @@ type LogsPager struct {
 }
 
 type LogsBackend interface {
-	getLogs(start int64, page int64, after *time.Time, query LogsFilter, sort LogsSort, cursor bool) (*LogsPager, error)
+	getLogs(start int64, page int64, beforeOrafter *time.Time, after bool,
+		query LogsFilter, sort LogsSort, cursor bool) (*LogsPager, error)
 	getLogsByCursor(nextCursor string) (*LogsPager, error)
 	postLogs(e []LogsEntry) error
 	register() error
@@ -116,6 +117,9 @@ type LogsCursorClaim struct {
 //   Sorting Parameters:
 //     - sort: common list of items of "tsec,tnano,device,src,lvl,time-created"
 //             you can use - on each individual item to reverse order
+//
+//   Cursor Parameters:
+//     - cursor: true in case you want us to return a cursor ID as well.
 //
 func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 
@@ -195,21 +199,33 @@ func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 		}
 	}
 
-	afterParam := r.FormValue("after")
-	var after *time.Time
+	var beforeOrAfter *time.Time
+	var after bool
 
-	if afterParam != "" {
-		t, err := time.Parse(time.RFC3339, afterParam)
+	after = true
+	beforeParam := r.FormValue("before")
+	afterParam := r.FormValue("after")
+
+	if beforeParam != "" {
+		t, err := time.Parse(time.RFC3339, beforeParam)
 		if err != nil {
-			rest.Error(w, "ERROR: parsing 'after' date "+err.Error(), http.StatusBadRequest)
+			rest.Error(w, "ERROR: parsing 'before' date "+err.Error(), http.StatusBadRequest)
 			return
 		}
-		after = &t
+		beforeOrAfter = &t
+		after = false
+	} else if afterParam != "" {
+		t, err := time.Parse(time.RFC3339, afterParam)
+		if err != nil {
+			rest.Error(w, "ERROR: parsing 'before' date "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		beforeOrAfter = &t
+		after = true
 	}
 
 	cursor := r.FormValue("cursor") != ""
-
-	result, err = a.backend.getLogs(startParamInt, pageParamInt, after, filter, logsSort, cursor)
+	result, err = a.backend.getLogs(startParamInt, pageParamInt, beforeOrAfter, after, filter, logsSort, cursor)
 
 	if err != nil {
 		rest.Error(w, "ERROR: getting logs failed "+err.Error(), http.StatusInternalServerError)
