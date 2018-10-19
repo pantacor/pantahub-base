@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	"github.com/urfave/cli"
+	"gitlab.com/pantacor/pvr/libpvr"
 )
 
 func CommandPost() cli.Command {
@@ -47,7 +48,13 @@ func CommandPost() cli.Command {
 				repoPath = c.Args()[0]
 			}
 
-			pvr, err := NewPvr(c.App, wd)
+			session, err := libpvr.NewSession(c.App)
+
+			if err != nil {
+				return cli.NewExitError(err, 4)
+			}
+
+			pvr, err := libpvr.NewPvr(session, wd)
 			if err != nil {
 				return cli.NewExitError(err, 2)
 			}
