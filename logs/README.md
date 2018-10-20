@@ -262,7 +262,7 @@ All fields available for sorting are:
 #### Example: logs with cursor
 
 ```
-http GET https://api2.pantahub.com/logs/?cursor=true Authorization:" Bearer $TOK"
+http GET localhost:12365/logs/?cursor=true Authorization:" Bearer $TOK"
 HTTP/1.1 200 OK
 Connection: keep-alive
 Content-Encoding: gzip
@@ -302,7 +302,7 @@ X-Runtime: 0.719266
 And use the value of ```next-cursor``` for follow up calls to the cursor endpoint:
 
 ```
-http  POST https://api2.pantahub.com/logs/cursor next-cursor="$next" Authorization:" Bearer $TOK"
+http  POST localhost:12365/logs/cursor next-cursor="$next" Authorization:" Bearer $TOK"
 ...
 ```
 
