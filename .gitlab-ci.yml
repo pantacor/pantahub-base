@@ -12,6 +12,22 @@ variables:
   DOCKER_DRIVER: overlay2
   GIT_SUBMODULE_STRATEGY: recursive
 
+build-branch:
+  stage: build
+  before_script:
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
+    - docker run --rm --privileged multiarch/qemu-user-static:register || true
+  script:
+    - docker pull $CONTAINER_IMAGE:$CI_BUILD_REF_SLUG || true
+    - docker build -f Dockerfile --build-arg NS=branch --cache-from $CONTAINER_IMAGE:$CI_BUILD_REF_SLUG --tag $CONTAINER_IMAGE:$CI_BUILD_REF_SLUG-$CI_BUILD_REF --tag $CONTAINER_IMAGE:$CI_BUILD_REF_SLUG .
+    - test -n "$CI_BUILD_TAG" && docker tag $CONTAINER_IMAGE:$CI_BUILD_REF_SLUG-$CI_BUILD_REF $CONTAINER_IMAGE:$CI_BUILD_TAG || true
+    - docker push $CONTAINER_IMAGE:$CI_BUILD_REF_SLUG-$CI_BUILD_REF
+    - docker push $CONTAINER_IMAGE:$CI_BUILD_REF_SLUG
+    - test -n "$CI_BUILD_TAG" && docker push $CONTAINER_IMAGE:$CI_BUILD_TAG || true
+  except:
+  - develop
+  - master
+
 build-devel:
   stage: build
   before_script:
@@ -25,7 +41,7 @@ build-devel:
     - docker push $CONTAINER_IMAGE:$CI_BUILD_REF_SLUG
     - test -n "$CI_BUILD_TAG" && docker push $CONTAINER_IMAGE:$CI_BUILD_TAG || true
   only:
-  - devel
+  - develop
 
 build-master:
   stage: build
