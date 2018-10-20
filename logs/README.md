@@ -86,24 +86,52 @@ As user you can navigate through your logs using the ```GET /logs/``` endpoint.
 
 Various parameters are available to restrict and sort your search.
 
-Paging:
+### Paging
+
 You can page using the start= and page= parameters:
+
  * ```start``` - start offset
  * ```page``` - page size; maximum entries to return in one call
 
-Streaming:
-You can implement poll streaming by using the "after" parameter which takes
-an RFC3399 formatted date/time as input and ensures that results will be
-considered only for new entries that were added to logs storage after that
-date.
+### Limit search by time
 
-To realize streaming Typically you would query for logs and then use the date
+You can limit search using the "after=" and "before=" query parameter to
+the ```/logs``` endpoint.
+
+ * ```after``` - RFC3399 formatted time to limit search to log entries
+   with ```time-created``` larger than this time.
+ * ```before``` - RFC3399 formatted time to limit search to log entries
+   with ```time-created``` smaller than this time.
+
+At this point behavioru if both parameters are found in query is undefined.
+
+### Streaming
+
+To realize streaming typically you would query for logs and then use the date
 of last item retrieved as after= parameter until you retrieve a new item.
 
 Also see below for Cursor feature which gives you a good way to step through
 long lists sorted by keys that are not unique.
 
-Example: Get log
+### Cursors
+
+If you want to scroll through later lists you can use cursor feature. With cursor
+you can use the ```/logs/cursor``` to page throught the search results whose
+initial invocation of the ```/logs``` endpoint got passed ```cursor=true``` a query
+parameter.
+
+Until the cursor gets exhausted the result page of ```/logs``` and ```/logs/cursor```
+endpoints will return a ```next-cursor``` field that contains the cursor you will
+have to pass to ```/logs/cursor``` to retrieve the next page.
+
+Note that cursors do get invalidated if they get exhausted (meaning: you retrieved
+the last entries). In case the cursor is found to be exhausted by ```/logs``` or
+```/logs/cursor``` endpoint, ```next-cursor``` will be empty string ("").
+
+
+### Examples
+
+#### Example: Get log
 
 ```
 http GET localhost:12365/logs/ Authorization:" Bearer $TOKEN" \
@@ -151,7 +179,7 @@ X-Powered-By: go-json-rest
 
 ```
 
-Example (with after):
+### Example: limit search with ```after```:
 
 ```
 http GET "localhost:12365/logs/?after=2017-06-02T00:25:01.885%2B02:00 "Authorization:" Bearer $TOKEN"
@@ -230,14 +258,7 @@ All fields available for sorting are:
  * tsec,tnano,device,src,lvl,time-created
 
 
-## Using Cursors
-
-If you want to scroll through later lists you can use cursor feature. With cursor
-you can use the ```/logs/cursor``` to continue to retrieve further pages of a logs
-query. To retrieve a cursor you have to use the cursor=true query parameter to the
-/logs endpoint.
-
-Example logs with cursor usage:
+#### Example: logs with cursor
 
 ```
 http GET https://api2.pantahub.com/logs/?cursor=true Authorization:" Bearer $TOK"
