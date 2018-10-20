@@ -213,7 +213,7 @@ X-Powered-By: go-json-rest
 
 ```
 
-Sorting:
+#### Example: sorting
 You can sort the logs by time-created.
 
 ```
