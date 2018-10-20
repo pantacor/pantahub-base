@@ -70,7 +70,7 @@ deploy-devel:
     - echo -n $KUBE_CONFIG_DEV | base64 -d > $HOME/.kube/config
     - kubectl -n api2 set image deploy/pantahub-base pantahub-base=$CONTAINER_IMAGE:$CI_BUILD_REF_SLUG-$CI_BUILD_REF
   only:
-    - devel
+    - develop
 
 deploy-prod:
   stage: deploy
