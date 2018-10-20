@@ -79,6 +79,7 @@ http POST localhost:12365/logs/ Authorization:" Bearer $DTOKEN" <<EOF
  }
 ]
 EOF
+```
 
 ## Browse the Logs (USER)
 
@@ -126,7 +127,7 @@ have to pass to ```/logs/cursor``` to retrieve the next page.
 
 Note that cursors do get invalidated if they get exhausted (meaning: you retrieved
 the last entries). In case the cursor is found to be exhausted by ```/logs``` or
-```/logs/cursor``` endpoint, ```next-cursor``` will be empty string ("").
+```/logs/cursor``` endpoint, ```next-cursor``` will be empty string ("").`  `
 
 
 ### Examples
