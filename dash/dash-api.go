@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 
 	jwt "github.com/StephanDollberg/go-json-rest-middleware-jwt"
 	"github.com/alecthomas/units"
@@ -69,12 +70,13 @@ type SubscriptionInfo struct {
 }
 
 type DeviceInfo struct {
-	DeviceId string `json:"device-id"`
-	Nick     string `json:"nick"`
-	Prn      string `json:"prn"`
-	Message  string `json:"message"`
-	Type     string `json:"type"`
-	Status   string `json:"status"`
+	DeviceId     string    `json:"device-id"`
+	Nick         string    `json:"nick"`
+	Prn          string    `json:"prn"`
+	Message      string    `json:"message"`
+	Type         string    `json:"type"`
+	Status       string    `json:"status"`
+	LastActivity time.Time `json:"last-activity"`
 }
 
 type Summary struct {
@@ -272,6 +274,7 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 		dInfo.Nick = v.DeviceNick
 		dInfo.DeviceId = v.DeviceId
 		dInfo.Status = v.Status
+		dInfo.LastActivity = v.Timestamp
 		summary.TopDevices = append(summary.TopDevices, dInfo)
 	}
 
