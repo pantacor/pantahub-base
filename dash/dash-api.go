@@ -24,13 +24,11 @@ import (
 	jwt "github.com/StephanDollberg/go-json-rest-middleware-jwt"
 	"github.com/alecthomas/units"
 	"github.com/ant0ine/go-json-rest/rest"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
-
-	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/subscriptions"
 	"gitlab.com/pantacor/pantahub-base/trails"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 )
 
 type DashApp struct {
@@ -71,11 +69,12 @@ type SubscriptionInfo struct {
 }
 
 type DeviceInfo struct {
-	DeviceId bson.ObjectId `json:"device-id"`
-	Nick     string        `json:"nick"`
-	Prn      string        `json:"prn"`
-	Message  string        `json:"message"`
-	Type     string        `json:"type"`
+	DeviceId string `json:"device-id"`
+	Nick     string `json:"nick"`
+	Prn      string `json:"prn"`
+	Message  string `json:"message"`
+	Type     string `json:"type"`
+	Status   string `json:"status"`
 }
 
 type Summary struct {
@@ -234,9 +233,9 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	tCol := a.mgoSession.DB("").C("pantahub_trails")
-	if tCol == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+	summaryCol := a.mgoSession.DB("pantabase_devicesummary").C("device_summary_short_new_v1")
+	if summaryCol == nil {
+		rest.Error(w, "Error with Database connectivity (summaryCol)", http.StatusInternalServerError)
 		return
 	}
 
@@ -254,8 +253,8 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 
 	summary := Summary{}
 
-	var mostRecentDeviceTrails []trails.Trail
-	err := tCol.Find(bson.M{"owner": owner}).Sort("-last-touched").Limit(5).All(&mostRecentDeviceTrails)
+	var mostRecentDeviceTrails []trails.TrailSummary
+	err := summaryCol.Find(bson.M{"owner": owner}).Sort("-timestamp").Limit(5).All(&mostRecentDeviceTrails)
 
 	if err != nil {
 		rest.Error(w, "Error finding devices for summary "+err.Error(),
@@ -266,23 +265,13 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 	summary.TopDevices = make([]DeviceInfo, 0)
 
 	for _, v := range mostRecentDeviceTrails {
-		var dev devices.Device
-		err = dCol.Find(bson.M{"owner": owner, "prn": v.Device}).One(&dev)
-		if err == mgo.ErrNotFound {
-			// XXX: for now we skip devices that have trail but not device (e.g. deleted);
-			// but its wrong. need to fix that we display 5 active devices in all cases
-			continue
-		} else if err != nil {
-			rest.Error(w, "Error finding device for top device summary "+err.Error(),
-				http.StatusInternalServerError)
-			return
-		}
 		dInfo := DeviceInfo{}
 		dInfo.Prn = v.Device
-		dInfo.Message = "Device changed at " + v.LastTouched.String()
+		dInfo.Message = "Device changed at " + v.TrailTouchedTime.String()
 		dInfo.Type = "INFO"
-		dInfo.Nick = dev.Nick
-		dInfo.DeviceId = dev.Id
+		dInfo.Nick = v.DeviceNick
+		dInfo.DeviceId = v.DeviceId
+		dInfo.Status = v.Status
 		summary.TopDevices = append(summary.TopDevices, dInfo)
 	}
 
