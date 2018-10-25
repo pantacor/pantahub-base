@@ -207,7 +207,7 @@ func (s *elasticLogger) getLogs(start int64, page int64, beforeOrAfter *time.Tim
 		}
 		searchS = searchS.Sort(v, asc)
 	}
-	searchS = searchS.Sort("_id", false)
+	searchS = searchS.Sort("_id", true)
 
 	searchBody, err := searchS.Source()
 	if err != nil {
