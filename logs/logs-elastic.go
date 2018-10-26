@@ -159,8 +159,8 @@ func (s *elasticLogger) unregister(deleteIndex bool) error {
 	return nil
 }
 
-func (s *elasticLogger) getLogs(start int64, page int64, after *time.Time,
-	query LogsFilter, sort LogsSort) (*LogsPager, error) {
+func (s *elasticLogger) getLogs(start int64, page int64, beforeOrAfter *time.Time,
+	after bool, query LogsFilter, sort LogsSort, cursor bool) (*LogsPager, error) {
 	queryFmt := fmt.Sprintf(s.elasticIndexPrefix + "-*/pv/_search")
 
 	queryURL, err := url.Parse(queryFmt)
@@ -179,8 +179,12 @@ func (s *elasticLogger) getLogs(start int64, page int64, after *time.Time,
 	if query.Device != "" {
 		q = q.Must(elastic.NewTermQuery("dev", query.Device))
 	}
-	if after != nil {
-		q = q.Must(elastic.NewRangeQuery("time-created").Gt(*after))
+	if beforeOrAfter != nil {
+		if after {
+			q = q.Must(elastic.NewRangeQuery("time-created").Gt(*beforeOrAfter))
+		} else {
+			q = q.Must(elastic.NewRangeQuery("time-created").Lt(*beforeOrAfter))
+		}
 	}
 
 	// build search
@@ -203,14 +207,21 @@ func (s *elasticLogger) getLogs(start int64, page int64, after *time.Time,
 		}
 		searchS = searchS.Sort(v, asc)
 	}
-	searchS = searchS.Sort("_id", false)
+	searchS = searchS.Sort("_id", true)
 
 	searchBody, err := searchS.Source()
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := s.r().SetBody(searchBody).Get(queryURI.String())
+	// add scroll to query; XXX: we need limits here for
+	if cursor {
+		q1 := queryURI.Query()
+		q1.Add("scroll", "1m")
+		queryURI.RawQuery = q1.Encode()
+	}
+
+	response, err := s.r().SetBody(searchBody).Post(queryURI.String())
 	if err != nil {
 		return nil, err
 	}
@@ -234,6 +245,61 @@ func (s *elasticLogger) getLogs(start int64, page int64, after *time.Time,
 	pagerResult.Count = elasticResult.TotalHits()
 	pagerResult.Start = start
 	pagerResult.Page = int64(len(elasticResult.Hits.Hits))
+	pagerResult.NextCursor = elasticResult.ScrollId
+
+	prototype := LogsEntry{}
+	arr := elasticResult.Each(reflect.TypeOf(&prototype))
+
+	for _, v := range arr {
+		pagerResult.Entries = append(pagerResult.Entries, v.(*LogsEntry))
+	}
+	pagerResult.Count = int64(len(arr))
+
+	return &pagerResult, nil
+}
+
+func (s *elasticLogger) getLogsByCursor(nextCursor string) (*LogsPager, error) {
+
+	queryFmt, values, err := elastic.ScrollBuildNextURL(false)
+	queryURL, err := url.Parse(queryFmt)
+	queryURL.RawQuery = values.Encode()
+
+	if err != nil {
+		return nil, err
+	}
+
+	queryURI := s.elasticURL.ResolveReference(queryURL)
+
+	searchBody, err := elastic.ScrollBuildBodyNext("1m", nextCursor)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := s.r().SetBody(searchBody).Post(queryURI.String())
+	if err != nil {
+		return nil, err
+	}
+
+	if response.StatusCode() != http.StatusOK {
+		errStr := fmt.Sprintf("WARN: getLogs call failed: %d - %s\n", response.StatusCode(), response.Status())
+		return nil, errors.New(errStr)
+	}
+
+	var elasticResult elastic.SearchResult
+
+	body := response.Body()
+	err = json.Unmarshal(body, &elasticResult)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var pagerResult LogsPager
+
+	pagerResult.Count = elasticResult.TotalHits()
+	pagerResult.Start = 0
+	pagerResult.Page = int64(len(elasticResult.Hits.Hits))
+	pagerResult.NextCursor = elasticResult.ScrollId
 
 	prototype := LogsEntry{}
 	arr := elasticResult.Each(reflect.TypeOf(&prototype))

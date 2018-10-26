@@ -1,4 +1,3 @@
-//
 // Copyright 2017  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,7 +22,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-func (a *TrailsApp) isTrailPublic(trailId string) (bool, error) {
+func (a *TrailsApp) isTrailPublic(trailID string) (bool, error) {
 
 	collTrails := a.mgoSession.DB("").C("pantahub_trails")
 
@@ -32,8 +31,8 @@ func (a *TrailsApp) isTrailPublic(trailId string) (bool, error) {
 	}
 
 	trail := Trail{}
-	log.Println("Trail:" + trailId)
-	err := collTrails.Find(bson.M{"_id": bson.ObjectIdHex(trailId)}).One(&trail)
+	log.Println("Trail:" + trailID)
+	err := collTrails.Find(bson.M{"_id": bson.ObjectIdHex(trailID)}).One(&trail)
 
 	if err != nil {
 		return false, err

@@ -20,6 +20,7 @@ import (
 	"os"
 
 	"github.com/urfave/cli"
+	"gitlab.com/pantacor/pvr/libpvr"
 )
 
 func CommandStatus() cli.Command {
@@ -34,7 +35,13 @@ func CommandStatus() cli.Command {
 				return cli.NewExitError(err, 1)
 			}
 
-			pvr, err := NewPvr(c.App, wd)
+			session, err := libpvr.NewSession(c.App)
+
+			if err != nil {
+				return cli.NewExitError(err, 4)
+			}
+
+			pvr, err := libpvr.NewPvr(session, wd)
 			if err != nil {
 				return cli.NewExitError(err, 2)
 			}
@@ -44,7 +51,7 @@ func CommandStatus() cli.Command {
 				return cli.NewExitError(err, 3)
 			}
 
-			fmt.Println(status)
+			fmt.Print(status)
 
 			return nil
 		},

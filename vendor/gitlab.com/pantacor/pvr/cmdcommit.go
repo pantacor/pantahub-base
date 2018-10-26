@@ -1,4 +1,4 @@
-	//
+//
 // Copyright 2017  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,6 +19,7 @@ import (
 	"os"
 
 	"github.com/urfave/cli"
+	"gitlab.com/pantacor/pvr/libpvr"
 )
 
 func CommandCommit() cli.Command {
@@ -33,9 +34,15 @@ func CommandCommit() cli.Command {
 				return err
 			}
 
-			pvr, err := NewPvr(c.App, wd)
+			session, err := libpvr.NewSession(c.App)
+
 			if err != nil {
-				return err
+				return cli.NewExitError(err, 4)
+			}
+
+			pvr, err := libpvr.NewPvr(session, wd)
+			if err != nil {
+				return cli.NewExitError(err, 2)
 			}
 
 			commitmsg := c.String("message")
