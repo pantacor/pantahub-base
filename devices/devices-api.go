@@ -826,6 +826,19 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *DevicesApp {
 		return nil
 	}
 
+	index = mgo.Index{
+		Key:        []string{"prn"},
+		Unique:     false,
+		Background: true,
+		Sparse:     false,
+	}
+
+	err = app.mgoSession.DB("").C("pantahub_devices").EnsureIndex(index)
+	if err != nil {
+		log.Println("Error setting up index prn for pantahub_devices: " + err.Error())
+		return nil
+	}
+
 	app.Api = rest.NewApi()
 	// we dont use default stack because we dont want content type enforcement
 	app.Api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
