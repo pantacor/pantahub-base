@@ -415,15 +415,17 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 		device.Challenge = ""
 	}
 
-	var ownerAccount accounts.Account
-	err = collectionAccounts.Find(bson.M{"prn": device.Owner}).One(&ownerAccount)
+	if device.Owner != "" {
+		var ownerAccount accounts.Account
+		err = collectionAccounts.Find(bson.M{"prn": device.Owner}).One(&ownerAccount)
 
-	if err != nil {
-		rest.Error(w, "Owner account not Found", http.StatusInternalServerError)
-		return
+		if err != nil {
+			rest.Error(w, "Owner account not Found", http.StatusInternalServerError)
+			return
+		}
+		device.OwnerNick = ownerAccount.Nick
 	}
 
-	device.OwnerNick = ownerAccount.Nick
 	device.UserMeta = utils.BsonUnquoteMap(&device.UserMeta)
 	device.DeviceMeta = utils.BsonUnquoteMap(&device.DeviceMeta)
 
