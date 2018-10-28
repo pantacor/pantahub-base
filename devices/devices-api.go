@@ -205,7 +205,7 @@ func (a *DevicesApp) handle_postdevice(w rest.ResponseWriter, r *rest.Request) {
 	newDevice.TimeModified = newDevice.TimeCreated
 
 	if newDevice.Nick == "" {
-		newDevice.Nick = petname.Generate(2, "_")
+		newDevice.Nick = petname.Generate(3, "_")
 	}
 
 	collection := a.mgoSession.DB("").C("pantahub_devices")
