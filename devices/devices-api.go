@@ -26,11 +26,10 @@ import (
 	jwt "github.com/StephanDollberg/go-json-rest-middleware-jwt"
 	"github.com/ant0ine/go-json-rest/rest"
 	petname "github.com/dustinkirkland/golang-petname"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
-
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 )
 
 func init() {
@@ -49,6 +48,7 @@ type Device struct {
 	Prn          string                 `json:"prn"`
 	Nick         string                 `json:"nick"`
 	Owner        string                 `json:"owner"`
+	OwnerNick    string                 `json:"owner-nick" bson:"-"`
 	Secret       string                 `json:"secret,omitempty"`
 	TimeCreated  time.Time              `json:"time-created" bson:"timecreated"`
 	TimeModified time.Time              `json:"time-modified" bson:"timemodified"`
@@ -384,6 +384,13 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
+	collectionAccounts := a.mgoSession.DB("").C("pantahub_accounts")
+
+	if collectionAccounts == nil {
+		rest.Error(w, "Error with Database (accounts) connectivity", http.StatusInternalServerError)
+		return
+	}
+
 	err := collection.FindId(mgoid).One(&device)
 
 	if err != nil {
@@ -407,6 +414,16 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 		device.Secret = ""
 		device.Challenge = ""
 	}
+
+	var ownerAccount accounts.Account
+	err = collectionAccounts.Find(bson.M{"prn": device.Owner}).One(&ownerAccount)
+
+	if err != nil {
+		rest.Error(w, "Owner account not Found", http.StatusInternalServerError)
+		return
+	}
+
+	device.OwnerNick = ownerAccount.Nick
 	device.UserMeta = utils.BsonUnquoteMap(&device.UserMeta)
 	device.DeviceMeta = utils.BsonUnquoteMap(&device.DeviceMeta)
 
