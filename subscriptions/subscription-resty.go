@@ -13,7 +13,7 @@ import (
 	"os"
 	"strconv"
 
-	jwt "github.com/StephanDollberg/go-json-rest-middleware-jwt"
+	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
 	"github.com/ant0ine/go-json-rest/rest"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	mgo "gopkg.in/mgo.v2"

@@ -69,7 +69,7 @@ var _ = Describe("Commands", func() {
 			val, err := client.Wait(1, wait).Result()
 			Expect(err).NotTo(HaveOccurred())
 			Expect(val).To(Equal(int64(0)))
-			Expect(time.Now()).To(BeTemporally("~", start.Add(wait), time.Second))
+			Expect(time.Now()).To(BeTemporally("~", start.Add(wait), 3*time.Second))
 		})
 
 		It("should Select", func() {
@@ -2118,6 +2118,170 @@ var _ = Describe("Commands", func() {
 
 	Describe("sorted sets", func() {
 
+		It("should BZPopMax", func() {
+			err := client.ZAdd("zset1", redis.Z{
+				Score:  1,
+				Member: "one",
+			}).Err()
+			Expect(err).NotTo(HaveOccurred())
+			err = client.ZAdd("zset1", redis.Z{
+				Score:  2,
+				Member: "two",
+			}).Err()
+			Expect(err).NotTo(HaveOccurred())
+			err = client.ZAdd("zset1", redis.Z{
+				Score:  3,
+				Member: "three",
+			}).Err()
+			Expect(err).NotTo(HaveOccurred())
+
+			member, err := client.BZPopMax(0, "zset1", "zset2").Result()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(member).To(Equal(redis.ZWithKey{
+				Z: redis.Z{
+					Score:  3,
+					Member: "three",
+				},
+				Key: "zset1",
+			}))
+		})
+
+		It("should BZPopMax blocks", func() {
+			started := make(chan bool)
+			done := make(chan bool)
+			go func() {
+				defer GinkgoRecover()
+
+				started <- true
+				bZPopMax := client.BZPopMax(0, "zset")
+				Expect(bZPopMax.Err()).NotTo(HaveOccurred())
+				Expect(bZPopMax.Val()).To(Equal(redis.ZWithKey{
+					Z: redis.Z{
+						Member: "a",
+						Score:  1,
+					},
+					Key: "zset",
+				}))
+				done <- true
+			}()
+			<-started
+
+			select {
+			case <-done:
+				Fail("BZPopMax is not blocked")
+			case <-time.After(time.Second):
+				// ok
+			}
+
+			zAdd := client.ZAdd("zset", redis.Z{
+				Member: "a",
+				Score:  1,
+			})
+			Expect(zAdd.Err()).NotTo(HaveOccurred())
+
+			select {
+			case <-done:
+				// ok
+			case <-time.After(time.Second):
+				Fail("BZPopMax is still blocked")
+			}
+		})
+
+		It("should BZPopMax timeout", func() {
+			val, err := client.BZPopMax(time.Second, "zset1").Result()
+			Expect(err).To(Equal(redis.Nil))
+			Expect(val).To(Equal(redis.ZWithKey{}))
+
+			Expect(client.Ping().Err()).NotTo(HaveOccurred())
+
+			stats := client.PoolStats()
+			Expect(stats.Hits).To(Equal(uint32(1)))
+			Expect(stats.Misses).To(Equal(uint32(2)))
+			Expect(stats.Timeouts).To(Equal(uint32(0)))
+		})
+
+		It("should BZPopMin", func() {
+			err := client.ZAdd("zset1", redis.Z{
+				Score:  1,
+				Member: "one",
+			}).Err()
+			Expect(err).NotTo(HaveOccurred())
+			err = client.ZAdd("zset1", redis.Z{
+				Score:  2,
+				Member: "two",
+			}).Err()
+			Expect(err).NotTo(HaveOccurred())
+			err = client.ZAdd("zset1", redis.Z{
+				Score:  3,
+				Member: "three",
+			}).Err()
+			Expect(err).NotTo(HaveOccurred())
+
+			member, err := client.BZPopMin(0, "zset1", "zset2").Result()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(member).To(Equal(redis.ZWithKey{
+				Z: redis.Z{
+					Score:  1,
+					Member: "one",
+				},
+				Key: "zset1",
+			}))
+		})
+
+		It("should BZPopMin blocks", func() {
+			started := make(chan bool)
+			done := make(chan bool)
+			go func() {
+				defer GinkgoRecover()
+
+				started <- true
+				bZPopMin := client.BZPopMin(0, "zset")
+				Expect(bZPopMin.Err()).NotTo(HaveOccurred())
+				Expect(bZPopMin.Val()).To(Equal(redis.ZWithKey{
+					Z: redis.Z{
+						Member: "a",
+						Score:  1,
+					},
+					Key: "zset",
+				}))
+				done <- true
+			}()
+			<-started
+
+			select {
+			case <-done:
+				Fail("BZPopMin is not blocked")
+			case <-time.After(time.Second):
+				// ok
+			}
+
+			zAdd := client.ZAdd("zset", redis.Z{
+				Member: "a",
+				Score:  1,
+			})
+			Expect(zAdd.Err()).NotTo(HaveOccurred())
+
+			select {
+			case <-done:
+				// ok
+			case <-time.After(time.Second):
+				Fail("BZPopMin is still blocked")
+			}
+		})
+
+		It("should BZPopMin timeout", func() {
+			val, err := client.BZPopMin(time.Second, "zset1").Result()
+			Expect(err).To(Equal(redis.Nil))
+			Expect(val).To(Equal(redis.ZWithKey{}))
+
+			Expect(client.Ping().Err()).NotTo(HaveOccurred())
+
+			stats := client.PoolStats()
+			Expect(stats.Hits).To(Equal(uint32(1)))
+			Expect(stats.Misses).To(Equal(uint32(2)))
+			Expect(stats.Timeouts).To(Equal(uint32(0)))
+		})
+
 		It("should ZAdd", func() {
 			added, err := client.ZAdd("zset", redis.Z{
 				Score:  1,
@@ -2629,10 +2793,13 @@ var _ = Describe("Commands", func() {
 				Member: "one",
 			}).Err()
 			Expect(err).NotTo(HaveOccurred())
+
 			err = client.ZAdd("zset", redis.Z{
 				Score:  2,
 				Member: "two",
 			}).Err()
+			Expect(err).NotTo(HaveOccurred())
+
 			members, err = client.ZPopMin("zset", 10).Result()
 			Expect(err).NotTo(HaveOccurred())
 			Expect(members).To(Equal([]redis.Z{{
@@ -3241,6 +3408,12 @@ var _ = Describe("Commands", func() {
 			}))
 		})
 
+		It("should XDel", func() {
+			n, err := client.XDel("stream", "1-0", "2-0", "3-0").Result()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(n).To(Equal(int64(3)))
+		})
+
 		It("should XLen", func() {
 			n, err := client.XLen("stream").Result()
 			Expect(err).NotTo(HaveOccurred())
@@ -3371,8 +3544,9 @@ var _ = Describe("Commands", func() {
 				res, err := client.XReadGroup(&redis.XReadGroupArgs{
 					Group:    "group",
 					Consumer: "consumer",
-					Streams:  []string{"stream", "0"},
+					Streams:  []string{"stream", ">"},
 				}).Result()
+				Expect(err).NotTo(HaveOccurred())
 				Expect(res).To(Equal([]redis.XStream{{
 					Stream: "stream",
 					Messages: []redis.XMessage{

@@ -53,7 +53,7 @@ import (
 	"strings"
 	"time"
 
-	jwt "github.com/StephanDollberg/go-json-rest-middleware-jwt"
+	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/utils"

@@ -442,39 +442,29 @@ func (s *ScrollService) next(ctx context.Context) (*SearchResult, error) {
 	return ret, nil
 }
 
-func ScrollBuildNextURL(pretty bool) (string, url.Values, error) {
+// buildNextURL builds the URL for the operation.
+func (s *ScrollService) buildNextURL() (string, url.Values, error) {
 	path := "/_search/scroll"
 
 	// Add query string parameters
 	params := url.Values{}
-
-	if pretty {
+	if s.pretty {
 		params.Set("pretty", "1")
 	}
 
 	return path, params, nil
 }
 
-// buildNextURL builds the URL for the operation.
-func (s *ScrollService) buildNextURL() (string, url.Values, error) {
-	return ScrollBuildNextURL(s.pretty)
-}
-
-func ScrollBuildBodyNext(keepAlive string, scrollId string) (interface{}, error) {
+// body returns the request to fetch the next batch of results.
+func (s *ScrollService) bodyNext() (interface{}, error) {
+	s.mu.RLock()
 	body := struct {
 		Scroll   string `json:"scroll"`
 		ScrollId string `json:"scroll_id,omitempty"`
 	}{
-		Scroll:   keepAlive,
-		ScrollId: scrollId,
+		Scroll:   s.keepAlive,
+		ScrollId: s.scrollId,
 	}
-	return body, nil
-}
-
-// body returns the request to fetch the next batch of results.
-func (s *ScrollService) bodyNext() (interface{}, error) {
-	s.mu.RLock()
-	body, err := ScrollBuildBodyNext(s.keepAlive, s.scrollId)
 	s.mu.RUnlock()
-	return body, err
+	return body, nil
 }

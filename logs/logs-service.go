@@ -34,9 +34,9 @@ import (
 	"strings"
 	"time"
 
-	jwt "github.com/StephanDollberg/go-json-rest-middleware-jwt"
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
+	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"

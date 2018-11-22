@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	jwt "github.com/StephanDollberg/go-json-rest-middleware-jwt"
+	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
 	"github.com/go-resty/resty"
 	"gitlab.com/pantacor/pantahub-base/auth"
 	"gitlab.com/pantacor/pantahub-base/devices"
