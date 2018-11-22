@@ -125,7 +125,7 @@ func NewPvrInit(s *Session, dir string) (*Pvr, error) {
 	fileInfo, err := os.Stat(pvr.Dir)
 
 	if os.IsNotExist(err) {
-		err = os.MkdirAll(pvr.Dir, 0600)
+		err = os.MkdirAll(pvr.Dir, 0700)
 	}
 
 	if err != nil {
@@ -598,13 +598,8 @@ type ObjectWithAccess struct {
 	ExpireTime   string `json:"expire-time"`
 }
 
-func (p *Pvr) initializeRemote(repoPath string) (pvrapi.PvrRemote, error) {
+func (p *Pvr) initializeRemote(repoUrl *url.URL) (pvrapi.PvrRemote, error) {
 	res := pvrapi.PvrRemote{}
-	repoUrl, err := url.Parse(repoPath)
-
-	if err != nil {
-		return res, err
-	}
 
 	pvrRemoteUrl := repoUrl
 	pvrRemoteUrl.Path = path.Join(pvrRemoteUrl.Path, ".pvrremote")
@@ -982,7 +977,7 @@ func (p *Pvr) postObjects(pvrRemote pvrapi.PvrRemote, force bool) error {
 	return nil
 }
 
-func (p *Pvr) PutRemote(repoPath string, force bool) error {
+func (p *Pvr) PutRemote(repoPath *url.URL, force bool) error {
 
 	pvrRemote, err := p.initializeRemote(repoPath)
 
@@ -1045,15 +1040,39 @@ func (p *Pvr) Put(uri string, force bool) error {
 	}
 
 	if url.Scheme == "" {
-		err = p.PutLocal(uri)
-	} else {
-		err = p.PutRemote(uri, force)
+		_, err := os.Stat(filepath.Join(uri, "json"))
+		// if we get pointed at a pvr repo on disk, go local
+		if err == nil {
+			err = p.PutLocal(uri)
+			goto save
+		} else if !os.IsNotExist(err) {
+			return errors.New("error testing existance of json file in provided path: " + err.Error())
+		}
+		repoBaseURL, err := url.Parse(p.Session.GetApp().Metadata["PVR_REPO_BASEURL"].(string))
+		if err != nil {
+			return errors.New("error parsing PVR_REPO_BASEURL setting, see --help - ERROR:" + err.Error())
+		}
+
+		if !path.IsAbs(uri) {
+			uri = "/" + uri
+		}
+
+		refURL, err := url.Parse(uri)
+		if err != nil {
+			return errors.New("error parsing provided repo name, see --help - ERROR:" + err.Error())
+		}
+
+		url = repoBaseURL.ResolveReference(refURL)
+
 	}
+
+	err = p.PutRemote(url, force)
 
 	if err != nil {
 		return err
 	}
 
+save:
 	if p.Pvrconfig.DefaultGetUrl == "" {
 		p.Pvrconfig.DefaultGetUrl = uri
 	}
@@ -1117,10 +1136,32 @@ func (p *Pvr) Post(uri string, envelope string, commitMsg string, rev int, force
 	}
 
 	if url.Scheme == "" {
-		return errors.New("Post must be a remote REST endpoint, not: " + url.String())
+		_, err := os.Stat(filepath.Join(uri, "json"))
+		// if we get pointed at a pvr repo on disk, go local
+		if err == nil {
+			return errors.New("Post must be a remote REST endpoint, not: " + uri)
+		} else if !os.IsNotExist(err) {
+			return errors.New("error testing existance of json file in provided path: " + err.Error())
+		}
+
+		repoBaseURL, err := url.Parse(p.Session.GetApp().Metadata["PVR_REPO_BASEURL"].(string))
+		if err != nil {
+			return errors.New("error parsing PVR_REPO_BASEURL setting, see --help - ERROR:" + err.Error())
+		}
+
+		if !path.IsAbs(uri) {
+			uri = "/" + uri
+		}
+
+		refURL, err := url.Parse(uri)
+		if err != nil {
+			return errors.New("error parsing provided repo name, see --help - ERROR:" + err.Error())
+		}
+
+		url = repoBaseURL.ResolveReference(refURL)
 	}
 
-	remotePvr, err := p.initializeRemote(uri)
+	remotePvr, err := p.initializeRemote(url)
 
 	if err != nil {
 		return err
@@ -1460,19 +1501,13 @@ func (p *Pvr) getObjects(pvrRemote pvrapi.PvrRemote, jsonData []byte) error {
 	return nil
 }
 
-func (p *Pvr) GetRepoRemote(repoPath string, merge bool) error {
-
-	url, err := url.Parse(repoPath)
-
-	if err != nil {
-		return err
-	}
+func (p *Pvr) GetRepoRemote(url *url.URL, merge bool) error {
 
 	if url.Scheme == "" {
 		return errors.New("Post must be a remote REST endpoint, not: " + url.String())
 	}
 
-	remotePvr, err := p.initializeRemote(repoPath)
+	remotePvr, err := p.initializeRemote(url)
 
 	if err != nil {
 		return err
@@ -1525,23 +1560,54 @@ func (p *Pvr) GetRepo(uri string, merge bool) error {
 
 	p.Pvrconfig.DefaultGetUrl = uri
 
+	// if no url scheme try following in order;
+	//  1. is uri a local .pvr repo directory -> GetRepoLocal
+	//  2. if a path with one or two elements -> Prepend https://pvr.pantahub.com
+	//  3. if a first dir of path is resolvable host -> Prepend https://
 	if url.Scheme == "" {
-		err = p.GetRepoLocal(uri, merge)
-	} else {
-		if p.Pvrconfig.DefaultPutUrl == "" {
-			p.Pvrconfig.DefaultPutUrl = uri
+		_, err := os.Stat(filepath.Join(uri, "json"))
+
+		// if we get pointed at a pvr repo on disk, go local
+		if err == nil {
+			err = p.GetRepoLocal(uri, merge)
+			goto save
+		} else if !os.IsNotExist(err) {
+			return errors.New("error testing existance of json file in provided path: " + err.Error())
 		}
 
-		if p.Pvrconfig.DefaultPostUrl == "" {
-			p.Pvrconfig.DefaultPostUrl = uri
+		repoBaseURL, err := url.Parse(p.Session.GetApp().Metadata["PVR_REPO_BASEURL"].(string))
+		if err != nil {
+			return errors.New("error parsing PVR_REPO_BASEURL setting, see --help - ERROR:" + err.Error())
 		}
 
-		err = p.GetRepoRemote(uri, merge)
+		if !path.IsAbs(uri) {
+			uri = "/" + uri
+		}
+
+		refURL, err := url.Parse(uri)
+		if err != nil {
+			return errors.New("error parsing provided repo name, see --help - ERROR:" + err.Error())
+		}
+
+		url = repoBaseURL.ResolveReference(refURL)
+
 	}
+
+	if p.Pvrconfig.DefaultPutUrl == "" {
+		p.Pvrconfig.DefaultPutUrl = uri
+	}
+
+	if p.Pvrconfig.DefaultPostUrl == "" {
+		p.Pvrconfig.DefaultPostUrl = uri
+	}
+
+	err = p.GetRepoRemote(url, merge)
+
 	if err != nil {
 		return err
 	}
 
+save:
 	err = p.SaveConfig()
 
 	return err

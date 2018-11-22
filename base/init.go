@@ -29,7 +29,7 @@ import (
 
 	"gopkg.in/mgo.v2/bson"
 
-	jwt "github.com/StephanDollberg/go-json-rest-middleware-jwt"
+	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
 	"github.com/rs/cors"
 	"gitlab.com/pantacor/pantahub-base/auth"
 	"gitlab.com/pantacor/pantahub-base/dash"

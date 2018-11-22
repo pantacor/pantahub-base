@@ -27,7 +27,7 @@ import (
 	"gitlab.com/pantacor/pantahub-base/testutils"
 	"gitlab.com/pantacor/pantahub-base/utils"
 
-	"github.com/StephanDollberg/go-json-rest-middleware-jwt"
+	"github.com/fundapps/go-json-rest-middleware-jwt"
 	"github.com/go-resty/resty"
 )
 

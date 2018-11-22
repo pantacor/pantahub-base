@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	jwt "github.com/StephanDollberg/go-json-rest-middleware-jwt"
+	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
 	"github.com/ant0ine/go-json-rest/rest"
 	petname "github.com/dustinkirkland/golang-petname"
 	"gitlab.com/pantacor/pantahub-base/accounts"

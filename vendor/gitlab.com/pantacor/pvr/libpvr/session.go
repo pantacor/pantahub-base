@@ -17,6 +17,7 @@ package libpvr
 
 import (
 	"errors"
+	"net/http"
 	"os/user"
 	"path/filepath"
 
@@ -73,6 +74,10 @@ func (s *Session) DoAuthCall(fn WrappableRestyCallFunc) (*resty.Response, error)
 	bearer = s.GetApp().Metadata["PVR_AUTH"].(string)
 	response, err = fn(resty.R().SetAuthToken(bearer))
 
+	if err == nil && response.StatusCode() == http.StatusOK {
+		return response, nil
+	}
+
 	// if we see www-authenticate, we need to auth ...
 	authHeader := response.Header().Get("www-authenticate")
 
@@ -82,6 +87,7 @@ func (s *Session) DoAuthCall(fn WrappableRestyCallFunc) (*resty.Response, error)
 		if bearer != "" {
 			response, err = fn(resty.R().SetAuthToken(bearer))
 			authHeader = response.Header().Get("Www-Authenticate")
+			s.GetApp().Metadata["PVR_AUTH"] = bearer
 		}
 	}
 
@@ -91,6 +97,7 @@ func (s *Session) DoAuthCall(fn WrappableRestyCallFunc) (*resty.Response, error)
 		if bearer != "" {
 			response, err = fn(resty.R().SetAuthToken(bearer))
 			authHeader = response.Header().Get("Www-Authenticate")
+			s.GetApp().Metadata["PVR_AUTH"] = bearer
 		}
 	}
 

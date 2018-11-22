@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"time"
 
-	jwt "github.com/StephanDollberg/go-json-rest-middleware-jwt"
+	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
 	"github.com/alecthomas/units"
 	"github.com/ant0ine/go-json-rest/rest"
 	"gitlab.com/pantacor/pantahub-base/subscriptions"
