@@ -182,6 +182,7 @@ func (a *DevicesApp) handle_postdevice(w rest.ResponseWriter, r *rest.Request) {
 	newDevice.Id = mgoid
 	newDevice.Prn = "prn:::devices:/" + newDevice.Id.Hex()
 
+	// if user does not provide a secret, we invent one ...
 	if newDevice.Secret == "" {
 		var err error
 		newDevice.Secret, err = utils.GenerateSecret(15)
@@ -194,7 +195,6 @@ func (a *DevicesApp) handle_postdevice(w rest.ResponseWriter, r *rest.Request) {
 	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
 
 	var owner interface{}
-
 	if ok {
 		owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
 	}
@@ -233,18 +233,18 @@ func (a *DevicesApp) handle_postdevice(w rest.ResponseWriter, r *rest.Request) {
 	newDevice.TimeCreated = time.Now()
 	newDevice.TimeModified = newDevice.TimeCreated
 
+	// we invent a nick for user in case he didnt ask for a specfic one...
 	if newDevice.Nick == "" {
 		newDevice.Nick = petname.Generate(3, "_")
 	}
 
 	collection := a.mgoSession.DB("").C("pantahub_devices")
-
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
-	_, err := collection.UpsertId(mgoid, newDevice)
 
+	_, err := collection.UpsertId(mgoid, newDevice)
 	if err != nil {
 		rest.Error(w, "Error creating device "+err.Error(), http.StatusInternalServerError)
 		return
