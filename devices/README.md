@@ -382,6 +382,47 @@ X-Runtime: 0.000635
     "token": "xxxxxxxxxxxx"
 }
 ```
+**Remember the ```token```* you won't be able to retrieve it another time.
+
+## Auto Assign Devices on Registration
+
+Now on device side you have to send the PantahubAutoAssignToken: http header when registering yourself. This will make pantahub to automatically associated you with the owner of the token. Example:
+
+```
+http --print=bBhH POST localhost:12365/devices/ PantahubAuthAutoToken:Fn5xxxxxxxxxxxxxxxxxxxxxxxxxxx
+POST /devices/ HTTP/1.1
+Accept: */*
+Accept-Encoding: gzip, deflate
+Connection: keep-alive
+Content-Length: 0
+Host: localhost:12365
+PantahubAuthAutoToken: Fn5xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+User-Agent: HTTPie/0.9.9
+
+
+
+HTTP/1.1 200 OK
+Content-Length: 353
+Content-Type: application/json; charset=utf-8
+Date: Mon, 10 Dec 2018 16:03:35 GMT
+X-Powered-By: go-json-rest
+X-Runtime: 0.000788
+
+{
+    "device-meta": {},
+    "id": "5c0e8e57c094f62eafcc96b8",
+    "nick": "privately_correct_quail",
+    "owner": "prn:pantahub.com:auth:/user1",
+    "prn": "prn:::devices:/5c0e8e57c094f62eafcc96b8",
+    "public": false,
+    "secret": "0jf4yyyyyyyyyyyy",
+    "time-created": "2018-12-10T17:03:35.489788421+01:00",
+    "time-modified": "2018-12-10T17:03:35.489788421+01:00",
+    "user-meta": {
+        "mykey": "yourvalue"
+    }
+}
+```
 
 
 ## List tokens registered
