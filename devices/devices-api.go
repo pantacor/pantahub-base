@@ -50,7 +50,7 @@ type Device struct {
 	Prn          string                 `json:"prn"`
 	Nick         string                 `json:"nick"`
 	Owner        string                 `json:"owner"`
-	OwnerNick    string                 `json:"owner-nick" bson:"-"`
+	OwnerNick    string                 `json:"owner-nick,omitempty" bson:"-"`
 	Secret       string                 `json:"secret,omitempty"`
 	TimeCreated  time.Time              `json:"time-created" bson:"timecreated"`
 	TimeModified time.Time              `json:"time-modified" bson:"timemodified"`
@@ -181,7 +181,15 @@ func (a *DevicesApp) handle_postdevice(w rest.ResponseWriter, r *rest.Request) {
 	mgoid := bson.NewObjectId()
 	newDevice.Id = mgoid
 	newDevice.Prn = "prn:::devices:/" + newDevice.Id.Hex()
-	newDevice.Challenge = petname.Generate(3, "-")
+
+	if newDevice.Secret == "" {
+		var err error
+		newDevice.Secret, err = utils.GenerateSecret(15)
+		if err != nil {
+			rest.Error(w, "Error generating secret", http.StatusInternalServerError)
+			return
+		}
+	}
 
 	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
 
@@ -197,10 +205,29 @@ func (a *DevicesApp) handle_postdevice(w rest.ResponseWriter, r *rest.Request) {
 		newDevice.UserMeta = utils.BsonQuoteMap(&newDevice.UserMeta)
 		newDevice.DeviceMeta = map[string]interface{}{}
 	} else {
+
 		// device speaking here...
 		newDevice.Owner = ""
 		newDevice.UserMeta = map[string]interface{}{}
 		newDevice.DeviceMeta = utils.BsonQuoteMap(&newDevice.DeviceMeta)
+
+		// lets see if we have an auto assign candidate
+		autoAuthToken := r.Header.Get("PantahubAuthAutoToken")
+
+		if autoAuthToken != "" {
+
+			autoInfo, err := a.getBase64AutoTokenInfo(autoAuthToken)
+			if err != nil {
+				rest.Error(w, "Error using AutoAuthToken "+err.Error(), http.StatusBadRequest)
+				return
+			}
+
+			// update owner and usermeta
+			newDevice.Owner = autoInfo.Owner
+			newDevice.UserMeta = autoInfo.UserMeta
+		} else {
+			newDevice.Challenge = petname.Generate(3, "-")
+		}
 	}
 
 	newDevice.TimeCreated = time.Now()
@@ -843,6 +870,12 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *DevicesApp {
 		return nil
 	}
 
+	err = app.EnsureTokenIndices()
+	if err != nil {
+		log.Println("Error creating indices for pantahub devices tokens: " + err.Error())
+		return nil
+	}
+
 	app.Api = rest.NewApi()
 	// we dont use default stack because we dont want content type enforcement
 	app.Api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
@@ -880,6 +913,12 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *DevicesApp {
 
 	// /auth_status endpoints
 	api_router, _ := rest.MakeRouter(
+		// token api
+		rest.Post("/tokens", app.handle_posttokens),
+		rest.Delete("/tokens/:id", app.handle_disabletokens),
+		rest.Get("/tokens", app.handle_gettokens),
+
+		// default api
 		rest.Get("/auth_status", handle_auth),
 		rest.Get("/", app.handle_getdevices),
 		rest.Post("/", app.handle_postdevice),

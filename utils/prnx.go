@@ -19,6 +19,8 @@ package utils
 import (
 	"fmt"
 	"strings"
+
+	"gopkg.in/mgo.v2/bson"
 )
 
 type Prn string
@@ -39,6 +41,10 @@ type PrnInfo struct {
 func PrnGetId(prn string) string {
 	idx := strings.Index(prn, "/")
 	return prn[idx+1 : len(prn)]
+}
+
+func IdGetPrn(id bson.ObjectId, serviceName string) string {
+	return "prn:::" + serviceName + ":/" + id.Hex()
 }
 
 func (p *Prn) GetInfo() (*PrnInfo, error) {
