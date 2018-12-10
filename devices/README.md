@@ -1,5 +1,4 @@
 
-
 # Device
 
 PANTAHUB Device Registry
@@ -82,7 +81,7 @@ X-Powered-By: go-json-rest
     "time-modified": "0001-01-01T00:00:00Z",
     "user-meta": {}
 }
-
+```
 
 Note how the output has a challenge entry, but no owner yet...
 
@@ -90,6 +89,7 @@ Note how the output has a challenge entry, but no owner yet...
 ```
 challenge=duly-helped-bat
 ```
+
 3. as a logged in user with TOKEN you claim the device through a simple PUT
 ```
 http PUT localhost:12365/devices/59669139632d7234e2703610?challenge=$challenge Authorization:"Bearer $TOKEN"
