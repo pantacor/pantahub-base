@@ -22,6 +22,8 @@ import (
 	"strings"
 	"time"
 
+	jwtgo "github.com/dgrijalva/jwt-go"
+
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/fundapps/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/accounts"
@@ -157,7 +159,7 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 }
 
 func (a *AuthApp) handle_getprofile(w rest.ResponseWriter, r *rest.Request) {
-	jwtClaims := r.Env["JWT_PAYLOAD"].(map[string]interface{})
+	jwtClaims := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)
 
 	accountPrn := jwtClaims["prn"].(string)
 

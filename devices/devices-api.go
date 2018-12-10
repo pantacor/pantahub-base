@@ -23,11 +23,13 @@ import (
 	"strings"
 	"time"
 
-	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
 	"github.com/ant0ine/go-json-rest/rest"
+	jwtgo "github.com/dgrijalva/jwt-go"
 	petname "github.com/dustinkirkland/golang-petname"
+	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/utils"
+
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -72,14 +74,14 @@ func (a *DevicesApp) handle_putuserdata(w rest.ResponseWriter, r *rest.Request) 
 	}
 
 	var owner interface{}
-	owner, ok = jwtPayload.(map[string]interface{})["prn"]
+	owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
 	if !ok {
 		rest.Error(w, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
 		return
 	}
 
 	var authType interface{}
-	authType, ok = jwtPayload.(map[string]interface{})["type"]
+	authType, ok = jwtPayload.(jwtgo.MapClaims)["type"]
 	if !ok {
 		rest.Error(w, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
 		return
@@ -126,14 +128,14 @@ func (a *DevicesApp) handle_putdevicedata(w rest.ResponseWriter, r *rest.Request
 	}
 
 	var owner interface{}
-	owner, ok = jwtPayload.(map[string]interface{})["prn"]
+	owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
 	if !ok {
 		rest.Error(w, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
 		return
 	}
 
 	var authType interface{}
-	authType, ok = jwtPayload.(map[string]interface{})["type"]
+	authType, ok = jwtPayload.(jwtgo.MapClaims)["type"]
 	if !ok {
 		rest.Error(w, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
 		return
@@ -186,7 +188,7 @@ func (a *DevicesApp) handle_postdevice(w rest.ResponseWriter, r *rest.Request) {
 	var owner interface{}
 
 	if ok {
-		owner, ok = jwtPayload.(map[string]interface{})["prn"]
+		owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
 	}
 
 	if ok {
@@ -230,14 +232,14 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 
 	putId := r.PathParam("id")
 
-	authId, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	authId, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in.", http.StatusForbidden)
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	if !ok {
 		// XXX: find right error
@@ -353,14 +355,14 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 
 	mgoid := bson.ObjectIdHex(r.PathParam("id"))
 
-	authId, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	authId, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in.", http.StatusForbidden)
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	if !ok {
 		// XXX: find right error
@@ -440,14 +442,14 @@ func (a *DevicesApp) handle_getuserdevice(w rest.ResponseWriter, r *rest.Request
 	usernick := r.PathParam("usernick")
 	devicenick := r.PathParam("devicenick")
 
-	authId, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	authId, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in.", http.StatusForbidden)
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	if !ok {
 		// XXX: find right error
@@ -548,14 +550,14 @@ func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) 
 
 	patchId := r.PathParam("id")
 
-	authId, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	authId, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in.", http.StatusForbidden)
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	if !ok {
 		// XXX: find right error
@@ -624,14 +626,14 @@ func (a *DevicesApp) handle_putpublic(w rest.ResponseWriter, r *rest.Request) {
 
 	putId := r.PathParam("id")
 
-	authId, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	authId, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in.", http.StatusForbidden)
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	if !ok {
 		// XXX: find right error
@@ -680,14 +682,14 @@ func (a *DevicesApp) handle_deletepublic(w rest.ResponseWriter, r *rest.Request)
 
 	putId := r.PathParam("id")
 
-	authId, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	authId, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in.", http.StatusForbidden)
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	if !ok {
 		// XXX: find right error
@@ -736,7 +738,7 @@ type ModelError struct {
 }
 
 func (a *DevicesApp) handle_getdevices(w rest.ResponseWriter, r *rest.Request) {
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		err := ModelError{}
 		err.Code = http.StatusInternalServerError
@@ -771,7 +773,7 @@ func (a *DevicesApp) handle_deletedevice(w rest.ResponseWriter, r *rest.Request)
 
 	delId := r.PathParam("id")
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in as a USER", http.StatusForbidden)
