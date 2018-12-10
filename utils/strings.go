@@ -16,6 +16,7 @@
 package utils
 
 import (
+	crand "crypto/rand"
 	"math/rand"
 	"time"
 
@@ -45,4 +46,21 @@ func GenerateChallenge() string {
 	}
 
 	return string(result)
+}
+
+func GenerateSecret(length int) (string, error) {
+	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
+	key := make([]byte, length)
+
+	_, err := crand.Read(key)
+	if err != nil {
+		return "", err
+	}
+
+	result := make([]byte, length)
+	for i, v := range key {
+		result[i] = chars[int(v)%len(chars)]
+	}
+
+	return string(result), nil
 }
