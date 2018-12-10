@@ -22,7 +22,9 @@ import (
 	"strconv"
 	"time"
 
+	jwtgo "github.com/dgrijalva/jwt-go"
 	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
+
 	"github.com/alecthomas/units"
 	"github.com/ant0ine/go-json-rest/rest"
 	"gitlab.com/pantacor/pantahub-base/subscriptions"
@@ -224,7 +226,7 @@ func copySubToDashMap(sub subscriptions.Subscription) map[QuotaType]Quota {
 }
 
 func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		err := ModelError{}
 		err.Code = http.StatusInternalServerError
@@ -279,7 +281,7 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	summary.Prn = owner.(string)
-	summary.Nick = r.Env["JWT_PAYLOAD"].(map[string]interface{})["nick"].(string)
+	summary.Nick = r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["nick"].(string)
 
 	sub, err := a.subService.LoadBySubject(utils.Prn(owner.(string)))
 	if err != nil && err != mgo.ErrNotFound {

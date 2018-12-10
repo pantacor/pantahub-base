@@ -19,6 +19,7 @@ import (
 	"net/http"
 
 	"github.com/ant0ine/go-json-rest/rest"
+	jwtgo "github.com/dgrijalva/jwt-go"
 )
 
 type AuthMiddleware struct {
@@ -44,7 +45,7 @@ func (s *AuthMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFu
 		env := r.Env
 
 		authInfo := AuthInfo{}
-		caller, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+		caller, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 		if !ok {
 			// XXX: find right error
 			rest.Error(w, "You need to be logged in", http.StatusForbidden)
@@ -54,7 +55,7 @@ func (s *AuthMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFu
 		prn := Prn(callerStr)
 		authInfo.Caller = prn
 
-		authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+		authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 		if !ok {
 			// XXX: find right error
 			rest.Error(w, "You need to be logged in", http.StatusForbidden)
@@ -63,7 +64,7 @@ func (s *AuthMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFu
 		authTypeStr := authType.(string)
 		authInfo.CallerType = authTypeStr
 
-		owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["owner"]
+		owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["owner"]
 		if ok {
 			ownerStr := owner.(string)
 			prn := Prn(ownerStr)
