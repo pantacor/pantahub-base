@@ -339,7 +339,7 @@ For that right now we use a simple token based approach:
 
  1. Owner uses ```/devices/tokens/``` end point to create a new token; optionally he can also provide a set of default user-meta information that the auto assign feature will put in place for every device joinig using such token.
  2. Token is a one-time-visible secret that will only be displayed on reply of the token registration, but not afterwards. If user looses a token he can generate a new one. Old token can stay active if user does not believe the token has been compromised
- 3. User configures device at factory to use the produced token as its pantahub registration credential. Pantavisor will then use the token when registering itself for first time. It uses ```PantahubAuthAutoToken``` to pass the token to pantahub when registering itself. With this pantahub will auto assign the device to the owner of the given token and will put UserMeta in place.
+ 3. User configures device at factory to use the produced token as its pantahub registration credential. Pantavisor will then use the token when registering itself for first time. It uses ```Pantahub-Devices-Auto-Token-V1``` to pass the token to pantahub when registering itself. With this pantahub will auto assign the device to the owner of the given token and will put UserMeta in place.
 
 Example:
 
@@ -386,17 +386,17 @@ X-Runtime: 0.000635
 
 ## Auto Assign Devices on Registration
 
-Now on device side you have to send the PantahubAutoAssignToken: http header when registering yourself. This will make pantahub to automatically associated you with the owner of the token. Example:
+Now on device side you have to send the Pantahub-Devices-Auto-Token-V1: http header when registering yourself. This will make pantahub to automatically associated you with the owner of the token. Example:
 
 ```
-http --print=bBhH POST localhost:12365/devices/ PantahubAuthAutoToken:Fn5xxxxxxxxxxxxxxxxxxxxxxxxxxx
+http --print=bBhH POST localhost:12365/devices/ Pantahub-Devices-Auto-Token-V1:Fn5xxxxxxxxxxxxxxxxxxxxxxxxxxx
 POST /devices/ HTTP/1.1
 Accept: */*
 Accept-Encoding: gzip, deflate
 Connection: keep-alive
 Content-Length: 0
 Host: localhost:12365
-PantahubAuthAutoToken: Fn5xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+Pantahub-Devices-Auto-Token-V1: Fn5xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 User-Agent: HTTPie/0.9.9
 
 
