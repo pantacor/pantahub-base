@@ -78,7 +78,7 @@ func (a *DevicesApp) handle_posttokens(w rest.ResponseWriter, r *rest.Request) {
 
 	err := r.DecodeJsonPayload(&req)
 
-	if err != nil {
+	if err != nil && err != rest.ErrJsonPayloadEmpty {
 		rest.Error(w, "error decoding request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
