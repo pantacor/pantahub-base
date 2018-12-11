@@ -34,6 +34,8 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
+const PantahubDevicesAutoTokenV1 = "Pantahub-Devices-Auto-Token-V1"
+
 func init() {
 	// seed this for petname as dustin dropped our patch upstream... moo
 	rand.Seed(time.Now().Unix())
@@ -212,7 +214,7 @@ func (a *DevicesApp) handle_postdevice(w rest.ResponseWriter, r *rest.Request) {
 		newDevice.DeviceMeta = utils.BsonQuoteMap(&newDevice.DeviceMeta)
 
 		// lets see if we have an auto assign candidate
-		autoAuthToken := r.Header.Get("PantahubAuthAutoToken")
+		autoAuthToken := r.Header.Get(PantahubDevicesAutoTokenV1)
 
 		if autoAuthToken != "" {
 
