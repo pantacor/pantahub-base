@@ -53,14 +53,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
-
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/utils"
-
-	"github.com/ant0ine/go-json-rest/rest"
 	pvrapi "gitlab.com/pantacor/pvr/api"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -122,6 +120,7 @@ type TrailSummary struct {
 	StepTime         time.Time `json:"step-time" bson:"step_time"`
 	ProgressTime     time.Time `json:"progress-time" bson:"progress_time"`
 	TrailTouchedTime time.Time `json:"trail-touched-time" bson:"trail_touched_time"`
+	RealIP           string    `json:"real-ip" bson:"real_ip"`
 }
 
 func handle_auth(w rest.ResponseWriter, r *rest.Request) {
