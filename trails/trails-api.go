@@ -56,7 +56,6 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
-	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	pvrapi "gitlab.com/pantacor/pvr/api"
@@ -1472,58 +1471,6 @@ func (a *TrailsApp) handle_putstepprogress(w rest.ResponseWriter, r *rest.Reques
 	w.WriteJson(stepProgress)
 }
 
-func (a *TrailsApp) get_trailsummary_one(trailId bson.ObjectId, owner string, coll *mgo.Collection) (TrailSummary, error) {
-
-	query := bson.M{
-		"trail-id": trailId,
-		"owner":    owner,
-		"$and": []interface{}{
-			bson.D{{"progress.status", bson.M{"$ne": "DONE"}}},
-		},
-	}
-
-	summary := TrailSummary{}
-	steps := make([]Step, 0)
-
-	err := coll.Find(query).Sort("-rev").Limit(1).All(&steps)
-	if err != nil {
-		return summary, err
-	}
-
-	if len(steps) > 0 {
-		step := steps[0]
-		summary.ProgressRev = step.Rev
-		summary.Progress = step.StepProgress.Progress
-		summary.ProgressTime = step.ProgressTime
-		summary.StepTime = step.StepTime
-		summary.Status = step.StepProgress.Status
-		summary.StatusMsg = step.StepProgress.StatusMsg
-		summary.DeviceId = step.TrailId.Hex()
-		summary.Device = step.Device
-	}
-
-	step := Step{}
-	query = bson.M{"trail-id": trailId, "owner": owner, "progress.status": "DONE"}
-
-	err = coll.Find(query).Sort("-rev").One(&step)
-	if err != nil {
-		return summary, err
-	}
-
-	summary.Rev = step.Rev
-	if summary.Status == "" || summary.Rev > summary.ProgressRev {
-		summary.ProgressRev = step.Rev
-		summary.Progress = step.StepProgress.Progress
-		summary.ProgressTime = step.ProgressTime
-		summary.StepTime = step.StepTime
-		summary.Status = step.StepProgress.Status
-		summary.StatusMsg = step.StepProgress.StatusMsg
-		summary.DeviceId = step.TrailId.Hex()
-		summary.Device = step.Device
-	}
-	return summary, nil
-}
-
 //
 // ## GET /trails/:id/summary
 //   get steps of the the given trail.
@@ -1543,40 +1490,34 @@ func (a *TrailsApp) handle_gettrailstepsummary(w rest.ResponseWriter, r *rest.Re
 		return
 	}
 
-	collSteps := a.mgoSession.DB("").C("pantahub_steps")
+	summaryCol := a.mgoSession.DB("pantabase_devicesummary").C("device_summary_short_new_v1")
 
-	if collSteps == nil {
+	if summaryCol == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
-	collDevices := a.mgoSession.DB("").C("pantahub_devices")
-
-	if collDevices == nil {
-		rest.Error(w, "Error with Database connectivity - devices", http.StatusInternalServerError)
-		return
-	}
-
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
-	trailId := r.PathParam("id")
 
 	if authType != "USER" {
 		rest.Error(w, "Need to be logged in as USER to get trail summary", http.StatusForbidden)
 		return
 	}
 
-	summary, _ := a.get_trailsummary_one(bson.ObjectIdHex(trailId), owner.(string), collSteps)
+	trailId := r.PathParam("id")
 
-	device := devices.Device{}
-	err := collDevices.Find(bson.M{"_id": summary.DeviceId}).One(&device)
-	if err != nil {
-		rest.Error(w, "Error getting device record for id "+summary.DeviceId,
-			http.StatusInternalServerError)
+	if trailId == "" {
+		rest.Error(w, "need to specify a device id", http.StatusForbidden)
 		return
 	}
 
-	summary.DeviceNick = device.Nick
+	summary := TrailSummary{}
+	err := summaryCol.Find(bson.M{"deviceid": trailId, "owner": owner}).One(&summary)
 
+	if err != nil {
+		rest.Error(w, "error finding new trailId", http.StatusForbidden)
+		return
+	}
 	w.WriteJson(summary)
 }
 
