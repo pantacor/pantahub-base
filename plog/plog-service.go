@@ -30,7 +30,9 @@ import (
 	"os"
 	"time"
 
-	jwt "github.com/StephanDollberg/go-json-rest-middleware-jwt"
+	jwtgo "github.com/dgrijalva/jwt-go"
+	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
+
 	"github.com/ant0ine/go-json-rest/rest"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gopkg.in/mgo.v2"
@@ -66,7 +68,7 @@ type PvrRemote struct {
 //   get summary of all trails by the calling owner.
 func (a *PlogApp) handle_getplogposts(w rest.ResponseWriter, r *rest.Request) {
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in", http.StatusForbidden)
@@ -80,7 +82,7 @@ func (a *PlogApp) handle_getplogposts(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	if authType != "USER" {
 		rest.Error(w, "Need to be logged in as USER to get trail summary", http.StatusForbidden)

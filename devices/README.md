@@ -1,5 +1,4 @@
 
-
 # Device
 
 PANTAHUB Device Registry
@@ -82,7 +81,7 @@ X-Powered-By: go-json-rest
     "time-modified": "0001-01-01T00:00:00Z",
     "user-meta": {}
 }
-
+```
 
 Note how the output has a challenge entry, but no owner yet...
 
@@ -90,6 +89,7 @@ Note how the output has a challenge entry, but no owner yet...
 ```
 challenge=duly-helped-bat
 ```
+
 3. as a logged in user with TOKEN you claim the device through a simple PUT
 ```
 http PUT localhost:12365/devices/59669139632d7234e2703610?challenge=$challenge Authorization:"Bearer $TOKEN"
@@ -329,4 +329,204 @@ X-Runtime: 0.001955
 {
     "Error": "Device unique constraint violated"
 }
+```
+
+# Auto Assign Devices to Owners
+
+Pantahub base offers a built in basic factory story in the sense that we offer the ability to auto assing devices to a specific owner.
+
+For that right now we use a simple token based approach:
+
+ 1. Owner uses ```/devices/tokens/``` end point to create a new token; optionally he can also provide a set of default user-meta information that the auto assign feature will put in place for every device joinig using such token.
+ 2. Token is a one-time-visible secret that will only be displayed on reply of the token registration, but not afterwards. If user looses a token he can generate a new one. Old token can stay active if user does not believe the token has been compromised
+ 3. User configures device at factory to use the produced token as its pantahub registration credential. Pantavisor will then use the token when registering itself for first time. It uses ```Pantahub-Devices-Auto-Token-V1``` to pass the token to pantahub when registering itself. With this pantahub will auto assign the device to the owner of the given token and will put UserMeta in place.
+
+Example:
+
+```
+http --print=bBhH POST localhost:12365/devices/tokens Authorization:" Bearer $TOK" default-user-meta:='{"mykey": "yourvalue"}'
+POST /devices/tokens HTTP/1.1
+Accept: application/json, */*
+Accept-Encoding: gzip, deflate
+Authorization: Bearer eyJxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...
+Connection: keep-alive
+Content-Length: 45
+Content-Type: application/json
+Host: localhost:12365
+User-Agent: HTTPie/0.9.9
+
+{
+    "default-user-meta": {
+        "mykey": "yourvalue"
+    }
+}
+
+HTTP/1.1 200 OK
+Content-Length: 370
+Content-Type: application/json; charset=utf-8
+Date: Mon, 10 Dec 2018 15:46:39 GMT
+X-Powered-By: go-json-rest
+X-Runtime: 0.000635
+
+{
+    "default-user-meta": {
+        "mykey": "yourvalue"
+    }, 
+    "disabled": false, 
+    "id": "5c0e8a5fc094f62eafcc96b4", 
+    "nick": "informally_trusted_dingo", 
+    "owner": "prn:pantahub.com:auth:/user1", 
+    "prn": "prn:::devices-tokens:/5c0e8a5fc094f62eafcc96b4", 
+    "time-created": "2018-12-10T16:46:39.740026537+01:00", 
+    "time-modified": "2018-12-10T16:46:39.740026537+01:00", 
+    "token": "xxxxxxxxxxxx"
+}
+```
+**Remember the ```token```* you won't be able to retrieve it another time.
+
+## Auto Assign Devices on Registration
+
+Now on device side you have to send the Pantahub-Devices-Auto-Token-V1: http header when registering yourself. This will make pantahub to automatically associated you with the owner of the token. Example:
+
+```
+http --print=bBhH POST localhost:12365/devices/ Pantahub-Devices-Auto-Token-V1:Fn5xxxxxxxxxxxxxxxxxxxxxxxxxxx
+POST /devices/ HTTP/1.1
+Accept: */*
+Accept-Encoding: gzip, deflate
+Connection: keep-alive
+Content-Length: 0
+Host: localhost:12365
+Pantahub-Devices-Auto-Token-V1: Fn5xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+User-Agent: HTTPie/0.9.9
+
+
+
+HTTP/1.1 200 OK
+Content-Length: 353
+Content-Type: application/json; charset=utf-8
+Date: Mon, 10 Dec 2018 16:03:35 GMT
+X-Powered-By: go-json-rest
+X-Runtime: 0.000788
+
+{
+    "device-meta": {},
+    "id": "5c0e8e57c094f62eafcc96b8",
+    "nick": "privately_correct_quail",
+    "owner": "prn:pantahub.com:auth:/user1",
+    "prn": "prn:::devices:/5c0e8e57c094f62eafcc96b8",
+    "public": false,
+    "secret": "0jf4yyyyyyyyyyyy",
+    "time-created": "2018-12-10T17:03:35.489788421+01:00",
+    "time-modified": "2018-12-10T17:03:35.489788421+01:00",
+    "user-meta": {
+        "mykey": "yourvalue"
+    }
+}
+```
+
+
+## List tokens registered
+
+If you want to see which tokens are already registered by your user, you can do so through a simple get at collection level:
+
+```
+http --print=bBhH GET localhost:12365/devices/tokens Authorization:" Bearer $TOK"
+GET /devices/tokens HTTP/1.1
+Accept: */*
+Accept-Encoding: gzip, deflate
+Authorization: Bearer xxxxxxxxxxxxxxXxxxxxxxxxxxxxxxxxxxxxxxxxxXXXXXxxxxxXXXXXXXXXXXXXXxxxxXXXXxxxxxxxxQ
+Connection: keep-alive
+Host: localhost:12365
+User-Agent: HTTPie/0.9.9
+
+
+
+HTTP/1.1 200 OK
+Content-Length: 1256
+Content-Type: application/json; charset=utf-8
+Date: Mon, 10 Dec 2018 15:48:14 GMT
+X-Powered-By: go-json-rest
+X-Runtime: 0.000664
+
+[
+    {
+        "default-user-meta": {
+            "mykey": "yourvalue"
+        }, 
+        "disabled": false, 
+        "id": "5c0e8a5fc094f62eafcc96b4", 
+        "nick": "informally_trusted_dingo", 
+        "owner": "prn:pantahub.com:auth:/user1", 
+        "prn": "prn:::devices-tokens:/5c0e8a5fc094f62eafcc96b4", 
+        "time-created": "2018-12-10T16:46:39.74+01:00", 
+        "time-modified": "2018-12-10T16:46:39.74+01:00"
+    }, 
+    {
+        "default-user-meta": {
+            "mykey": "yourvalue"
+        }, 
+        "disabled": true, 
+        "id": "5c0e6b93c094f67d861e9444", 
+        "nick": "entirely_fit_badger", 
+        "owner": "prn:pantahub.com:auth:/user1", 
+        "prn": "prn:::devices-tokens:/5c0e6b93c094f67d861e9444", 
+        "time-created": "2018-12-10T14:35:15.984+01:00", 
+        "time-modified": "2018-12-10T14:35:15.984+01:00"
+    }, <>
+    {
+        "default-user-meta": {
+            "mykey": "yourvalue"
+        }, 
+        "disabled": true, 
+        "id": "5c0e5affc094f6050521ae9c", 
+        "nick": "correctly_literate_camel", 
+        "owner": "prn:pantahub.com:auth:/user1", 
+        "prn": "prn:::devices-tokens:/5c0e5affc094f6050521ae9c", 
+        "time-created": "2018-12-10T13:24:31.615+01:00", 
+        "time-modified": "2018-12-10T13:24:31.615+01:00"
+    }, 
+    {
+        "default-user-meta": {
+            "mykey": "yourvalue"
+        }, 
+        "disabled": true, 
+        "id": "5c0e5ad6c094f603c3d11f7c", 
+        "nick": "miserably_singular_insect", 
+        "owner": "prn:pantahub.com:auth:/user1", 
+        "prn": "prn:::devices-tokens:/5c0e5ad6c094f603c3d11f7c", 
+        "time-created": "2018-12-10T13:23:50.359+01:00", 
+        "time-modified": "2018-12-10T13:23:50.359+01:00"
+    }
+]
+```
+
+
+## Disable Tokens
+
+In case you want to ensure no further devices will be auto assinged you can disable your token in pantahub. Existing devices will continue to be authenticated though.
+
+```
+http --print=bBhH  DELETE localhost:12365/devices/tokens/5c0e8a5fc094f62eafcc96b4 Authorization:" Bearer $TOK"
+DELETE /devices/tokens/5c0e8a5fc094f62eafcc96b4 HTTP/1.1
+Accept: */*
+Accept-Encoding: gzip, deflate
+Authorization: Bearer XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
+Connection: keep-alive
+Content-Length: 0
+Host: localhost:12365
+User-Agent: HTTPie/0.9.9
+
+
+
+HTTP/1.1 200 OK
+Content-Length: 15
+Content-Type: application/json; charset=utf-8
+Date: Mon, 10 Dec 2018 15:52:19 GMT
+X-Powered-By: go-json-rest
+X-Runtime: 0.000664
+
+{
+    "status": "OK"
+}
+...
 ```

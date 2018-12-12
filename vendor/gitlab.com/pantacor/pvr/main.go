@@ -16,9 +16,8 @@
 package main
 
 import (
-	"os"
-
 	"crypto/tls"
+	"os"
 
 	"github.com/go-resty/resty"
 	"github.com/urfave/cli"
@@ -41,6 +40,13 @@ func main() {
 			Name:   "baseurl, b",
 			Usage:  "Use `BASEURL` for resolving prn URIs to core service endpoints",
 			EnvVar: "PVR_BASEURL",
+			Value:  "https://api.pantahub.com",
+		},
+		cli.StringFlag{
+			Name:   "repo-baseurl, r",
+			Usage:  "Use `REPO_BASEURL` for resolving PVR repositories like docker through user/name syntax.",
+			EnvVar: "PVR_REPO_BASEURL",
+			Value:  "https://pvr.pantahub.com",
 		},
 		cli.BoolFlag{
 			Name:   "debug, d",
@@ -66,6 +72,12 @@ func main() {
 			c.App.Metadata["PVR_BASEURL"] = "https://api.pantahub.com"
 		}
 
+		if c.GlobalString("repo-baseurl") != "" {
+			c.App.Metadata["PVR_REPO_BASEURL"] = c.GlobalString("repo-baseurl")
+		} else {
+			c.App.Metadata["PVR_REPO_BASEURL"] = "https://pvr.pantahub.com"
+		}
+
 		return nil
 	}
 
@@ -89,6 +101,7 @@ func main() {
 		CommandRegister(),
 		CommandScan(),
 		CommandPs(),
+		CommandLogs(),
 	}
 	app.Run(os.Args)
 }

@@ -1,10 +1,12 @@
-hash: e5010d5104f3cbda7c69228830392f041649fc7879ddde8dcd15b39e21ef1b2a
-updated: 2018-10-15T10:19:11.8457369+02:00
+hash: f00375ac561672b5a15f1ae5229bc62bdd8e2b31d40d915550eddaa542c54fe5
+updated: 2018-11-22T01:41:08.0819796+01:00
 imports:
 - name: github.com/alecthomas/units
   version: 2efee857e7cfd4f3d0138cc3cbb1b4966962b93a
 - name: github.com/ant0ine/go-json-rest
-  version: ce4b71cdf7ba29ef443d704bd923f5bbf281ee30
+  version: cab770813df3db97a11bd04239ac1890c3caf188
+  repo: https://github.com/asac/go-json-rest
+  vcs: git
   subpackages:
   - rest
   - rest/trie
@@ -17,7 +19,7 @@ imports:
   - aws/session
   - service/s3
 - name: github.com/dgrijalva/jwt-go
-  version: dbeaa9332f19a944acb5736b4456cfcc02140e29
+  version: 01aeca54ebda6e0fbfafd0a524d234159c05ec20
 - name: github.com/dustinkirkland/golang-petname
   version: d3c2ba80e75eeef10c5cf2fc76d2c809637376b3
 - name: github.com/fatih/structs
@@ -26,10 +28,12 @@ imports:
   version: 90f0f02707011b560ad1982ded9e6ead151198d4
   subpackages:
   - fluent
+- name: github.com/fundapps/go-json-rest-middleware-jwt
+  version: 262c4123a0bdec07c20cedd92f7867fcdf8701a3
 - name: github.com/gibson042/canonicaljson-go
   version: 53c2489e9cef6411013b4a2fcec5eace9bf17dae
 - name: github.com/go-redis/redis
-  version: fa76dd0e87967c95e6f7bef33a230ed2c263fe2d
+  version: 78a66f0e5fd787d5d0ba6ef4cc442895288229ad
   subpackages:
   - internal
   - internal/consistenthash
@@ -46,20 +50,20 @@ imports:
   - buffer
   - jlexer
   - jwriter
+- name: github.com/miolini/datacounter
+  version: fd4e42a1d5e0d2714f16caf92f9c64215bf957ce
 - name: github.com/philhofer/fwd
   version: bb6d471dc95d4fe11e432687f8b70ff496cf3136
 - name: github.com/pkg/errors
   version: e881fd58d78e04cf6d0de1217f8707c8cc2249bc
 - name: github.com/rs/cors
   version: a3460e445dd310dbefee993fe449f2ff9c08ae71
-- name: github.com/StephanDollberg/go-json-rest-middleware-jwt
-  version: be2a0500d9b32741c6823e55c27b4a79151272eb
 - name: github.com/tinylib/msgp
   version: f65876d3ea05943d6613bca6b8ed391843044bd4
   subpackages:
   - msgp
 - name: gitlab.com/pantacor/pvr
-  version: c59e5922e9e8f0df3900010228c9531d2a9a8a14
+  version: 55d124044cad3d00137201fc23b816167056e295
   subpackages:
   - api
 - name: gitlab.com/pantacor/pvr.git

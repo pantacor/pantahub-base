@@ -1,11 +1,14 @@
 package: gitlab.com/pantacor/pantahub-base
 import:
-- package: github.com/StephanDollberg/go-json-rest-middleware-jwt
+- package: github.com/fundapps/go-json-rest-middleware-jwt 
 - package: github.com/alecthomas/units
 - package: github.com/ant0ine/go-json-rest
   version: ~3.3.2
+  repo: https://github.com/asac/go-json-rest
+  vcs: git
   subpackages:
   - rest
+  version: cab770813df3db97a11bd04239ac1890c3caf188
 - package: github.com/asaskevich/govalidator
   version: ~7.0.0
 - package: github.com/aws/aws-sdk-go
@@ -15,7 +18,7 @@ import:
   - aws/session
   - service/s3
 - package: github.com/dgrijalva/jwt-go
-  version: ~3.1.0
+  version: 01aeca54ebda6e0fbfafd0a524d234159c05ec20
 - package: github.com/dustinkirkland/golang-petname
 - package: gitlab.com/pantacor/pvr.git
   version: ~2.0.0
@@ -29,3 +32,4 @@ import:
 - package: github.com/go-resty/resty
   version: ~1.0.0
 - package: gopkg.in/olivere/elastic.v5
+  version: ~5.0.0

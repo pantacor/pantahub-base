@@ -53,12 +53,11 @@ import (
 	"strings"
 	"time"
 
-	jwt "github.com/StephanDollberg/go-json-rest-middleware-jwt"
-	"gitlab.com/pantacor/pantahub-base/devices"
+	"github.com/ant0ine/go-json-rest/rest"
+	jwtgo "github.com/dgrijalva/jwt-go"
+	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/utils"
-
-	"github.com/ant0ine/go-json-rest/rest"
 	pvrapi "gitlab.com/pantacor/pvr/api"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -120,6 +119,7 @@ type TrailSummary struct {
 	StepTime         time.Time `json:"step-time" bson:"step_time"`
 	ProgressTime     time.Time `json:"progress-time" bson:"progress_time"`
 	TrailTouchedTime time.Time `json:"trail-touched-time" bson:"trail_touched_time"`
+	RealIP           string    `json:"real-ip" bson:"real_ip"`
 }
 
 func handle_auth(w rest.ResponseWriter, r *rest.Request) {
@@ -145,14 +145,14 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 
 	r.DecodeJsonPayload(&initialState)
 
-	device, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	device, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	if authType != "DEVICE" {
 		// XXX: find right error
@@ -160,7 +160,7 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["owner"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["owner"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "Device needs an owner", http.StatusForbidden)
@@ -236,14 +236,14 @@ func (a *TrailsApp) handle_gettrails(w rest.ResponseWriter, r *rest.Request) {
 
 	r.DecodeJsonPayload(&initialState)
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	coll := a.mgoSession.DB("").C("pantahub_trails")
 
@@ -282,14 +282,14 @@ func (a *TrailsApp) handle_gettrail(w rest.ResponseWriter, r *rest.Request) {
 
 	var err error
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	coll := a.mgoSession.DB("").C("pantahub_trails")
 
@@ -330,14 +330,14 @@ func (a *TrailsApp) handle_gettrailpvrinfo(w rest.ResponseWriter, r *rest.Reques
 
 	var err error
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	coll := a.mgoSession.DB("").C("pantahub_steps")
 
@@ -393,14 +393,14 @@ func (a *TrailsApp) handle_getsteppvrinfo(w rest.ResponseWriter, r *rest.Request
 
 	var err error
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	coll := a.mgoSession.DB("").C("pantahub_steps")
 
@@ -491,11 +491,11 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 
 	var err error
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["owner"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["owner"]
 
 	// if not a device there wont be an owner; so we use the caller (aka prn)
 	if !ok {
-		owner, ok = r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+		owner, ok = r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 		if !ok {
 			// XXX: find right error
 			rest.Error(w, "You need to be logged in as user or device", http.StatusForbidden)
@@ -503,7 +503,7 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 		}
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	collTrails := a.mgoSession.DB("").C("pantahub_trails")
 
@@ -616,14 +616,14 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 //
 func (a *TrailsApp) handle_getsteps(w rest.ResponseWriter, r *rest.Request) {
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	coll := a.mgoSession.DB("").C("pantahub_steps")
 
@@ -694,14 +694,14 @@ func (a *TrailsApp) handle_getsteps(w rest.ResponseWriter, r *rest.Request) {
 //
 func (a *TrailsApp) handle_getstep(w rest.ResponseWriter, r *rest.Request) {
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	trailId := r.PathParam("id")
 
@@ -759,14 +759,14 @@ func (a *TrailsApp) handle_getstepstate(w rest.ResponseWriter, r *rest.Request) 
 
 	var err error
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	coll := a.mgoSession.DB("").C("pantahub_steps")
 
@@ -800,14 +800,14 @@ func (a *TrailsApp) handle_getstepstate(w rest.ResponseWriter, r *rest.Request) 
 
 func (a *TrailsApp) handle_getstepsobjects(w rest.ResponseWriter, r *rest.Request) {
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	coll := a.mgoSession.DB("").C("pantahub_steps")
 
@@ -901,14 +901,14 @@ func (a *TrailsApp) handle_getstepsobjects(w rest.ResponseWriter, r *rest.Reques
 
 func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Request) {
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	coll := a.mgoSession.DB("").C("pantahub_steps")
 
@@ -998,14 +998,14 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 
 func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request) {
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	coll := a.mgoSession.DB("").C("pantahub_steps")
 
@@ -1116,14 +1116,14 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 
 func (a *TrailsApp) handle_getstepsobject(w rest.ResponseWriter, r *rest.Request) {
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	coll := a.mgoSession.DB("").C("pantahub_steps")
 
@@ -1227,14 +1227,14 @@ func (a *TrailsApp) handle_getstepsobject(w rest.ResponseWriter, r *rest.Request
 
 func (a *TrailsApp) handle_getstepsobjectfile(w rest.ResponseWriter, r *rest.Request) {
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	coll := a.mgoSession.DB("").C("pantahub_steps")
 
@@ -1348,14 +1348,14 @@ func (a *TrailsApp) handle_getstepsobjectfile(w rest.ResponseWriter, r *rest.Req
 //
 func (a *TrailsApp) handle_putstepstate(w rest.ResponseWriter, r *rest.Request) {
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	coll := a.mgoSession.DB("").C("pantahub_steps")
 	if coll == nil {
@@ -1424,14 +1424,14 @@ func (a *TrailsApp) handle_putstepprogress(w rest.ResponseWriter, r *rest.Reques
 	trailId := r.PathParam("id")
 	stepId := trailId + "-" + r.PathParam("rev")
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	coll := a.mgoSession.DB("").C("pantahub_steps")
 
@@ -1471,58 +1471,6 @@ func (a *TrailsApp) handle_putstepprogress(w rest.ResponseWriter, r *rest.Reques
 	w.WriteJson(stepProgress)
 }
 
-func (a *TrailsApp) get_trailsummary_one(trailId bson.ObjectId, owner string, coll *mgo.Collection) (TrailSummary, error) {
-
-	query := bson.M{
-		"trail-id": trailId,
-		"owner":    owner,
-		"$and": []interface{}{
-			bson.D{{"progress.status", bson.M{"$ne": "DONE"}}},
-		},
-	}
-
-	summary := TrailSummary{}
-	steps := make([]Step, 0)
-
-	err := coll.Find(query).Sort("-rev").Limit(1).All(&steps)
-	if err != nil {
-		return summary, err
-	}
-
-	if len(steps) > 0 {
-		step := steps[0]
-		summary.ProgressRev = step.Rev
-		summary.Progress = step.StepProgress.Progress
-		summary.ProgressTime = step.ProgressTime
-		summary.StepTime = step.StepTime
-		summary.Status = step.StepProgress.Status
-		summary.StatusMsg = step.StepProgress.StatusMsg
-		summary.DeviceId = step.TrailId.Hex()
-		summary.Device = step.Device
-	}
-
-	step := Step{}
-	query = bson.M{"trail-id": trailId, "owner": owner, "progress.status": "DONE"}
-
-	err = coll.Find(query).Sort("-rev").One(&step)
-	if err != nil {
-		return summary, err
-	}
-
-	summary.Rev = step.Rev
-	if summary.Status == "" || summary.Rev > summary.ProgressRev {
-		summary.ProgressRev = step.Rev
-		summary.Progress = step.StepProgress.Progress
-		summary.ProgressTime = step.ProgressTime
-		summary.StepTime = step.StepTime
-		summary.Status = step.StepProgress.Status
-		summary.StatusMsg = step.StepProgress.StatusMsg
-		summary.DeviceId = step.TrailId.Hex()
-		summary.Device = step.Device
-	}
-	return summary, nil
-}
-
 //
 // ## GET /trails/:id/summary
 //   get steps of the the given trail.
@@ -1535,56 +1483,7 @@ func (a *TrailsApp) get_trailsummary_one(trailId bson.ObjectId, owner string, co
 //
 func (a *TrailsApp) handle_gettrailstepsummary(w rest.ResponseWriter, r *rest.Request) {
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
-	if !ok {
-		// XXX: find right error
-		rest.Error(w, "You need to be logged in", http.StatusForbidden)
-		return
-	}
-
-	collSteps := a.mgoSession.DB("").C("pantahub_steps")
-
-	if collSteps == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
-	}
-
-	collDevices := a.mgoSession.DB("").C("pantahub_devices")
-
-	if collDevices == nil {
-		rest.Error(w, "Error with Database connectivity - devices", http.StatusInternalServerError)
-		return
-	}
-
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
-	trailId := r.PathParam("id")
-
-	if authType != "USER" {
-		rest.Error(w, "Need to be logged in as USER to get trail summary", http.StatusForbidden)
-		return
-	}
-
-	summary, _ := a.get_trailsummary_one(bson.ObjectIdHex(trailId), owner.(string), collSteps)
-
-	device := devices.Device{}
-	err := collDevices.Find(bson.M{"_id": summary.DeviceId}).One(&device)
-	if err != nil {
-		rest.Error(w, "Error getting device record for id "+summary.DeviceId,
-			http.StatusInternalServerError)
-		return
-	}
-
-	summary.DeviceNick = device.Nick
-
-	w.WriteJson(summary)
-}
-
-//
-// ## GET /trails/summary
-//   get summary of all trails by the calling owner.
-func (a *TrailsApp) handle_gettrailsummary(w rest.ResponseWriter, r *rest.Request) {
-
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in", http.StatusForbidden)
@@ -1598,7 +1497,50 @@ func (a *TrailsApp) handle_gettrailsummary(w rest.ResponseWriter, r *rest.Reques
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+
+	if authType != "USER" {
+		rest.Error(w, "Need to be logged in as USER to get trail summary", http.StatusForbidden)
+		return
+	}
+
+	trailId := r.PathParam("id")
+
+	if trailId == "" {
+		rest.Error(w, "need to specify a device id", http.StatusForbidden)
+		return
+	}
+
+	summary := TrailSummary{}
+	err := summaryCol.Find(bson.M{"deviceid": trailId, "owner": owner}).One(&summary)
+
+	if err != nil {
+		rest.Error(w, "error finding new trailId", http.StatusForbidden)
+		return
+	}
+	w.WriteJson(summary)
+}
+
+//
+// ## GET /trails/summary
+//   get summary of all trails by the calling owner.
+func (a *TrailsApp) handle_gettrailsummary(w rest.ResponseWriter, r *rest.Request) {
+
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	if !ok {
+		// XXX: find right error
+		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		return
+	}
+
+	summaryCol := a.mgoSession.DB("pantabase_devicesummary").C("device_summary_short_new_v1")
+
+	if summaryCol == nil {
+		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	if authType != "USER" {
 		rest.Error(w, "Need to be logged in as USER to get trail summary", http.StatusForbidden)
