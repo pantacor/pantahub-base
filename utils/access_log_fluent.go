@@ -49,7 +49,7 @@ func (mw *AccessLogFluentMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.Han
 			for i := 0; i < 10; i++ {
 				mw.Logger, err = fluent.New(fluent.Config{FluentPort: port, FluentHost: host})
 				if err == nil {
-					return nil
+					break
 				}
 				log.Printf("WARNING: couldnt instantiate fluent logger (round %d/10): %s\n", i, err.Error())
 				time.Sleep(time.Duration(6 * time.Second))
