@@ -145,7 +145,9 @@ func (mw *AccessLogFluentMiddleware) makeAccessLogFluentRecord(r *rest.Request) 
 	}
 
 	var remoteUser string
-	if r.Env["JWT_PAYLOAD"] != nil {
+	if r.Env["REMOTE_USER"] != nil {
+		remoteUser = r.Env["REMOTE_USER"].(string)
+	} else if r.Env["JWT_PAYLOAD"] != nil {
 		payload := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)
 		if payload["id"] != nil {
 			remoteUser = payload["id"].(string)
