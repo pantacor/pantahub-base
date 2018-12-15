@@ -29,7 +29,6 @@ import (
 	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/utils"
-
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -448,11 +447,16 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 
 	if device.Owner != "" {
 		var ownerAccount accounts.Account
-		err = collectionAccounts.Find(bson.M{"prn": device.Owner}).One(&ownerAccount)
 
-		if err != nil {
-			rest.Error(w, "Owner account not Found", http.StatusInternalServerError)
-			return
+		// first check default accounts like user1, user2, etc...
+		ownerAccount, ok := accounts.DefaultAccounts[device.Owner]
+		if !ok {
+			err = collectionAccounts.Find(bson.M{"prn": device.Owner}).One(&ownerAccount)
+
+			if err != nil {
+				rest.Error(w, "Owner account not Found", http.StatusInternalServerError)
+				return
+			}
 		}
 		device.OwnerNick = ownerAccount.Nick
 	}
