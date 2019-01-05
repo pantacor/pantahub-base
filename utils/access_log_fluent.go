@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
+	jwtgo "github.com/dgrijalva/jwt-go"
 	"github.com/fatih/structs"
 	"github.com/fluent/fluent-logger-golang/fluent"
 )
@@ -46,10 +47,16 @@ func (mw *AccessLogFluentMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.Han
 		host = GetEnv(ENV_FLUENT_HOST)
 
 		if host != "" {
-			mw.Logger, err = fluent.New(fluent.Config{FluentPort: port, FluentHost: host})
+			for i := 0; i < 10; i++ {
+				mw.Logger, err = fluent.New(fluent.Config{FluentPort: port, FluentHost: host})
+				if err == nil {
+					break
+				}
+				log.Printf("WARNING: couldnt instantiate fluent logger (round %d/10): %s\n", i, err.Error())
+				time.Sleep(time.Duration(6 * time.Second))
+			}
 			if err != nil {
-				log.Fatalln("FATAL: cannot instantiate fluent logger: " + err.Error())
-				return nil
+				log.Fatalln("FATAL: couldn't instantiate fluent logger: " + err.Error())
 			}
 			log.Printf("INFO: fluent logging enabled for endpoint %s; %s: %s, %s: %d\n", mw.Prefix, ENV_FLUENT_HOST, host, ENV_FLUENT_PORT, port)
 		} else {
@@ -140,8 +147,12 @@ func (mw *AccessLogFluentMiddleware) makeAccessLogFluentRecord(r *rest.Request) 
 	var remoteUser string
 	if r.Env["REMOTE_USER"] != nil {
 		remoteUser = r.Env["REMOTE_USER"].(string)
+	} else if r.Env["JWT_PAYLOAD"] != nil {
+		payload := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)
+		if payload["id"] != nil {
+			remoteUser = payload["id"].(string)
+		}
 	}
-
 	// msgpack does not like type map[string][]string; hence we
 	// help by using interface{} value type instead
 	reqMap := map[string]interface{}{}

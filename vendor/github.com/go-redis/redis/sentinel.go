@@ -176,12 +176,16 @@ type sentinelFailover struct {
 	masterName  string
 	_masterAddr string
 	sentinel    *SentinelClient
+	pubsub      *PubSub
 }
 
 func (c *sentinelFailover) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.closeSentinel()
+	if c.sentinel != nil {
+		return c.closeSentinel()
+	}
+	return nil
 }
 
 func (c *sentinelFailover) Pool() *pool.ConnPool {
@@ -240,7 +244,7 @@ func (c *sentinelFailover) masterAddr() (string, error) {
 		if err != nil {
 			internal.Logf("sentinel: GetMasterAddrByName master=%q failed: %s",
 				c.masterName, err)
-			sentinel.Close()
+			_ = sentinel.Close()
 			continue
 		}
 
@@ -301,13 +305,27 @@ func (c *sentinelFailover) switchMaster(addr string) {
 func (c *sentinelFailover) setSentinel(sentinel *SentinelClient) {
 	c.discoverSentinels(sentinel)
 	c.sentinel = sentinel
-	go c.listen(sentinel)
+
+	c.pubsub = sentinel.Subscribe("+switch-master")
+	go c.listen(c.pubsub)
 }
 
 func (c *sentinelFailover) closeSentinel() error {
-	err := c.sentinel.Close()
+	var firstErr error
+
+	err := c.pubsub.Close()
+	if err != nil && firstErr == err {
+		firstErr = err
+	}
+	c.pubsub = nil
+
+	err = c.sentinel.Close()
+	if err != nil && firstErr == err {
+		firstErr = err
+	}
 	c.sentinel = nil
-	return err
+
+	return firstErr
 }
 
 func (c *sentinelFailover) discoverSentinels(sentinel *SentinelClient) {
@@ -332,10 +350,7 @@ func (c *sentinelFailover) discoverSentinels(sentinel *SentinelClient) {
 	}
 }
 
-func (c *sentinelFailover) listen(sentinel *SentinelClient) {
-	pubsub := sentinel.Subscribe("+switch-master")
-	defer pubsub.Close()
-
+func (c *sentinelFailover) listen(pubsub *PubSub) {
 	ch := pubsub.Channel()
 	for {
 		msg, ok := <-ch

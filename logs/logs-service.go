@@ -34,9 +34,9 @@ import (
 	"strings"
 	"time"
 
-	jwt "github.com/StephanDollberg/go-json-rest-middleware-jwt"
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
+	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -126,14 +126,14 @@ func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 	var result *LogsPager
 	var err error
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	if authType != "USER" {
 		rest.Error(w, "Need to be logged in as USER to get logs", http.StatusForbidden)
 		return
 	}
 
-	own, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	own, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in", http.StatusForbidden)
@@ -259,14 +259,14 @@ func (a *logsApp) handle_getlogscursor(w rest.ResponseWriter, r *rest.Request) {
 
 	var err error
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	if authType != "USER" {
 		rest.Error(w, "Need to be logged in as USER to get logs", http.StatusForbidden)
 		return
 	}
 
-	own, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	own, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in", http.StatusForbidden)
@@ -368,21 +368,21 @@ func unmarshalBody(body []byte) ([]LogsEntry, error) {
 //   Post one or many log entries as an error of LogEntry
 func (a *logsApp) handle_postlogs(w rest.ResponseWriter, r *rest.Request) {
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	if authType != "DEVICE" {
 		rest.Error(w, "Need to be logged in as DEVICE to post logs", http.StatusForbidden)
 		return
 	}
 
-	device, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	device, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["owner"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["owner"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in as device with owner", http.StatusForbidden)

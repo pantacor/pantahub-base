@@ -28,7 +28,9 @@ import (
 
 	"gitlab.com/pantacor/pantahub-base/subscriptions"
 
-	jwt "github.com/StephanDollberg/go-json-rest-middleware-jwt"
+	jwtgo "github.com/dgrijalva/jwt-go"
+	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
+
 	"github.com/alecthomas/units"
 	"github.com/ant0ine/go-json-rest/rest"
 	"gitlab.com/pantacor/pantahub-base/utils"
@@ -92,7 +94,7 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 
 	var ownerStr string
 
-	caller, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	caller, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in", http.StatusForbidden)
@@ -100,11 +102,11 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 	}
 	callerStr, ok := caller.(string)
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 	if authType.(string) == "USER" {
 		ownerStr = callerStr
 	} else {
-		owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["owner"]
+		owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["owner"]
 		if !ok {
 			// XXX: find right error
 			rest.Error(w, "You need to be logged in as a USER or DEVICE", http.StatusForbidden)
@@ -212,7 +214,7 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 
 	newObject := Object{}
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in as a USER", http.StatusForbidden)
@@ -374,9 +376,9 @@ func MakeObjAccessible(Issuer string, Subject string, obj Object, storageId stri
 
 func (a *ObjectsApp) handle_getobject(w rest.ResponseWriter, r *rest.Request) {
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["owner"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["owner"]
 	if !ok {
-		owner, ok = r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+		owner, ok = r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 		// XXX: find right error
 		if !ok {
 			rest.Error(w, "You need to be logged in as USER or DEVICE with owner", http.StatusForbidden)
@@ -433,9 +435,9 @@ func (a *ObjectsApp) handle_getobject(w rest.ResponseWriter, r *rest.Request) {
 func (a *ObjectsApp) handle_getobjectfile(w rest.ResponseWriter, r *rest.Request) {
 
 	// XXX: refactor: dupe code with getobject with getobject
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["owner"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["owner"]
 	if !ok {
-		owner, ok = r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+		owner, ok = r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 		// XXX: find right error
 		if !ok {
 			rest.Error(w, "You need to be logged in as USER or DEVICE with owner", http.StatusForbidden)
@@ -493,7 +495,7 @@ func (a *ObjectsApp) handle_getobjectfile(w rest.ResponseWriter, r *rest.Request
 
 func (a *ObjectsApp) handle_getobjects(w rest.ResponseWriter, r *rest.Request) {
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in as a USER", http.StatusForbidden)
@@ -526,7 +528,7 @@ func (a *ObjectsApp) handle_getobjects(w rest.ResponseWriter, r *rest.Request) {
 
 func (a *ObjectsApp) handle_deleteobject(w rest.ResponseWriter, r *rest.Request) {
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in as a USER", http.StatusForbidden)

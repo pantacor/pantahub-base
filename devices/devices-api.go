@@ -23,14 +23,17 @@ import (
 	"strings"
 	"time"
 
-	jwt "github.com/StephanDollberg/go-json-rest-middleware-jwt"
 	"github.com/ant0ine/go-json-rest/rest"
+	jwtgo "github.com/dgrijalva/jwt-go"
 	petname "github.com/dustinkirkland/golang-petname"
+	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
+
+const PantahubDevicesAutoTokenV1 = "Pantahub-Devices-Auto-Token-V1"
 
 func init() {
 	// seed this for petname as dustin dropped our patch upstream... moo
@@ -48,7 +51,7 @@ type Device struct {
 	Prn          string                 `json:"prn"`
 	Nick         string                 `json:"nick"`
 	Owner        string                 `json:"owner"`
-	OwnerNick    string                 `json:"owner-nick" bson:"-"`
+	OwnerNick    string                 `json:"owner-nick,omitempty" bson:"-"`
 	Secret       string                 `json:"secret,omitempty"`
 	TimeCreated  time.Time              `json:"time-created" bson:"timecreated"`
 	TimeModified time.Time              `json:"time-modified" bson:"timemodified"`
@@ -72,14 +75,14 @@ func (a *DevicesApp) handle_putuserdata(w rest.ResponseWriter, r *rest.Request) 
 	}
 
 	var owner interface{}
-	owner, ok = jwtPayload.(map[string]interface{})["prn"]
+	owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
 	if !ok {
 		rest.Error(w, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
 		return
 	}
 
 	var authType interface{}
-	authType, ok = jwtPayload.(map[string]interface{})["type"]
+	authType, ok = jwtPayload.(jwtgo.MapClaims)["type"]
 	if !ok {
 		rest.Error(w, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
 		return
@@ -126,14 +129,14 @@ func (a *DevicesApp) handle_putdevicedata(w rest.ResponseWriter, r *rest.Request
 	}
 
 	var owner interface{}
-	owner, ok = jwtPayload.(map[string]interface{})["prn"]
+	owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
 	if !ok {
 		rest.Error(w, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
 		return
 	}
 
 	var authType interface{}
-	authType, ok = jwtPayload.(map[string]interface{})["type"]
+	authType, ok = jwtPayload.(jwtgo.MapClaims)["type"]
 	if !ok {
 		rest.Error(w, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
 		return
@@ -179,14 +182,22 @@ func (a *DevicesApp) handle_postdevice(w rest.ResponseWriter, r *rest.Request) {
 	mgoid := bson.NewObjectId()
 	newDevice.Id = mgoid
 	newDevice.Prn = "prn:::devices:/" + newDevice.Id.Hex()
-	newDevice.Challenge = petname.Generate(3, "-")
+
+	// if user does not provide a secret, we invent one ...
+	if newDevice.Secret == "" {
+		var err error
+		newDevice.Secret, err = utils.GenerateSecret(15)
+		if err != nil {
+			rest.Error(w, "Error generating secret", http.StatusInternalServerError)
+			return
+		}
+	}
 
 	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
 
 	var owner interface{}
-
 	if ok {
-		owner, ok = jwtPayload.(map[string]interface{})["prn"]
+		owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
 	}
 
 	if ok {
@@ -195,27 +206,46 @@ func (a *DevicesApp) handle_postdevice(w rest.ResponseWriter, r *rest.Request) {
 		newDevice.UserMeta = utils.BsonQuoteMap(&newDevice.UserMeta)
 		newDevice.DeviceMeta = map[string]interface{}{}
 	} else {
+
 		// device speaking here...
 		newDevice.Owner = ""
 		newDevice.UserMeta = map[string]interface{}{}
 		newDevice.DeviceMeta = utils.BsonQuoteMap(&newDevice.DeviceMeta)
+
+		// lets see if we have an auto assign candidate
+		autoAuthToken := r.Header.Get(PantahubDevicesAutoTokenV1)
+
+		if autoAuthToken != "" {
+
+			autoInfo, err := a.getBase64AutoTokenInfo(autoAuthToken)
+			if err != nil {
+				rest.Error(w, "Error using AutoAuthToken "+err.Error(), http.StatusBadRequest)
+				return
+			}
+
+			// update owner and usermeta
+			newDevice.Owner = autoInfo.Owner
+			newDevice.UserMeta = autoInfo.UserMeta
+		} else {
+			newDevice.Challenge = petname.Generate(3, "-")
+		}
 	}
 
 	newDevice.TimeCreated = time.Now()
 	newDevice.TimeModified = newDevice.TimeCreated
 
+	// we invent a nick for user in case he didnt ask for a specfic one...
 	if newDevice.Nick == "" {
 		newDevice.Nick = petname.Generate(3, "_")
 	}
 
 	collection := a.mgoSession.DB("").C("pantahub_devices")
-
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
-	_, err := collection.UpsertId(mgoid, newDevice)
 
+	_, err := collection.UpsertId(mgoid, newDevice)
 	if err != nil {
 		rest.Error(w, "Error creating device "+err.Error(), http.StatusInternalServerError)
 		return
@@ -230,14 +260,14 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 
 	putId := r.PathParam("id")
 
-	authId, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	authId, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in.", http.StatusForbidden)
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	if !ok {
 		// XXX: find right error
@@ -353,14 +383,14 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 
 	mgoid := bson.ObjectIdHex(r.PathParam("id"))
 
-	authId, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	authId, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in.", http.StatusForbidden)
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	if !ok {
 		// XXX: find right error
@@ -417,11 +447,16 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 
 	if device.Owner != "" {
 		var ownerAccount accounts.Account
-		err = collectionAccounts.Find(bson.M{"prn": device.Owner}).One(&ownerAccount)
 
-		if err != nil {
-			rest.Error(w, "Owner account not Found", http.StatusInternalServerError)
-			return
+		// first check default accounts like user1, user2, etc...
+		ownerAccount, ok := accounts.DefaultAccounts[device.Owner]
+		if !ok {
+			err = collectionAccounts.Find(bson.M{"prn": device.Owner}).One(&ownerAccount)
+
+			if err != nil {
+				rest.Error(w, "Owner account not Found", http.StatusInternalServerError)
+				return
+			}
 		}
 		device.OwnerNick = ownerAccount.Nick
 	}
@@ -440,14 +475,14 @@ func (a *DevicesApp) handle_getuserdevice(w rest.ResponseWriter, r *rest.Request
 	usernick := r.PathParam("usernick")
 	devicenick := r.PathParam("devicenick")
 
-	authId, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	authId, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in.", http.StatusForbidden)
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	if !ok {
 		// XXX: find right error
@@ -548,14 +583,14 @@ func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) 
 
 	patchId := r.PathParam("id")
 
-	authId, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	authId, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in.", http.StatusForbidden)
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	if !ok {
 		// XXX: find right error
@@ -624,14 +659,14 @@ func (a *DevicesApp) handle_putpublic(w rest.ResponseWriter, r *rest.Request) {
 
 	putId := r.PathParam("id")
 
-	authId, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	authId, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in.", http.StatusForbidden)
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	if !ok {
 		// XXX: find right error
@@ -680,14 +715,14 @@ func (a *DevicesApp) handle_deletepublic(w rest.ResponseWriter, r *rest.Request)
 
 	putId := r.PathParam("id")
 
-	authId, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	authId, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in.", http.StatusForbidden)
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["type"]
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	if !ok {
 		// XXX: find right error
@@ -736,7 +771,7 @@ type ModelError struct {
 }
 
 func (a *DevicesApp) handle_getdevices(w rest.ResponseWriter, r *rest.Request) {
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		err := ModelError{}
 		err.Code = http.StatusInternalServerError
@@ -771,7 +806,7 @@ func (a *DevicesApp) handle_deletedevice(w rest.ResponseWriter, r *rest.Request)
 
 	delId := r.PathParam("id")
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(map[string]interface{})["prn"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in as a USER", http.StatusForbidden)
@@ -841,6 +876,12 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *DevicesApp {
 		return nil
 	}
 
+	err = app.EnsureTokenIndices()
+	if err != nil {
+		log.Println("Error creating indices for pantahub devices tokens: " + err.Error())
+		return nil
+	}
+
 	app.Api = rest.NewApi()
 	// we dont use default stack because we dont want content type enforcement
 	app.Api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
@@ -853,7 +894,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *DevicesApp {
 		OriginValidator: func(origin string, request *rest.Request) bool {
 			return true
 		},
-		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{
 			"Accept", "Content-Type", "X-Custom-Header", "Origin", "Authorization"},
 		AccessControlAllowCredentials: true,
@@ -878,6 +919,12 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *DevicesApp {
 
 	// /auth_status endpoints
 	api_router, _ := rest.MakeRouter(
+		// token api
+		rest.Post("/tokens", app.handle_posttokens),
+		rest.Delete("/tokens/:id", app.handle_disabletokens),
+		rest.Get("/tokens", app.handle_gettokens),
+
+		// default api
 		rest.Get("/auth_status", handle_auth),
 		rest.Get("/", app.handle_getdevices),
 		rest.Post("/", app.handle_postdevice),

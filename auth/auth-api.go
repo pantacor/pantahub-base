@@ -16,19 +16,19 @@
 package auth
 
 import (
-	"strings"
-
-	"gitlab.com/pantacor/pantahub-base/accounts"
-	"gitlab.com/pantacor/pantahub-base/devices"
-	"gitlab.com/pantacor/pantahub-base/utils"
-
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
-	"github.com/StephanDollberg/go-json-rest-middleware-jwt"
+	jwtgo "github.com/dgrijalva/jwt-go"
+
 	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/fundapps/go-json-rest-middleware-jwt"
+	"gitlab.com/pantacor/pantahub-base/accounts"
+	"gitlab.com/pantacor/pantahub-base/devices"
+	"gitlab.com/pantacor/pantahub-base/utils"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -159,7 +159,7 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 }
 
 func (a *AuthApp) handle_getprofile(w rest.ResponseWriter, r *rest.Request) {
-	jwtClaims := r.Env["JWT_PAYLOAD"].(map[string]interface{})
+	jwtClaims := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)
 
 	accountPrn := jwtClaims["prn"].(string)
 
@@ -261,6 +261,19 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 		Sparse:     true,
 	}
 	err := app.mgoSession.DB("").C("pantahub_accounts").EnsureIndex(index)
+	if err != nil {
+		log.Fatalln("Error setting up index for pantahub_accounts: " + err.Error())
+		return nil
+	}
+
+	index = mgo.Index{
+		Key:        []string{"prn"},
+		Unique:     false,
+		DropDups:   false,
+		Background: true, // See notes.
+		Sparse:     true,
+	}
+	err = app.mgoSession.DB("").C("pantahub_accounts").EnsureIndex(index)
 	if err != nil {
 		log.Fatalln("Error setting up index for pantahub_accounts: " + err.Error())
 		return nil

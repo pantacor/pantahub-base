@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"crypto/tls"
 	"io"
 	"net/http"
 	"strings"
@@ -40,6 +41,30 @@ func TestRequestBaseUrl(t *testing.T) {
 
 func TestRequestUrlScheme(t *testing.T) {
 	req := defaultRequest("GET", "https://localhost", nil, t)
+	urlBase := req.BaseUrl()
+
+	expected := "https"
+	if urlBase.Scheme != expected {
+		t.Error(expected + " was the expected scheme, but instead got " + urlBase.Scheme)
+	}
+}
+
+func TestRequestUrlSchemeHTTP(t *testing.T) {
+	req := defaultRequest("GET", "http://localhost", nil, t)
+	urlBase := req.BaseUrl()
+
+	expected := "http"
+	if urlBase.Scheme != expected {
+		t.Error(expected + " was the expected scheme, but instead got " + urlBase.Scheme)
+	}
+}
+
+func TestRequestUrlSchemeHTTP2TLS(t *testing.T) {
+	req := defaultRequest("GET", "http://localhost", nil, t)
+	req.Proto = "HTTP"
+	req.ProtoMajor = 2
+	req.ProtoMinor = 0
+	req.TLS = &tls.ConnectionState{}
 	urlBase := req.BaseUrl()
 
 	expected := "https"
