@@ -33,12 +33,12 @@ func TestParseSuccess(t *testing.T) {
 
 		info, err := test.GetInfo()
 		if err != nil {
-			t.Error("GetInfo Failed - %s: %s", test, err)
+			t.Errorf("GetInfo Failed - %s: %s", test, err)
 			t.Fail()
 			return
 		}
 		if !info.Equals(testInfo) {
-			t.Error("GetInfo Failed - %s", test)
+			t.Errorf("GetInfo Failed - %s", test)
 			t.Fail()
 			return
 		}
@@ -64,7 +64,7 @@ func TestParseErrors(t *testing.T) {
 		test := Prn(v)
 		_, err := test.GetInfo()
 		if err == nil {
-			t.Error("PRN must fail %s: %s (error:%s)", test, err.Error())
+			t.Errorf("PRN must fail %s: %s (error:%s)", test, err.Error())
 			t.Fail()
 			return
 		}
