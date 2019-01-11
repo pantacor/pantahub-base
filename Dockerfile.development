@@ -1,0 +1,14 @@
+FROM golang:alpine
+
+RUN apk add --no-cache \
+    openssl \
+    build-base
+
+ENV DOCKERIZE_VERSION v0.6.1
+RUN wget https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSION/dockerize-alpine-linux-amd64-$DOCKERIZE_VERSION.tar.gz \
+    && tar -C /usr/local/bin -xzvf dockerize-alpine-linux-amd64-$DOCKERIZE_VERSION.tar.gz \
+    && rm dockerize-alpine-linux-amd64-$DOCKERIZE_VERSION.tar.gz
+
+WORKDIR /go/src/gitlab.com/pantacor/pantahub-base
+
+CMD ["dockerize", "-wait", "tcp://mongo:27017", "-wait", "tcp://fluentd:24224", "-wait", "tcp://elasticsearch:9200", "-timeout", "60s", "go", "run", "main.go"]
