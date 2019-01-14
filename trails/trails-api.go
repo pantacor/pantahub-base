@@ -95,6 +95,7 @@ type Step struct {
 	StepProgress StepProgress           `json:"progress" bson:"progress"`
 	StepTime     time.Time              `json:"step-time" bson:"step-time"`
 	ProgressTime time.Time              `json:"progress-time" bson:"progress-time"`
+	Garbage      bool                   `json:"garbage" bson:"garbage"`
 }
 
 type StepProgress struct {
@@ -592,7 +593,10 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	err = collTrails.Update(bson.M{"_id": trail.Id}, bson.M{"$set": bson.M{"last-touched": newStep.StepTime}})
+	err = collTrails.Update(bson.M{
+		"_id":     trail.Id,
+		"garbage": bson.M{"$ne": true},
+	}, bson.M{"$set": bson.M{"last-touched": newStep.StepTime}})
 
 	if err != nil {
 		// XXX: figure how to be better on error cases here...
@@ -1026,6 +1030,11 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 
 	err := coll.Find(bson.M{"_id": trailId + "-" + rev}).One(&step)
 
+	if step.Garbage {
+		rest.Error(w, "No access for step", http.StatusForbidden)
+		return
+	}
+
 	if authType == "DEVICE" && step.Device != owner {
 		rest.Error(w, "No access for device", http.StatusForbidden)
 		return
@@ -1052,7 +1061,7 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 	storageId := objects.MakeStorageId(step.Owner, sha)
 	err = collection.FindId(storageId).One(&newObject)
 
-	if err != nil {
+	if err != nil || newObject.Garbage {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
 	}
@@ -1397,7 +1406,12 @@ func (a *TrailsApp) handle_putstepstate(w rest.ResponseWriter, r *rest.Request) 
 
 	step.Id = trailId + "-" + rev
 
-	err = coll.Update(bson.M{"_id": trailId + "-" + rev, "owner": owner, "progress.status": "NEW"}, step)
+	err = coll.Update(bson.M{
+		"_id":             trailId + "-" + rev,
+		"owner":           owner,
+		"progress.status": "NEW",
+		"garbage":         bson.M{"$ne": true},
+	}, step)
 
 	if err != nil {
 		rest.Error(w, "Error updating step state: "+err.Error(), http.StatusInternalServerError)
@@ -1454,14 +1468,21 @@ func (a *TrailsApp) handle_putstepprogress(w rest.ResponseWriter, r *rest.Reques
 
 	progressTime := time.Now()
 
-	err := coll.Update(bson.M{"_id": stepId, "device": owner}, bson.M{"$set": bson.M{"progress": stepProgress, "progress-time": progressTime}})
+	err := coll.Update(bson.M{
+		"_id":     stepId,
+		"device":  owner,
+		"garbage": bson.M{"$ne": true},
+	}, bson.M{"$set": bson.M{"progress": stepProgress, "progress-time": progressTime}})
 
 	if err != nil {
 		rest.Error(w, "Cannot update step progress "+err.Error(), http.StatusForbidden)
 		return
 	}
 
-	err = collTrails.Update(bson.M{"_id": bson.ObjectIdHex(trailId)}, bson.M{"$set": bson.M{"last-touched": progressTime}})
+	err = collTrails.Update(bson.M{
+		"_id":     bson.ObjectIdHex(trailId),
+		"garbage": bson.M{"$ne": true},
+	}, bson.M{"$set": bson.M{"last-touched": progressTime}})
 
 	if err != nil {
 		// XXX: figure how to be better on error cases here...

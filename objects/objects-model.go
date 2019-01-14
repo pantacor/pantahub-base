@@ -15,6 +15,7 @@ type Object struct {
 	SizeInt     int64  `json:"sizeint"`
 	MimeType    string `json:"mime-type"`
 	initialized bool
+	Garbage     bool `json:"garbage" bson:"garbage"`
 }
 
 type ObjectWithAccess struct {

@@ -59,6 +59,7 @@ type Device struct {
 	IsPublic     bool                   `json:"public"`
 	UserMeta     map[string]interface{} `json:"user-meta" bson:"user-meta"`
 	DeviceMeta   map[string]interface{} `json:"device-meta" bson:"device-meta"`
+	Garbage      bool                   `json:"garbage" bson:"garbage"`
 }
 
 func handle_auth(w rest.ResponseWriter, r *rest.Request) {
@@ -110,7 +111,11 @@ func (a *DevicesApp) handle_putuserdata(w rest.ResponseWriter, r *rest.Request) 
 		return
 	}
 
-	err = collection.Update(bson.M{"_id": bsonId, "owner": owner.(string)},
+	err = collection.Update(bson.M{
+		"_id":     bsonId,
+		"owner":   owner.(string),
+		"garbage": bson.M{"$ne": true},
+	},
 		bson.M{"$set": bson.M{"user-meta": data, "timemodified": time.Now()}})
 	if err != nil {
 		rest.Error(w, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
@@ -164,7 +169,11 @@ func (a *DevicesApp) handle_putdevicedata(w rest.ResponseWriter, r *rest.Request
 		return
 	}
 
-	err = collection.Update(bson.M{"_id": bsonId, "prn": owner.(string)}, bson.M{"$set": bson.M{"device-meta": data, "timemodified": time.Now()}})
+	err = collection.Update(bson.M{
+		"_id":     bsonId,
+		"prn":     owner.(string),
+		"garbage": bson.M{"$ne": true},
+	}, bson.M{"$set": bson.M{"device-meta": data, "timemodified": time.Now()}})
 	if err != nil {
 		rest.Error(w, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
 		return
@@ -293,7 +302,7 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 
 	err := collection.FindId(bson.ObjectIdHex(putId)).One(&newDevice)
 
-	if err != nil {
+	if err != nil || newDevice.Garbage {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
 	}
@@ -611,7 +620,7 @@ func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) 
 	}
 
 	err := collection.FindId(bson.ObjectIdHex(patchId)).One(&newDevice)
-	if err != nil {
+	if err != nil || newDevice.Garbage {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
 	}
@@ -687,7 +696,7 @@ func (a *DevicesApp) handle_putpublic(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	err := collection.FindId(bson.ObjectIdHex(putId)).One(&newDevice)
-	if err != nil {
+	if err != nil || newDevice.Garbage {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
 	}
@@ -743,7 +752,7 @@ func (a *DevicesApp) handle_deletepublic(w rest.ResponseWriter, r *rest.Request)
 	}
 
 	err := collection.FindId(bson.ObjectIdHex(putId)).One(&newDevice)
-	if err != nil {
+	if err != nil || newDevice.Garbage {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
 	}

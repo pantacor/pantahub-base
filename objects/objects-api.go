@@ -246,7 +246,7 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 	storageId := MakeStorageId(ownerStr, sha)
 
 	err = collection.FindId(storageId).One(&newObject)
-	if err != nil {
+	if err != nil || newObject.Garbage {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
 	}
