@@ -16,6 +16,7 @@
 package devices
 
 import (
+	"encoding/json"
 	"log"
 	"math/rand"
 	"net/http"
@@ -27,6 +28,7 @@ import (
 	jwtgo "github.com/dgrijalva/jwt-go"
 	petname "github.com/dustinkirkland/golang-petname"
 	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
+	"github.com/go-resty/resty"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gopkg.in/mgo.v2"
@@ -834,12 +836,27 @@ func (a *DevicesApp) handle_deletedevice(w rest.ResponseWriter, r *rest.Request)
 	collection.FindId(bson.ObjectIdHex(delId)).One(&device)
 
 	if device.Owner == owner {
-		collection.RemoveId(bson.ObjectIdHex(delId))
+		result := MarkDeviceAsGarbage(w, delId)
+		if int(result["status"].(float64)) == 1 {
+			device.Garbage = true
+		}
+
 	}
 
 	w.WriteJson(device)
 }
 
+// MarkDeviceAsGarbage : Mark Device as Garbage
+func MarkDeviceAsGarbage(w rest.ResponseWriter, deviceID string) map[string]interface{} {
+	response := map[string]interface{}{}
+	APIEndPoint := utils.GetEnv("PANTAHUB_GC_API") + "/markgarbage/device/" + deviceID
+	res, err := resty.R().Put(APIEndPoint)
+	if err != nil {
+		rest.Error(w, "internal error calling test server: "+err.Error(), http.StatusInternalServerError)
+	}
+	err = json.Unmarshal(res.Body(), &response)
+	return response
+}
 func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *DevicesApp {
 
 	app := new(DevicesApp)
