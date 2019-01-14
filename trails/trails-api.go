@@ -946,6 +946,10 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 	}
 
 	err := coll.Find(bson.M{"_id": trailId + "-" + rev}).One(&step)
+	if step.Garbage {
+		rest.Error(w, "No access for step", http.StatusForbidden)
+		return
+	}
 
 	if authType == "DEVICE" && step.Device != owner {
 		rest.Error(w, "No access for device", http.StatusForbidden)
