@@ -520,6 +520,10 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	trailId := r.PathParam("id")
+	if !devices.ValidateDevice(trailId) {
+		rest.Error(w, "No access for device", http.StatusForbidden)
+		return
+	}
 	trail := Trail{}
 
 	if authType == "USER" || authType == "DEVICE" {
