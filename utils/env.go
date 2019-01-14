@@ -176,6 +176,9 @@ const (
 	// enable resty client debugging if env is set
 	// default: ""
 	ENV_RESTY_DEBUG = "RESTY_DEBUG"
+
+	// Pantahub GC API end point
+	ENV_PANTAHUB_GC_API = "PANTAHUB_GC_API"
 )
 
 var defaultEnvs = map[string]string{
@@ -244,6 +247,9 @@ var defaultEnvs = map[string]string{
 
 	// resty REST client configs
 	ENV_RESTY_DEBUG: "",
+
+	// Pantahub GC API end point
+	ENV_PANTAHUB_GC_API: "http://localhost:2000",
 }
 
 func GetEnv(key string) string {
