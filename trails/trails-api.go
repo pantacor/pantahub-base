@@ -1038,6 +1038,10 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 
 	step := Step{}
 	trailId := r.PathParam("id")
+	if !devices.ValidateDevice(trailId) {
+		rest.Error(w, "No access for device", http.StatusForbidden)
+		return
+	}
 	rev := r.PathParam("rev")
 	putId := r.PathParam("obj")
 
