@@ -1462,6 +1462,10 @@ func (a *TrailsApp) handle_putstepprogress(w rest.ResponseWriter, r *rest.Reques
 	stepProgress := StepProgress{}
 	r.DecodeJsonPayload(&stepProgress)
 	trailId := r.PathParam("id")
+	if !devices.ValidateDevice(trailId) {
+		rest.Error(w, "No access for device", http.StatusForbidden)
+		return
+	}
 	stepId := trailId + "-" + r.PathParam("rev")
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
