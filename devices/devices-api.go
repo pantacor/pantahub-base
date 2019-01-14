@@ -113,11 +113,7 @@ func (a *DevicesApp) handle_putuserdata(w rest.ResponseWriter, r *rest.Request) 
 		return
 	}
 
-	err = collection.Update(bson.M{
-		"_id":     bsonId,
-		"owner":   owner.(string),
-		"garbage": bson.M{"$ne": true},
-	},
+	err = collection.Update(bson.M{"_id": bsonId, "owner": owner.(string)},
 		bson.M{"$set": bson.M{"user-meta": data, "timemodified": time.Now()}})
 	if err != nil {
 		rest.Error(w, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
@@ -171,11 +167,7 @@ func (a *DevicesApp) handle_putdevicedata(w rest.ResponseWriter, r *rest.Request
 		return
 	}
 
-	err = collection.Update(bson.M{
-		"_id":     bsonId,
-		"prn":     owner.(string),
-		"garbage": bson.M{"$ne": true},
-	}, bson.M{"$set": bson.M{"device-meta": data, "timemodified": time.Now()}})
+	err = collection.Update(bson.M{"_id": bsonId, "prn": owner.(string)}, bson.M{"$set": bson.M{"device-meta": data, "timemodified": time.Now()}})
 	if err != nil {
 		rest.Error(w, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
 		return
@@ -301,10 +293,12 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
+	err := collection.Find(bson.M{
+		"_id":     bson.ObjectIdHex(putId),
+		"garbage": bson.M{"$ne": true},
+	}).One(&newDevice)
 
-	err := collection.FindId(bson.ObjectIdHex(putId)).One(&newDevice)
-
-	if err != nil || newDevice.Garbage {
+	if err != nil {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
 	}
@@ -431,8 +425,10 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, "Error with Database (accounts) connectivity", http.StatusInternalServerError)
 		return
 	}
-
-	err := collection.FindId(mgoid).One(&device)
+	err := collection.Find(bson.M{
+		"_id":     mgoid,
+		"garbage": bson.M{"$ne": true},
+	}).One(&device)
 
 	if err != nil {
 		rest.Error(w, "No Access", http.StatusForbidden)
@@ -551,8 +547,11 @@ func (a *DevicesApp) handle_getuserdevice(w rest.ResponseWriter, r *rest.Request
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
-
-	err := collDevices.Find(bson.M{"nick": devicenick, "owner": account.Prn}).One(&device)
+	err := collDevices.Find(bson.M{
+		"nick":    devicenick,
+		"owner":   account.Prn,
+		"garbage": bson.M{"$ne": true},
+	}).One(&device)
 
 	if err == mgo.ErrNotFound {
 		log.Println("ERROR: error getting device by nick: " + err.Error())
@@ -620,9 +619,11 @@ func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) 
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
-
-	err := collection.FindId(bson.ObjectIdHex(patchId)).One(&newDevice)
-	if err != nil || newDevice.Garbage {
+	err := collection.Find(bson.M{
+		"_id":     bson.ObjectIdHex(patchId),
+		"garbage": bson.M{"$ne": true},
+	}).One(&newDevice)
+	if err != nil {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
 	}
@@ -697,8 +698,11 @@ func (a *DevicesApp) handle_putpublic(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	err := collection.FindId(bson.ObjectIdHex(putId)).One(&newDevice)
-	if err != nil || newDevice.Garbage {
+	err := collection.Find(bson.M{
+		"_id":     bson.ObjectIdHex(putId),
+		"garbage": bson.M{"$ne": true},
+	}).One(&newDevice)
+	if err != nil {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
 	}
@@ -753,8 +757,11 @@ func (a *DevicesApp) handle_deletepublic(w rest.ResponseWriter, r *rest.Request)
 		return
 	}
 
-	err := collection.FindId(bson.ObjectIdHex(putId)).One(&newDevice)
-	if err != nil || newDevice.Garbage {
+	err := collection.Find(bson.M{
+		"_id":     bson.ObjectIdHex(putId),
+		"garbage": bson.M{"$ne": true},
+	}).One(&newDevice)
+	if err != nil {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
 	}
@@ -802,7 +809,10 @@ func (a *DevicesApp) handle_getdevices(w rest.ResponseWriter, r *rest.Request) {
 
 	devices := make([]Device, 0)
 
-	collection.Find(bson.M{"owner": owner}).All(&devices)
+	collection.Find(bson.M{
+		"owner":   owner,
+		"garbage": bson.M{"$ne": true},
+	}).All(&devices)
 
 	for k, v := range devices {
 		v.UserMeta = utils.BsonUnquoteMap(&v.UserMeta)
@@ -832,8 +842,10 @@ func (a *DevicesApp) handle_deletedevice(w rest.ResponseWriter, r *rest.Request)
 	}
 
 	device := Device{}
-
-	collection.FindId(bson.ObjectIdHex(delId)).One(&device)
+	collection.Find(bson.M{
+		"_id":     bson.ObjectIdHex(delId),
+		"garbage": bson.M{"$ne": true},
+	}).One(&device)
 
 	if device.Owner == owner {
 		result := MarkDeviceAsGarbage(w, delId)
@@ -857,6 +869,21 @@ func MarkDeviceAsGarbage(w rest.ResponseWriter, deviceID string) map[string]inte
 	err = json.Unmarshal(res.Body(), &response)
 	return response
 }
+
+// ValidateDevice : Validate Device id
+func ValidateDevice(ID string) bool {
+	session, _ := utils.GetMongoSession()
+	collection := session.DB("").C("pantahub_devices")
+	count, _ := collection.Find(bson.M{
+		"_id":     bson.ObjectIdHex(ID),
+		"garbage": bson.M{"$ne": true},
+	}).Count()
+	if count > 0 {
+		return true
+	}
+	return false
+}
+
 func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *DevicesApp {
 
 	app := new(DevicesApp)

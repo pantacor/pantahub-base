@@ -56,6 +56,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
+	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	pvrapi "gitlab.com/pantacor/pvr/api"
@@ -167,10 +168,15 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, "Device needs an owner", http.StatusForbidden)
 		return
 	}
+	deviceID := prnGetId(device.(string))
+	if !devices.ValidateDevice(deviceID) {
+		rest.Error(w, "No access for device", http.StatusForbidden)
+		return
+	}
 
 	// do we need tip/tail here? or is that always read-only?
 	newTrail := Trail{}
-	newTrail.Id = bson.ObjectIdHex(prnGetId(device.(string)))
+	newTrail.Id = bson.ObjectIdHex(deviceID)
 	newTrail.Owner = owner.(string)
 	newTrail.Device = device.(string)
 	newTrail.LastInSync = time.Time{}
