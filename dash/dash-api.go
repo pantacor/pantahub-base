@@ -308,7 +308,10 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	deviceCount, err :=
-		dCol.Find(bson.M{"owner": owner}).Count()
+		dCol.Find(bson.M{
+			"owner":   owner,
+			"garbage": bson.M{"$ne": true},
+		}).Count()
 
 	if err != nil {
 		rest.Error(w, "Error finding devices for summary "+err.Error(),

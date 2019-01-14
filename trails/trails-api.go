@@ -255,13 +255,19 @@ func (a *TrailsApp) handle_gettrails(w rest.ResponseWriter, r *rest.Request) {
 	trails := make([]Trail, 0)
 
 	if authType == "DEVICE" {
-		coll.Find(bson.M{"device": owner}).All(&trails)
+		coll.Find(bson.M{
+			"device":  owner,
+			"garbage": bson.M{"$ne": true},
+		}).All(&trails)
 		if len(trails) > 1 {
 			log.Println("WARNING: more than one trail in db for device - bad DB: " + owner.(string))
 			trails = trails[0:1]
 		}
 	} else if authType == "USER" {
-		coll.Find(bson.M{"owner": owner}).All(&trails)
+		coll.Find(bson.M{
+			"owner":   owner,
+			"garbage": bson.M{"$ne": true},
+		}).All(&trails)
 	}
 
 	for k, v := range trails {
@@ -309,11 +315,22 @@ func (a *TrailsApp) handle_gettrail(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if isPublic {
-		err = coll.Find(bson.M{"_id": getId}).One(&trail)
+		err = coll.Find(bson.M{
+			"_id":     getId,
+			"garbage": bson.M{"$ne": true},
+		}).One(&trail)
 	} else if authType == "DEVICE" {
-		err = coll.Find(bson.M{"_id": getId, "device": owner}).One(&trail)
+		err = coll.Find(bson.M{
+			"_id":     getId,
+			"device":  owner,
+			"garbage": bson.M{"$ne": true},
+		}).One(&trail)
 	} else if authType == "USER" {
-		err = coll.Find(bson.M{"_id": getId, "owner": owner}).One(&trail)
+		err = coll.Find(bson.M{
+			"_id":     getId,
+			"owner":   owner,
+			"garbage": bson.M{"$ne": true},
+		}).One(&trail)
 	}
 
 	if err != nil {
@@ -358,11 +375,22 @@ func (a *TrailsApp) handle_gettrailpvrinfo(w rest.ResponseWriter, r *rest.Reques
 
 	//	get last step
 	if isPublic {
-		err = coll.Find(bson.M{"trail-id": bson.ObjectIdHex(getId)}).Sort("-rev").One(&step)
+		err = coll.Find(bson.M{
+			"trail-id": bson.ObjectIdHex(getId),
+			"garbage":  bson.M{"$ne": true},
+		}).Sort("-rev").One(&step)
 	} else if authType == "DEVICE" {
-		err = coll.Find(bson.M{"device": owner, "trail-id": bson.ObjectIdHex(getId)}).Sort("-rev").One(&step)
+		err = coll.Find(bson.M{
+			"device":   owner,
+			"trail-id": bson.ObjectIdHex(getId),
+			"garbage":  bson.M{"$ne": true},
+		}).Sort("-rev").One(&step)
 	} else if authType == "USER" {
-		err = coll.Find(bson.M{"owner": owner, "trail-id": bson.ObjectIdHex(getId)}).Sort("-rev").One(&step)
+		err = coll.Find(bson.M{
+			"owner":    owner,
+			"trail-id": bson.ObjectIdHex(getId),
+			"garbage":  bson.M{"$ne": true},
+		}).Sort("-rev").One(&step)
 	}
 
 	if err != nil {
@@ -423,11 +451,22 @@ func (a *TrailsApp) handle_getsteppvrinfo(w rest.ResponseWriter, r *rest.Request
 
 	//	get last step
 	if isPublic {
-		err = coll.Find(bson.M{"_id": stepId}).One(&step)
+		err = coll.Find(bson.M{
+			"_id":     stepId,
+			"garbage": bson.M{"$ne": true},
+		}).One(&step)
 	} else if authType == "DEVICE" {
-		err = coll.Find(bson.M{"device": owner, "_id": stepId}).One(&step)
+		err = coll.Find(bson.M{
+			"device":  owner,
+			"_id":     stepId,
+			"garbage": bson.M{"$ne": true},
+		}).One(&step)
 	} else if authType == "USER" {
-		err = coll.Find(bson.M{"owner": owner, "_id": stepId}).One(&step)
+		err = coll.Find(bson.M{
+			"owner":   owner,
+			"_id":     stepId,
+			"garbage": bson.M{"$ne": true},
+		}).One(&step)
 	}
 
 	if err != nil {
@@ -467,7 +506,10 @@ func (a *TrailsApp) get_latest_steprev(trailId bson.ObjectId) (int, error) {
 
 	step := &Step{}
 
-	err := collSteps.Find(bson.M{"trail-id": trailId}).Sort("-rev").Limit(1).One(step)
+	err := collSteps.Find(bson.M{
+		"trail-id": trailId,
+		"garbage":  bson.M{"$ne": true},
+	}).Sort("-rev").Limit(1).One(step)
 
 	if err != nil {
 		return -1, err
@@ -516,7 +558,10 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 	trail := Trail{}
 
 	if authType == "USER" || authType == "DEVICE" {
-		err = collTrails.Find(bson.M{"_id": bson.ObjectIdHex(trailId)}).One(&trail)
+		err = collTrails.Find(bson.M{
+			"_id":     bson.ObjectIdHex(trailId),
+			"garbage": bson.M{"$ne": true},
+		}).One(&trail)
 	} else {
 		rest.Error(w, "Need to be logged in as USER to post trail steps", http.StatusForbidden)
 		return
@@ -555,7 +600,10 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 
 	stepId := trailId + "-" + strconv.Itoa(newStep.Rev-1)
 
-	err = collSteps.Find(bson.M{"_id": stepId}).One(&previousStep)
+	err = collSteps.Find(bson.M{
+		"_id":     stepId,
+		"garbage": bson.M{"$ne": true},
+	}).One(&previousStep)
 
 	if err != nil {
 		// XXX: figure how to be better on error cases here...
@@ -645,11 +693,25 @@ func (a *TrailsApp) handle_getsteps(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if isPublic {
-		query = bson.M{"trail-id": bson.ObjectIdHex(trailId), "progress.status": "NEW"}
+		query = bson.M{
+			"trail-id":        bson.ObjectIdHex(trailId),
+			"progress.status": "NEW",
+			"garbage":         bson.M{"$ne": true},
+		}
 	} else if authType == "DEVICE" {
-		query = bson.M{"trail-id": bson.ObjectIdHex(trailId), "device": owner, "progress.status": "NEW"}
+		query = bson.M{
+			"trail-id":        bson.ObjectIdHex(trailId),
+			"device":          owner,
+			"progress.status": "NEW",
+			"garbage":         bson.M{"$ne": true},
+		}
 	} else if authType == "USER" {
-		query = bson.M{"trail-id": bson.ObjectIdHex(trailId), "owner": owner, "progress.status": bson.M{"$ne": "DONE"}}
+		query = bson.M{
+			"trail-id":        bson.ObjectIdHex(trailId),
+			"owner":           owner,
+			"progress.status": bson.M{"$ne": "DONE"},
+			"garbage":         bson.M{"$ne": true},
+		}
 	}
 
 	// allow override of progress.status defaults
@@ -721,7 +783,10 @@ func (a *TrailsApp) handle_getstep(w rest.ResponseWriter, r *rest.Request) {
 	step := Step{}
 	rev := r.PathParam("rev")
 
-	query := bson.M{"_id": trailId + "-" + rev}
+	query := bson.M{
+		"_id":     trailId + "-" + rev,
+		"garbage": bson.M{"$ne": true},
+	}
 
 	if isPublic {
 		err = coll.Find(query).One(&step)
@@ -730,7 +795,11 @@ func (a *TrailsApp) handle_getstep(w rest.ResponseWriter, r *rest.Request) {
 		err = coll.Find(query).One(&step)
 	} else if authType == "USER" {
 		query["owner"] = owner
-		err = coll.Find(bson.M{"_id": trailId + "-" + rev, "owner": owner}).One(&step)
+		err = coll.Find(bson.M{
+			"_id":     trailId + "-" + rev,
+			"owner":   owner,
+			"garbage": bson.M{"$ne": true},
+		}).One(&step)
 	} else {
 		rest.Error(w, "No Access to step", http.StatusForbidden)
 		return
@@ -788,11 +857,22 @@ func (a *TrailsApp) handle_getstepstate(w rest.ResponseWriter, r *rest.Request) 
 	}
 
 	if isPublic {
-		coll.Find(bson.M{"_id": trailId + "-" + rev}).One(&step)
+		coll.Find(bson.M{
+			"_id":     trailId + "-" + rev,
+			"garbage": bson.M{"$ne": true},
+		}).One(&step)
 	} else if authType == "DEVICE" {
-		coll.Find(bson.M{"_id": trailId + "-" + rev, "device": owner}).One(&step)
+		coll.Find(bson.M{
+			"_id":     trailId + "-" + rev,
+			"device":  owner,
+			"garbage": bson.M{"$ne": true},
+		}).One(&step)
 	} else if authType == "USER" {
-		coll.Find(bson.M{"_id": trailId + "-" + rev, "owner": owner}).One(&step)
+		coll.Find(bson.M{
+			"_id":     trailId + "-" + rev,
+			"owner":   owner,
+			"garbage": bson.M{"$ne": true},
+		}).One(&step)
 	}
 
 	w.WriteJson(utils.BsonUnquoteMap(&step.State))
@@ -829,11 +909,22 @@ func (a *TrailsApp) handle_getstepsobjects(w rest.ResponseWriter, r *rest.Reques
 	}
 
 	if isPublic {
-		coll.Find(bson.M{"_id": trailId + "-" + rev}).One(&step)
+		coll.Find(bson.M{
+			"_id":     trailId + "-" + rev,
+			"garbage": bson.M{"$ne": true},
+		}).One(&step)
 	} else if authType == "DEVICE" {
-		coll.Find(bson.M{"_id": trailId + "-" + rev, "device": owner}).One(&step)
+		coll.Find(bson.M{
+			"_id":     trailId + "-" + rev,
+			"device":  owner,
+			"garbage": bson.M{"$ne": true},
+		}).One(&step)
 	} else if authType == "USER" {
-		coll.Find(bson.M{"_id": trailId + "-" + rev, "owner": owner}).One(&step)
+		coll.Find(bson.M{
+			"_id":     trailId + "-" + rev,
+			"owner":   owner,
+			"garbage": bson.M{"$ne": true},
+		}).One(&step)
 	}
 
 	var objectsWithAccess []objects.ObjectWithAccess
@@ -878,7 +969,10 @@ func (a *TrailsApp) handle_getstepsobjects(w rest.ResponseWriter, r *rest.Reques
 		storageId := objects.MakeStorageId(step.Owner, sha)
 
 		var newObject objects.Object
-		err = collection.FindId(storageId).One(&newObject)
+		err = collection.Find(bson.M{
+			"_id":     storageId,
+			"garbage": bson.M{"$ne": true},
+		}).One(&newObject)
 
 		if err != nil {
 			rest.Error(w, "Not Accessible Resource Id: "+storageId+" ERR: "+err.Error(), http.StatusForbidden)
@@ -926,8 +1020,10 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 		rest.Error(w, "Unknown AuthType", http.StatusBadRequest)
 		return
 	}
-
-	err := coll.Find(bson.M{"_id": trailId + "-" + rev}).One(&step)
+	err := coll.Find(bson.M{
+		"_id":     trailId + "-" + rev,
+		"garbage": bson.M{"$ne": true},
+	}).One(&step)
 
 	if authType == "DEVICE" && step.Device != owner {
 		rest.Error(w, "No access for device", http.StatusForbidden)
@@ -1024,7 +1120,10 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 		return
 	}
 
-	err := coll.Find(bson.M{"_id": trailId + "-" + rev}).One(&step)
+	err := coll.Find(bson.M{
+		"_id":     trailId + "-" + rev,
+		"garbage": bson.M{"$ne": true},
+	}).One(&step)
 
 	if authType == "DEVICE" && step.Device != owner {
 		rest.Error(w, "No access for device", http.StatusForbidden)
@@ -1050,7 +1149,10 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 	}
 
 	storageId := objects.MakeStorageId(step.Owner, sha)
-	err = collection.FindId(storageId).One(&newObject)
+	err = collection.Find(bson.M{
+		"_id":     storageId,
+		"garbage": bson.M{"$ne": true},
+	}).One(&newObject)
 
 	if err != nil {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
@@ -1145,11 +1247,22 @@ func (a *TrailsApp) handle_getstepsobject(w rest.ResponseWriter, r *rest.Request
 	}
 
 	if isPublic {
-		coll.Find(bson.M{"_id": trailId + "-" + rev}).One(&step)
+		coll.Find(bson.M{
+			"_id":     trailId + "-" + rev,
+			"garbage": bson.M{"$ne": true},
+		}).One(&step)
 	} else if authType == "DEVICE" {
-		coll.Find(bson.M{"_id": trailId + "-" + rev, "device": owner}).One(&step)
+		coll.Find(bson.M{
+			"_id":     trailId + "-" + rev,
+			"device":  owner,
+			"garbage": bson.M{"$ne": true},
+		}).One(&step)
 	} else if authType == "USER" {
-		coll.Find(bson.M{"_id": trailId + "-" + rev, "owner": owner}).One(&step)
+		coll.Find(bson.M{
+			"_id":     trailId + "-" + rev,
+			"owner":   owner,
+			"garbage": bson.M{"$ne": true},
+		}).One(&step)
 	}
 
 	stateU := utils.BsonUnquoteMap(&step.State)
@@ -1198,7 +1311,10 @@ func (a *TrailsApp) handle_getstepsobject(w rest.ResponseWriter, r *rest.Request
 		storageId := objects.MakeStorageId(step.Owner, sha)
 
 		var newObject objects.Object
-		err = collection.FindId(storageId).One(&newObject)
+		err = collection.Find(bson.M{
+			"_id":     storageId,
+			"garbage": bson.M{"$ne": true},
+		}).One(&newObject)
 
 		if err != nil {
 			rest.Error(w, "Not Accessible Resource Id: "+storageId+" ERR: "+err.Error(), http.StatusForbidden)
@@ -1257,11 +1373,22 @@ func (a *TrailsApp) handle_getstepsobjectfile(w rest.ResponseWriter, r *rest.Req
 	}
 
 	if isPublic {
-		coll.Find(bson.M{"_id": trailId + "-" + rev}).One(&step)
+		coll.Find(bson.M{
+			"_id":     trailId + "-" + rev,
+			"garbage": bson.M{"$ne": true},
+		}).One(&step)
 	} else if authType == "DEVICE" {
-		coll.Find(bson.M{"_id": trailId + "-" + rev, "device": owner}).One(&step)
+		coll.Find(bson.M{
+			"_id":     trailId + "-" + rev,
+			"device":  owner,
+			"garbage": bson.M{"$ne": true},
+		}).One(&step)
 	} else if authType == "USER" {
-		coll.Find(bson.M{"_id": trailId + "-" + rev, "owner": owner}).One(&step)
+		coll.Find(bson.M{
+			"_id":     trailId + "-" + rev,
+			"owner":   owner,
+			"garbage": bson.M{"$ne": true},
+		}).One(&step)
 	}
 
 	stateU := utils.BsonUnquoteMap(&step.State)
@@ -1310,7 +1437,10 @@ func (a *TrailsApp) handle_getstepsobjectfile(w rest.ResponseWriter, r *rest.Req
 		storageId := objects.MakeStorageId(step.Owner, sha)
 
 		var newObject objects.Object
-		err = collection.FindId(storageId).One(&newObject)
+		err = collection.Find(bson.M{
+			"_id":     storageId,
+			"garbage": bson.M{"$ne": true},
+		}).One(&newObject)
 
 		if err != nil {
 			rest.Error(w, "Not Accessible Resource Id: "+storageId+" ERR: "+err.Error(), http.StatusForbidden)
@@ -1371,8 +1501,11 @@ func (a *TrailsApp) handle_putstepstate(w rest.ResponseWriter, r *rest.Request) 
 		rest.Error(w, "Need to be logged in as USER to put step state", http.StatusForbidden)
 		return
 	}
-
-	err := coll.Find(bson.M{"_id": trailId + "-" + rev, "progress.status": "NEW"}).One(&step)
+	err := coll.Find(bson.M{
+		"_id":             trailId + "-" + rev,
+		"progress.status": "NEW",
+		"garbage":         bson.M{"$ne": true},
+	}).One(&step)
 
 	if err != nil {
 		rest.Error(w, "Error with accessing data: "+err.Error(), http.StatusInternalServerError)
