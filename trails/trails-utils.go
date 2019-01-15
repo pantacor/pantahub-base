@@ -32,7 +32,7 @@ func (a *TrailsApp) isTrailPublic(trailID string) (bool, error) {
 
 	trail := Trail{}
 	log.Println("Trail:" + trailID)
-	err := collTrails.Find(bson.M{"_id": bson.ObjectIdHex(trailID)}).One(&trail)
+	err := collTrails.FindId(bson.ObjectIdHex(trailID)).One(&trail)
 
 	if err != nil {
 		return false, err

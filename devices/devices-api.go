@@ -849,6 +849,7 @@ func MarkDeviceAsGarbage(w rest.ResponseWriter, deviceID string) map[string]inte
 	err = json.Unmarshal(res.Body(), &response)
 	return response
 }
+
 func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *DevicesApp {
 
 	app := new(DevicesApp)
