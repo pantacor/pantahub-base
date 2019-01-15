@@ -881,8 +881,8 @@ func (a *TrailsApp) handle_getstepsobjects(w rest.ResponseWriter, r *rest.Reques
 			return
 		}
 
-		objId := v.(string)
-		sha, err := utils.DecodeSha256HexString(objId)
+		objID := v.(string)
+		sha, err := utils.DecodeSha256HexString(objID)
 
 		if err != nil {
 			rest.Error(w, "Get Steps Object id must be a valid sha256", http.StatusBadRequest)
