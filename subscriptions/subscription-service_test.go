@@ -266,7 +266,7 @@ func testDeleteSubscription(t *testing.T) {
 	err = sService.Delete(sub)
 
 	if err != nil {
-		t.Errorf("delete subscription failed", err.Error())
+		t.Errorf("delete subscription failed: %s", err.Error())
 		t.Fail()
 	}
 
@@ -292,7 +292,7 @@ func testSaveDeletedSubscription(t *testing.T) {
 	err = sService.Delete(sub)
 
 	if err != nil {
-		t.Errorf("delete subscription failed", err.Error())
+		t.Errorf("delete subscription failed: %s", err.Error())
 		t.Fail()
 	}
 

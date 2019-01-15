@@ -166,10 +166,11 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, "Device needs an owner", http.StatusForbidden)
 		return
 	}
+	deviceID := prnGetId(device.(string))
 
 	// do we need tip/tail here? or is that always read-only?
 	newTrail := Trail{}
-	newTrail.Id = bson.ObjectIdHex(prnGetId(device.(string)))
+	newTrail.Id = bson.ObjectIdHex(deviceID)
 	newTrail.Owner = owner.(string)
 	newTrail.Device = device.(string)
 	newTrail.LastInSync = time.Time{}
@@ -640,7 +641,10 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	err = collTrails.Update(bson.M{"_id": trail.Id}, bson.M{"$set": bson.M{"last-touched": newStep.StepTime}})
+	err = collTrails.Update(bson.M{
+		"_id":     trail.Id,
+		"garbage": bson.M{"$ne": true},
+	}, bson.M{"$set": bson.M{"last-touched": newStep.StepTime}})
 
 	if err != nil {
 		// XXX: figure how to be better on error cases here...
@@ -958,8 +962,8 @@ func (a *TrailsApp) handle_getstepsobjects(w rest.ResponseWriter, r *rest.Reques
 			return
 		}
 
-		objId := v.(string)
-		sha, err := utils.DecodeSha256HexString(objId)
+		objID := v.(string)
+		sha, err := utils.DecodeSha256HexString(objID)
 
 		if err != nil {
 			rest.Error(w, "Get Steps Object id must be a valid sha256", http.StatusBadRequest)
@@ -1020,6 +1024,7 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 		rest.Error(w, "Unknown AuthType", http.StatusBadRequest)
 		return
 	}
+
 	err := coll.Find(bson.M{
 		"_id":     trailId + "-" + rev,
 		"garbage": bson.M{"$ne": true},
@@ -1530,7 +1535,12 @@ func (a *TrailsApp) handle_putstepstate(w rest.ResponseWriter, r *rest.Request) 
 
 	step.Id = trailId + "-" + rev
 
-	err = coll.Update(bson.M{"_id": trailId + "-" + rev, "owner": owner, "progress.status": "NEW"}, step)
+	err = coll.Update(bson.M{
+		"_id":             trailId + "-" + rev,
+		"owner":           owner,
+		"progress.status": "NEW",
+		"garbage":         bson.M{"$ne": true},
+	}, step)
 
 	if err != nil {
 		rest.Error(w, "Error updating step state: "+err.Error(), http.StatusInternalServerError)
@@ -1587,14 +1597,21 @@ func (a *TrailsApp) handle_putstepprogress(w rest.ResponseWriter, r *rest.Reques
 
 	progressTime := time.Now()
 
-	err := coll.Update(bson.M{"_id": stepId, "device": owner}, bson.M{"$set": bson.M{"progress": stepProgress, "progress-time": progressTime}})
+	err := coll.Update(bson.M{
+		"_id":     stepId,
+		"device":  owner,
+		"garbage": bson.M{"$ne": true},
+	}, bson.M{"$set": bson.M{"progress": stepProgress, "progress-time": progressTime}})
 
 	if err != nil {
 		rest.Error(w, "Cannot update step progress "+err.Error(), http.StatusForbidden)
 		return
 	}
 
-	err = collTrails.Update(bson.M{"_id": bson.ObjectIdHex(trailId)}, bson.M{"$set": bson.M{"last-touched": progressTime}})
+	err = collTrails.Update(bson.M{
+		"_id":     bson.ObjectIdHex(trailId),
+		"garbage": bson.M{"$ne": true},
+	}, bson.M{"$set": bson.M{"last-touched": progressTime}})
 
 	if err != nil {
 		// XXX: figure how to be better on error cases here...

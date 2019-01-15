@@ -425,6 +425,7 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, "Error with Database (accounts) connectivity", http.StatusInternalServerError)
 		return
 	}
+
 	err := collection.Find(bson.M{
 		"_id":     mgoid,
 		"garbage": bson.M{"$ne": true},
@@ -547,6 +548,7 @@ func (a *DevicesApp) handle_getuserdevice(w rest.ResponseWriter, r *rest.Request
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
+
 	err := collDevices.Find(bson.M{
 		"nick":    devicenick,
 		"owner":   account.Prn,
@@ -619,6 +621,7 @@ func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) 
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
+
 	err := collection.Find(bson.M{
 		"_id":     bson.ObjectIdHex(patchId),
 		"garbage": bson.M{"$ne": true},
@@ -842,6 +845,7 @@ func (a *DevicesApp) handle_deletedevice(w rest.ResponseWriter, r *rest.Request)
 	}
 
 	device := Device{}
+
 	collection.Find(bson.M{
 		"_id":     bson.ObjectIdHex(delId),
 		"garbage": bson.M{"$ne": true},
@@ -869,6 +873,7 @@ func MarkDeviceAsGarbage(w rest.ResponseWriter, deviceID string) map[string]inte
 	err = json.Unmarshal(res.Body(), &response)
 	return response
 }
+
 func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *DevicesApp {
 
 	app := new(DevicesApp)
