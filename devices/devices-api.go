@@ -293,6 +293,7 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
+
 	err := collection.FindId(bson.ObjectIdHex(putId)).One(&newDevice)
 
 	if err != nil {
@@ -422,6 +423,7 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, "Error with Database (accounts) connectivity", http.StatusInternalServerError)
 		return
 	}
+
 	err := collection.FindId(mgoid).One(&device)
 
 	if err != nil {
@@ -609,6 +611,7 @@ func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) 
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
+
 	err := collection.FindId(bson.ObjectIdHex(patchId)).One(&newDevice)
 	if err != nil {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
@@ -820,6 +823,7 @@ func (a *DevicesApp) handle_deletedevice(w rest.ResponseWriter, r *rest.Request)
 	}
 
 	device := Device{}
+
 	collection.FindId(bson.ObjectIdHex(delId)).One(&device)
 
 	if device.Owner == owner {
