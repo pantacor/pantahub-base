@@ -293,10 +293,7 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
-	err := collection.Find(bson.M{
-		"_id":     bson.ObjectIdHex(putId),
-		"garbage": bson.M{"$ne": true},
-	}).One(&newDevice)
+	err := collection.FindId(putId).One(&newDevice)
 
 	if err != nil {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
@@ -425,10 +422,7 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, "Error with Database (accounts) connectivity", http.StatusInternalServerError)
 		return
 	}
-	err := collection.Find(bson.M{
-		"_id":     mgoid,
-		"garbage": bson.M{"$ne": true},
-	}).One(&device)
+	err := collection.FindId(mgoid).One(&device)
 
 	if err != nil {
 		rest.Error(w, "No Access", http.StatusForbidden)
@@ -548,9 +542,8 @@ func (a *DevicesApp) handle_getuserdevice(w rest.ResponseWriter, r *rest.Request
 		return
 	}
 	err := collDevices.Find(bson.M{
-		"nick":    devicenick,
-		"owner":   account.Prn,
-		"garbage": bson.M{"$ne": true},
+		"nick":  devicenick,
+		"owner": account.Prn,
 	}).One(&device)
 
 	if err == mgo.ErrNotFound {
@@ -619,10 +612,7 @@ func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) 
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
-	err := collection.Find(bson.M{
-		"_id":     bson.ObjectIdHex(patchId),
-		"garbage": bson.M{"$ne": true},
-	}).One(&newDevice)
+	err := collection.FindId(patchId).One(&newDevice)
 	if err != nil {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
@@ -698,10 +688,7 @@ func (a *DevicesApp) handle_putpublic(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	err := collection.Find(bson.M{
-		"_id":     bson.ObjectIdHex(putId),
-		"garbage": bson.M{"$ne": true},
-	}).One(&newDevice)
+	err := collection.FindId(putId).One(&newDevice)
 	if err != nil {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
@@ -757,10 +744,7 @@ func (a *DevicesApp) handle_deletepublic(w rest.ResponseWriter, r *rest.Request)
 		return
 	}
 
-	err := collection.Find(bson.M{
-		"_id":     bson.ObjectIdHex(putId),
-		"garbage": bson.M{"$ne": true},
-	}).One(&newDevice)
+	err := collection.FindId(putId).One(&newDevice)
 	if err != nil {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
@@ -810,8 +794,7 @@ func (a *DevicesApp) handle_getdevices(w rest.ResponseWriter, r *rest.Request) {
 	devices := make([]Device, 0)
 
 	collection.Find(bson.M{
-		"owner":   owner,
-		"garbage": bson.M{"$ne": true},
+		"owner": owner,
 	}).All(&devices)
 
 	for k, v := range devices {
@@ -842,10 +825,7 @@ func (a *DevicesApp) handle_deletedevice(w rest.ResponseWriter, r *rest.Request)
 	}
 
 	device := Device{}
-	collection.Find(bson.M{
-		"_id":     bson.ObjectIdHex(delId),
-		"garbage": bson.M{"$ne": true},
-	}).One(&device)
+	collection.FindId(delId).One(&device)
 
 	if device.Owner == owner {
 		result := MarkDeviceAsGarbage(w, delId)

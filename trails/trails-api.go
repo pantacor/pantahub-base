@@ -77,7 +77,6 @@ type Trail struct {
 	LastInSync   time.Time              `json:"last-insync" bson:"last-insync"`
 	LastTouched  time.Time              `json:"last-touched" bson:"last-touched"`
 	FactoryState map[string]interface{} `json:"factory-state" bson:"factory-state"`
-	Garbage      bool                   `json:"garbage" bson:"garbage"`
 }
 
 // step wanted can be added by the device owner or delegate.
@@ -96,7 +95,6 @@ type Step struct {
 	StepProgress StepProgress           `json:"progress" bson:"progress"`
 	StepTime     time.Time              `json:"step-time" bson:"step-time"`
 	ProgressTime time.Time              `json:"progress-time" bson:"progress-time"`
-	Garbage      bool                   `json:"garbage" bson:"garbage"`
 }
 
 type StepProgress struct {
@@ -525,7 +523,7 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	if err != nil || trail.Garbage {
+	if err != nil {
 		rest.Error(w, "No resource access possible", http.StatusInternalServerError)
 		return
 	}
@@ -933,11 +931,7 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 		return
 	}
 
-	err := coll.Find(bson.M{"_id": trailId + "-" + rev}).One(&step)
-	if step.Garbage {
-		rest.Error(w, "No access for step", http.StatusForbidden)
-		return
-	}
+	err := coll.FindId(trailId + "-" + rev).One(&step)
 
 	if authType == "DEVICE" && step.Device != owner {
 		rest.Error(w, "No access for device", http.StatusForbidden)
@@ -1034,12 +1028,7 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 		return
 	}
 
-	err := coll.Find(bson.M{"_id": trailId + "-" + rev}).One(&step)
-
-	if step.Garbage {
-		rest.Error(w, "No access for step", http.StatusForbidden)
-		return
-	}
+	err := coll.FindId(trailId + "-" + rev).One(&step)
 
 	if authType == "DEVICE" && step.Device != owner {
 		rest.Error(w, "No access for device", http.StatusForbidden)
@@ -1067,7 +1056,7 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 	storageId := objects.MakeStorageId(step.Owner, sha)
 	err = collection.FindId(storageId).One(&newObject)
 
-	if err != nil || newObject.Garbage {
+	if err != nil {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
 	}
