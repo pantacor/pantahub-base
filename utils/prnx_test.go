@@ -64,7 +64,7 @@ func TestParseErrors(t *testing.T) {
 		test := Prn(v)
 		_, err := test.GetInfo()
 		if err == nil {
-			t.Errorf("PRN must fail %s: %s (error:%s)", test, err.Error())
+			t.Errorf("PRN must fail %s: %s", test, err.Error())
 			t.Fail()
 			return
 		}
