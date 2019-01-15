@@ -293,6 +293,7 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
+
 	err := collection.Find(bson.M{
 		"_id":     bson.ObjectIdHex(putId),
 		"garbage": bson.M{"$ne": true},

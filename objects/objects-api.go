@@ -415,6 +415,7 @@ func (a *ObjectsApp) handle_getobject(w rest.ResponseWriter, r *rest.Request) {
 	storageId := MakeStorageId(ownerStr, sha)
 
 	var filesObj Object
+
 	err = collection.Find(bson.M{
 		"_id":     storageId,
 		"garbage": bson.M{"$ne": true},
