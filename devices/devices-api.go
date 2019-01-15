@@ -543,6 +543,7 @@ func (a *DevicesApp) handle_getuserdevice(w rest.ResponseWriter, r *rest.Request
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
+
 	err := collDevices.Find(bson.M{"nick": devicenick, "owner": account.Prn}).One(&device)
 
 	if err == mgo.ErrNotFound {
