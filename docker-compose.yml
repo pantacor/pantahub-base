@@ -14,7 +14,7 @@ services:
     environment:
       - FLUENT_HOST=fluentd
       - MONGO_HOST=mongo
-      - ELASTICSEARCH_HOST=elasticsearch
+      - ELASTIC_URL=http://elasticsearch:9200
   mongo:
     image: mongo
     environment:

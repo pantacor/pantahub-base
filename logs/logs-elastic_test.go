@@ -64,7 +64,7 @@ func testElasticDoGetLogs(t *testing.T) {
 
 	filter := &LogsEntry{}
 	sort := LogsSort{}
-	pager, err := elasticTestLogger.getLogs(0, 3, nil, filter, sort)
+	pager, err := elasticTestLogger.getLogs(0, 3, nil, false, filter, sort, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
@@ -74,7 +74,7 @@ func testElasticDoGetLogs(t *testing.T) {
 		t.Fail()
 	}
 
-	pager, err = elasticTestLogger.getLogs(1, 3, nil, filter, sort)
+	pager, err = elasticTestLogger.getLogs(1, 3, nil, false, filter, sort, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
@@ -84,7 +84,7 @@ func testElasticDoGetLogs(t *testing.T) {
 		t.Fail()
 	}
 
-	pager, err = elasticTestLogger.getLogs(1, 1, nil, filter, sort)
+	pager, err = elasticTestLogger.getLogs(1, 1, nil, false, filter, sort, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
@@ -116,7 +116,7 @@ func testElasticDoGetLogsAfter(t *testing.T) {
 
 	filter := &LogsEntry{}
 	sort := LogsSort{}
-	pager, err := elasticTestLogger.getLogs(0, 3, &timeBase, filter, sort)
+	pager, err := elasticTestLogger.getLogs(0, 3, &timeBase, true, filter, sort, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
@@ -126,7 +126,7 @@ func testElasticDoGetLogsAfter(t *testing.T) {
 		t.Fail()
 	}
 
-	pager, err = elasticTestLogger.getLogs(1, 3, &timeBase, filter, sort)
+	pager, err = elasticTestLogger.getLogs(1, 3, &timeBase, true, filter, sort, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
