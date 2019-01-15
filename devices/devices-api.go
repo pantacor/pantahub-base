@@ -293,7 +293,7 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
-	err := collection.FindId(putId).One(&newDevice)
+	err := collection.FindId(bson.ObjectIdHex(putId)).One(&newDevice)
 
 	if err != nil {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
@@ -612,7 +612,7 @@ func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) 
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
-	err := collection.FindId(patchId).One(&newDevice)
+	err := collection.FindId(bson.ObjectIdHex(patchId)).One(&newDevice)
 	if err != nil {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
@@ -688,7 +688,7 @@ func (a *DevicesApp) handle_putpublic(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	err := collection.FindId(putId).One(&newDevice)
+	err := collection.FindId(bson.ObjectIdHex(putId)).One(&newDevice)
 	if err != nil {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
@@ -744,7 +744,7 @@ func (a *DevicesApp) handle_deletepublic(w rest.ResponseWriter, r *rest.Request)
 		return
 	}
 
-	err := collection.FindId(putId).One(&newDevice)
+	err := collection.FindId(bson.ObjectIdHex(putId)).One(&newDevice)
 	if err != nil {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
@@ -793,9 +793,7 @@ func (a *DevicesApp) handle_getdevices(w rest.ResponseWriter, r *rest.Request) {
 
 	devices := make([]Device, 0)
 
-	collection.Find(bson.M{
-		"owner": owner,
-	}).All(&devices)
+	collection.Find(bson.M{"owner": owner}).All(&devices)
 
 	for k, v := range devices {
 		v.UserMeta = utils.BsonUnquoteMap(&v.UserMeta)
@@ -825,7 +823,7 @@ func (a *DevicesApp) handle_deletedevice(w rest.ResponseWriter, r *rest.Request)
 	}
 
 	device := Device{}
-	collection.FindId(delId).One(&device)
+	collection.FindId(bson.ObjectIdHex(delId)).One(&device)
 
 	if device.Owner == owner {
 		result := MarkDeviceAsGarbage(w, delId)

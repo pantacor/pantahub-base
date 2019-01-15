@@ -1028,7 +1028,7 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 		return
 	}
 
-	err := coll.FindId(trailId + "-" + rev).One(&step)
+	err := coll.Find(bson.M{"_id": trailId + "-" + rev}).One(&step)
 
 	if authType == "DEVICE" && step.Device != owner {
 		rest.Error(w, "No access for device", http.StatusForbidden)
