@@ -56,7 +56,6 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
-	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	pvrapi "gitlab.com/pantacor/pvr/api"
@@ -170,10 +169,6 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 	deviceID := prnGetId(device.(string))
-	if !devices.ValidateDevice(deviceID) {
-		rest.Error(w, "No access for device", http.StatusForbidden)
-		return
-	}
 
 	// do we need tip/tail here? or is that always read-only?
 	newTrail := Trail{}
@@ -521,10 +516,6 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	trailId := r.PathParam("id")
-	if !devices.ValidateDevice(trailId) {
-		rest.Error(w, "No access for device", http.StatusForbidden)
-		return
-	}
 	trail := Trail{}
 
 	if authType == "USER" || authType == "DEVICE" {
@@ -935,10 +926,6 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 	step := Step{}
 
 	trailId := r.PathParam("id")
-	if !devices.ValidateDevice(trailId) {
-		rest.Error(w, "No access for device", http.StatusForbidden)
-		return
-	}
 	rev := r.PathParam("rev")
 
 	if authType != "DEVICE" && authType != "USER" {
@@ -1039,10 +1026,6 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 
 	step := Step{}
 	trailId := r.PathParam("id")
-	if !devices.ValidateDevice(trailId) {
-		rest.Error(w, "No access for device", http.StatusForbidden)
-		return
-	}
 	rev := r.PathParam("rev")
 	putId := r.PathParam("obj")
 
@@ -1397,10 +1380,6 @@ func (a *TrailsApp) handle_putstepstate(w rest.ResponseWriter, r *rest.Request) 
 
 	step := Step{}
 	trailId := r.PathParam("id")
-	if !devices.ValidateDevice(trailId) {
-		rest.Error(w, "No access for device", http.StatusForbidden)
-		return
-	}
 	rev := r.PathParam("rev")
 
 	if authType != "USER" {
@@ -1463,10 +1442,6 @@ func (a *TrailsApp) handle_putstepprogress(w rest.ResponseWriter, r *rest.Reques
 	stepProgress := StepProgress{}
 	r.DecodeJsonPayload(&stepProgress)
 	trailId := r.PathParam("id")
-	if !devices.ValidateDevice(trailId) {
-		rest.Error(w, "No access for device", http.StatusForbidden)
-		return
-	}
 	stepId := trailId + "-" + r.PathParam("rev")
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]

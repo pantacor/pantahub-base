@@ -870,20 +870,6 @@ func MarkDeviceAsGarbage(w rest.ResponseWriter, deviceID string) map[string]inte
 	return response
 }
 
-// ValidateDevice : Validate Device id
-func ValidateDevice(ID string) bool {
-	session, _ := utils.GetMongoSession()
-	collection := session.DB("").C("pantahub_devices")
-	count, _ := collection.Find(bson.M{
-		"_id":     bson.ObjectIdHex(ID),
-		"garbage": bson.M{"$ne": true},
-	}).Count()
-	if count > 0 {
-		return true
-	}
-	return false
-}
-
 func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *DevicesApp {
 
 	app := new(DevicesApp)
