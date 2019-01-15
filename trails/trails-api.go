@@ -78,6 +78,7 @@ type Trail struct {
 	LastInSync   time.Time              `json:"last-insync" bson:"last-insync"`
 	LastTouched  time.Time              `json:"last-touched" bson:"last-touched"`
 	FactoryState map[string]interface{} `json:"factory-state" bson:"factory-state"`
+	Garbage      bool                   `json:"garbage" bson:"garbage"`
 }
 
 // step wanted can be added by the device owner or delegate.
@@ -533,7 +534,7 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	if err != nil {
+	if err != nil || trail.Garbage {
 		rest.Error(w, "No resource access possible", http.StatusInternalServerError)
 		return
 	}
