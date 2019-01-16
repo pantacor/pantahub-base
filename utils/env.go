@@ -179,6 +179,9 @@ const (
 
 	// Pantahub GC API end point
 	ENV_PANTAHUB_GC_API = "PANTAHUB_GC_API"
+
+	// Pantahub GC garbage removal flag
+	ENV_PANTAHUB_GC_REMOVE_GARBAGE = "PANTAHUB_GC_REMOVE_GARBAGE"
 )
 
 var defaultEnvs = map[string]string{
@@ -250,6 +253,9 @@ var defaultEnvs = map[string]string{
 
 	// Pantahub GC API end point
 	ENV_PANTAHUB_GC_API: "http://localhost:2000",
+
+	// Pantahub GC garbage removal flag
+	ENV_PANTAHUB_GC_REMOVE_GARBAGE: "false",
 }
 
 func GetEnv(key string) string {
