@@ -30,6 +30,7 @@ import (
 	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
 	"github.com/go-resty/resty"
 	"gitlab.com/pantacor/pantahub-base/accounts"
+	"gitlab.com/pantacor/pantahub-base/gcapi"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -829,18 +830,17 @@ func (a *DevicesApp) handle_deletedevice(w rest.ResponseWriter, r *rest.Request)
 
 	if device.Owner == owner {
 		result := MarkDeviceAsGarbage(w, delId)
-		if int(result["status"].(float64)) == 1 {
+		if result.Status == 1 {
 			device.Garbage = true
 		}
-
 	}
 
 	w.WriteJson(device)
 }
 
 // MarkDeviceAsGarbage : Mark Device as Garbage
-func MarkDeviceAsGarbage(w rest.ResponseWriter, deviceID string) map[string]interface{} {
-	response := map[string]interface{}{}
+func MarkDeviceAsGarbage(w rest.ResponseWriter, deviceID string) gcapi.MarkDeviceGarbage {
+	response := gcapi.MarkDeviceGarbage{}
 	APIEndPoint := utils.GetEnv("PANTAHUB_GC_API") + "/markgarbage/device/" + deviceID
 	res, err := resty.R().Put(APIEndPoint)
 	if err != nil {
