@@ -60,9 +60,7 @@ func (a *HealthzApp) handle_healthz(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 	var val interface{}
-	err := collection.Find(bson.M{
-		"garbage": bson.M{"$ne": true},
-	}).One(val)
+	err := collection.Find(bson.M{}).One(val)
 	if err != nil {
 		log.Println("ERROR: with database query: " + err.Error())
 		rest.Error(w, "Error with Database query", http.StatusInternalServerError)
