@@ -32,7 +32,10 @@ func (a *TrailsApp) isTrailPublic(trailID string) (bool, error) {
 
 	trail := Trail{}
 	log.Println("Trail:" + trailID)
-	err := collTrails.FindId(bson.ObjectIdHex(trailID)).One(&trail)
+	err := collTrails.Find(bson.M{
+		"_id":     bson.ObjectIdHex(trailID),
+		"garbage": bson.M{"$ne": true},
+	}).One(&trail)
 
 	if err != nil {
 		return false, err
@@ -45,7 +48,10 @@ func (a *TrailsApp) isTrailPublic(trailID string) (bool, error) {
 	}
 
 	device := devices.Device{}
-	err = collDevices.Find(bson.M{"prn": trail.Device}).One(&device)
+	err = collDevices.Find(bson.M{
+		"prn":     trail.Device,
+		"garbage": bson.M{"$ne": true},
+	}).One(&device)
 
 	if err != nil {
 		return false, err

@@ -245,7 +245,10 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 
 	storageId := MakeStorageId(ownerStr, sha)
 
-	err = collection.FindId(storageId).One(&newObject)
+	err = collection.Find(bson.M{
+		"_id":     storageId,
+		"garbage": bson.M{"$ne": true},
+	}).One(&newObject)
 	if err != nil {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
@@ -412,7 +415,11 @@ func (a *ObjectsApp) handle_getobject(w rest.ResponseWriter, r *rest.Request) {
 	storageId := MakeStorageId(ownerStr, sha)
 
 	var filesObj Object
-	err = collection.FindId(storageId).One(&filesObj)
+
+	err = collection.Find(bson.M{
+		"_id":     storageId,
+		"garbage": bson.M{"$ne": true},
+	}).One(&filesObj)
 
 	if err != nil {
 		rest.Error(w, "No Access", http.StatusForbidden)
@@ -470,7 +477,10 @@ func (a *ObjectsApp) handle_getobjectfile(w rest.ResponseWriter, r *rest.Request
 	storageId := MakeStorageId(ownerStr, sha)
 
 	var filesObj Object
-	err = collection.FindId(storageId).One(&filesObj)
+	err = collection.Find(bson.M{
+		"_id":     storageId,
+		"garbage": bson.M{"$ne": true},
+	}).One(&filesObj)
 
 	if err != nil {
 		rest.Error(w, "No Access", http.StatusForbidden)
@@ -519,6 +529,7 @@ func (a *ObjectsApp) handle_getobjects(w rest.ResponseWriter, r *rest.Request) {
 		}
 	}
 	m["owner"] = owner
+	m["garbage"] = bson.M{"$ne": true}
 
 	newObjects := make([]Object, 0)
 	collection.Find(m).All(&newObjects)
@@ -560,8 +571,10 @@ func (a *ObjectsApp) handle_deleteobject(w rest.ResponseWriter, r *rest.Request)
 	storageId := MakeStorageId(ownerStr, sha)
 
 	newObject := Object{}
-
-	collection.FindId(storageId).One(&newObject)
+	collection.Find(bson.M{
+		"_id":     storageId,
+		"garbage": bson.M{"$ne": true},
+	}).One(&newObject)
 
 	if newObject.Owner == owner {
 		collection.RemoveId(storageId)

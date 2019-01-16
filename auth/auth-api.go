@@ -460,7 +460,10 @@ func (a *AuthApp) deviceAuth(deviceId string, secret string) bool {
 	mgoId := bson.ObjectIdHex(id)
 
 	device := devices.Device{}
-	c.FindId(mgoId).One(&device)
+	c.Find(bson.M{
+		"_id":     mgoId,
+		"garbage": bson.M{"$ne": true},
+	}).One(&device)
 	if secret == device.Secret {
 		return true
 	}
@@ -475,7 +478,10 @@ func (a *AuthApp) devicePayload(deviceId string) map[string]interface{} {
 	mgoId := bson.ObjectIdHex(id)
 
 	device := devices.Device{}
-	err := c.FindId(mgoId).One(&device)
+	err := c.Find(bson.M{
+		"_id":     mgoId,
+		"garbage": bson.M{"$ne": true},
+	}).One(&device)
 
 	if err != nil {
 		return nil
