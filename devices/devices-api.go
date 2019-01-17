@@ -919,6 +919,32 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *DevicesApp {
 		log.Println("Error setting up index prn for pantahub_devices: " + err.Error())
 		return nil
 	}
+	// Indexing for the owner,garbage fields
+	index = mgo.Index{
+		Key:        []string{"owner", "garbage"},
+		Unique:     false,
+		Background: true,
+		Sparse:     false,
+	}
+
+	err = app.mgoSession.DB("").C("pantahub_devices").EnsureIndex(index)
+	if err != nil {
+		log.Println("Error setting up index {owner,garbage} for pantahub_devices: " + err.Error())
+		return nil
+	}
+	// Indexing for the device,garbage fields
+	index = mgo.Index{
+		Key:        []string{"device", "garbage"},
+		Unique:     false,
+		Background: true,
+		Sparse:     false,
+	}
+
+	err = app.mgoSession.DB("").C("pantahub_devices").EnsureIndex(index)
+	if err != nil {
+		log.Println("Error setting up index {device,garbage} for pantahub_devices: " + err.Error())
+		return nil
+	}
 
 	err = app.EnsureTokenIndices()
 	if err != nil {
