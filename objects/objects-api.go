@@ -598,6 +598,20 @@ func New(jwtMiddleware *jwt.JWTMiddleware, subService subscriptions.Subscription
 	app.awsS3Bucket = "systemcloud-001"
 	app.awsRegion = "us-east-1"
 
+	// Indexing for the owner,garbage fields in pantahub_objects
+	index := mgo.Index{
+		Key:        []string{"owner", "garbage"},
+		Unique:     false,
+		Background: true,
+		Sparse:     false,
+	}
+
+	err := app.mgoSession.DB("").C("pantahub_objects").EnsureIndex(index)
+	if err != nil {
+		log.Println("Error setting up index {owner,garbage} for pantahub_objects: " + err.Error())
+		return nil
+	}
+
 	app.Api = rest.NewApi()
 	// we dont use default stack because we dont want content type enforcement
 	app.Api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,

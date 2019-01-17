@@ -1721,6 +1721,34 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *TrailsApp {
 	app.jwt_middleware = jwtMiddleware
 	app.mgoSession = session
 
+	// Indexing for the owner,garbage fields in pantahub_trails
+	index := mgo.Index{
+		Key:        []string{"owner", "garbage"},
+		Unique:     false,
+		Background: true,
+		Sparse:     false,
+	}
+
+	err := app.mgoSession.DB("").C("pantahub_trails").EnsureIndex(index)
+	if err != nil {
+		log.Println("Error setting up index {owner,garbage} for pantahub_trail: " + err.Error())
+		return nil
+	}
+
+	// Indexing for the owner,garbage fields in pantahub_steps
+	index = mgo.Index{
+		Key:        []string{"owner", "garbage"},
+		Unique:     false,
+		Background: true,
+		Sparse:     false,
+	}
+
+	err = app.mgoSession.DB("").C("pantahub_steps").EnsureIndex(index)
+	if err != nil {
+		log.Println("Error setting up index {owner,garbage} for pantahub_steps: " + err.Error())
+		return nil
+	}
+
 	app.Api = rest.NewApi()
 
 	// we dont use default stack because we dont want content type enforcement
