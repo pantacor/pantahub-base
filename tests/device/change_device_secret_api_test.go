@@ -16,7 +16,6 @@ package tests
 
 import (
 	"log"
-	"reflect"
 	"strconv"
 	"testing"
 
@@ -30,6 +29,7 @@ func TestChangeDeviceSecret(t *testing.T) {
 	log.Print("Test:Change Device Secret")
 	t.Run("of valid device", testChangeSecretOfValidDevice)
 	t.Run("of invalid device", testChangeSecretOfInvalidDevice)
+	t.Run("to empty", testChangeSecretToEmpty)
 	tearDownChangeDeviceSecret(t)
 }
 
@@ -38,17 +38,16 @@ func testChangeSecretOfValidDevice(t *testing.T) {
 	log.Print(" Case 1:Change Secret Of a Valid Device")
 	helpers.Login(t, "user1", "user1")
 	device, _ := helpers.CreateDevice(t, true, "123")
-	result, res := helpers.LoginDevice(t, device.Prn, device.Secret)
+	result, res := helpers.ChangeDeviceSecret(t, device.ID.Hex(), "NewSecret")
 	if res.StatusCode() != 200 {
 		t.Errorf("Expected Response code:200 OK but got:" + strconv.Itoa(res.StatusCode()))
 	}
-	_, ok := result["token"].(string)
-	if !ok {
-		t.Errorf("Expected string value as token,but got")
-		log.Print(reflect.TypeOf(result["token"]))
-	}
 	expectedResult := map[string]interface{}{
-		"token": result["token"].(string),
+		"id":     device.ID.Hex(),
+		"prn":    device.Prn,
+		"nick":   device.Nick,
+		"owner":  device.Owner,
+		"secret": "NewSecret",
 	}
 	if helpers.CheckResult(result, expectedResult) {
 		log.Print(" Case 1:Passed")
@@ -65,14 +64,14 @@ func testChangeSecretOfValidDevice(t *testing.T) {
 
 // testChangeSecretOfInvalidDevice : test Change Secret Of Invalid Device
 func testChangeSecretOfInvalidDevice(t *testing.T) {
-	log.Print(" Case 2: Change Secret Of Invalid Device")
-
-	result, res := helpers.LoginDevice(t, "invalid prn", "invalid password")
-	if res.StatusCode() != 401 {
-		t.Errorf("Expected Response code:401 UnAuthorized but got:" + strconv.Itoa(res.StatusCode()))
+	log.Print(" Case 2:Change Secret Of Invalid Device")
+	helpers.Login(t, "user1", "user1")
+	result, res := helpers.ChangeDeviceSecret(t, "5c4dcf7d80123b2f2c7e96e2", "NewSecret")
+	if res.StatusCode() != 403 {
+		t.Errorf("Expected Response code:403 Forbidden but got:" + strconv.Itoa(res.StatusCode()))
 	}
 	expectedResult := map[string]interface{}{
-		"Error": "Not Authorized",
+		"Error": "Not Accessible Resource Id",
 	}
 	if helpers.CheckResult(result, expectedResult) {
 		log.Print(" Case 2:Passed")
@@ -84,14 +83,18 @@ func testChangeSecretOfInvalidDevice(t *testing.T) {
 		t.Error(result)
 		t.Fail()
 	}
+}
 
-	log.Print(" Case 3:Login Empty values")
-	result, res = helpers.LoginDevice(t, "", "")
-	if res.StatusCode() != 401 {
-		t.Errorf("Expected Response code:401 UnAuthorized but got:" + strconv.Itoa(res.StatusCode()))
+// testChangeSecretToEmpty : test Change Secret To Empty
+func testChangeSecretToEmpty(t *testing.T) {
+	log.Print(" Case 3:Change Device Secret to empty")
+	device, _ := helpers.CreateDevice(t, true, "123")
+	result, res := helpers.ChangeDeviceSecret(t, device.ID.Hex(), "")
+	if res.StatusCode() != 403 {
+		t.Errorf("Expected Response code:403 Forbidden but got:" + strconv.Itoa(res.StatusCode()))
 	}
-	expectedResult = map[string]interface{}{
-		"Error": "Not Authorized",
+	expectedResult := map[string]interface{}{
+		"Error": "Empty Secret not allowed for devices in PUT",
 	}
 	if helpers.CheckResult(result, expectedResult) {
 		log.Print(" Case 3:Passed")
