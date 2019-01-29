@@ -15,7 +15,9 @@
 //
 package utils
 
-import "os"
+import (
+	"os"
+)
 
 const (
 	// Pantahub Product Name (branding)
@@ -182,6 +184,12 @@ const (
 
 	// Pantahub GC garbage removal flag
 	ENV_PANTAHUB_GC_REMOVE_GARBAGE = "PANTAHUB_GC_REMOVE_GARBAGE"
+
+	// Pantahub GC UnClaimed expiry for device to mark it as garbage
+	ENV_PANTAHUB_GC_UNCLAIMED_EXPIRY = "PANTAHUB_GC_UNCLAIMED_EXPIRY"
+
+	// Pantahub GC garbage expiry time to remove it
+	ENV_PANTAHUB_GC_GARBAGE_EXPIRY = "PANTAHUB_GC_GARBAGE_EXPIRY"
 )
 
 var defaultEnvs = map[string]string{
@@ -256,6 +264,21 @@ var defaultEnvs = map[string]string{
 
 	// Pantahub GC garbage removal flag
 	ENV_PANTAHUB_GC_REMOVE_GARBAGE: "false",
+
+	/* Pantahub GC UnClaimed expiry for device to mark it as garbage:
+	   If a device is unclaimed for 5 Days then it will be marked as garbage
+
+	   Format:ISO_8601: https://en.wikipedia.org/wiki/ISO_8601?oldformat=true#Durations
+	*/
+	ENV_PANTAHUB_GC_UNCLAIMED_EXPIRY: "P5D", // => 5 Days
+
+	/* Pantahub GC garbage expiry time to remove it:
+	Once a device/trail/step/object is marked as
+	garbage it will be removed after 2 days
+
+	Format:ISO_8601: https://en.wikipedia.org/wiki/ISO_8601?oldformat=true#Durations
+	*/
+	ENV_PANTAHUB_GC_GARBAGE_EXPIRY: "P2D", // => 2 Days
 }
 
 func GetEnv(key string) string {
