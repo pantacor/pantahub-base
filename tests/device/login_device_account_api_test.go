@@ -1,5 +1,5 @@
 //
-// Copyright 2018  Pantacor Ltd.
+// Copyright 2019  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import (
 	"gitlab.com/pantacor/pantahub-testharness/helpers"
 )
 
-// TestLoginDeviceAccount : Test Logn Device Account
+// TestLoginDeviceAccount : Test Logn Device Accountcd
 func TestLoginDeviceAccount(t *testing.T) {
 	setUpLoginDeviceAccount(t)
 	log.Print("Test:Login User Account")
