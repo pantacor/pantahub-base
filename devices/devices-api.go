@@ -450,9 +450,11 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 			rest.Error(w, "No Access", http.StatusForbidden)
 			return
 		}
-	} else if !callerIsDevice && !callerIsUser {
+	} else if authId != device.Prn && authId != device.Owner {
 		device.Secret = ""
 		device.Challenge = ""
+		device.UserMeta = map[string]interface{}{}
+		device.DeviceMeta = map[string]interface{}{}
 	}
 
 	if device.Owner != "" {
