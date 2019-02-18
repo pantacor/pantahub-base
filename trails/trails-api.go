@@ -1093,7 +1093,7 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 	}
 
 	issuerUrl := utils.GetApiEndpoint("/trails")
-	newObjectWithAccess := objects.MakeObjAccessible(issuerUrl, owner.(string), newObject, storageId)
+	newObjectWithAccess := objects.MakeObjAccessible(issuerUrl, newObject.Owner, newObject, storageId)
 	w.WriteJson(newObjectWithAccess)
 }
 
@@ -1217,7 +1217,7 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 	}
 
 	issuerUrl := utils.GetApiEndpoint("/trails")
-	newObjectWithAccess := objects.MakeObjAccessible(issuerUrl, owner.(string), newObject, storageId)
+	newObjectWithAccess := objects.MakeObjAccessible(issuerUrl, newObject.Owner, newObject, storageId)
 	w.WriteJson(newObjectWithAccess)
 }
 

@@ -450,9 +450,11 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 			rest.Error(w, "No Access", http.StatusForbidden)
 			return
 		}
-	} else if !callerIsDevice && !callerIsUser {
+	} else if authId != device.Prn && authId != device.Owner {
 		device.Secret = ""
 		device.Challenge = ""
+		device.UserMeta = map[string]interface{}{}
+		device.DeviceMeta = map[string]interface{}{}
 	}
 
 	if device.Owner != "" {
@@ -668,6 +670,73 @@ func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) 
 	newDevice.Secret = ""
 
 	w.WriteJson(newDevice)
+}
+
+func (a *DevicesApp) handle_patchdevicedata(w rest.ResponseWriter, r *rest.Request) {
+
+	collection := a.mgoSession.DB("").C("pantahub_devices")
+	if collection == nil {
+		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+	device := Device{}
+
+	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
+	if !ok {
+		rest.Error(w, "Missing JWT_PAYLOAD", http.StatusBadRequest)
+		return
+	}
+
+	var owner interface{}
+	owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
+	if !ok {
+		rest.Error(w, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
+		return
+	}
+
+	var authType interface{}
+	authType, ok = jwtPayload.(jwtgo.MapClaims)["type"]
+	if !ok {
+		rest.Error(w, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
+		return
+	}
+
+	if authType != "DEVICE" {
+		rest.Error(w, "Device data can only be updated by Device", http.StatusBadRequest)
+		return
+	}
+
+	deviceId := r.PathParam("id")
+	bsonId := bson.ObjectIdHex(deviceId)
+
+	err := collection.Find(bson.M{
+		"_id":     bsonId,
+		"garbage": bson.M{"$ne": true},
+	}).One(&device)
+	if err != nil {
+		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
+		return
+	}
+
+	data := map[string]interface{}{}
+	err = r.DecodeJsonPayload(&data)
+	if err != nil {
+		rest.Error(w, "Error parsing data: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	for k, v := range data {
+		device.DeviceMeta[k] = v
+		if v == nil {
+			delete(device.DeviceMeta, k)
+		}
+	}
+	err = collection.Update(bson.M{"_id": bsonId, "prn": owner.(string)}, bson.M{"$set": bson.M{"device-meta": device.DeviceMeta, "timemodified": time.Now()}})
+	if err != nil {
+		rest.Error(w, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.WriteJson(utils.BsonUnquoteMap(&device.DeviceMeta))
 }
 
 func (a *DevicesApp) handle_putpublic(w rest.ResponseWriter, r *rest.Request) {
@@ -1005,6 +1074,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *DevicesApp {
 		rest.Delete("/:id/public", app.handle_deletepublic),
 		rest.Put("/:id/user-meta", app.handle_putuserdata),
 		rest.Put("/:id/device-meta", app.handle_putdevicedata),
+		rest.Patch("/:id/device-meta", app.handle_patchdevicedata),
 		rest.Delete("/:id", app.handle_deletedevice),
 		// lookup by nick-path (np)
 		rest.Get("/np/:usernick/:devicenick", app.handle_getuserdevice),
