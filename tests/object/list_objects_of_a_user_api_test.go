@@ -34,14 +34,30 @@ func TestListObjects(t *testing.T) {
 // testListLogsOfUser : test List Logs Of User
 func testListObjectsOfUser(t *testing.T) {
 	log.Print(" Case 1:List Objects Of User")
-	helpers.Login(t, "user1", "user1")
+	_, res := helpers.Login(t, "user1", "user1")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Login User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 
 	sha := helpers.GenerateObjectSha()
-	_, object1, _ := helpers.CreateObject(t, sha)
+	_, object1, res := helpers.CreateObject(t, sha)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Object:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	sha = helpers.GenerateObjectSha()
-	_, object2, _ := helpers.CreateObject(t, sha)
+	_, object2, res := helpers.CreateObject(t, sha)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Object:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	sha = helpers.GenerateObjectSha()
-	_, object3, _ := helpers.CreateObject(t, sha)
+	_, object3, res := helpers.CreateObject(t, sha)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Object:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	//log.Print(object1)
 	//log.Print(object2)
 	result, res := helpers.ListObjects(t)

@@ -37,16 +37,24 @@ func TestRefreshToken(t *testing.T) {
 func testValidToken(t *testing.T) {
 	log.Print(" Case 1:Valid token")
 	// POST auth/accounts
-	helpers.Register(
+	_, res := helpers.Register(
 		t,
 		"test@gmail.com",
 		"testpassword",
 		"testnick",
 	)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Registering User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	account := helpers.GetUser(t, "test@gmail.com")
-	helpers.VerifyUserAccount(t, account)
+	_, res = helpers.VerifyUserAccount(t, account)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Verifying User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	result, _ := helpers.Login(t, "testnick", "testpassword")
-	result, res := helpers.RefreshToken(t, result["token"].(string))
+	result, res = helpers.RefreshToken(t, result["token"].(string))
 
 	if res.StatusCode() != 200 {
 		t.Errorf("Expected Response code:200 OK but got:" + strconv.Itoa(res.StatusCode()))

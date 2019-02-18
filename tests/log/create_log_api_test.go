@@ -34,9 +34,21 @@ func TestCreateLog(t *testing.T) {
 // testCreateLog : test Create Log Of A Device
 func testCreateLog(t *testing.T) {
 	log.Print(" Case 1:Create Log Of A Device")
-	helpers.Login(t, "user1", "user1")
-	device, _ := helpers.CreateDevice(t, true, "123")
-	loginResult, _ := helpers.LoginDevice(t, device.Prn, device.Secret)
+	_, res := helpers.Login(t, "user1", "user1")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Login User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
+	device, res := helpers.CreateDevice(t, true, "123")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Device:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
+	loginResult, res := helpers.LoginDevice(t, device.Prn, device.Secret)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Login Device Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	dToken := loginResult["token"].(string)
 
 	logData := map[string]interface{}{

@@ -35,8 +35,16 @@ func TestMakeDeviceNonPublic(t *testing.T) {
 // testMakeValidDeviceNonPublic : test Make Valid Device Non Public
 func testMakeValidDeviceNonPublic(t *testing.T) {
 	log.Print(" Case 1:Make Device Non Public")
-	helpers.Login(t, "user1", "user1")
-	device, _ := helpers.CreateDevice(t, true, "123")
+	_, res := helpers.Login(t, "user1", "user1")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Login User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
+	device, res := helpers.CreateDevice(t, true, "123")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Device:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	helpers.MakeDevicePublic(t, device.ID.Hex())
 	result, res := helpers.MakeDeviceNonPublic(t, device.ID.Hex())
 	if res.StatusCode() != 200 {
@@ -66,7 +74,11 @@ func testMakeValidDeviceNonPublic(t *testing.T) {
 // testMakeInvalidDeviceNonPublic : test Make Invalid Device Non Public
 func testMakeInvalidDeviceNonPublic(t *testing.T) {
 	log.Print(" Case 2:Make Invalid Device Non Public")
-	helpers.Login(t, "user1", "user1")
+	_, res := helpers.Login(t, "user1", "user1")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Login User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	result, res := helpers.MakeDeviceNonPublic(t, "5c4dcf7d80123b2f2c7e96e2")
 	if res.StatusCode() != 403 {
 		t.Errorf("Expected Response code:403 Forbidden but got:" + strconv.Itoa(res.StatusCode()))

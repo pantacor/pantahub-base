@@ -37,7 +37,11 @@ func TestChangeDeviceSecret(t *testing.T) {
 func testChangeSecretOfValidDevice(t *testing.T) {
 	log.Print(" Case 1:Change Secret Of a Valid Device")
 	helpers.Login(t, "user1", "user1")
-	device, _ := helpers.CreateDevice(t, true, "123")
+	device, res := helpers.CreateDevice(t, true, "123")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Device:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	result, res := helpers.ChangeDeviceSecret(t, device.ID.Hex(), "NewSecret")
 	if res.StatusCode() != 200 {
 		t.Errorf("Expected Response code:200 OK but got:" + strconv.Itoa(res.StatusCode()))
@@ -88,7 +92,11 @@ func testChangeSecretOfInvalidDevice(t *testing.T) {
 // testChangeSecretToEmpty : test Change Secret To Empty
 func testChangeSecretToEmpty(t *testing.T) {
 	log.Print(" Case 3:Change Device Secret to empty")
-	device, _ := helpers.CreateDevice(t, true, "123")
+	device, res := helpers.CreateDevice(t, true, "123")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Device:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	result, res := helpers.ChangeDeviceSecret(t, device.ID.Hex(), "")
 	if res.StatusCode() != 403 {
 		t.Errorf("Expected Response code:403 Forbidden but got:" + strconv.Itoa(res.StatusCode()))

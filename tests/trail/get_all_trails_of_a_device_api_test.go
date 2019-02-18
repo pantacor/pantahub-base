@@ -34,13 +34,32 @@ func TestGetAllTrails(t *testing.T) {
 // testGetAllTrailsOfDevice : test Get All Trails Of A Device
 func testGetAllTrailsOfDevice(t *testing.T) {
 	log.Print(" Case 1:Get All Trails Of A Device")
-	helpers.Login(t, "user1", "user1")
+	_, res := helpers.Login(t, "user1", "user1")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Login User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	sha := helpers.GenerateObjectSha()
-	helpers.CreateObject(t, sha)
-	device, _ := helpers.CreateDevice(t, true, "123")
-	helpers.CreateTrail(t, device, true, sha)
-
-	result, _ := helpers.LoginDevice(t, device.Prn, device.Secret)
+	_, _, res = helpers.CreateObject(t, sha)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Object:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
+	device, res := helpers.CreateDevice(t, true, "123")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Device:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
+	_, res = helpers.CreateTrail(t, device, true, sha)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Trail:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
+	result, res := helpers.LoginDevice(t, device.Prn, device.Secret)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Login Device Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	dToken := result["token"].(string)
 	trailsResult, res := helpers.ListTrails(t, device.ID.Hex(), dToken)
 	if res.StatusCode() != 200 {

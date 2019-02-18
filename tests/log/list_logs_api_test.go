@@ -34,9 +34,21 @@ func TestListLogs(t *testing.T) {
 // testListLogsOfUser : test List Logs Of User
 func testListLogsOfUser(t *testing.T) {
 	log.Print(" Case 1:List Logs Of User")
-	helpers.Login(t, "user1", "user1")
-	device, _ := helpers.CreateDevice(t, true, "123")
-	loginResult, _ := helpers.LoginDevice(t, device.Prn, device.Secret)
+	_, res := helpers.Login(t, "user1", "user1")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Login User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
+	device, res := helpers.CreateDevice(t, true, "123")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Device:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
+	loginResult, res := helpers.LoginDevice(t, device.Prn, device.Secret)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Login Device Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	dToken := loginResult["token"].(string)
 
 	logData1 := map[string]interface{}{
@@ -60,11 +72,22 @@ func testListLogsOfUser(t *testing.T) {
 		"tsec":  1496532292,
 		"tnano": 802110514,
 	}
-	helpers.CreateLog(t, dToken, logData1)
-	helpers.CreateLog(t, dToken, logData2)
-	helpers.CreateLog(t, dToken, logData3)
+	_, res = helpers.CreateLog(t, dToken, logData1)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Log1:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
+	_, res = helpers.CreateLog(t, dToken, logData2)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Log2:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
+	_, res = helpers.CreateLog(t, dToken, logData3)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Log3:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	result, res := helpers.ListLogs(t)
-	//log.Print(result)
 	if res.StatusCode() != 200 {
 		t.Errorf("Expected Response code:200 OK but got:" + strconv.Itoa(res.StatusCode()))
 	}

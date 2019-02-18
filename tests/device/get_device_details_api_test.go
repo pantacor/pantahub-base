@@ -35,8 +35,16 @@ func TestGetDeviceDetails(t *testing.T) {
 // testGetDetailsOfValidDevice : test Get Details Of A Valid Device
 func testGetDetailsOfValidDevice(t *testing.T) {
 	log.Print(" Case 1:Get Details Of A Valid Device")
-	helpers.Login(t, "user1", "user1")
-	device, _ := helpers.CreateDevice(t, true, "123")
+	_, res := helpers.Login(t, "user1", "user1")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Login User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
+	device, res := helpers.CreateDevice(t, true, "123")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Device:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	result, res := helpers.GetDevice(t, device.ID.Hex())
 	if res.StatusCode() != 200 {
 		t.Errorf("Expected Response code:200 OK but got:" + strconv.Itoa(res.StatusCode()))
@@ -64,7 +72,11 @@ func testGetDetailsOfValidDevice(t *testing.T) {
 // testGetDetailsOfInvalidDevice : test Get Details Of An Invalid Device
 func testGetDetailsOfInvalidDevice(t *testing.T) {
 	log.Print(" Case 2:Get Details Of An Invalid Device")
-	helpers.Login(t, "user1", "user1")
+	_, res := helpers.Login(t, "user1", "user1")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Login User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	result, res := helpers.GetDevice(t, "5c4dcf7d80123b2f2c7e96e2")
 	if res.StatusCode() != 403 {
 		t.Errorf("Expected Response code:403 Forbidden but got:" + strconv.Itoa(res.StatusCode()))

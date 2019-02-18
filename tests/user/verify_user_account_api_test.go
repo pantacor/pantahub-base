@@ -38,12 +38,16 @@ func TestVerifyUserAccount(t *testing.T) {
 func testValidAccount(t *testing.T) {
 	log.Print(" Case 1:Valid Account")
 	// POST auth/accounts
-	helpers.Register(
+	_, res := helpers.Register(
 		t,
 		"test@gmail.com",
 		"testpassword",
 		"testnick",
 	)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Registering User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	account := helpers.GetUser(t, "test@gmail.com")
 	result, res := helpers.VerifyUserAccount(t, account)
 	if res.StatusCode() != 200 {

@@ -36,17 +36,33 @@ func TestAssignUserToDevice(t *testing.T) {
 func testAssignToValidDevice(t *testing.T) {
 	log.Print(" Case 1:Assign User To Valid Device ")
 	// Register user account
-	helpers.Register(
+	_, res := helpers.Register(
 		t,
 		"test@gmail.com",
 		"testpassword",
 		"testnick",
 	)
-	user := helpers.GetUser(t, "test@gmail.com")
-	helpers.VerifyUserAccount(t, user)
-	helpers.Login(t, "testnick", "testpassword")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Registering User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
+	user := helpers.GetUser(t, "test@gmail.com") //Error handled inside the function
+	_, res = helpers.VerifyUserAccount(t, user)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Verifying User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
+	_, res = helpers.Login(t, "testnick", "testpassword")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Login User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 
-	device, _ := helpers.CreateDevice(t, false, "123")
+	device, res := helpers.CreateDevice(t, false, "123")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Device:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	result, res := helpers.AssignUserToDevice(t, device.ID.Hex(), device.Challenge)
 
 	if res.StatusCode() != 200 {
@@ -97,7 +113,11 @@ func testAssignToInvalidDevice(t *testing.T) {
 
 	log.Print(" Case 3:Assign User To valid device with Invalid Challenge ")
 
-	device, _ := helpers.CreateDevice(t, false, "123")
+	device, res := helpers.CreateDevice(t, false, "123")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Device:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	//make challenge invalid
 	device.Challenge = "invalid_challenge"
 	result, res = helpers.AssignUserToDevice(t, device.ID.Hex(), device.Challenge)

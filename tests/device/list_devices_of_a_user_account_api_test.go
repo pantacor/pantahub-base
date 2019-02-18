@@ -31,18 +31,42 @@ func TestListDevicesOfUserAccount(t *testing.T) {
 
 	log.Print(" Case 1:List Devices Of A User Account")
 	// POST auth/accounts
-	helpers.Register(
+	_, res := helpers.Register(
 		t,
 		"test@gmail.com",
 		"testpassword",
 		"testnick",
 	)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Register User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	account := helpers.GetUser(t, "test@gmail.com")
-	helpers.VerifyUserAccount(t, account)
-	helpers.Login(t, "testnick", "testpassword")
-	device1, _ := helpers.CreateDevice(t, true, "123")
-	device2, _ := helpers.CreateDevice(t, true, "345")
-	device3, _ := helpers.CreateDevice(t, true, "678")
+	_, res = helpers.VerifyUserAccount(t, account)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Verifying User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
+	_, res = helpers.Login(t, "testnick", "testpassword")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Login User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
+	device1, res := helpers.CreateDevice(t, true, "123")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Device1:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
+	device2, res := helpers.CreateDevice(t, true, "345")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Device2:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
+	device3, res := helpers.CreateDevice(t, true, "678")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Device3:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	result, res := helpers.ListUserDevices(t)
 
 	if res.StatusCode() != 200 {

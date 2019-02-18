@@ -37,16 +37,32 @@ func TestLoginDeviceAccount(t *testing.T) {
 func testLoginValidDeviceAccount(t *testing.T) {
 	log.Print(" Case 1:Valid Device Account")
 	// Register user account
-	helpers.Register(
+	_, res := helpers.Register(
 		t,
 		"test@gmail.com",
 		"testpassword",
 		"testnick",
 	)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Register User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	account := helpers.GetUser(t, "test@gmail.com")
-	helpers.VerifyUserAccount(t, account)
-	helpers.Login(t, "testnick", "testpassword")
-	device, _ := helpers.CreateDevice(t, true, "123")
+	_, res = helpers.VerifyUserAccount(t, account)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Verifying User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
+	_, res = helpers.Login(t, "testnick", "testpassword")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Login User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
+	device, res := helpers.CreateDevice(t, true, "123")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Device:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	result, res := helpers.LoginDevice(t, device.Prn, device.Secret)
 	if res.StatusCode() != 200 {
 		t.Errorf("Expected Response code:200 OK but got:" + strconv.Itoa(res.StatusCode()))

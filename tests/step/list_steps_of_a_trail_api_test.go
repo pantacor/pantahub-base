@@ -30,21 +30,49 @@ func TestListSteps(t *testing.T) {
 	log.Print("Test:List Steps Of A Trail")
 
 	log.Print(" Case 1:List Steps Of A Trail")
-	helpers.Login(t, "user1", "user1")
+	_, res := helpers.Login(t, "user1", "user1")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Login User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	//generate device & login to get DTOKEN
-	device, _ := helpers.CreateDevice(t, true, "123")
+	device, res := helpers.CreateDevice(t, true, "123")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Device:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 
 	//generate object
 	sha := helpers.GenerateObjectSha()
-	helpers.CreateObject(t, sha)
+	_, _, res = helpers.CreateObject(t, sha)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Object:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	//create trail
-	trail, _ := helpers.CreateTrail(t, device, true, sha)
+	trail, res := helpers.CreateTrail(t, device, true, sha)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Trail:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	//add step rev=1
-	helpers.CreateStep(t, device, 1, true, sha)
+	_, res = helpers.CreateStep(t, device, 1, true, sha)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Step:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	//add step rev=2
-	helpers.CreateStep(t, device, 2, true, sha)
+	_, res = helpers.CreateStep(t, device, 2, true, sha)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Step:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	//add step rev=3
-	helpers.CreateStep(t, device, 3, true, sha)
+	_, res = helpers.CreateStep(t, device, 3, true, sha)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Step:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 
 	result, res := helpers.ListSteps(t, trail.ID.Hex())
 	if res.StatusCode() != 200 {

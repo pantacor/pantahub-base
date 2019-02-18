@@ -34,15 +34,27 @@ func TestCreateObject(t *testing.T) {
 // testCreateObject : test Create Object
 func testCreateObject(t *testing.T) {
 	log.Print(" Case 1:Create Object")
-	helpers.Register(
+	_, res := helpers.Register(
 		t,
 		"test@gmail.com",
 		"testpassword",
 		"testnick",
 	)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Registering User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	account := helpers.GetUser(t, "test@gmail.com")
-	helpers.VerifyUserAccount(t, account)
-	helpers.Login(t, "testnick", "testpassword")
+	_, res = helpers.VerifyUserAccount(t, account)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Verifying User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
+	_, res = helpers.Login(t, "testnick", "testpassword")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Login User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	//helpers.Login(t, "user1", "user1")
 	sha := helpers.GenerateObjectSha()
 	_, object, res := helpers.CreateObject(t, sha)

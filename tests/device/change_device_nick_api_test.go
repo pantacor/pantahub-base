@@ -36,7 +36,11 @@ func TestChangeDeviceNick(t *testing.T) {
 func testChangeDeviceNickOfValidDevice(t *testing.T) {
 	log.Print(" Case 1:Change Device Nick Of a Valid Device")
 	helpers.Login(t, "user1", "user1")
-	device, _ := helpers.CreateDevice(t, true, "123")
+	device, res := helpers.CreateDevice(t, true, "123")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Device:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	result, res := helpers.UpdateDeviceNick(t, device.ID.Hex(), "newNick")
 	if res.StatusCode() != 200 {
 		t.Errorf("Expected Response code:200 OK but got:" + strconv.Itoa(res.StatusCode()))

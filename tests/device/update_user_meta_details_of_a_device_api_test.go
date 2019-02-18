@@ -35,8 +35,16 @@ func TestUpdateUserMetaDetails(t *testing.T) {
 // testUpdateUserMetaDetailsOfValidDevice : Update User Meta Details Of Valid Device
 func testUpdateUserMetaDetailsOfValidDevice(t *testing.T) {
 	log.Print(" Case 1:Update User Meta Details Of Valid Device")
-	helpers.Login(t, "user1", "user1")
-	device, _ := helpers.CreateDevice(t, true, "123")
+	_, res := helpers.Login(t, "user1", "user1")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Login User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
+	device, res := helpers.CreateDevice(t, true, "123")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Device:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	userMetaDetails := map[string]interface{}{
 		"name":  "test",
 		"place": "berlin",
@@ -65,7 +73,11 @@ func testUpdateUserMetaDetailsOfValidDevice(t *testing.T) {
 // testUpdateUserMetaDetailsOfInvalidDevice : test Update User Meta Details Of Invalid Device
 func testUpdateUserMetaDetailsOfInvalidDevice(t *testing.T) {
 	log.Print(" Case 2:Update User Meta Details Of Invalid Device")
-	helpers.Login(t, "user1", "user1")
+	_, res := helpers.Login(t, "user1", "user1")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Login User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	userMetaDetails := map[string]interface{}{
 		"name":  "test",
 		"place": "berlin",

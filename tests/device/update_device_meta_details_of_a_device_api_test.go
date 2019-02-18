@@ -35,15 +35,27 @@ func TestUpdateDeviceMetaDetails(t *testing.T) {
 // testUpdateDeviceMetaDetailsOfValidDevice : Update Device Meta Details Of Valid Device
 func testUpdateDeviceMetaDetailsOfValidDevice(t *testing.T) {
 	log.Print(" Case 1:Update Device Meta Details Of Valid Device")
-	helpers.Login(t, "user1", "user1")
-	device, _ := helpers.CreateDevice(t, true, "123")
-	result, _ := helpers.LoginDevice(t, device.Prn, device.Secret)
+	_, res := helpers.Login(t, "user1", "user1")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Login User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
+	device, res := helpers.CreateDevice(t, true, "123")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Device:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
+	result, res := helpers.LoginDevice(t, device.Prn, device.Secret)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Login User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	dToken := result["token"].(string)
 	deviceMetaDetails := map[string]interface{}{
 		"name":  "test",
 		"place": "berlin",
 	}
-	result, res := helpers.UpdateDeviceMetaDetails(
+	result, res = helpers.UpdateDeviceMetaDetails(
 		t,
 		dToken,
 		device.ID.Hex(),
@@ -73,15 +85,27 @@ func testUpdateDeviceMetaDetailsOfValidDevice(t *testing.T) {
 // testUpdateDeviceMetaDetailsOfInvalidDevice : test Update Device Meta Details Of Invalid Device
 func testUpdateDeviceMetaDetailsOfInvalidDevice(t *testing.T) {
 	log.Print(" Case 2:Update Device Meta Details Of Invalid Device")
-	helpers.Login(t, "user1", "user1")
-	device, _ := helpers.CreateDevice(t, true, "123")
-	result, _ := helpers.LoginDevice(t, device.Prn, device.Secret)
+	_, res := helpers.Login(t, "user1", "user1")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Login User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
+	device, res := helpers.CreateDevice(t, true, "123")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Device:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
+	result, res := helpers.LoginDevice(t, device.Prn, device.Secret)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Login Device Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	dToken := result["token"].(string)
 	deviceMetaDetails := map[string]interface{}{
 		"name":  "test",
 		"place": "berlin",
 	}
-	result, res := helpers.UpdateDeviceMetaDetails(
+	result, res = helpers.UpdateDeviceMetaDetails(
 		t,
 		dToken,
 		"5c4dcf7d80123b2f2c7e96e2", //invalid deviceID

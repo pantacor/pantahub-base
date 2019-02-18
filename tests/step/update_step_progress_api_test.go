@@ -34,15 +34,39 @@ func TestUpdateStepProgress(t *testing.T) {
 // testUpdateStepProgress : test Update Step Progress
 func testUpdateStepProgress(t *testing.T) {
 	log.Print(" Case 1:Update Step Progress")
-	helpers.Login(t, "user1", "user1")
-	device, _ := helpers.CreateDevice(t, true, "123")
+	_, res := helpers.Login(t, "user1", "user1")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Login User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
+	device, res := helpers.CreateDevice(t, true, "123")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Device:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	loginResult, res := helpers.LoginDevice(t, device.Prn, device.Secret)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Login Device Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	dToken := loginResult["token"].(string)
 
 	sha := helpers.GenerateObjectSha()
-	helpers.CreateObject(t, sha)
-	trail, _ := helpers.CreateTrail(t, device, true, sha)
-	helpers.CreateStep(t, device, 1, true, sha)
+	_, _, res = helpers.CreateObject(t, sha)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Object:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
+	trail, res := helpers.CreateTrail(t, device, true, sha)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Trail:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
+	_, res = helpers.CreateStep(t, device, 1, true, sha)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Step:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	progressData := map[string]interface{}{
 		"log":        "log1",
 		"progress":   50,

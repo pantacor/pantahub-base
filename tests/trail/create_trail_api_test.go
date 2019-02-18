@@ -36,10 +36,22 @@ func TestCreateTrail(t *testing.T) {
 // testCreateTrailOfValidDevice : test Create Trail Of A Valid Device
 func testCreateTrailOfValidDevice(t *testing.T) {
 	log.Print(" Case 1:Create Trail Of A Valid Device")
-	helpers.Login(t, "user1", "user1")
-	device, _ := helpers.CreateDevice(t, true, "123")
+	_, res := helpers.Login(t, "user1", "user1")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
+	device, res := helpers.CreateDevice(t, true, "123")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Device:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	sha := helpers.GenerateObjectSha()
-	helpers.CreateObject(t, sha)
+	_, _, res = helpers.CreateObject(t, sha)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Object:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	trail, res := helpers.CreateTrail(t, device, true, sha)
 	if res.StatusCode() != 200 {
 		t.Errorf("Expected Response code:200 OK but got:" + strconv.Itoa(res.StatusCode()))
@@ -75,12 +87,20 @@ func testCreateTrailOfValidDevice(t *testing.T) {
 // testCreateTrailOfInvalidDevice : test Create Trail Of An Invalid Device
 func testCreateTrailOfInvalidDevice(t *testing.T) {
 	log.Print(" Case 2:Create Trail Of An Invalid Device")
-	helpers.Login(t, "user1", "user1")
+	_, res := helpers.Login(t, "user1", "user1")
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Login User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	device := models.Device{
 		ID: "5c4dcf7d80123b2f2c7e96e2",
 	}
 	sha := helpers.GenerateObjectSha()
-	helpers.CreateObject(t, sha)
+	_, _, res = helpers.CreateObject(t, sha)
+	if res.StatusCode() != 200 {
+		t.Errorf("Error Creating Object:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Error(res)
+	}
 	trail, res := helpers.CreateTrail(t, device, true, sha)
 	if res.StatusCode() != 401 {
 		t.Errorf("Expected Response code:401 UnAuthorized but got:" + strconv.Itoa(res.StatusCode()))
