@@ -21,7 +21,17 @@ $ go get -v u gitlab.com/pantacor/pantahub-base
 $ go build -o ~/bin/pantahub-base gitlab.com/pantacor/pantahub-base
 ...
 ``` 
+# Test
 
+* Note:Make Sure testharness project is accessible
+
+```
+$ git clone -b develop https://gitlab.com/pantacor/pantahub-testharness
+...
+
+```
+$ go test -v ./tests/...
+...
 
 # Run
 
