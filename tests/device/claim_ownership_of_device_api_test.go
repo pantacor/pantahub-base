@@ -23,18 +23,18 @@ import (
 	"gitlab.com/pantacor/pantahub-testharness/helpers"
 )
 
-// TestAssignUserToDevice : Test Assign User To Device
-func TestAssignUserToDevice(t *testing.T) {
-	setUpAssignUserToDevice(t)
+// Test : Test Claim Ownership Of Device
+func TestClaimOwnershipOfDevice(t *testing.T) {
+	setUpClaimOwnershipOfDevice(t)
 	log.Print("Test:Assign User To Device")
-	t.Run("to valid device", testAssignToValidDevice)
-	t.Run("With invalid device", testAssignToInvalidDevice)
-	tearDownAssignUserToDevice(t)
+	t.Run("to valid device", testClaimValidDevice)
+	t.Run("With invalid device", testClaimInvalidDevice)
+	tearDownClaimOwnershipOfDevice(t)
 }
 
-// testAssignToValidDevice : test Assign To Valid Device
-func testAssignToValidDevice(t *testing.T) {
-	log.Print(" Case 1:Assign User To Valid Device ")
+// testClaimValidDevice : test Claim Valid Device
+func testClaimValidDevice(t *testing.T) {
+	log.Print(" Case 1:Claim Valid Device ")
 	// Register user account
 	_, res := helpers.Register(
 		t,
@@ -88,9 +88,9 @@ func testAssignToValidDevice(t *testing.T) {
 
 }
 
-// testAssignToInvalidDevice : test Assign To Invalid Device
-func testAssignToInvalidDevice(t *testing.T) {
-	log.Print(" Case 2:Assign User To Invalid Device ")
+// testClaimInvalidDevice : test Claim Invalid Device
+func testClaimInvalidDevice(t *testing.T) {
+	log.Print(" Case 2:Claim Invalid Device ")
 	//assigning user to invalid device
 	result, res := helpers.AssignUserToDevice(t, "5c4dcf7d80123b2f2c7e96e2", "invalid_challenge")
 
@@ -111,7 +111,7 @@ func testAssignToInvalidDevice(t *testing.T) {
 		t.Fail()
 	}
 
-	log.Print(" Case 3:Assign User To valid device with Invalid Challenge ")
+	log.Print(" Case 3:Claim valid device with Invalid Challenge ")
 
 	device, res := helpers.CreateDevice(t, false, "123")
 	if res.StatusCode() != 200 {
@@ -139,12 +139,12 @@ func testAssignToInvalidDevice(t *testing.T) {
 	}
 
 }
-func setUpAssignUserToDevice(t *testing.T) bool {
+func setUpClaimOwnershipOfDevice(t *testing.T) bool {
 	db.Connect()
 	helpers.ClearOldData(t)
 	return true
 }
-func tearDownAssignUserToDevice(t *testing.T) bool {
+func tearDownClaimOwnershipOfDevice(t *testing.T) bool {
 	helpers.ClearOldData(t)
 	return true
 }
