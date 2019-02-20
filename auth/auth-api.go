@@ -256,7 +256,7 @@ func (app *AuthApp) handle_postcode(w rest.ResponseWriter, r *rest.Request) {
 	caller := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"].(string)
 	callerType := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"].(string)
 
-	if caller != "" {
+	if caller == "" {
 		rest.Error(w, "must be authenticated as user", http.StatusUnauthorized)
 		return
 	}
@@ -294,14 +294,19 @@ func (app *AuthApp) handle_postcode(w rest.ResponseWriter, r *rest.Request) {
 
 // this requests to swap access code with accesstoken
 type tokenRequest struct {
-	Code string `json:"access-code"`
+	Code    string `json:"access-code"`
+	Comment string `json:"comment"`
 }
-type tokenResponse struct {
+type tokenStore struct {
 	ID      bson.ObjectId `json:"id", bson:"_id"`
-	Token   string        `json:"token"`
 	Client  string        `json:"client"`
 	Owner   string        `json:"owner"`
 	Comment string        `json:"comment"`
+	Claims  jwtgo.Claims  `json:"jwt-claims"`
+}
+
+type tokenResult struct {
+	Token string `json:"token"`
 }
 
 // handle_posttoken can be used by services to swap an accessCode to a long living accessToken.
@@ -319,6 +324,7 @@ func (app *AuthApp) handle_posttoken(writer rest.ResponseWriter, r *rest.Request
 	// this is the claim of the service authenticating itself
 	caller := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"].(string)
 
+	log.Println("Requesting code " + tokenRequest.Code)
 	// we parse the accessCode to see if we can swap it out.
 	tok, err := jwtgo.Parse(tokenRequest.Code, func(token *jwtgo.Token) (interface{}, error) {
 		jwtSecret := utils.GetEnv(utils.ENV_PANTAHUB_JWT_AUTH_SECRET)
@@ -339,7 +345,11 @@ func (app *AuthApp) handle_posttoken(writer rest.ResponseWriter, r *rest.Request
 	}
 
 	claims := tok.Claims.(jwtgo.MapClaims)
-	user := claims["approver"].(string)
+
+	user := claims["approver_prn"].(string)
+	userNick := claims["approver_nick"].(string)
+	userType := claims["approver_type"].(string)
+	userRoles := claims["approver_roles"].(string)
 	service := claims["service"].(string)
 	scopes := claims["scopes"].(string)
 	log.Println("DEBUG: request to issue accesstoken: service=" + service + "user=" + user + " scopes=" + scopes)
@@ -361,10 +371,14 @@ func (app *AuthApp) handle_posttoken(writer rest.ResponseWriter, r *rest.Request
 	}
 
 	// claim for a scoped token
+	tokenClaims["token_id"] = bson.NewObjectId()
 	tokenClaims["id"] = user
 	tokenClaims["aud"] = service
 	tokenClaims["scopes"] = scopes
-	delete(tokenClaims, "exp") // ensure no exp is set (infinite valid)
+	tokenClaims["prn"] = user
+	tokenClaims["nick"] = userNick
+	tokenClaims["roles"] = userRoles
+	tokenClaims["type"] = userType
 
 	tokenString, err := token.SignedString(app.jwt_middleware.Key)
 
@@ -381,18 +395,22 @@ func (app *AuthApp) handle_posttoken(writer rest.ResponseWriter, r *rest.Request
 		return
 	}
 
-	tokenResult := tokenResponse{
-		ID:      bson.NewObjectId(),
+	tokenStore := tokenStore{
+		ID:      tokenClaims["token_id"].(bson.ObjectId),
 		Client:  service,
 		Owner:   user,
-		Token:   tokenString,
-		Comment: "",
+		Comment: tokenRequest.Comment,
+		Claims:  tokenClaims,
 	}
 
-	err = collection.Insert(&tokenResult)
+	err = collection.Insert(&tokenStore)
 	if collection == nil {
 		rest.Error(writer, "Error storing issued token in DB", http.StatusInternalServerError)
 		return
+	}
+
+	tokenResult := tokenResult{
+		Token: tokenString,
 	}
 
 	writer.WriteJson(tokenResult)
@@ -622,7 +640,10 @@ func (a *AuthApp) accessCodePayload(userIdEmailNick string, serviceIdEmailNick s
 	}
 
 	accessCodePayload := map[string]interface{}{}
-	accessCodePayload["approver"] = userAccountPayload["prn"]
+	accessCodePayload["approver_prn"] = userAccountPayload["prn"]
+	accessCodePayload["approver_nick"] = userAccountPayload["nick"]
+	accessCodePayload["approver_roles"] = userAccountPayload["roles"]
+	accessCodePayload["approver_type"] = userAccountPayload["type"]
 	accessCodePayload["service"] = serviceAccountPayload["prn"]
 	accessCodePayload["scopes"] = scopes
 
