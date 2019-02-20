@@ -280,6 +280,11 @@ func (app *AuthApp) handle_postcode(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
+	if req.Scopes != "*" {
+		rest.Error(w, "access code requested with invalid scope. During alpha, scopes '*' (all rights) is only valid scope", http.StatusBadRequest)
+		return
+	}
+
 	var mapClaim jwtgo.MapClaims
 	mapClaim = app.accessCodePayload(caller, req.Service, req.Scopes)
 	mapClaim["exp"] = time.Now().Add(time.Minute * 5)
