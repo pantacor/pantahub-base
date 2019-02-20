@@ -22,9 +22,8 @@ import (
 	"strings"
 	"time"
 
-	jwtgo "github.com/dgrijalva/jwt-go"
-
 	"github.com/ant0ine/go-json-rest/rest"
+	jwtgo "github.com/dgrijalva/jwt-go"
 	"github.com/fundapps/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/devices"
@@ -241,6 +240,164 @@ func (a *AuthApp) handle_verify(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(newAccount)
 }
 
+type codeRequest struct {
+	Service string `json:"service"`
+	Scopes  string `json:"scopes"`
+}
+
+type codeResponse struct {
+	Code string `json:"code"`
+}
+
+func (app *AuthApp) handle_postcode(w rest.ResponseWriter, r *rest.Request) {
+	var err error
+
+	// this is the claim of the service authenticating itself
+	caller := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"].(string)
+	callerType := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"].(string)
+
+	if caller != "" {
+		rest.Error(w, "must be authenticated as user", http.StatusUnauthorized)
+		return
+	}
+
+	if callerType != "USER" {
+		rest.Error(w, "only USER's can request access codes", http.StatusForbidden)
+		return
+	}
+
+	req := codeRequest{}
+	err = r.DecodeJsonPayload(&req)
+
+	if err != nil {
+		rest.Error(w, "error decoding code request", http.StatusBadRequest)
+		log.Println("WARNING: access code request received with wrong request body: " + err.Error())
+		return
+	}
+
+	if req.Service == "" {
+		rest.Error(w, "access code requested with invalid service", http.StatusBadRequest)
+		return
+	}
+
+	var mapClaim jwtgo.MapClaims
+	mapClaim = app.accessCodePayload(caller, req.Service, req.Scopes)
+	mapClaim["exp"] = time.Now().Add(time.Minute * 5)
+
+	response := codeResponse{}
+
+	code := jwtgo.New(jwtgo.GetSigningMethod(app.jwt_middleware.SigningAlgorithm))
+	code.Claims = mapClaim
+	response.Code, err = code.SignedString(app.jwt_middleware.Key)
+	w.WriteJson(response)
+}
+
+// this requests to swap access code with accesstoken
+type tokenRequest struct {
+	Code string `json:"access-code"`
+}
+type tokenResponse struct {
+	ID      bson.ObjectId `json:"id", bson:"_id"`
+	Token   string        `json:"token"`
+	Client  string        `json:"client"`
+	Owner   string        `json:"owner"`
+	Comment string        `json:"comment"`
+}
+
+// handle_posttoken can be used by services to swap an accessCode to a long living accessToken.
+// Payload is of type application/json and type TokenRequest
+// note that tokenhandler is supposed to be called authenticated by service that wants the access
+// token to be issued on his behalf
+func (app *AuthApp) handle_posttoken(writer rest.ResponseWriter, r *rest.Request) {
+	tokenRequest := tokenRequest{}
+	err := r.DecodeJsonPayload(&tokenRequest)
+
+	if err != nil {
+		rest.Error(writer, "Failed to decode token Request", http.StatusBadRequest)
+		return
+	}
+	// this is the claim of the service authenticating itself
+	caller := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"].(string)
+
+	// we parse the accessCode to see if we can swap it out.
+	tok, err := jwtgo.Parse(tokenRequest.Code, func(token *jwtgo.Token) (interface{}, error) {
+		jwtSecret := utils.GetEnv(utils.ENV_PANTAHUB_JWT_AUTH_SECRET)
+		return []byte(jwtSecret), nil
+	})
+
+	if err != nil {
+		log.Println("ERROR: Failed parsing the access Code " + err.Error())
+		rest.Error(writer, "Failed parsing the access Code", http.StatusUnauthorized)
+		return
+	}
+
+	err = tok.Claims.Valid()
+	if err != nil {
+		log.Println("ERROR: Failed validating the access Code claims: " + err.Error())
+		rest.Error(writer, "Failed validating the access Code claims", http.StatusUnauthorized)
+		return
+	}
+
+	claims := tok.Claims.(jwtgo.MapClaims)
+	user := claims["approver"].(string)
+	service := claims["service"].(string)
+	scopes := claims["scopes"].(string)
+	log.Println("DEBUG: request to issue accesstoken: service=" + service + "user=" + user + " scopes=" + scopes)
+
+	if service != caller {
+		log.Println("WARNING: invalid service (" + service + " != " + caller + ") tries to swap an accesscode")
+		rest.Error(writer, "invalid service ("+service+" != "+caller+") tries to swap an accesscode", http.StatusUnauthorized)
+		return
+	}
+
+	token := jwtgo.New(jwtgo.GetSigningMethod(app.jwt_middleware.SigningAlgorithm))
+	tokenClaims := token.Claims.(jwtgo.MapClaims)
+
+	// lets get the standard payload for a user and modify it so its a service accesstoken
+	if app.jwt_middleware.PayloadFunc != nil {
+		for key, value := range app.jwt_middleware.PayloadFunc(user) {
+			tokenClaims[key] = value
+		}
+	}
+
+	// claim for a scoped token
+	tokenClaims["id"] = user
+	tokenClaims["aud"] = service
+	tokenClaims["scopes"] = scopes
+	delete(tokenClaims, "exp") // ensure no exp is set (infinite valid)
+
+	tokenString, err := token.SignedString(app.jwt_middleware.Key)
+
+	if err != nil {
+		log.Println("WARNING: invalid service (" + service + " != " + caller + ") tries to swap an accesscode")
+		rest.Error(writer, "invalid service ("+service+" != "+caller+") tries to swap an accesscode", http.StatusUnauthorized)
+		return
+	}
+
+	collection := app.mgoSession.DB("").C("pantahub_oauth_accesstokens")
+
+	if collection == nil {
+		rest.Error(writer, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+
+	tokenResult := tokenResponse{
+		ID:      bson.NewObjectId(),
+		Client:  service,
+		Owner:   user,
+		Token:   tokenString,
+		Comment: "",
+	}
+
+	err = collection.Insert(&tokenResult)
+	if collection == nil {
+		rest.Error(writer, "Error storing issued token in DB", http.StatusInternalServerError)
+		return
+	}
+
+	writer.WriteJson(tokenResult)
+}
+
 type AuthApp struct {
 	jwt_middleware *jwt.JWTMiddleware
 	Api            *rest.Api
@@ -331,7 +488,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 			if strings.HasPrefix(userId, "prn:::devices:") {
 				return app.devicePayload(userId)
 			} else {
-				return app.userPayload(userId)
+				return app.accountPayload(userId)
 			}
 		} else {
 			return AccountToPayload(plm)
@@ -369,6 +526,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 	api_router, _ := rest.MakeRouter(
 		rest.Get("/", app.handle_getprofile),
 		rest.Post("/login", app.jwt_middleware.LoginHandler),
+		rest.Post("/token", app.handle_posttoken),
+		rest.Post("/code", app.handle_postcode),
 		rest.Get("/auth_status", handle_auth),
 		rest.Get("/login", app.jwt_middleware.RefreshHandler),
 		rest.Post("/accounts", app.handle_postaccount),
@@ -431,7 +590,46 @@ func (a *AuthApp) accountAuth(idEmailNick string, secret string) bool {
 	return false
 }
 
-func (a *AuthApp) userPayload(idEmailNick string) map[string]interface{} {
+func (app *AuthApp) getAccountPayload(idEmailNick string) map[string]interface{} {
+	var plm accounts.Account
+	var ok, ok2 bool
+	if plm, ok = accounts.DefaultAccounts[idEmailNick]; !ok {
+		fullprn := "prn:pantahub.com:auth:/" + idEmailNick
+		if plm, ok2 = accounts.DefaultAccounts[fullprn]; !ok && !ok2 {
+			if strings.HasPrefix(idEmailNick, "prn:::devices:") {
+				return app.devicePayload(idEmailNick)
+			} else {
+				return app.accountPayload(idEmailNick)
+			}
+		}
+	}
+	return AccountToPayload(plm)
+}
+
+func (a *AuthApp) accessCodePayload(userIdEmailNick string, serviceIdEmailNick string, scopes string) map[string]interface{} {
+	var (
+		err                   error
+		userAccountPayload    map[string]interface{}
+		serviceAccountPayload map[string]interface{}
+	)
+
+	serviceAccountPayload = a.getAccountPayload(serviceIdEmailNick)
+	userAccountPayload = a.getAccountPayload(userIdEmailNick)
+
+	// error with db or not found -> log and fail
+	if err != nil {
+		return nil
+	}
+
+	accessCodePayload := map[string]interface{}{}
+	accessCodePayload["approver"] = userAccountPayload["prn"]
+	accessCodePayload["service"] = serviceAccountPayload["prn"]
+	accessCodePayload["scopes"] = scopes
+
+	return accessCodePayload
+}
+
+func (a *AuthApp) accountPayload(idEmailNick string) map[string]interface{} {
 
 	var (
 		err     error
