@@ -130,4 +130,56 @@ X-Powered-By: go-json-rest
 ```
 
 
+# Service authorization with access tokens (aka oauth2'ish authorization flow)
 
+Services are just like normal user accounts to be authenticated through the /auth/login endpoint.
+
+Services/Clients can impersonate a user through a token exchange inspired by oauth2.
+
+For that the service has to request from the user to issue a code with certain access scopes.
+
+The user then uses the /auth/code endpoint to issue such accesscode and hands it over to the service/client who in turn swaps out that code for a long-lived access-token.
+
+For example the following steps will show how the authorization flow could look like:
+
+Step 1 - user authenticates to pantahub
+```
+UTOK=`http http://localhost:12365/auth/login username=user1 password=user1 | jq -r .token`
+```
+
+Step 2 - user issues authorization code for service1L
+```
+CODE=`http http://localhost:12365/auth/code Authorization:" Bearer $UTOK" service="prn:pantahub.com:auth:/service1" scopes="*" | jq -r .code`
+```
+
+Step 3 - service authenticates itself with pantahub
+```
+STOK=`http http://localhost:12365/auth/login username=service1 password=service1 | jq -r .token`
+```
+
+Step 4 - service requests swaps code for token
+```
+OTOK=`http http://localhost:12365/auth/token Authorization:" Bearer $STOK" access-code="$CODE" | jq -r .token`
+```
+
+Step 5. service uses access token to access pantahub on behalf of user
+```
+http http://localhost:12365/auth/auth_status Authorization:" Bearer $OTOK"
+HTTP/1.1 200 OK
+Content-Length: 243
+Content-Type: application/json; charset=utf-8
+Date: Wed, 20 Feb 2019 23:39:45 GMT
+X-Powered-By: go-json-rest
+X-Runtime: 0.000000
+
+{
+    "aud": "prn:pantahub.com:auth:/service1",
+    "id": "prn:pantahub.com:auth:/user1",
+    "nick": "user1",
+    "prn": "prn:pantahub.com:auth:/user1",
+    "roles": "admin",
+    "scopes": "*",
+    "token_id": "5c6de5279c8c94c4dc06f067",
+    "type": "USER"
+}
+```
