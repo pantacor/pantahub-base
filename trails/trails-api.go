@@ -122,6 +122,8 @@ type TrailSummary struct {
 	RealIP           string    `json:"real-ip" bson:"real_ip"`
 	FleetGroup       string    `json:"fleet-group" bson:"fleet_group"`
 	FleetModel       string    `json:"fleet-model" bson:"fleet_model"`
+	FleetLocation    string    `json:"fleet-location" bson:"fleet_location"`
+	FleetRev         string    `json:"fleet-rev" bson:"fleet_rev"`
 }
 
 func handle_auth(w rest.ResponseWriter, r *rest.Request) {
