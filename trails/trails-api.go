@@ -120,6 +120,8 @@ type TrailSummary struct {
 	ProgressTime     time.Time `json:"progress-time" bson:"progress_time"`
 	TrailTouchedTime time.Time `json:"trail-touched-time" bson:"trail_touched_time"`
 	RealIP           string    `json:"real-ip" bson:"real_ip"`
+	FleetGroup       string    `json:"fleet-group" bson:"fleet_group"`
+	FleetModel       string    `json:"fleet-model" bson:"fleet_model"`
 }
 
 func handle_auth(w rest.ResponseWriter, r *rest.Request) {
