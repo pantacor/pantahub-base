@@ -152,6 +152,9 @@ func (mw *AccessLogFluentMiddleware) makeAccessLogFluentRecord(r *rest.Request) 
 		if payload["id"] != nil {
 			remoteUser = payload["id"].(string)
 		}
+		if payload["aud"] != nil {
+			remoteUser = payload["aud"].(string) + "(" + remoteUser + ")"
+		}
 	}
 	// msgpack does not like type map[string][]string; hence we
 	// help by using interface{} value type instead
