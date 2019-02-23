@@ -1707,14 +1707,16 @@ func (a *TrailsApp) handle_gettrailsummary(w rest.ResponseWriter, r *rest.Reques
 		sortParam = "-timestamp"
 	}
 
-	filterParam := r.FormValue("filter")
 	m := bson.M{}
-	err := json.Unmarshal([]byte(filterParam), &m)
-
-	if err != nil {
-		rest.Error(w, "Illegal Filter "+err.Error(), http.StatusBadRequest)
-		return
+	filterParam := r.FormValue("filter")
+	if filterParam != "" {
+		err := json.Unmarshal([]byte(filterParam), &m)
+		if err != nil {
+			rest.Error(w, "Illegal Filter "+err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
+
 	// always filter by owner...
 	m["owner"] = owner
 
