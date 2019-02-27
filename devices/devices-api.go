@@ -114,8 +114,19 @@ func (a *DevicesApp) handle_putuserdata(w rest.ResponseWriter, r *rest.Request) 
 		return
 	}
 
-	err = collection.Update(bson.M{"_id": bsonId, "owner": owner.(string)},
-		bson.M{"$set": bson.M{"user-meta": data, "timemodified": time.Now()}})
+	var device Device
+	err = collection.Find(
+		bson.M{"_id": bsonId, "owner": owner.(string)},
+	).One(&device)
+
+	for key, value := range data {
+		device.UserMeta[key] = value
+	}
+
+	err = collection.Update(
+		bson.M{"_id": bsonId, "owner": owner.(string)},
+		bson.M{"$set": bson.M{"user-meta": device.UserMeta, "timemodified": time.Now()}},
+	)
 	if err != nil {
 		rest.Error(w, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
 		return
