@@ -258,9 +258,32 @@ func (s *elasticLogger) getLogs(start int64, page int64, beforeOrAfter *time.Tim
 	return &pagerResult, nil
 }
 
-func (s *elasticLogger) getLogsByCursor(nextCursor string) (*LogsPager, error) {
+func (s *elasticLogger) scrollBuildNextURL(pretty bool) (string, url.Values, error) {
+	path := "/_search/scroll"
 
-	queryFmt, values, err := elastic.ScrollBuildNextURL(false)
+	// Add query string parameters
+	params := url.Values{}
+
+	if pretty {
+		params.Set("pretty", "1")
+	}
+
+	return path, params, nil
+}
+
+func (s *elasticLogger) scrollBuildBodyNext(keepAlive string, scrollId string) (interface{}, error) {
+	body := struct {
+		Scroll   string `json:"scroll"`
+		ScrollId string `json:"scroll_id,omitempty"`
+	}{
+		Scroll:   keepAlive,
+		ScrollId: scrollId,
+	}
+	return body, nil
+}
+
+func (s *elasticLogger) getLogsByCursor(nextCursor string) (*LogsPager, error) {
+	queryFmt, values, err := s.scrollBuildNextURL(false)
 	queryURL, err := url.Parse(queryFmt)
 	queryURL.RawQuery = values.Encode()
 
@@ -270,7 +293,7 @@ func (s *elasticLogger) getLogsByCursor(nextCursor string) (*LogsPager, error) {
 
 	queryURI := s.elasticURL.ResolveReference(queryURL)
 
-	searchBody, err := elastic.ScrollBuildBodyNext("1m", nextCursor)
+	searchBody, err := s.scrollBuildBodyNext("1m", nextCursor)
 	if err != nil {
 		return nil, err
 	}
