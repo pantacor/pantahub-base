@@ -1,5 +1,5 @@
-hash: f00375ac561672b5a15f1ae5229bc62bdd8e2b31d40d915550eddaa542c54fe5
-updated: 2018-11-22T01:41:08.0819796+01:00
+hash: a4bb7b2b02c6741bb88b62c9ccca03dec2481d24c1cf603cf5002cdcee21826d
+updated: 2019-03-03T22:09:25.161083+05:30
 imports:
 - name: github.com/alecthomas/units
   version: 2efee857e7cfd4f3d0138cc3cbb1b4966962b93a
@@ -32,38 +32,30 @@ imports:
   version: 262c4123a0bdec07c20cedd92f7867fcdf8701a3
 - name: github.com/gibson042/canonicaljson-go
   version: 53c2489e9cef6411013b4a2fcec5eace9bf17dae
-- name: github.com/go-redis/redis
-  version: 78a66f0e5fd787d5d0ba6ef4cc442895288229ad
-  subpackages:
-  - internal
-  - internal/consistenthash
-  - internal/hashtag
-  - internal/pool
-  - internal/proto
-  - internal/singleflight
-  - internal/util
 - name: github.com/go-resty/resty
   version: 9ac9c42358f7c3c69ac9f8610e8790d7c338e85d
 - name: github.com/mailru/easyjson
-  version: 60711f1a8329503b04e1c88535f419d0bb440bff
+  version: 6243d8e04c3f819e79757e8bc3faa15c3cb27003
   subpackages:
   - buffer
   - jlexer
   - jwriter
 - name: github.com/miolini/datacounter
   version: fd4e42a1d5e0d2714f16caf92f9c64215bf957ce
+- name: github.com/mongodb/mongo-go-driver
+  version: 29905d4bda472574c8b499e2f93b5b2747d8fbd7
 - name: github.com/philhofer/fwd
   version: bb6d471dc95d4fe11e432687f8b70ff496cf3136
 - name: github.com/pkg/errors
   version: e881fd58d78e04cf6d0de1217f8707c8cc2249bc
 - name: github.com/rs/cors
-  version: a3460e445dd310dbefee993fe449f2ff9c08ae71
+  version: 76f58f330d76a55c5badc74f6212e8a15e742c77
 - name: github.com/tinylib/msgp
   version: f65876d3ea05943d6613bca6b8ed391843044bd4
   subpackages:
   - msgp
 - name: gitlab.com/pantacor/pvr
-  version: 55d124044cad3d00137201fc23b816167056e295
+  version: 2471bbad7a659b2c6bbbbda485460dc3398b56f4
   subpackages:
   - api
 - name: gitlab.com/pantacor/pvr.git
@@ -84,7 +76,7 @@ imports:
   - internal/sasl
   - internal/scram
 - name: gopkg.in/olivere/elastic.v5
-  version: fc3063a8c0686f64e94f4b2c17eb140c06eb6793
+  version: 2a49cd32474903f20e8a6c2feae0f37e0e5a74cd
   subpackages:
   - config
   - uritemplates

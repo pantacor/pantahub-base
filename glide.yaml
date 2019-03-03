@@ -33,3 +33,5 @@ import:
   version: ~1.0.0
 - package: gopkg.in/olivere/elastic.v5
   version: ~5.0.0
+- package: github.com/mongodb/mongo-go-driver
+  version: ~0.1.0
