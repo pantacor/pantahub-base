@@ -1,13 +1,11 @@
 PVR operates on two types of entities:
 
+Sumodules:
  * PVR Repository
- * PVR Devices
+ * PVR Pantahub
+ * PVR Devel
 
-# The PVR Repository Commands
-
-> "*When you are in scalable REST world, there is not much else than JSON with binary blobs being published through dumb CDNs.
-> 
-> With PVR, consuming and sharing file trees in json format becomes a joy for REST environments.*"
+# PVR Repository
 
 ## Features
 
@@ -17,6 +15,10 @@ PVR operates on two types of entities:
  * get, push and apply patches as incremental updates
  * all repo operations are atomic and can be recovered
  * object store can be local or in cloud/CDN
+
+## Requirement
+
+ * a server backend implementing state CRUD primitives like offered by pantahub "trails"
 
 ## Install
 
@@ -58,7 +60,7 @@ While working on changes to your local checkout, you can use `status` and `diff`
 to observe your current changes:
 
 ```
-example2$ ../pvr status
+example2$ pvr status
 A newfile.txt
 D deleted.txt
 C some.json
@@ -71,7 +73,7 @@ This means that `newfile.txt` is new, working.txt and some.json changed and
 You can introspect the changes through the `diff` command:
 
 ```
-example2$ ../pvr diff
+example2$ pvr diff
 {
 	"deleted.txt": null,
 	"newfile.txt": "dc460da4ad72c482231e28e688e01f2778a88ce31a08826899d54ef7183998b5",
@@ -86,7 +88,7 @@ Being happy with what you see, you can checkpoint your working state using the
 `commit` command:
 
 ```
-example2$ ../pvr commit
+example2$ pvr commit
 Committing some.json
 Committing working.txt
 Adding newfile.txt
@@ -113,7 +115,7 @@ You can also push your repository to a pvr compliant REST backend. In this
 case to a device trails (replace device id with your device)
 
 ```
-example2: pvr push https://api.pantahub.com/trails/<DEVICEID>
+example2: pvr post https://api.pantahub.com/trails/<DEVICEID>
 ```
 
 You can later clone that very repo to use it as a starting point or get 

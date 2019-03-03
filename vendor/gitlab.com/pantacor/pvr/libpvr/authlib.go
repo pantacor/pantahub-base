@@ -112,6 +112,11 @@ func (p *PvrAuthConfig) DoRefresh(authEp, token string) (string, string, error) 
 }
 
 func (p *PvrAuthConfig) Save() error {
+
+	if p.path == "" {
+		return errors.New("not persistent authconfig")
+	}
+
 	configNew := p.path + ".tmp"
 	configPath := p.path
 

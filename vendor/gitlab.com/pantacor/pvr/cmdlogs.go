@@ -28,8 +28,8 @@ func CommandLogs() cli.Command {
 	return cli.Command{
 		Name:        "logs",
 		Aliases:     []string{"log"},
-		Usage:       "Show Owned Devices",
-		Description: "Get a quick overview of devices you manage in Pantahub",
+		Usage:       "Get logs for your devices (early preview)",
+		Description: "Get streaming logs of devices you own from pantahub",
 		Action: func(c *cli.Context) error {
 
 			session, err := libpvr.NewSession(c.App)
