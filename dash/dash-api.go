@@ -16,7 +16,6 @@
 package dash
 
 import (
-	"context"
 	"log"
 	"net/http"
 	"os"
@@ -25,21 +24,20 @@ import (
 
 	jwtgo "github.com/dgrijalva/jwt-go"
 	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
-	"github.com/mongodb/mongo-go-driver/mongo"
-	"github.com/mongodb/mongo-go-driver/mongo/options"
 
 	"github.com/alecthomas/units"
 	"github.com/ant0ine/go-json-rest/rest"
 	"gitlab.com/pantacor/pantahub-base/subscriptions"
 	"gitlab.com/pantacor/pantahub-base/trails"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
 type DashApp struct {
 	jwt_middleware *jwt.JWTMiddleware
 	Api            *rest.Api
-	mongoClient    *mongo.Client
+	mgoSession     *mgo.Session
 	subService     subscriptions.SubscriptionService
 }
 
@@ -239,19 +237,19 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	summaryCol := a.mongoClient.Database("pantabase_devicesummary").Collection("device_summary_short_new_v1")
+	summaryCol := a.mgoSession.DB("pantabase_devicesummary").C("device_summary_short_new_v1")
 	if summaryCol == nil {
 		rest.Error(w, "Error with Database connectivity (summaryCol)", http.StatusInternalServerError)
 		return
 	}
 
-	dCol := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
+	dCol := a.mgoSession.DB("").C("pantahub_devices")
 	if dCol == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
-	oCol := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
+	oCol := a.mgoSession.DB("").C("pantahub_objects")
 	if oCol == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
@@ -260,29 +258,8 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 	summary := Summary{}
 
 	var mostRecentDeviceTrails []trails.TrailSummary
-	findOptions := options.Find()
-	findOptions.SetSort(bson.M{"timestamp": -1})
-	findOptions.SetLimit(5)
-	findOptions.SetNoCursorTimeout(true)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	cur, err := summaryCol.Find(ctx, bson.M{
-		"owner": owner,
-	}, findOptions)
-	if err != nil {
-		rest.Error(w, "Error on fetching devices:"+err.Error(), http.StatusForbidden)
-		return
-	}
-	defer cur.Close(ctx)
-	for cur.Next(ctx) {
-		result := trails.TrailSummary{}
-		err := cur.Decode(&result)
-		if err != nil {
-			rest.Error(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
-			return
-		}
-		mostRecentDeviceTrails = append(mostRecentDeviceTrails, result)
-	}
+	err := summaryCol.Find(bson.M{"owner": owner}).Sort("-timestamp").Limit(5).All(&mostRecentDeviceTrails)
+
 	if err != nil {
 		rest.Error(w, "Error finding devices for summary "+err.Error(),
 			http.StatusInternalServerError)
@@ -307,7 +284,12 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 	summary.Nick = r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["nick"].(string)
 
 	sub, err := a.subService.LoadBySubject(utils.Prn(owner.(string)))
-	if err != nil {
+	if err != nil && err != mgo.ErrNotFound {
+		rest.Error(w, "Error finding subscription for summary "+err.Error(),
+			http.StatusInternalServerError)
+		return
+	}
+	if err == mgo.ErrNotFound {
 		sub = a.subService.GetDefaultSubscription(utils.Prn(owner.(string)))
 	}
 
@@ -325,14 +307,12 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 		QuotaStats: copySubToDashMap(sub),
 	}
 
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	deviceCount, err := dCol.CountDocuments(ctx,
-		bson.M{
+	deviceCount, err :=
+		dCol.Find(bson.M{
 			"owner":   owner,
 			"garbage": bson.M{"$ne": true},
-		},
-	)
+		}).Count()
+
 	if err != nil {
 		rest.Error(w, "Error finding devices for summary "+err.Error(),
 			http.StatusInternalServerError)
@@ -345,40 +325,8 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 
 	// quota on disk
 	resp := DiskQuotaUsageResult{}
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	pipeline := []bson.M{
-		bson.M{"$match": bson.M{
-			"owner": owner.(string),
-		}},
-		bson.M{
-			"$group": bson.M{
-				"_id":   "$owner",
-				"total": bson.M{"$sum": "$sizeint"},
-			},
-		},
-	}
-	pipelineData, err := bson.Marshal(pipeline)
-	if err != nil {
-		rest.Error(w, "ERROR Marshalling pipeline: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	cur, err = oCol.Aggregate(ctx, pipelineData)
-	if err != nil {
-		rest.Error(w, "ERROR Aggregate pipeline data: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer cur.Close(ctx)
-	for cur.Next(ctx) {
-		result := DiskQuotaUsageResult{}
-		err := cur.Decode(&result)
-		if err != nil {
-			rest.Error(w, "ERROR Decoding Document: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-		resp = result
-		break
-	}
+	err = oCol.Pipe([]bson.M{{"$match": bson.M{"owner": owner.(string)}},
+		{"$group": bson.M{"_id": "$owner", "total": bson.M{"$sum": "$sizeint"}}}}).One(&resp)
 
 	if err == nil {
 		quotaObjects := summary.Sub.QuotaStats[QUOTA_OBJECTS]
@@ -390,7 +338,7 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 		fRound := float64(int64(float64(resp.Total)/float64(uM)*100)) / 100
 		quotaObjects.Actual = fRound
 		summary.Sub.QuotaStats[QUOTA_OBJECTS] = quotaObjects
-	} else if err != nil {
+	} else if err != nil && err != mgo.ErrNotFound {
 		rest.Error(w, "Error finding quota usage of disk: "+err.Error(),
 			http.StatusInternalServerError)
 		return
@@ -401,11 +349,11 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 
 func New(jwtMiddleware *jwt.JWTMiddleware,
 	subService subscriptions.SubscriptionService,
-	mongoClient *mongo.Client) *DashApp {
+	session *mgo.Session) *DashApp {
 
 	app := new(DashApp)
 	app.jwt_middleware = jwtMiddleware
-	app.mongoClient = mongoClient
+	app.mgoSession = session
 	app.subService = subService
 
 	app.Api = rest.NewApi()

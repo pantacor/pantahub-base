@@ -9,38 +9,32 @@
 package subscriptions
 
 import (
-	"context"
 	"log"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/mongodb/mongo-go-driver/mongo"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
 var (
-	mongoClient *mongo.Client
+	mgoSession *mgo.Session
 )
 
 func setup(t *testing.T) {
 	var err error
 
-	mongoClient, err := utils.GetMongoClientTest()
+	mgoSession, err = utils.GetMongoSessionTest()
 
 	if err != nil {
-		log.Println("error initiating mongoClient " + err.Error())
+		log.Println("error initiating mgoSession " + err.Error())
 		os.Exit(1)
 	}
 
 	// Count all to check if we can talk to DB
-	collection := mongoClient.Database(utils.MongoDb).Collection(collectionSubscription)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	_, err = collection.CountDocuments(ctx,
-		bson.M{},
-	)
+	_, err = mgoSession.DB("").C(collectionSubscription).Find(bson.M{}).Count()
 	if err != nil {
 		t.Errorf("Fail to access collection '%s' test setup. error: %s",
 			collectionSubscription, err.Error())
@@ -48,9 +42,7 @@ func setup(t *testing.T) {
 		return
 	}
 
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	err = mongoClient.Database(utils.MongoDb).Collection(collectionSubscription).Drop(ctx)
+	err = mgoSession.DB("").C(collectionSubscription).DropCollection()
 	if err != nil {
 		t.Logf("Warning: failed to drop collection '%s' in test setup. error: %s",
 			collectionSubscription, err.Error())
@@ -59,7 +51,7 @@ func setup(t *testing.T) {
 }
 
 func newTestService() SubscriptionService {
-	wrappedService := NewService(mongoClient, utils.Prn("prn:pantahub.com:base:/"),
+	wrappedService := NewService(mgoSession, utils.Prn("prn:pantahub.com:base:/"),
 		[]utils.Prn{
 			"prn::auth:/admin",
 			"prn::auth:/admin2",

@@ -53,31 +53,26 @@ import (
 	"strings"
 	"time"
 
-	"context"
-
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
-	"github.com/mongodb/mongo-go-driver/bson/primitive"
-	"github.com/mongodb/mongo-go-driver/mongo"
-	"github.com/mongodb/mongo-go-driver/mongo/options"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
 	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	pvrapi "gitlab.com/pantacor/pvr/api"
+	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
 type TrailsApp struct {
 	jwt_middleware *jwt.JWTMiddleware
 	Api            *rest.Api
-	mongoClient    *mongo.Client
+	mgoSession     *mgo.Session
 }
 
 type Trail struct {
-	Id     primitive.ObjectID `json:"id" bson:"_id"`
-	Owner  string             `json:"owner"`
-	Device string             `json:"device"`
+	Id     bson.ObjectId `json:"id" bson:"_id"`
+	Owner  string        `json:"owner"`
+	Device string        `json:"device"`
 	//  Admins   []string `json:"admins"`   // XXX: maybe this is best way to do delegating device access....
 	LastInSync   time.Time              `json:"last-insync" bson:"last-insync"`
 	LastTouched  time.Time              `json:"last-touched" bson:"last-touched"`
@@ -92,7 +87,7 @@ type Step struct {
 	Owner        string                 `json:"owner"`
 	Device       string                 `json:"device"`
 	Committer    string                 `json:"committer"`
-	TrailId      primitive.ObjectID     `json:"trail-id" bson:"trail-id"` //parent id
+	TrailId      bson.ObjectId          `json:"trail-id" bson:"trail-id"` //parent id
 	Rev          int                    `json:"rev"`
 	CommitMsg    string                 `json:"commit-msg" bson:"commit-msg"`
 	State        map[string]interface{} `json:"state"` // json blurb
@@ -179,12 +174,7 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 
 	// do we need tip/tail here? or is that always read-only?
 	newTrail := Trail{}
-	deviceObjectID, err := primitive.ObjectIDFromHex(deviceID)
-	if err != nil {
-		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	newTrail.Id = deviceObjectID
+	newTrail.Id = bson.ObjectIdHex(deviceID)
 	newTrail.Owner = owner.(string)
 	newTrail.Device = device.(string)
 	newTrail.LastInSync = time.Time{}
@@ -209,36 +199,27 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 	newStep.ProgressTime = time.Now()
 	newStep.StepProgress.Status = "DONE"
 
-	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_trails")
+	collection := a.mgoSession.DB("").C("pantahub_trails")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 	// XXX: prototype: for production we need to prevent posting twice!!
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	_, err = collection.InsertOne(
-		ctx,
-		newTrail,
-	)
+	err = collection.Insert(newTrail)
+
 	if err != nil {
 		rest.Error(w, "Error inserting trail into database "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	collection = a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
+	collection = a.mgoSession.DB("").C("pantahub_steps")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	_, err = collection.InsertOne(
-		ctx,
-		newStep,
-	)
+	err = collection.Insert(newStep)
 
 	if err != nil {
 		rest.Error(w, "Error inserting step into database "+err.Error(), http.StatusInternalServerError)
@@ -269,53 +250,36 @@ func (a *TrailsApp) handle_gettrails(w rest.ResponseWriter, r *rest.Request) {
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
-	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_trails")
+	coll := a.mgoSession.DB("").C("pantahub_trails")
 
 	if coll == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
-	ownerField := ""
-	if authType == "DEVICE" {
-		ownerField = "device"
-	} else if authType == "USER" {
-		ownerField = "owner"
-	}
 
 	trails := make([]Trail, 0)
 
-	findOptions := options.Find()
-	findOptions.SetHint(bson.M{"_id": 1}) //Index fields
-	findOptions.SetNoCursorTimeout(true)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	cur, err := coll.Find(ctx, bson.M{
-		ownerField: owner,
-		"garbage":  bson.M{"$ne": true},
-	}, findOptions)
-	if err != nil {
-		rest.Error(w, "Error on fetching devices:"+err.Error(), http.StatusForbidden)
-		return
-	}
-	defer cur.Close(ctx)
-
-	for cur.Next(ctx) {
-		result := Trail{}
-		err := cur.Decode(&result)
-		if err != nil {
-			rest.Error(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
-			return
-		}
-		result.FactoryState = utils.BsonUnquoteMap(&result.FactoryState)
-		trails = append(trails, result)
-	}
-
 	if authType == "DEVICE" {
+		coll.Find(bson.M{
+			"device":  owner,
+			"garbage": bson.M{"$ne": true},
+		}).All(&trails)
 		if len(trails) > 1 {
 			log.Println("WARNING: more than one trail in db for device - bad DB: " + owner.(string))
 			trails = trails[0:1]
 		}
+	} else if authType == "USER" {
+		coll.Find(bson.M{
+			"owner":   owner,
+			"garbage": bson.M{"$ne": true},
+		}).All(&trails)
 	}
+
+	for k, v := range trails {
+		v.FactoryState = utils.BsonUnquoteMap(&v.FactoryState)
+		trails[k] = v
+	}
+
 	w.WriteJson(trails)
 }
 
@@ -338,7 +302,7 @@ func (a *TrailsApp) handle_gettrail(w rest.ResponseWriter, r *rest.Request) {
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
-	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_trails")
+	coll := a.mgoSession.DB("").C("pantahub_trails")
 
 	if coll == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -354,29 +318,24 @@ func (a *TrailsApp) handle_gettrail(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, "Error getting public trail", http.StatusInternalServerError)
 		return
 	}
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
-	trailObjectID, err := primitive.ObjectIDFromHex(getId)
-	if err != nil {
-		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
-		return
-	}
+
 	if isPublic {
-		err = coll.FindOne(ctx, bson.M{
-			"_id":     trailObjectID,
+		err = coll.Find(bson.M{
+			"_id":     getId,
 			"garbage": bson.M{"$ne": true},
-		}).Decode(&trail)
+		}).One(&trail)
 	} else if authType == "DEVICE" {
-		err = coll.FindOne(ctx, bson.M{
-			"_id":     trailObjectID,
+		err = coll.Find(bson.M{
+			"_id":     getId,
 			"device":  owner,
 			"garbage": bson.M{"$ne": true},
-		}).Decode(&trail)
+		}).One(&trail)
 	} else if authType == "USER" {
-		err = coll.FindOne(ctx, bson.M{
-			"_id":     trailObjectID,
+		err = coll.Find(bson.M{
+			"_id":     getId,
 			"owner":   owner,
 			"garbage": bson.M{"$ne": true},
-		}).Decode(&trail)
+		}).One(&trail)
 	}
 
 	if err != nil {
@@ -402,7 +361,7 @@ func (a *TrailsApp) handle_gettrailpvrinfo(w rest.ResponseWriter, r *rest.Reques
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
-	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
+	coll := a.mgoSession.DB("").C("pantahub_steps")
 
 	if coll == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -418,32 +377,25 @@ func (a *TrailsApp) handle_gettrailpvrinfo(w rest.ResponseWriter, r *rest.Reques
 		rest.Error(w, "Error getting trail public", http.StatusInternalServerError)
 		return
 	}
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
-	trailObjectID, err := primitive.ObjectIDFromHex(getId)
-	if err != nil {
-		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	findOneOptions := options.FindOne()
-	findOneOptions.SetSort(bson.M{"rev": -1})
+
 	//	get last step
 	if isPublic {
-		err = coll.FindOne(ctx, bson.M{
-			"trail-id": trailObjectID,
+		err = coll.Find(bson.M{
+			"trail-id": bson.ObjectIdHex(getId),
 			"garbage":  bson.M{"$ne": true},
-		}, findOneOptions).Decode(&step)
+		}).Sort("-rev").One(&step)
 	} else if authType == "DEVICE" {
-		err = coll.FindOne(ctx, bson.M{
+		err = coll.Find(bson.M{
 			"device":   owner,
-			"trail-id": trailObjectID,
+			"trail-id": bson.ObjectIdHex(getId),
 			"garbage":  bson.M{"$ne": true},
-		}, findOneOptions).Decode(&step)
+		}).Sort("-rev").One(&step)
 	} else if authType == "USER" {
-		err = coll.FindOne(ctx, bson.M{
+		err = coll.Find(bson.M{
 			"owner":    owner,
-			"trail-id": trailObjectID,
+			"trail-id": bson.ObjectIdHex(getId),
 			"garbage":  bson.M{"$ne": true},
-		}, findOneOptions).Decode(&step)
+		}).Sort("-rev").One(&step)
 	}
 
 	if err != nil {
@@ -483,7 +435,7 @@ func (a *TrailsApp) handle_getsteppvrinfo(w rest.ResponseWriter, r *rest.Request
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
-	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
+	coll := a.mgoSession.DB("").C("pantahub_steps")
 
 	if coll == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -502,26 +454,24 @@ func (a *TrailsApp) handle_getsteppvrinfo(w rest.ResponseWriter, r *rest.Request
 		return
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
 	//	get last step
 	if isPublic {
-		err = coll.FindOne(ctx, bson.M{
+		err = coll.Find(bson.M{
 			"_id":     stepId,
 			"garbage": bson.M{"$ne": true},
-		}).Decode(&step)
-
+		}).One(&step)
 	} else if authType == "DEVICE" {
-		err = coll.FindOne(ctx, bson.M{
+		err = coll.Find(bson.M{
 			"device":  owner,
 			"_id":     stepId,
 			"garbage": bson.M{"$ne": true},
-		}).Decode(&step)
+		}).One(&step)
 	} else if authType == "USER" {
-		err = coll.FindOne(ctx, bson.M{
+		err = coll.Find(bson.M{
 			"owner":   owner,
 			"_id":     stepId,
 			"garbage": bson.M{"$ne": true},
-		}).Decode(&step)
+		}).One(&step)
 	}
 
 	if err != nil {
@@ -552,24 +502,19 @@ func (a *TrailsApp) handle_getsteppvrinfo(w rest.ResponseWriter, r *rest.Request
 	w.WriteJson(remoteInfo)
 }
 
-func (a *TrailsApp) get_latest_steprev(trailId primitive.ObjectID) (int, error) {
-	collSteps := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
+func (a *TrailsApp) get_latest_steprev(trailId bson.ObjectId) (int, error) {
+	collSteps := a.mgoSession.DB("").C("pantahub_steps")
 
 	if collSteps == nil {
 		return -1, errors.New("bad database connetivity")
 	}
 
 	step := &Step{}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	findOneOptions := options.FindOne()
-	findOneOptions.SetSort(bson.M{"rev": -1})
 
-	err := collSteps.FindOne(ctx, bson.M{
+	err := collSteps.Find(bson.M{
 		"trail-id": trailId,
 		"garbage":  bson.M{"$ne": true},
-	}, findOneOptions).
-		Decode(&step)
+	}).Sort("-rev").Limit(1).One(step)
 
 	if err != nil {
 		return -1, err
@@ -607,7 +552,7 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
-	collTrails := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_trails")
+	collTrails := a.mgoSession.DB("").C("pantahub_trails")
 
 	if collTrails == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -617,19 +562,11 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 	trailId := r.PathParam("id")
 	trail := Trail{}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	trailObjectID, err := primitive.ObjectIDFromHex(trailId)
-	if err != nil {
-		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	if authType == "USER" || authType == "DEVICE" {
-		err = collTrails.FindOne(ctx, bson.M{
-			"_id":     trailObjectID,
+		err = collTrails.Find(bson.M{
+			"_id":     bson.ObjectIdHex(trailId),
 			"garbage": bson.M{"$ne": true},
-		}).Decode(&trail)
+		}).One(&trail)
 	} else {
 		rest.Error(w, "Need to be logged in as USER to post trail steps", http.StatusForbidden)
 		return
@@ -645,7 +582,7 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	collSteps := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
+	collSteps := a.mgoSession.DB("").C("pantahub_steps")
 
 	if collSteps == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -657,12 +594,7 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 	r.DecodeJsonPayload(&newStep)
 
 	if newStep.Rev == -1 {
-		trailObjectID, err := primitive.ObjectIDFromHex(trailId)
-		if err != nil {
-			rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
-			return
-		}
-		newStep.Rev, err = a.get_latest_steprev(trailObjectID)
+		newStep.Rev, err = a.get_latest_steprev(bson.ObjectIdHex(trailId))
 		newStep.Rev += 1
 	}
 
@@ -672,12 +604,11 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	stepId := trailId + "-" + strconv.Itoa(newStep.Rev-1)
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	err = collSteps.FindOne(ctx, bson.M{
+
+	err = collSteps.Find(bson.M{
 		"_id":     stepId,
 		"garbage": bson.M{"$ne": true},
-	}).Decode(&previousStep)
+	}).One(&previousStep)
 
 	if err != nil {
 		// XXX: figure how to be better on error cases here...
@@ -706,34 +637,19 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	_, err = collSteps.InsertOne(
-		ctx,
-		newStep,
-	)
+	err = collSteps.Insert(newStep)
 
 	if err != nil {
 		// XXX: figure how to be better on error cases here...
 		rest.Error(w, "No access to resource or bad step rev1 "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	updateResult, err := collTrails.UpdateOne(
-		ctx,
-		bson.M{
-			"_id":     trail.Id,
-			"garbage": bson.M{"$ne": true},
-		},
-		bson.M{"$set": bson.M{
-			"last-touched": newStep.StepTime,
-		}},
-	)
-	if updateResult.MatchedCount == 0 {
-		rest.Error(w, "Trail not found", http.StatusBadRequest)
-		return
-	}
+
+	err = collTrails.Update(bson.M{
+		"_id":     trail.Id,
+		"garbage": bson.M{"$ne": true},
+	}, bson.M{"$set": bson.M{"last-touched": newStep.StepTime}})
+
 	if err != nil {
 		// XXX: figure how to be better on error cases here...
 		log.Printf("Error updating last-touched for trail in poststep; not failing because step was written: %s\n  => ERROR: %s\n ", trail.Id.Hex(), err.Error())
@@ -765,7 +681,7 @@ func (a *TrailsApp) handle_getsteps(w rest.ResponseWriter, r *rest.Request) {
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
-	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
+	coll := a.mgoSession.DB("").C("pantahub_steps")
 
 	if coll == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -783,27 +699,23 @@ func (a *TrailsApp) handle_getsteps(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, "Error getting trail public", http.StatusInternalServerError)
 		return
 	}
-	trailObjectID, err := primitive.ObjectIDFromHex(trailId)
-	if err != nil {
-		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
-		return
-	}
+
 	if isPublic {
 		query = bson.M{
-			"trail-id":        trailObjectID,
+			"trail-id":        bson.ObjectIdHex(trailId),
 			"progress.status": "NEW",
 			"garbage":         bson.M{"$ne": true},
 		}
 	} else if authType == "DEVICE" {
 		query = bson.M{
-			"trail-id":        trailObjectID,
+			"trail-id":        bson.ObjectIdHex(trailId),
 			"device":          owner,
 			"progress.status": "NEW",
 			"garbage":         bson.M{"$ne": true},
 		}
 	} else if authType == "USER" {
 		query = bson.M{
-			"trail-id":        trailObjectID,
+			"trail-id":        bson.ObjectIdHex(trailId),
 			"owner":           owner,
 			"progress.status": bson.M{"$ne": "DONE"},
 			"garbage":         bson.M{"$ne": true},
@@ -822,31 +734,22 @@ func (a *TrailsApp) handle_getsteps(w rest.ResponseWriter, r *rest.Request) {
 		}
 	}
 
-	findOptions := options.Find()
-	findOptions.SetNoCursorTimeout(true)
-	if authType == "DEVICE" {
-		findOptions.SetLimit(1)
-	}
-	findOptions.SetSort(bson.M{"rev": 1}) //order by rev asc
+	q := coll.Find(query).Sort("rev")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	cur, err := coll.Find(ctx, query, findOptions)
+	if authType == "DEVICE" {
+		err = q.Limit(1).All(&steps)
+	} else {
+		err = q.All(&steps)
+	}
+
 	if err != nil {
-		rest.Error(w, "Error on fetching steps:"+err.Error(), http.StatusForbidden)
+		rest.Error(w, "Error getting trails step steps", http.StatusInternalServerError)
 		return
 	}
-	defer cur.Close(ctx)
 
-	for cur.Next(ctx) {
-		result := Step{}
-		err := cur.Decode(&result)
-		if err != nil {
-			rest.Error(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
-			return
-		}
-		result.State = utils.BsonUnquoteMap(&result.State)
-		steps = append(steps, result)
+	for k, v := range steps {
+		v.State = utils.BsonUnquoteMap(&v.State)
+		steps[k] = v
 	}
 	w.WriteJson(steps)
 }
@@ -878,7 +781,7 @@ func (a *TrailsApp) handle_getstep(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, "Error getting trail public", http.StatusInternalServerError)
 	}
 
-	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
+	coll := a.mgoSession.DB("").C("pantahub_steps")
 
 	if coll == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -893,25 +796,27 @@ func (a *TrailsApp) handle_getstep(w rest.ResponseWriter, r *rest.Request) {
 		"garbage": bson.M{"$ne": true},
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
 	if isPublic {
-		err = coll.FindOne(ctx, query).Decode(&step)
+		err = coll.Find(query).One(&step)
 	} else if authType == "DEVICE" {
 		query["device"] = owner
-		err = coll.FindOne(ctx, query).Decode(&step)
+		err = coll.Find(query).One(&step)
 	} else if authType == "USER" {
 		query["owner"] = owner
-		err = coll.FindOne(ctx, bson.M{
+		err = coll.Find(bson.M{
 			"_id":     trailId + "-" + rev,
 			"owner":   owner,
 			"garbage": bson.M{"$ne": true},
-		}).Decode(&step)
+		}).One(&step)
 	} else {
 		rest.Error(w, "No Access to step", http.StatusForbidden)
 		return
 	}
 
-	if err != nil {
+	if err == mgo.ErrNotFound {
+		rest.Error(w, "Step not available", http.StatusNotFound)
+		return
+	} else if err != nil {
 		rest.Error(w, "No access", http.StatusInternalServerError)
 		return
 	}
@@ -940,7 +845,7 @@ func (a *TrailsApp) handle_getstepstate(w rest.ResponseWriter, r *rest.Request) 
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
-	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
+	coll := a.mgoSession.DB("").C("pantahub_steps")
 
 	if coll == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -959,24 +864,23 @@ func (a *TrailsApp) handle_getstepstate(w rest.ResponseWriter, r *rest.Request) 
 		return
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
 	if isPublic {
-		err = coll.FindOne(ctx, bson.M{
+		coll.Find(bson.M{
 			"_id":     trailId + "-" + rev,
 			"garbage": bson.M{"$ne": true},
-		}).Decode(&step)
+		}).One(&step)
 	} else if authType == "DEVICE" {
-		err = coll.FindOne(ctx, bson.M{
+		coll.Find(bson.M{
 			"_id":     trailId + "-" + rev,
 			"device":  owner,
 			"garbage": bson.M{"$ne": true},
-		}).Decode(&step)
+		}).One(&step)
 	} else if authType == "USER" {
-		err = coll.FindOne(ctx, bson.M{
+		coll.Find(bson.M{
 			"_id":     trailId + "-" + rev,
 			"owner":   owner,
 			"garbage": bson.M{"$ne": true},
-		}).Decode(&step)
+		}).One(&step)
 	}
 
 	w.WriteJson(utils.BsonUnquoteMap(&step.State))
@@ -993,7 +897,7 @@ func (a *TrailsApp) handle_getstepsobjects(w rest.ResponseWriter, r *rest.Reques
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
-	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
+	coll := a.mgoSession.DB("").C("pantahub_steps")
 
 	if coll == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -1011,25 +915,24 @@ func (a *TrailsApp) handle_getstepsobjects(w rest.ResponseWriter, r *rest.Reques
 		rest.Error(w, "Error getting trail public", http.StatusInternalServerError)
 		return
 	}
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
 
 	if isPublic {
-		err = coll.FindOne(ctx, bson.M{
+		coll.Find(bson.M{
 			"_id":     trailId + "-" + rev,
 			"garbage": bson.M{"$ne": true},
-		}).Decode(&step)
+		}).One(&step)
 	} else if authType == "DEVICE" {
-		err = coll.FindOne(ctx, bson.M{
+		coll.Find(bson.M{
 			"_id":     trailId + "-" + rev,
 			"device":  owner,
 			"garbage": bson.M{"$ne": true},
-		}).Decode(&step)
+		}).One(&step)
 	} else if authType == "USER" {
-		err = coll.FindOne(ctx, bson.M{
+		coll.Find(bson.M{
 			"_id":     trailId + "-" + rev,
 			"owner":   owner,
 			"garbage": bson.M{"$ne": true},
-		}).Decode(&step)
+		}).One(&step)
 	}
 
 	var objectsWithAccess []objects.ObjectWithAccess
@@ -1049,7 +952,7 @@ func (a *TrailsApp) handle_getstepsobjects(w rest.ResponseWriter, r *rest.Reques
 			continue
 		}
 
-		collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
+		collection := a.mgoSession.DB("").C("pantahub_objects")
 
 		if collection == nil {
 			rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -1074,12 +977,10 @@ func (a *TrailsApp) handle_getstepsobjects(w rest.ResponseWriter, r *rest.Reques
 		storageId := objects.MakeStorageId(step.Owner, sha)
 
 		var newObject objects.Object
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		err = collection.FindOne(ctx, bson.M{
+		err = collection.Find(bson.M{
 			"_id":     storageId,
 			"garbage": bson.M{"$ne": true},
-		}).Decode(&newObject)
+		}).One(&newObject)
 
 		if err != nil {
 			rest.Error(w, "Not Accessible Resource Id: "+storageId+" ERR: "+err.Error(), http.StatusForbidden)
@@ -1111,7 +1012,7 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
-	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
+	coll := a.mgoSession.DB("").C("pantahub_steps")
 
 	if coll == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -1127,17 +1028,11 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 		rest.Error(w, "Unknown AuthType", http.StatusBadRequest)
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	err := coll.FindOne(ctx, bson.M{
+
+	err := coll.Find(bson.M{
 		"_id":     trailId + "-" + rev,
 		"garbage": bson.M{"$ne": true},
-	}).
-		Decode(&step)
-	if err != nil {
-		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
-		return
-	}
+	}).One(&step)
 
 	if authType == "DEVICE" && step.Device != owner {
 		rest.Error(w, "No access for device", http.StatusForbidden)
@@ -1152,7 +1047,7 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 
 	newObject.Owner = step.Owner
 
-	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
+	collection := a.mgoSession.DB("").C("pantahub_objects")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -1172,7 +1067,7 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 
 	objects.SyncObjectSizes(&newObject)
 
-	result, err := objects.CalcUsageAfterPost(newObject.Owner, a.mongoClient, newObject.Id, newObject.SizeInt)
+	result, err := objects.CalcUsageAfterPost(newObject.Owner, a.mgoSession, bson.ObjectId(newObject.Id), newObject.SizeInt)
 
 	if err != nil {
 		log.Println("Error to calc diskquota: " + err.Error())
@@ -1193,12 +1088,7 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 			http.StatusPreconditionFailed)
 	}
 
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	_, err = collection.InsertOne(
-		ctx,
-		newObject,
-	)
+	err = collection.Insert(newObject)
 
 	if err != nil {
 		w.WriteHeader(http.StatusConflict)
@@ -1222,7 +1112,7 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
-	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
+	coll := a.mgoSession.DB("").C("pantahub_steps")
 
 	if coll == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -1239,16 +1129,10 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	err := coll.FindOne(ctx, bson.M{
+	err := coll.Find(bson.M{
 		"_id":     trailId + "-" + rev,
 		"garbage": bson.M{"$ne": true},
-	}).Decode(&step)
-	if err != nil {
-		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
-		return
-	}
+	}).One(&step)
 
 	if authType == "DEVICE" && step.Device != owner {
 		rest.Error(w, "No access for device", http.StatusForbidden)
@@ -1259,7 +1143,7 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 	}
 
 	newObject := objects.Object{}
-	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
+	collection := a.mgoSession.DB("").C("pantahub_objects")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -1274,13 +1158,10 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 	}
 
 	storageId := objects.MakeStorageId(step.Owner, sha)
-
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	err = collection.FindOne(ctx, bson.M{
+	err = collection.Find(bson.M{
 		"_id":     storageId,
 		"garbage": bson.M{"$ne": true},
-	}).Decode(&newObject)
+	}).One(&newObject)
 
 	if err != nil {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
@@ -1311,7 +1192,8 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 	}
 
 	objects.SyncObjectSizes(&newObject)
-	result, err := objects.CalcUsageAfterPut(newObject.Owner, a.mongoClient, newObject.Id, newObject.SizeInt)
+
+	result, err := objects.CalcUsageAfterPut(newObject.Owner, a.mgoSession, bson.ObjectId(newObject.Id), newObject.SizeInt)
 
 	if err != nil {
 		log.Println("Error to calc diskquota: " + err.Error())
@@ -1332,19 +1214,7 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 			http.StatusPreconditionFailed)
 	}
 
-	ctx, _ = context.WithTimeout(context.Background(), 5*time.Second)
-	updateOptions := options.Update()
-	updateOptions.SetUpsert(true)
-	updateResult, err := collection.UpdateOne(
-		ctx,
-		bson.M{"_id": storageId},
-		bson.M{"$set": newObject},
-		updateOptions,
-	)
-	if updateResult.MatchedCount == 0 {
-		w.WriteHeader(http.StatusConflict)
-		w.Header().Add("X-PH-Error", "Error inserting object into database ")
-	}
+	_, err = collection.UpsertId(storageId, newObject)
 	if err != nil {
 		w.WriteHeader(http.StatusConflict)
 		w.Header().Add("X-PH-Error", "Error inserting object into database "+err.Error())
@@ -1366,7 +1236,7 @@ func (a *TrailsApp) handle_getstepsobject(w rest.ResponseWriter, r *rest.Request
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
-	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
+	coll := a.mgoSession.DB("").C("pantahub_steps")
 
 	if coll == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -1384,29 +1254,24 @@ func (a *TrailsApp) handle_getstepsobject(w rest.ResponseWriter, r *rest.Request
 		rest.Error(w, "Error getting traitrailsIdl public", http.StatusInternalServerError)
 		return
 	}
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
 
 	if isPublic {
-		err = coll.FindOne(ctx, bson.M{
+		coll.Find(bson.M{
 			"_id":     trailId + "-" + rev,
 			"garbage": bson.M{"$ne": true},
-		}).Decode(&step)
+		}).One(&step)
 	} else if authType == "DEVICE" {
-		err = coll.FindOne(ctx, bson.M{
+		coll.Find(bson.M{
 			"_id":     trailId + "-" + rev,
 			"device":  owner,
 			"garbage": bson.M{"$ne": true},
-		}).Decode(&step)
+		}).One(&step)
 	} else if authType == "USER" {
-		err = coll.FindOne(ctx, bson.M{
+		coll.Find(bson.M{
 			"_id":     trailId + "-" + rev,
 			"owner":   owner,
 			"garbage": bson.M{"$ne": true},
-		}).Decode(&step)
-	}
-	if err != nil {
-		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
-		return
+		}).One(&step)
 	}
 
 	stateU := utils.BsonUnquoteMap(&step.State)
@@ -1425,7 +1290,7 @@ func (a *TrailsApp) handle_getstepsobject(w rest.ResponseWriter, r *rest.Request
 			continue
 		}
 
-		collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
+		collection := a.mgoSession.DB("").C("pantahub_objects")
 
 		if collection == nil {
 			rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -1455,13 +1320,10 @@ func (a *TrailsApp) handle_getstepsobject(w rest.ResponseWriter, r *rest.Request
 		storageId := objects.MakeStorageId(step.Owner, sha)
 
 		var newObject objects.Object
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		err = collection.FindOne(ctx, bson.M{
+		err = collection.Find(bson.M{
 			"_id":     storageId,
 			"garbage": bson.M{"$ne": true},
-		}).
-			Decode(&newObject)
+		}).One(&newObject)
 
 		if err != nil {
 			rest.Error(w, "Not Accessible Resource Id: "+storageId+" ERR: "+err.Error(), http.StatusForbidden)
@@ -1499,7 +1361,7 @@ func (a *TrailsApp) handle_getstepsobjectfile(w rest.ResponseWriter, r *rest.Req
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
-	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
+	coll := a.mgoSession.DB("").C("pantahub_steps")
 
 	if coll == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -1518,28 +1380,24 @@ func (a *TrailsApp) handle_getstepsobjectfile(w rest.ResponseWriter, r *rest.Req
 		rest.Error(w, "Error getting trail public", http.StatusInternalServerError)
 		return
 	}
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+
 	if isPublic {
-		err = coll.FindOne(ctx, bson.M{
+		coll.Find(bson.M{
 			"_id":     trailId + "-" + rev,
 			"garbage": bson.M{"$ne": true},
-		}).Decode(&step)
+		}).One(&step)
 	} else if authType == "DEVICE" {
-		err = coll.FindOne(ctx, bson.M{
+		coll.Find(bson.M{
 			"_id":     trailId + "-" + rev,
 			"device":  owner,
 			"garbage": bson.M{"$ne": true},
-		}).Decode(&step)
+		}).One(&step)
 	} else if authType == "USER" {
-		err = coll.FindOne(ctx, bson.M{
+		coll.Find(bson.M{
 			"_id":     trailId + "-" + rev,
 			"owner":   owner,
 			"garbage": bson.M{"$ne": true},
-		}).Decode(&step)
-	}
-	if err != nil {
-		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
-		return
+		}).One(&step)
 	}
 
 	stateU := utils.BsonUnquoteMap(&step.State)
@@ -1558,7 +1416,7 @@ func (a *TrailsApp) handle_getstepsobjectfile(w rest.ResponseWriter, r *rest.Req
 			continue
 		}
 
-		collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
+		collection := a.mgoSession.DB("").C("pantahub_objects")
 
 		if collection == nil {
 			rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -1588,12 +1446,10 @@ func (a *TrailsApp) handle_getstepsobjectfile(w rest.ResponseWriter, r *rest.Req
 		storageId := objects.MakeStorageId(step.Owner, sha)
 
 		var newObject objects.Object
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		err = collection.FindOne(ctx, bson.M{
+		err = collection.Find(bson.M{
 			"_id":     storageId,
 			"garbage": bson.M{"$ne": true},
-		}).Decode(&newObject)
+		}).One(&newObject)
 
 		if err != nil {
 			rest.Error(w, "Not Accessible Resource Id: "+storageId+" ERR: "+err.Error(), http.StatusForbidden)
@@ -1640,7 +1496,7 @@ func (a *TrailsApp) handle_putstepstate(w rest.ResponseWriter, r *rest.Request) 
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
-	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
+	coll := a.mgoSession.DB("").C("pantahub_steps")
 	if coll == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
@@ -1654,14 +1510,11 @@ func (a *TrailsApp) handle_putstepstate(w rest.ResponseWriter, r *rest.Request) 
 		rest.Error(w, "Need to be logged in as USER to put step state", http.StatusForbidden)
 		return
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	err := coll.FindOne(ctx, bson.M{
+	err := coll.Find(bson.M{
 		"_id":             trailId + "-" + rev,
 		"progress.status": "NEW",
 		"garbage":         bson.M{"$ne": true},
-	}).Decode(&step)
+	}).One(&step)
 
 	if err != nil {
 		rest.Error(w, "Error with accessing data: "+err.Error(), http.StatusInternalServerError)
@@ -1685,22 +1538,13 @@ func (a *TrailsApp) handle_putstepstate(w rest.ResponseWriter, r *rest.Request) 
 	step.ProgressTime = time.Unix(0, 0)
 
 	step.Id = trailId + "-" + rev
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	updateResult, err := coll.UpdateOne(
-		ctx,
-		bson.M{
-			"_id":             trailId + "-" + rev,
-			"owner":           owner,
-			"progress.status": "NEW",
-			"garbage":         bson.M{"$ne": true},
-		},
-		bson.M{"$set": step},
-	)
-	if updateResult.MatchedCount == 0 {
-		rest.Error(w, "Error updating step state: not found", http.StatusBadRequest)
-		return
-	}
+
+	err = coll.Update(bson.M{
+		"_id":             trailId + "-" + rev,
+		"owner":           owner,
+		"progress.status": "NEW",
+		"garbage":         bson.M{"$ne": true},
+	}, step)
 
 	if err != nil {
 		rest.Error(w, "Error updating step state: "+err.Error(), http.StatusInternalServerError)
@@ -1736,14 +1580,14 @@ func (a *TrailsApp) handle_putstepprogress(w rest.ResponseWriter, r *rest.Reques
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
-	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
+	coll := a.mgoSession.DB("").C("pantahub_steps")
 
 	if coll == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
-	collTrails := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_trails")
+	collTrails := a.mgoSession.DB("").C("pantahub_trails")
 
 	if collTrails == nil {
 		rest.Error(w, "Error with Database connectivity - trails", http.StatusInternalServerError)
@@ -1756,48 +1600,22 @@ func (a *TrailsApp) handle_putstepprogress(w rest.ResponseWriter, r *rest.Reques
 	}
 
 	progressTime := time.Now()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	updateResult, err := coll.UpdateOne(
-		ctx,
-		bson.M{
-			"_id":     stepId,
-			"device":  owner,
-			"garbage": bson.M{"$ne": true},
-		},
-		bson.M{"$set": bson.M{
-			"progress":      stepProgress,
-			"progress-time": progressTime,
-		}},
-	)
-	if updateResult.MatchedCount == 0 {
-		rest.Error(w, "Error updating trail: not found", http.StatusBadRequest)
-		return
-	}
+
+	err := coll.Update(bson.M{
+		"_id":     stepId,
+		"device":  owner,
+		"garbage": bson.M{"$ne": true},
+	}, bson.M{"$set": bson.M{"progress": stepProgress, "progress-time": progressTime}})
 
 	if err != nil {
 		rest.Error(w, "Cannot update step progress "+err.Error(), http.StatusForbidden)
 		return
 	}
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	trailObjectID, err := primitive.ObjectIDFromHex(trailId)
-	if err != nil {
-		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	updateResult, err = collTrails.UpdateOne(
-		ctx,
-		bson.M{
-			"_id":     trailObjectID,
-			"garbage": bson.M{"$ne": true},
-		},
-		bson.M{"$set": bson.M{"last-touched": progressTime}},
-	)
-	if updateResult.MatchedCount == 0 {
-		rest.Error(w, "Error updating trail: not found", http.StatusBadRequest)
-		return
-	}
+
+	err = collTrails.Update(bson.M{
+		"_id":     bson.ObjectIdHex(trailId),
+		"garbage": bson.M{"$ne": true},
+	}, bson.M{"$set": bson.M{"last-touched": progressTime}})
 
 	if err != nil {
 		// XXX: figure how to be better on error cases here...
@@ -1826,7 +1644,7 @@ func (a *TrailsApp) handle_gettrailstepsummary(w rest.ResponseWriter, r *rest.Re
 		return
 	}
 
-	summaryCol := a.mongoClient.Database("pantabase_devicesummary").Collection("device_summary_short_new_v1")
+	summaryCol := a.mgoSession.DB("pantabase_devicesummary").C("device_summary_short_new_v1")
 
 	if summaryCol == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -1848,12 +1666,7 @@ func (a *TrailsApp) handle_gettrailstepsummary(w rest.ResponseWriter, r *rest.Re
 	}
 
 	summary := TrailSummary{}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	err := summaryCol.FindOne(ctx, bson.M{
-		"deviceid": trailId,
-		"owner":    owner,
-	}).Decode(&summary)
+	err := summaryCol.Find(bson.M{"deviceid": trailId, "owner": owner}).One(&summary)
 
 	if err != nil {
 		rest.Error(w, "error finding new trailId", http.StatusForbidden)
@@ -1874,7 +1687,7 @@ func (a *TrailsApp) handle_gettrailsummary(w rest.ResponseWriter, r *rest.Reques
 		return
 	}
 
-	summaryCol := a.mongoClient.Database("pantabase_devicesummary").Collection("device_summary_short_new_v1")
+	summaryCol := a.mgoSession.DB("pantabase_devicesummary").C("device_summary_short_new_v1")
 
 	if summaryCol == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -1908,35 +1721,7 @@ func (a *TrailsApp) handle_gettrailsummary(w rest.ResponseWriter, r *rest.Reques
 	m["owner"] = owner
 
 	summaries := make([]TrailSummary, 0)
-
-	findOptions := options.Find()
-	findOptions.SetNoCursorTimeout(true)
-	if sortParam[0:0] == "-" {
-		sortParam = sortParam[1:] //removing "-"
-		findOptions.SetSort(bson.M{sortParam: -1})
-	} else {
-		findOptions.SetSort(bson.M{sortParam: 1})
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	cur, err := summaryCol.Find(ctx, bson.M{
-		"owner": owner,
-	}, findOptions)
-	if err != nil {
-		rest.Error(w, "Error on fetching summaries:"+err.Error(), http.StatusForbidden)
-		return
-	}
-	defer cur.Close(ctx)
-	for cur.Next(ctx) {
-		result := TrailSummary{}
-		err := cur.Decode(&result)
-		if err != nil {
-			rest.Error(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
-			return
-		}
-		summaries = append(summaries, result)
-	}
+	summaryCol.Find(m).Sort(sortParam).All(&summaries)
 
 	w.WriteJson(summaries)
 }
@@ -1947,89 +1732,65 @@ func (a *TrailsApp) handle_gettrailsummary(w rest.ResponseWriter, r *rest.Reques
 //   get walks
 //   search attributes for advanced steps/walk searching inside trail
 //
-func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *TrailsApp {
+func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *TrailsApp {
 
 	app := new(TrailsApp)
 	app.jwt_middleware = jwtMiddleware
-	app.mongoClient = mongoClient
+	app.mgoSession = session
 
 	// Indexing for the owner,garbage fields in pantahub_trails
-	collection := app.mongoClient.Database(utils.MongoDb).Collection("pantahub_trails")
-	indexOptions := options.CreateIndexes().SetMaxTime(10 * time.Second)
-	index := mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "owner", Value: bsonx.Int32(1)},
-			{Key: "garbage", Value: bsonx.Int32(1)},
-		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(false)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+	index := mgo.Index{
+		Key:        []string{"owner", "garbage"},
+		Unique:     false,
+		Background: true,
+		Sparse:     false,
 	}
-	_, err := collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+
+	err := app.mgoSession.DB("").C("pantahub_trails").EnsureIndex(index)
 	if err != nil {
-		log.Fatalln("Error setting up index for pantahub_trails: " + err.Error())
+		log.Println("Error setting up index {owner,garbage} for pantahub_trail: " + err.Error())
 		return nil
 	}
 
 	// Indexing for the device,garbage fields in pantahub_trails
-	collection = app.mongoClient.Database(utils.MongoDb).Collection("pantahub_trails")
-	indexOptions = options.CreateIndexes().SetMaxTime(10 * time.Second)
-	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "device", Value: bsonx.Int32(1)},
-			{Key: "garbage", Value: bsonx.Int32(1)},
-		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(false)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+	index = mgo.Index{
+		Key:        []string{"device", "garbage"},
+		Unique:     false,
+		Background: true,
+		Sparse:     false,
 	}
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+
+	err = app.mgoSession.DB("").C("pantahub_trails").EnsureIndex(index)
 	if err != nil {
-		log.Fatalln("Error setting up index for pantahub_trails: " + err.Error())
+		log.Println("Error setting up index {device,garbage} for pantahub_trail: " + err.Error())
 		return nil
 	}
 
 	// Indexing for the owner,garbage fields in pantahub_steps
-	collection = app.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
-	indexOptions = options.CreateIndexes().SetMaxTime(10 * time.Second)
-	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "owner", Value: bsonx.Int32(1)},
-			{Key: "garbage", Value: bsonx.Int32(1)},
-		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(false)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+	index = mgo.Index{
+		Key:        []string{"owner", "garbage"},
+		Unique:     false,
+		Background: true,
+		Sparse:     false,
 	}
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+
+	err = app.mgoSession.DB("").C("pantahub_steps").EnsureIndex(index)
 	if err != nil {
-		log.Fatalln("Error setting up index for pantahub_steps: " + err.Error())
+		log.Println("Error setting up index {owner,garbage} for pantahub_steps: " + err.Error())
 		return nil
 	}
 
 	// Indexing for the device,garbage fields in pantahub_steps
-	collection = app.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
-	indexOptions = options.CreateIndexes().SetMaxTime(10 * time.Second)
-	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "device", Value: bsonx.Int32(1)},
-			{Key: "garbage", Value: bsonx.Int32(1)},
-		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(false)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+	index = mgo.Index{
+		Key:        []string{"device", "garbage"},
+		Unique:     false,
+		Background: true,
+		Sparse:     false,
 	}
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+
+	err = app.mgoSession.DB("").C("pantahub_steps").EnsureIndex(index)
 	if err != nil {
-		log.Fatalln("Error setting up index for pantahub_steps: " + err.Error())
+		log.Println("Error setting up index {device,garbage} for pantahub_steps: " + err.Error())
 		return nil
 	}
 

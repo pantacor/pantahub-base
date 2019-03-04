@@ -43,7 +43,7 @@ func CreateOwnedDevice(t *testing.T, serverUrl *url.URL, ownerAuthToken string,
 		t.Fail()
 	}
 
-	if device.Id.Hex() == "" {
+	if device.Id == "" {
 		t.Errorf("Body contained no id: " + string(res.Body()))
 		t.Fail()
 	}

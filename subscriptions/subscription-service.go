@@ -9,15 +9,11 @@
 package subscriptions
 
 import (
-	"context"
 	"errors"
-	"log"
 	"time"
 
-	"github.com/mongodb/mongo-go-driver/mongo"
-	"github.com/mongodb/mongo-go-driver/mongo/options"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -63,10 +59,10 @@ type SubscriptionService interface {
 }
 
 type subscriptionService struct {
-	mongoClient *mongo.Client `json:"-" bson:"-"`
-	servicePrn  utils.Prn
-	admins      []utils.Prn
-	types       map[utils.Prn]interface{}
+	mgoSession *mgo.Session `json:"-" bson:"-"`
+	servicePrn utils.Prn
+	admins     []utils.Prn
+	types      map[utils.Prn]interface{}
 }
 
 var (
@@ -115,13 +111,7 @@ func (i subscriptionService) New(subject utils.Prn,
 		s.Attributes[k] = v
 	}
 
-	collection := i.mongoClient.Database(utils.MongoDb).Collection(collectionSubscription)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	_, err := collection.InsertOne(
-		ctx,
-		s,
-	)
+	err := i.mgoSession.DB("").C(collectionSubscription).Insert(s)
 	if err != nil {
 		return nil, err
 	}
@@ -141,12 +131,7 @@ func (i subscriptionService) IsAdmin(user utils.Prn) bool {
 
 func (i subscriptionService) Load(ID string) (Subscription, error) {
 	s := SubscriptionMgo{}
-	collection := i.mongoClient.Database(utils.MongoDb).Collection(collectionSubscription)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	err := collection.FindOne(ctx, bson.M{
-		"_id": ID,
-	}).Decode(&s)
+	err := i.mgoSession.DB("").C(collectionSubscription).FindId(ID).One(&s)
 	if err != nil {
 		return nil, err
 	}
@@ -157,12 +142,7 @@ func (i subscriptionService) Load(ID string) (Subscription, error) {
 
 func (i subscriptionService) LoadBySubject(subject utils.Prn) (Subscription, error) {
 	s := SubscriptionMgo{}
-	collection := i.mongoClient.Database(utils.MongoDb).Collection(collectionSubscription)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	err := collection.FindOne(ctx, bson.M{
-		"subject": subject,
-	}).Decode(&s)
+	err := i.mgoSession.DB("").C(collectionSubscription).Find(bson.M{"subject": subject}).One(&s)
 	if err != nil {
 		return nil, err
 	}
@@ -198,37 +178,23 @@ func (i subscriptionService) List(subject utils.Prn,
 		query["service"] = i.servicePrn
 	}
 
-	collection := i.mongoClient.Database(utils.MongoDb).Collection(collectionSubscription)
-	findOptions := options.Find()
-	if page >= 0 {
-		findOptions.SetLimit(int64(page))
-	}
-	findOptions.SetHint(bson.M{"_id": 1}) //Index fields
-	findOptions.SetNoCursorTimeout(true)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	cur, err := collection.Find(ctx, query, findOptions)
-	if err != nil {
-		return resultPage, err
-	}
-	defer cur.Close(ctx)
-	for cur.Next(ctx) {
-		result := SubscriptionMgo{}
-		err := cur.Decode(&result)
-		if err != nil {
-			return resultPage, err
-		}
-		subs = append(subs, result)
-	}
+	mgoQuery := i.mgoSession.DB("").C(collectionSubscription).Find(query).Skip(start)
 
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	count, err := collection.CountDocuments(ctx, query)
+	count, err := mgoQuery.Count()
 	if err != nil {
 		return resultPage, err
 	}
-	resultPage.Size = int(count)
+	resultPage.Size = count
+
+	if page >= 0 {
+		mgoQuery = mgoQuery.Limit(page)
+	}
 	resultPage.Page = page
+
+	err = mgoQuery.All(&subs)
+	if err != nil {
+		return resultPage, err
+	}
 
 	resultPage.Subs = make([]Subscription, len(subs))
 	for j, v := range subs {
@@ -239,12 +205,9 @@ func (i subscriptionService) List(subject utils.Prn,
 }
 
 func (i subscriptionService) Delete(sub Subscription) error {
-	collection := i.mongoClient.Database(utils.MongoDb).Collection(collectionSubscription)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	_, err := collection.DeleteOne(ctx, bson.M{
-		"_id": sub.GetID(),
-	})
+	err := i.mgoSession.
+		DB("").C(collectionSubscription).
+		RemoveId(sub.GetID())
 
 	if err != nil {
 		return err
@@ -260,14 +223,10 @@ func (i subscriptionService) Save(sub Subscription) error {
 		return errors.New("Wrong Subscription Type Passed to service")
 	}
 
-	collection := i.mongoClient.Database(utils.MongoDb).Collection(collectionSubscription)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	_, err := collection.UpdateOne(
-		ctx,
-		bson.M{"_id": sub.GetID()},
-		bson.M{"$set": s},
-	)
+	err := i.mgoSession.
+		DB("").C(collectionSubscription).
+		UpdateId(sub.GetID(), &s)
+
 	if err != nil {
 		return err
 	}
@@ -279,35 +238,24 @@ func (i subscriptionService) Now() time.Time {
 }
 
 func (i subscriptionService) ensureIndices() error {
-	collection := i.mongoClient.Database(utils.MongoDb).Collection(collectionSubscription)
-	indexOptions := options.CreateIndexes().SetMaxTime(10 * time.Second)
-
-	index := mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "service", Value: bsonx.Int32(1)},
-			{Key: "subject", Value: bsonx.Int32(1)},
+	err := i.mgoSession.DB("").C(collectionSubscription).EnsureIndex(
+		mgo.Index{
+			Key:    []string{"service", "subject"},
+			Unique: true,
 		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(true)},
-		},
-	}
-	_, err := collection.Indexes().CreateOne(context.Background(), index, indexOptions)
-	if err != nil {
-		log.Fatalln("Error setting up index for subscription: " + err.Error())
-		return nil
-	}
+	)
 
 	return err
 }
 
-// New creates a new mongoClient backed subscription service
-// Will use the default DB configured in mongoClient provided as arg.
-func NewService(mongoClient *mongo.Client,
+// New creates a new mgo backed subscription service
+// Will use the default DB configured in mgo.Session provided as arg.
+func NewService(session *mgo.Session,
 	servicePrn utils.Prn, admins []utils.Prn,
 	typeDefs map[utils.Prn]interface{}) SubscriptionService {
 
 	sub := new(subscriptionService)
-	sub.mongoClient = mongoClient
+	sub.mgoSession = session
 	sub.servicePrn = servicePrn
 	sub.admins = admins
 	sub.types = typeDefs

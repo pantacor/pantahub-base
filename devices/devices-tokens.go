@@ -1,5 +1,5 @@
 //
-// Copyright 2018-2019  Pantacor Ltd.
+// Copyright 2018  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 package devices
 
 import (
-	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -27,12 +26,10 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
-	"github.com/mongodb/mongo-go-driver/mongo"
-	"github.com/mongodb/mongo-go-driver/mongo/options"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
 	"gitlab.com/pantacor/pantahub-base/utils"
 
 	petname "github.com/dustinkirkland/golang-petname"
+	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -113,10 +110,7 @@ func (a *DevicesApp) handle_posttokens(w rest.ResponseWriter, r *rest.Request) {
 	req.TimeCreated = time.Now()
 	req.TimeModified = req.TimeCreated
 
-	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	_, err = collection.InsertOne(ctx, &req)
+	err = a.mgoSession.DB("").C("pantahub_devices_tokens").Insert(&req)
 
 	if err != nil {
 		rest.Error(w, "error inserting device token into database: "+err.Error(), http.StatusInternalServerError)
@@ -161,20 +155,11 @@ func (a *DevicesApp) handle_disabletokens(w rest.ResponseWriter, r *rest.Request
 	tokenId := r.PathParam("id")
 	tokenIdBson := bson.ObjectIdHex(tokenId)
 
-	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	updateOptions := options.Update()
-	updateOptions.SetUpsert(true)
-	_, err := collection.UpdateOne(
-		ctx,
-		bson.M{
-			"_id":   tokenIdBson,
-			"owner": caller.(string),
-		},
-		bson.M{"$set": bson.M{"disabled": true}},
-		updateOptions,
-	)
+	err := a.mgoSession.DB("").C("pantahub_devices_tokens").
+		Update(
+			bson.M{"_id": tokenIdBson, "owner": caller.(string)},
+			bson.M{"$set": bson.M{"disabled": true}},
+		)
 
 	if err != nil {
 		rest.Error(w, "error inserting device token into database: "+err.Error(), http.StatusInternalServerError)
@@ -212,31 +197,18 @@ func (a *DevicesApp) handle_gettokens(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	res := []PantahubDevicesJoinToken{}
-	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
-	findOptions := options.Find()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	cur, err := collection.Find(ctx, bson.M{
-		"owner": caller.(string),
-	}, findOptions)
+	err := a.mgoSession.DB("").C("pantahub_devices_tokens").Find(bson.M{"owner": caller.(string)}).All(&res)
 
 	if err != nil {
-		rest.Error(w, "error getting device tokens for user:"+err.Error(), http.StatusForbidden)
+		rest.Error(w, "error getting device tokens for user: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	defer cur.Close(ctx)
-	for cur.Next(ctx) {
-		result := PantahubDevicesJoinToken{}
-		err := cur.Decode(&result)
-		if err != nil {
-			rest.Error(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
-			return
-		}
-		// lets not reveal details about token when collection gets queried
-		result.TokenSha = nil
-		result.Token = ""
-		res = append(res, result)
+	// lets not reveal details about token when collection gets queried
+	for i, v := range res {
+		v.TokenSha = nil
+		v.Token = ""
+		res[i] = v
 	}
 
 	w.WriteJson(res)
@@ -265,10 +237,7 @@ func (a *DevicesApp) getBase64AutoTokenInfo(tokenBase64 string) (*autoTokenInfo,
 
 	res := PantahubDevicesJoinToken{}
 
-	col := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	err = col.FindOne(ctx, bson.M{"tokensha": tokenSha}).Decode(&res)
+	err = a.mgoSession.DB("").C("pantahub_devices_tokens").Find(bson.M{"tokensha": tokenSha}).One(&res)
 	if err != nil {
 		return nil, errors.New("token not found")
 	}
@@ -286,93 +255,69 @@ func (a *DevicesApp) getBase64AutoTokenInfo(tokenBase64 string) (*autoTokenInfo,
 
 func (a *DevicesApp) EnsureTokenIndices() error {
 
-	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
-	indexOptions := options.CreateIndexes().SetMaxTime(10 * time.Second)
-
-	index := mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "owner", Value: bsonx.Int32(1)},
-		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(false)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+	index := mgo.Index{
+		Key:        []string{"owner"},
+		Unique:     false,
+		Background: true,
+		Sparse:     false,
 	}
 
-	_, err := collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+	err := a.mgoSession.DB("").C("pantahub_devices_tokens").EnsureIndex(index)
 	if err != nil {
-		log.Fatalln("Error setting up index for pantahub_devices: " + err.Error())
-		return nil
+		log.Println("Error setting up index owner for pantahub_devices_tokens: " + err.Error())
+		return err
 	}
 
-	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "nick", Value: bsonx.Int32(1)},
-		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(true)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
-	}
-	collection = a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
-	if err != nil {
-		log.Fatalln("Error setting up index for pantahub_devices: " + err.Error())
-		return nil
+	index = mgo.Index{
+		Key:        []string{"nick"},
+		Unique:     true,
+		Background: true,
+		Sparse:     false,
 	}
 
-	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "disabled", Value: bsonx.Int32(1)},
-		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(false)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
-	}
-	collection = a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+	err = a.mgoSession.DB("").C("pantahub_devices_tokens").EnsureIndex(index)
 	if err != nil {
-		log.Fatalln("Error setting up index for pantahub_devices: " + err.Error())
-		return nil
+		log.Println("Error setting up index nick for pantahub_devices_tokens: " + err.Error())
+		return err
 	}
 
-	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "prn", Value: bsonx.Int32(1)},
-		},
-		Options: bsonx.Doc{
-			{Key: "name", Value: bsonx.String("device_tokens_prn")},
-			{Key: "unique", Value: bsonx.Boolean(true)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
-	}
-	collection = a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
-	if err != nil {
-		log.Fatalln("Error setting up index for pantahub_devices: " + err.Error())
-		return nil
+	index = mgo.Index{
+		Key:        []string{"disabled"},
+		Unique:     false,
+		Background: true,
+		Sparse:     false,
 	}
 
-	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "tokensha", Value: bsonx.Int32(1)},
-		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(true)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
-	}
-	collection = a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+	err = a.mgoSession.DB("").C("pantahub_devices_tokens").EnsureIndex(index)
 	if err != nil {
-		log.Fatalln("Error setting up index for pantahub_devices: " + err.Error())
-		return nil
+		log.Println("Error setting up index disabled for pantahub_devices_tokens: " + err.Error())
+		return err
+	}
+
+	index = mgo.Index{
+		Key:        []string{"prn"},
+		Unique:     true,
+		Background: true,
+		Sparse:     false,
+	}
+
+	err = a.mgoSession.DB("").C("pantahub_devices_tokens").EnsureIndex(index)
+	if err != nil {
+		log.Println("Error setting up index prn for pantahub_devices_tokens: " + err.Error())
+		return err
+	}
+
+	index = mgo.Index{
+		Key:        []string{"tokensha"},
+		Unique:     true,
+		Background: true,
+		Sparse:     false,
+	}
+
+	err = a.mgoSession.DB("").C("pantahub_devices_tokens").EnsureIndex(index)
+	if err != nil {
+		log.Println("Error setting up index prn for pantahub_devices_tokens: " + err.Error())
+		return err
 	}
 
 	return nil

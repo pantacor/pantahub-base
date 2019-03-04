@@ -13,10 +13,10 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
-	"github.com/mongodb/mongo-go-driver/mongo"
+	"github.com/ant0ine/go-json-rest/rest"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -137,7 +137,7 @@ func (s *SubscriptionsApp) put(w rest.ResponseWriter, r *rest.Request) {
 
 	sub, err := s.service.LoadBySubject(req.Subject)
 
-	if err != nil {
+	if err != mgo.ErrNotFound && err != nil {
 		// XXX: right now not implemented
 		errID := bson.NewObjectId()
 		log.Printf("ERROR (%s): error using database in 'post subscriptions' by user %s: %s'\n",
@@ -167,7 +167,7 @@ func (s *SubscriptionsApp) MakeHandler() http.Handler {
 	return s.api.MakeHandler()
 }
 
-func NewResty(jwtMiddleware *jwt.JWTMiddleware, subscriptionService SubscriptionService, mongoClient *mongo.Client) *SubscriptionsApp {
+func NewResty(jwtMiddleware *jwt.JWTMiddleware, subscriptionService SubscriptionService, session *mgo.Session) *SubscriptionsApp {
 
 	app := new(SubscriptionsApp)
 	app.jwt_middleware = jwtMiddleware

@@ -15,53 +15,43 @@
 package trails
 
 import (
-	"context"
 	"errors"
-	"time"
+	"log"
 
-	"github.com/mongodb/mongo-go-driver/bson/primitive"
 	"gitlab.com/pantacor/pantahub-base/devices"
-	"gitlab.com/pantacor/pantahub-base/utils"
 	"gopkg.in/mgo.v2/bson"
 )
 
 func (a *TrailsApp) isTrailPublic(trailID string) (bool, error) {
 
-	collTrails := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_trails")
+	collTrails := a.mgoSession.DB("").C("pantahub_trails")
 
 	if collTrails == nil {
 		return false, errors.New("Cannot get collection")
 	}
 
 	trail := Trail{}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	trailObjectID, err := primitive.ObjectIDFromHex(trailID)
-	if err != nil {
-		return false, err
-	}
-	err = collTrails.FindOne(ctx, bson.M{
-		"_id":     trailObjectID,
+	log.Println("Trail:" + trailID)
+	err := collTrails.Find(bson.M{
+		"_id":     bson.ObjectIdHex(trailID),
 		"garbage": bson.M{"$ne": true},
-	}).Decode(&trail)
+	}).One(&trail)
 
 	if err != nil {
 		return false, err
 	}
 
-	collDevices := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
+	collDevices := a.mgoSession.DB("").C("pantahub_devices")
 
 	if collDevices == nil {
 		return false, errors.New("Cannot get collection2")
 	}
 
 	device := devices.Device{}
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	err = collDevices.FindOne(ctx, bson.M{
+	err = collDevices.Find(bson.M{
 		"prn":     trail.Device,
 		"garbage": bson.M{"$ne": true},
-	}).Decode(&device)
+	}).One(&device)
 
 	if err != nil {
 		return false, err

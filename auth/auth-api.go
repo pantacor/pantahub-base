@@ -16,21 +16,15 @@
 package auth
 
 import (
-	"context"
 	"log"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/mongodb/mongo-go-driver/bson/primitive"
-	"github.com/mongodb/mongo-go-driver/mongo/options"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
-
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"github.com/fundapps/go-json-rest-middleware-jwt"
-	"github.com/mongodb/mongo-go-driver/mongo"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/utils"
@@ -120,57 +114,33 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, "Accounts must have a nick set", http.StatusPreconditionFailed)
 		return
 	}
-	log.Print(newAccount)
-	if !newAccount.Id.IsZero() {
+
+	if newAccount.Id != "" {
 		rest.Error(w, "Accounts cannot have id before creation", http.StatusPreconditionFailed)
 		return
 	}
 
-	mgoid := bson.NewObjectId()
-	ObjectID, err := primitive.ObjectIDFromHex(mgoid.Hex())
-	if err != nil {
-		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	newAccount.Id = ObjectID
+	newAccount.Id = bson.NewObjectId()
 	newAccount.Prn = "prn:::accounts:/" + newAccount.Id.Hex()
 	newAccount.Challenge = utils.GenerateChallenge()
 	newAccount.TimeCreated = time.Now()
 	newAccount.Type = accounts.ACCOUNT_TYPE_USER // XXX: need org approach too
 	newAccount.TimeModified = newAccount.TimeCreated
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
+	collection := a.mgoSession.DB("").C("pantahub_accounts")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
+	_, err := collection.UpsertId(newAccount.Id, newAccount)
 
-	usersCount, _ := collection.CountDocuments(ctx,
-		bson.M{
-			"$or": []bson.M{
-				{"email": newAccount.Email},
-				{"nick": newAccount.Nick},
-			},
-		},
-	)
-	if usersCount > 0 {
-		rest.Error(w, "Email or Nick already in use", http.StatusPreconditionFailed)
-		return
-	}
-
-	updateOptions := options.Update()
-	updateOptions.SetUpsert(true)
-	_, err = collection.UpdateOne(
-		ctx,
-		bson.M{"_id": newAccount.Id},
-		bson.M{"$set": newAccount},
-		updateOptions,
-	)
 	if err != nil {
-		rest.Error(w, "Internal Error: "+err.Error(), http.StatusInternalServerError)
+		if mgo.IsDup(err) {
+			rest.Error(w, "Email or Nick already in use", http.StatusPreconditionFailed)
+		} else {
+			rest.Error(w, "Internal Error: "+err.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -201,10 +171,9 @@ func (a *AuthApp) handle_getprofile(w rest.ResponseWriter, r *rest.Request) {
 	var ok bool
 
 	if account, ok = accounts.DefaultAccounts[accountPrn]; !ok {
-		col := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		cancel()
-		err := col.FindOne(ctx, bson.M{"prn": accountPrn}).Decode(&account)
+		col := a.mgoSession.DB("").C("pantahub_accounts")
+
+		err := col.Find(bson.M{"prn": accountPrn}).One(&account)
 		// always unset credentials so we dont end up sending them out
 		account.Password = ""
 		account.Challenge = ""
@@ -229,7 +198,7 @@ func (a *AuthApp) handle_verify(w rest.ResponseWriter, r *rest.Request) {
 
 	newAccount := accounts.Account{}
 
-	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
+	collection := a.mgoSession.DB("").C("pantahub_accounts")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -239,18 +208,8 @@ func (a *AuthApp) handle_verify(w rest.ResponseWriter, r *rest.Request) {
 	r.ParseForm()
 	putId := r.FormValue("id")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	ObjectID, err := primitive.ObjectIDFromHex(putId)
-	if err != nil {
-		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	err = collection.FindOne(ctx,
-		bson.M{
-			"_id": ObjectID,
-		}).
-		Decode(&newAccount)
+	err := collection.FindId(bson.ObjectIdHex(putId)).One(&newAccount)
+
 	if err != nil {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
@@ -273,18 +232,7 @@ func (a *AuthApp) handle_verify(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	newAccount.TimeModified = time.Now()
-	updateOptions := options.Update()
-	updateOptions.SetUpsert(true)
-	_, err = collection.UpdateOne(
-		ctx,
-		bson.M{"_id": newAccount.Id},
-		bson.M{"$set": newAccount},
-		updateOptions,
-	)
-	if err != nil {
-		rest.Error(w, "Error on Updating", http.StatusInternalServerError)
-		return
-	}
+	collection.UpsertId(newAccount.Id, newAccount)
 
 	// always wipe secrets before sending over wire
 	newAccount.Password = ""
@@ -445,7 +393,7 @@ func (app *AuthApp) handle_posttoken(writer rest.ResponseWriter, r *rest.Request
 		return
 	}
 
-	collection := app.mongoClient.Database(utils.MongoDb).Collection("pantahub_oauth_accesstokens")
+	collection := app.mgoSession.DB("").C("pantahub_oauth_accesstokens")
 
 	if collection == nil {
 		rest.Error(writer, "Error with Database connectivity", http.StatusInternalServerError)
@@ -460,10 +408,8 @@ func (app *AuthApp) handle_posttoken(writer rest.ResponseWriter, r *rest.Request
 		Claims:  tokenClaims,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	cancel()
-	_, err = collection.InsertOne(ctx, &tokenStore)
-	if collection == nil || err != nil {
+	err = collection.Insert(&tokenStore)
+	if collection == nil {
 		rest.Error(writer, "Error storing issued token in DB", http.StatusInternalServerError)
 		return
 	}
@@ -478,75 +424,67 @@ func (app *AuthApp) handle_posttoken(writer rest.ResponseWriter, r *rest.Request
 type AuthApp struct {
 	jwt_middleware *jwt.JWTMiddleware
 	Api            *rest.Api
-	mongoClient    *mongo.Client
+	mgoSession     *mgo.Session
 }
 
-func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
+func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *AuthApp {
 
 	app := new(AuthApp)
 	app.jwt_middleware = jwtMiddleware
-	app.mongoClient = mongoClient
+	app.mgoSession = session
 
-	//key := flag.String("nick", "", "The field you'd like to place an index on")
-	//unique := flag.Bool("unique", true, "Would you like the index to be unique?")
-	//value := flag.Int("type", 1, "would you like the index to be ascending (1) or descending (-1)?")
-
-	indexOptions := options.CreateIndexes().SetMaxTime(10 * time.Second)
-
-	index := mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "nick", Value: bsonx.Int32(1)},
-		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(true)},
-			{Key: "sparse", Value: bsonx.Boolean(true)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+	index := mgo.Index{
+		Key:        []string{"nick"},
+		Unique:     true,
+		DropDups:   true,
+		Background: true, // See notes.
+		Sparse:     true,
 	}
-	collection := app.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
-	_, err := collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+	err := app.mgoSession.DB("").C("pantahub_accounts").EnsureIndex(index)
 	if err != nil {
 		log.Fatalln("Error setting up index for pantahub_accounts: " + err.Error())
 		return nil
 	}
 
-	indexOptions = options.CreateIndexes().SetMaxTime(10 * time.Second)
-
-	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "prn", Value: bsonx.Int32(1)},
-		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(false)},
-			{Key: "sparse", Value: bsonx.Boolean(true)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+	index = mgo.Index{
+		Key:        []string{"prn"},
+		Unique:     false,
+		DropDups:   false,
+		Background: true, // See notes.
+		Sparse:     true,
 	}
-	collection = app.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+	err = app.mgoSession.DB("").C("pantahub_accounts").EnsureIndex(index)
 	if err != nil {
 		log.Fatalln("Error setting up index for pantahub_accounts: " + err.Error())
 		return nil
 	}
 
-	indexOptions = options.CreateIndexes().SetMaxTime(10 * time.Second)
-
-	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "email", Value: bsonx.Int32(1)},
-		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(true)},
-			{Key: "sparse", Value: bsonx.Boolean(true)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+	index = mgo.Index{
+		Key:        []string{"email"},
+		Unique:     true,
+		DropDups:   true,
+		Background: true, // See notes.
+		Sparse:     true,
 	}
-	collection = app.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+	err = app.mgoSession.DB("").C("pantahub_accounts").EnsureIndex(index)
 	if err != nil {
 		log.Fatalln("Error setting up index for pantahub_accounts: " + err.Error())
 		return nil
 	}
+
+	index = mgo.Index{
+		Key:        []string{"nick"},
+		Unique:     true,
+		Background: true,
+		Sparse:     false,
+	}
+
+	err = app.mgoSession.DB("").C("pantahub_accounts").EnsureIndex(index)
+	if err != nil {
+		log.Fatalln("Error setting up index for pantahub_accounts: " + err.Error())
+		return nil
+	}
+
 	jwtMiddleware.Authenticator = func(userId string, password string) bool {
 
 		if userId == "" || password == "" {
@@ -630,20 +568,18 @@ func (a *AuthApp) getAccount(prnEmailNick string) (accounts.Account, error) {
 		account accounts.Account
 	)
 
-	c := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
+	c := a.mgoSession.DB("").C("pantahub_accounts")
 
 	// we accept three variants to identify the account:
 	//  - id (pure and with prn format
 	//  - email
 	//  - nick
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 	if utils.IsEmail(prnEmailNick) {
-		err = c.FindOne(ctx, bson.M{"email": prnEmailNick}).Decode(&account)
+		err = c.Find(bson.M{"email": prnEmailNick}).One(&account)
 	} else if utils.IsNick(prnEmailNick) {
-		err = c.FindOne(ctx, bson.M{"nick": prnEmailNick}).Decode(&account)
+		err = c.Find(bson.M{"nick": prnEmailNick}).One(&account)
 	} else {
-		err = c.FindOne(ctx, bson.M{"prn": prnEmailNick}).Decode(&account)
+		err = c.Find(bson.M{"prn": prnEmailNick}).One(&account)
 	}
 
 	return account, err
@@ -742,25 +678,16 @@ func (a *AuthApp) accountPayload(idEmailNick string) map[string]interface{} {
 
 func (a *AuthApp) deviceAuth(deviceId string, secret string) bool {
 
-	c := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
+	c := a.mgoSession.DB("").C("pantahub_devices")
 
 	id := utils.PrnGetId(deviceId)
 	mgoId := bson.ObjectIdHex(id)
 
 	device := devices.Device{}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	deviceID, err := primitive.ObjectIDFromHex(mgoId.Hex())
-	if err != nil {
-		return false
-	}
-	err = c.FindOne(ctx, bson.M{
-		"_id":     deviceID,
+	c.Find(bson.M{
+		"_id":     mgoId,
 		"garbage": bson.M{"$ne": true},
-	}).Decode(&device)
-	if err != nil {
-		return false
-	}
+	}).One(&device)
 	if secret == device.Secret {
 		return true
 	}
@@ -769,22 +696,17 @@ func (a *AuthApp) deviceAuth(deviceId string, secret string) bool {
 
 func (a *AuthApp) devicePayload(deviceId string) map[string]interface{} {
 
-	c := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
+	c := a.mgoSession.DB("").C("pantahub_devices")
 
 	id := utils.PrnGetId(deviceId)
 	mgoId := bson.ObjectIdHex(id)
 
 	device := devices.Device{}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	deviceID, err := primitive.ObjectIDFromHex(mgoId.Hex())
-	if err != nil {
-		return nil
-	}
-	err = c.FindOne(ctx, bson.M{
-		"_id":     deviceID,
+	err := c.Find(bson.M{
+		"_id":     mgoId,
 		"garbage": bson.M{"$ne": true},
-	}).Decode(&device)
+	}).One(&device)
+
 	if err != nil {
 		return nil
 	}

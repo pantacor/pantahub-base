@@ -16,138 +16,103 @@
 package logs
 
 import (
-	"context"
 	"errors"
 	"log"
 	"strings"
 	"time"
 
-	"github.com/mongodb/mongo-go-driver/mongo"
-	"github.com/mongodb/mongo-go-driver/mongo/options"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
 type mgoLogger struct {
-	mongoClient   *mongo.Client
+	mgoSession    *mgo.Session
 	mgoCollection string
 }
 
 func (s *mgoLogger) register() error {
 	var err error
-	collection := s.mongoClient.Database(utils.MongoDb).Collection(s.mgoCollection)
-	indexOptions := options.CreateIndexes().SetMaxTime(10 * time.Second)
 
-	index := mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "own", Value: bsonx.Int32(1)},
-		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(false)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+	index := mgo.Index{
+		Key:        []string{"own"},
+		Unique:     false,
+		DropDups:   true,
+		Background: true, // See notes.
+		Sparse:     false,
 	}
 
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+	err = s.mgoSession.DB("").C(s.mgoCollection).EnsureIndex(index)
 	if err != nil {
-		log.Fatalln("Error setting up index for " + s.mgoCollection + ": " + err.Error())
-		return nil
+		log.Println("Error setting up index for: " + s.mgoCollection + " ERROR: " + err.Error())
+		return err
 	}
 
-	collection = s.mongoClient.Database(utils.MongoDb).Collection(s.mgoCollection)
-	indexOptions = options.CreateIndexes().SetMaxTime(10 * time.Second)
-	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "dev", Value: bsonx.Int32(1)},
-		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(false)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+	index = mgo.Index{
+		Key:        []string{"dev"},
+		Unique:     false,
+		DropDups:   true,
+		Background: true, // See notes.
+		Sparse:     false,
 	}
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+	err = s.mgoSession.DB("").C(s.mgoCollection).EnsureIndex(index)
 	if err != nil {
-		log.Fatalln("Error setting up index for " + s.mgoCollection + ": " + err.Error())
-		return nil
+		log.Println("Error setting up index for: " + s.mgoCollection + " ERROR: " + err.Error())
+		return err
 	}
 
-	collection = s.mongoClient.Database(utils.MongoDb).Collection(s.mgoCollection)
-	indexOptions = options.CreateIndexes().SetMaxTime(10 * time.Second)
-	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "time-created", Value: bsonx.Int32(1)},
-		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(false)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+	index = mgo.Index{
+		Key:        []string{"time-created"},
+		Unique:     false,
+		DropDups:   true,
+		Background: true, // See notes.
+		Sparse:     false,
 	}
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+	err = s.mgoSession.DB("").C(s.mgoCollection).EnsureIndex(index)
 	if err != nil {
-		log.Fatalln("Error setting up index for " + s.mgoCollection + ": " + err.Error())
-		return nil
+		log.Println("Error setting up index for: " + s.mgoCollection + " ERROR: " + err.Error())
+		return err
 	}
 
-	collection = s.mongoClient.Database(utils.MongoDb).Collection(s.mgoCollection)
-	indexOptions = options.CreateIndexes().SetMaxTime(10 * time.Second)
-	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "tsec", Value: bsonx.Int32(1)},
-			{Key: "tnano", Value: bsonx.Int32(1)},
-		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(false)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+	index = mgo.Index{
+		Key:        []string{"tsec", "tnano"},
+		Unique:     false,
+		DropDups:   true,
+		Background: true, // See notes.
+		Sparse:     false,
 	}
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+	err = s.mgoSession.DB("").C(s.mgoCollection).EnsureIndex(index)
 	if err != nil {
-		log.Fatalln("Error setting up index for " + s.mgoCollection + ": " + err.Error())
-		return nil
+		log.Println("Error setting up index for: " + s.mgoCollection + " ERROR: " + err.Error())
+		return err
 	}
 
-	collection = s.mongoClient.Database(utils.MongoDb).Collection(s.mgoCollection)
-	indexOptions = options.CreateIndexes().SetMaxTime(10 * time.Second)
-	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "lvl", Value: bsonx.Int32(1)},
-		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(false)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+	index = mgo.Index{
+		Key:        []string{"lvl"},
+		Unique:     false,
+		DropDups:   true,
+		Background: true, // See notes.
+		Sparse:     false,
 	}
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+
+	err = s.mgoSession.DB("").C(s.mgoCollection).EnsureIndex(index)
 	if err != nil {
-		log.Fatalln("Error setting up index for " + s.mgoCollection + ": " + err.Error())
-		return nil
+		log.Println("Error setting up index for: " + s.mgoCollection + " ERROR: " + err.Error())
+		return err
 	}
 
-	collection = s.mongoClient.Database(utils.MongoDb).Collection(s.mgoCollection)
-	indexOptions = options.CreateIndexes().SetMaxTime(10 * time.Second)
-	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "dev", Value: bsonx.Int32(1)},
-			{Key: "own", Value: bsonx.Int32(1)},
-			{Key: "time-created", Value: bsonx.Int32(1)},
-		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(false)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+	index = mgo.Index{
+		Key:        []string{"dev", "own", "time-created"},
+		Unique:     false,
+		DropDups:   true,
+		Background: true, // See notes.
+		Sparse:     false,
 	}
 
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+	err = s.mgoSession.DB("").C(s.mgoCollection).EnsureIndex(index)
 	if err != nil {
-		log.Fatalln("Error setting up index for " + s.mgoCollection + ": " + err.Error())
-		return nil
+		log.Println("Error setting up index for: " + s.mgoCollection + " ERROR: " + err.Error())
+		return err
 	}
 
 	return nil
@@ -155,7 +120,7 @@ func (s *mgoLogger) register() error {
 
 func (s *mgoLogger) unregister(delete bool) error {
 	if delete {
-		err := s.mongoClient.Database(utils.MongoDb).Collection(s.mgoCollection).Drop(nil)
+		err := s.mgoSession.DB("").C(s.mgoCollection).DropCollection()
 		if err != nil {
 			return err
 		}
@@ -174,7 +139,7 @@ func (s *mgoLogger) getLogs(start int64, page int64, beforeOrAfter *time.Time,
 	}
 
 	sortStr := strings.Join(sort, ",")
-	collLogs := s.mongoClient.Database(utils.MongoDb).Collection(s.mgoCollection)
+	collLogs := s.mgoSession.DB("").C(s.mgoCollection)
 
 	if collLogs == nil {
 		return nil, errors.New("Couldnt instantiate mgo connection for collection " + s.mgoCollection)
@@ -213,55 +178,30 @@ func (s *mgoLogger) getLogs(start int64, page int64, beforeOrAfter *time.Time,
 			"-time-created"
 	}
 
-	findOptions := options.Find()
-	findOptions.SetNoCursorTimeout(true)
+	q := collLogs.Find(findFilter).Sort(sortStr)
+
 	if start > 0 {
-		findOptions.SetSkip(start)
+		q = q.Skip(int(start))
 	}
 	if page > 0 {
-		findOptions.SetLimit(page)
+		q = q.Limit(int(page))
 	}
 
-	sortFields := bson.M{}
-	for _, v := range sort {
-		if v[0:0] == "-" {
-			sortFields[v] = -1
-		} else {
-			sortFields[v] = 1
-		}
-	}
-	if len(sortFields) > 0 {
-		findOptions.SetSort(sortFields)
-	} else {
-		findOptions.SetSort(bson.M{"time-created": -1})
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	cur, err := collLogs.Find(ctx, findFilter, findOptions)
-	if err != nil {
-		return nil, err
-	}
-
-	defer cur.Close(ctx)
-	entries := []*LogsEntry{}
-
-	for cur.Next(ctx) {
-		result := &LogsEntry{}
-		err := cur.Decode(&result)
-		if err != nil {
-			return nil, err
-		}
-		entries = append(entries, result)
-	}
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	count, err := collLogs.CountDocuments(ctx, findFilter)
-	if err != nil {
-		return nil, err
-	}
-	result.Count = count
+	count, err := q.Count()
+	result.Count = int64(count)
 	result.Start = start
 	result.Page = page
+
+	if err != nil {
+		return nil, err
+	}
+
+	entries := []*LogsEntry{}
+	err = q.Skip(int(start)).Limit(int(page)).All(&entries)
+
+	if err != nil {
+		return nil, err
+	}
 
 	result.Entries = entries
 	return &result, nil
@@ -272,7 +212,7 @@ func (s *mgoLogger) getLogsByCursor(nextCursor string) (*LogsPager, error) {
 }
 
 func (s *mgoLogger) postLogs(e []LogsEntry) error {
-	collLogs := s.mongoClient.Database(utils.MongoDb).Collection(s.mgoCollection)
+	collLogs := s.mgoSession.DB("").C(s.mgoCollection)
 
 	if collLogs == nil {
 		return errors.New("Error with Database connectivity")
@@ -282,11 +222,7 @@ func (s *mgoLogger) postLogs(e []LogsEntry) error {
 	for i, v := range e {
 		arr[i] = v
 	}
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
-	_, err := collLogs.InsertMany(
-		ctx,
-		arr,
-	)
+	err := collLogs.Insert(arr...)
 	if err != nil {
 		return err
 	}
@@ -294,16 +230,16 @@ func (s *mgoLogger) postLogs(e []LogsEntry) error {
 	return nil
 }
 
-// NewMgoLogger instantiates an mongoClient logger backend. Expects an
-// mongoClient configuration
-func NewMgoLogger(mongoClient *mongo.Client) (LogsBackend, error) {
-	return newMgoLogger(mongoClient)
+// NewMgoLogger instantiates an mgo logger backend. Expects an
+// mgoSession configuration
+func NewMgoLogger(mgoSession *mgo.Session) (LogsBackend, error) {
+	return newMgoLogger(mgoSession)
 }
 
-func newMgoLogger(mongoClient *mongo.Client) (*mgoLogger, error) {
+func newMgoLogger(mgoSession *mgo.Session) (*mgoLogger, error) {
 	self := &mgoLogger{}
 	self.mgoCollection = utils.GetEnv(utils.ENV_PANTAHUB_PRODUCTNAME) + "_logs"
-	self.mongoClient = mongoClient
+	self.mgoSession = mgoSession
 
 	return self, nil
 }
