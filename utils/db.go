@@ -48,7 +48,7 @@ func GetMongoClient() (*mongo.Client, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	client, err := mongo.Connect(ctx, "mongodb://"+host+":"+port, clientOptions)
+	client, err := mongo.Connect(ctx, "mongodb://"+host+":"+port+"/"+MongoDb, clientOptions)
 	if err != nil {
 		panic(err)
 	}
@@ -75,7 +75,7 @@ func GetMongoClientTest() (*mongo.Client, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	client, err := mongo.Connect(ctx, "mongodb://"+host+":"+port, clientOptions)
+	client, err := mongo.Connect(ctx, "mongodb://"+host+":"+port+"/"+MongoDb, clientOptions)
 	if err != nil {
 		panic(err)
 	}
