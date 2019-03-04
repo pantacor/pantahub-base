@@ -27,7 +27,7 @@ var (
 func setup(t *testing.T) {
 	var err error
 
-	mongoClient, err := utils.GetMongoClient()
+	mongoClient, err := utils.GetMongoClientTest()
 
 	if err != nil {
 		log.Println("error initiating mongoClient " + err.Error())

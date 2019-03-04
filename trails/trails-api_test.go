@@ -37,7 +37,7 @@ func falseAuthenticator(userId string, password string) bool {
 // IMPORTANT: you need a mongodb running localhost default port by default
 func setUp(t *testing.T) {
 
-	mongoClient, err := utils.GetMongoClient()
+	mongoClient, err := utils.GetMongoClientTest()
 
 	if err != nil {
 		t.Errorf("error getting mongoClient (%s)", err.Error())

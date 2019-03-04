@@ -42,7 +42,7 @@ var (
 
 func setUp(t *testing.T) {
 
-	mongoClient, err := utils.GetMongoClient()
+	mongoClient, err := utils.GetMongoClientTest()
 
 	if err != nil {
 		t.Errorf("error getting mongoClient (%s)", err.Error())

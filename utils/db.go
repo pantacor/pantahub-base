@@ -19,6 +19,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/mongodb/mongo-go-driver/mongo/options"
+
 	"github.com/mongodb/mongo-go-driver/mongo"
 )
 
@@ -30,9 +32,49 @@ func GetMongoClient() (*mongo.Client, error) {
 	MongoDb = GetEnv(ENV_MONGO_DB)
 	host := GetEnv(ENV_MONGO_HOST)
 	port := GetEnv(ENV_MONGO_PORT)
+	mongoUser := GetEnv(ENV_MONGO_USER)
+	mongoPass := GetEnv(ENV_MONGO_PASS)
+	mongoRs := GetEnv(ENV_MONGO_RS)
+
+	//Setting Client Options
+	clientOptions := options.Client()
+	credentials := options.Credential{
+		Username: mongoUser,
+		Password: mongoPass,
+	}
+	clientOptions.SetAuth(credentials)
+	clientOptions.SetReplicaSet(mongoRs)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	client, err := mongo.Connect(ctx, "mongodb://"+host+":"+port)
+	client, err := mongo.Connect(ctx, "mongodb://"+host+":"+port, clientOptions)
+	if err != nil {
+		panic(err)
+	}
+	return client, err
+}
+
+// GetMongoClienttest : To Get Mongo Client Object of test db
+func GetMongoClientTest() (*mongo.Client, error) {
+	MongoDb = "testdb-" + GetEnv(ENV_MONGO_DB)
+	host := GetEnv(ENV_MONGO_HOST)
+	port := GetEnv(ENV_MONGO_PORT)
+	mongoUser := GetEnv(ENV_MONGO_USER)
+	mongoPass := GetEnv(ENV_MONGO_PASS)
+	mongoRs := GetEnv(ENV_MONGO_RS)
+
+	//Setting Client Options
+	clientOptions := options.Client()
+	credentials := options.Credential{
+		Username: mongoUser,
+		Password: mongoPass,
+	}
+	clientOptions.SetAuth(credentials)
+	clientOptions.SetReplicaSet(mongoRs)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	client, err := mongo.Connect(ctx, "mongodb://"+host+":"+port, clientOptions)
 	if err != nil {
 		panic(err)
 	}
