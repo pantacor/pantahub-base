@@ -30,14 +30,14 @@ func setupMongo(t *testing.T) error {
 
 	var err error
 
-	mgoSession, err := utils.GetMongoSession()
+	mongoClient, err := utils.GetMongoClientTest()
 
 	if err != nil {
-		log.Println("error initiating mgoSession " + err.Error())
+		log.Println("error initiating mongoClient " + err.Error())
 		os.Exit(1)
 	}
 
-	mgoTestLogger, err = newMgoLogger(mgoSession)
+	mgoTestLogger, err = newMgoLogger(mongoClient)
 
 	if err != nil {
 		log.Println("error initiating mgoTestLogger " + err.Error())

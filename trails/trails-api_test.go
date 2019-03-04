@@ -37,17 +37,17 @@ func falseAuthenticator(userId string, password string) bool {
 // IMPORTANT: you need a mongodb running localhost default port by default
 func setUp(t *testing.T) {
 
-	mgoSession, err := utils.GetMongoSessionTest()
+	mongoClient, err := utils.GetMongoClientTest()
 
 	if err != nil {
-		t.Errorf("error getting mgoSession (%s)", err.Error())
+		t.Errorf("error getting mongoClient (%s)", err.Error())
 		t.Fail()
 	}
 
 	// clean while ignore errors as usually this collection does not exist.
-	mgoSession.DB("").C("pantahub_trails").DropCollection()
-	mgoSession.DB("").C("pantahub_devices").DropCollection()
-	mgoSession.DB("").C("pantahub_steps").DropCollection()
+	mongoClient.Database(utils.MongoDb).Collection("pantahub_trails").Drop(nil)
+	mongoClient.Database(utils.MongoDb).Collection("pantahub_devices").Drop(nil)
+	mongoClient.Database(utils.MongoDb).Collection("pantahub_steps").Drop(nil)
 
 	jwtMWA = &jwt.JWTMiddleware{
 		Key:        []byte("secret key"),
@@ -65,7 +65,7 @@ func setUp(t *testing.T) {
 	recorder = httptest.NewRecorder()
 
 	// auth app we need
-	authApp := auth.New(jwtMWA, mgoSession)
+	authApp := auth.New(jwtMWA, mongoClient)
 	authServer := httptest.NewServer(authApp.Api.MakeHandler())
 	authUrl, err = url.Parse(authServer.URL)
 	if err != nil {
@@ -74,7 +74,7 @@ func setUp(t *testing.T) {
 	}
 
 	// trails app we test
-	devicesApp := devices.New(jwtMWR, mgoSession)
+	devicesApp := devices.New(jwtMWR, mongoClient)
 	devicesServer := httptest.NewServer(devicesApp.Api.MakeHandler())
 	devicesUrl, err = url.Parse(devicesServer.URL)
 	if err != nil {
@@ -83,7 +83,7 @@ func setUp(t *testing.T) {
 	}
 
 	// trails app we test
-	trailsApp := New(jwtMWR, mgoSession)
+	trailsApp := New(jwtMWR, mongoClient)
 	server = httptest.NewServer(trailsApp.Api.MakeHandler())
 	serverUrl, err = url.Parse(server.URL)
 	if err != nil {

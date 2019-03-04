@@ -42,10 +42,10 @@ var (
 
 func setUp(t *testing.T) {
 
-	mgoSession, err := utils.GetMongoSessionTest()
+	mongoClient, err := utils.GetMongoClientTest()
 
 	if err != nil {
-		t.Errorf("error getting mgoSession (%s)", err.Error())
+		t.Errorf("error getting mongoClient (%s)", err.Error())
 		t.Fail()
 	}
 
@@ -56,7 +56,7 @@ func setUp(t *testing.T) {
 		MaxRefresh: time.Hour * 24,
 	}
 
-	authApp := New(jwtMWA, mgoSession)
+	authApp := New(jwtMWA, mongoClient)
 
 	recorder = httptest.NewRecorder()
 	server = httptest.NewServer(authApp.Api.MakeHandler())
