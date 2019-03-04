@@ -39,9 +39,8 @@ func GetMongoClient() (*mongo.Client, error) {
 	//Setting Client Options
 	clientOptions := options.Client()
 	credentials := options.Credential{
-		Username:      mongoUser,
-		Password:      mongoPass,
-		AuthMechanism: "SCRAM-SHA-256",
+		Username: mongoUser,
+		Password: mongoPass,
 	}
 	clientOptions.SetAuth(credentials)
 	clientOptions.SetReplicaSet(mongoRs)
