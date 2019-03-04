@@ -31,6 +31,7 @@ import (
 
 	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
 	"github.com/rs/cors"
+	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/auth"
 	"gitlab.com/pantacor/pantahub-base/dash"
 	"gitlab.com/pantacor/pantahub-base/devices"
@@ -177,13 +178,14 @@ func GetFileUploadServer() *FileUploadServer {
 
 func DoInit() {
 
+	accounts.SetAccountIDs()
 	phAuth := utils.GetEnv(utils.ENV_PANTAHUB_AUTH)
 	jwtSecret := utils.GetEnv(utils.ENV_PANTAHUB_JWT_AUTH_SECRET)
 
-	session, _ := utils.GetMongoSession()
+	mongoClient, _ := utils.GetMongoClient()
 
 	adminUsers := utils.GetSubscriptionAdmins()
-	subService := subscriptions.NewService(session, utils.Prn("prn::subscriptions:"),
+	subService := subscriptions.NewService(mongoClient, utils.Prn("prn::subscriptions:"),
 		adminUsers, subscriptions.SubscriptionProperties)
 
 	{
@@ -192,7 +194,7 @@ func DoInit() {
 			Realm:      "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
 			Timeout:    time.Minute * 60,
 			MaxRefresh: time.Hour * 24,
-		}, session)
+		}, mongoClient)
 		http.Handle("/auth/", http.StripPrefix("/auth", app.Api.MakeHandler()))
 	}
 	{
@@ -200,7 +202,7 @@ func DoInit() {
 			Key:           []byte(jwtSecret),
 			Realm:         "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
 			Authenticator: falseAuthenticator,
-		}, subService, session)
+		}, subService, mongoClient)
 		http.Handle("/objects/", http.StripPrefix("/objects", app.Api.MakeHandler()))
 	}
 	{
@@ -208,7 +210,7 @@ func DoInit() {
 			Key:           []byte(jwtSecret),
 			Realm:         "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
 			Authenticator: falseAuthenticator,
-		}, session)
+		}, mongoClient)
 		http.Handle("/devices/", http.StripPrefix("/devices", app.Api.MakeHandler()))
 	}
 	{
@@ -216,7 +218,7 @@ func DoInit() {
 			Key:           []byte(jwtSecret),
 			Realm:         "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
 			Authenticator: falseAuthenticator,
-		}, session)
+		}, mongoClient)
 		http.Handle("/trails/", http.StripPrefix("/trails", app.Api.MakeHandler()))
 	}
 	{
@@ -224,7 +226,7 @@ func DoInit() {
 			Key:           []byte(jwtSecret),
 			Realm:         "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
 			Authenticator: falseAuthenticator,
-		}, session)
+		}, mongoClient)
 		http.Handle("/plog/", http.StripPrefix("/plog", app.Api.MakeHandler()))
 	}
 	{
@@ -232,12 +234,12 @@ func DoInit() {
 			Key:           []byte(jwtSecret),
 			Realm:         "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
 			Authenticator: falseAuthenticator,
-		}, session)
+		}, mongoClient)
 		http.Handle("/logs/", http.StripPrefix("/logs", app.Api.MakeHandler()))
 	}
 
 	{
-		app := healthz.New(session)
+		app := healthz.New(mongoClient)
 		http.Handle("/healthz/", http.StripPrefix("/healthz", app.Api.MakeHandler()))
 	}
 	{
@@ -245,7 +247,7 @@ func DoInit() {
 			Key:           []byte(jwtSecret),
 			Realm:         "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
 			Authenticator: falseAuthenticator,
-		}, subService, session)
+		}, subService, mongoClient)
 		http.Handle("/dash/", http.StripPrefix("/dash", app.Api.MakeHandler()))
 	}
 	{
@@ -253,7 +255,7 @@ func DoInit() {
 			Key:           []byte(jwtSecret),
 			Realm:         "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
 			Authenticator: falseAuthenticator,
-		}, subService, session)
+		}, subService, mongoClient)
 		http.Handle("/subscriptions/", http.StripPrefix("/subscriptions", app.MakeHandler()))
 	}
 

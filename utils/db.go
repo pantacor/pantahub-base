@@ -16,55 +16,25 @@
 package utils
 
 import (
-	"log"
+	"context"
+	"time"
 
-	"gopkg.in/mgo.v2"
+	"github.com/mongodb/mongo-go-driver/mongo"
 )
 
-func GetMongoSession() (*mgo.Session, error) {
-	// XXX: make mongo host configurable through env
-	mongoDb := GetEnv(ENV_MONGO_DB)
-	mongoHost := GetEnv(ENV_MONGO_HOST)
-	mongoPort := GetEnv(ENV_MONGO_PORT)
-	mongoUser := GetEnv(ENV_MONGO_USER)
-	mongoPass := GetEnv(ENV_MONGO_PASS)
-	mongoRs := GetEnv(ENV_MONGO_RS)
+// MongoDb : Holds Mongo Db Name
+var MongoDb string
 
-	mongoCreds := ""
-	if mongoUser != "" {
-		mongoCreds = mongoUser + ":" + mongoPass + "@"
+// GetMongoClient : To Get Mongo Client Object
+func GetMongoClient() (*mongo.Client, error) {
+	MongoDb = GetEnv(ENV_MONGO_DB)
+	host := GetEnv(ENV_MONGO_HOST)
+	port := GetEnv(ENV_MONGO_PORT)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	client, err := mongo.Connect(ctx, "mongodb://"+host+":"+port)
+	if err != nil {
+		panic(err)
 	}
-
-	mongoConnect := "mongodb://" + mongoCreds + mongoHost + ":" + mongoPort + "/" + mongoDb
-
-	if mongoRs != "" {
-		mongoConnect = mongoConnect + "?replicaSet=" + mongoRs
-	}
-	log.Println("Will connect to mongo PROD db with: " + mongoConnect)
-
-	return mgo.Dial(mongoConnect)
-}
-
-func GetMongoSessionTest() (*mgo.Session, error) {
-	// XXX: make mongo host configurable through env
-	mongoDb := "testdb-" + GetEnv(ENV_MONGO_DB)
-	mongoHost := GetEnv(ENV_MONGO_HOST)
-	mongoPort := GetEnv(ENV_MONGO_PORT)
-	mongoUser := GetEnv(ENV_MONGO_USER)
-	mongoPass := GetEnv(ENV_MONGO_PASS)
-	mongoRs := GetEnv(ENV_MONGO_RS)
-
-	mongoCreds := ""
-	if mongoUser != "" {
-		mongoCreds = mongoUser + ":" + mongoPass + "@"
-	}
-
-	mongoConnect := "mongodb://" + mongoCreds + mongoHost + ":" + mongoPort + "/" + mongoDb
-
-	if mongoRs != "" {
-		mongoConnect = mongoConnect + "?replicaSet=" + mongoRs
-	}
-	log.Println("Will connect to mongo TEST db with: " + mongoConnect)
-
-	return mgo.Dial(mongoConnect)
+	return client, err
 }
