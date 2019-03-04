@@ -63,7 +63,7 @@ func (a *HealthzApp) handle_healthz(w rest.ResponseWriter, r *rest.Request) {
 	var val interface{}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	err := collection.FindOne(ctx, bson.M{}).Decode(&val)
+	err := collection.FindOne(ctx, bson.D{}).Decode(&val)
 	if err != nil {
 		log.Println("ERROR: with database query: " + err.Error())
 		rest.Error(w, "Error with Database query", http.StatusInternalServerError)
