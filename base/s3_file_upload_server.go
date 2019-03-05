@@ -142,12 +142,11 @@ func (s *S3FileUploadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func NewS3FileUploadServer() *S3FileUploadServer {
 	connParams := s3.S3ConnectionParameters{
-		AccessKey:            utils.GetEnv(utils.ENV_PANTAHUB_S3_ACCESS_KEY_ID),
-		SecretKey:            utils.GetEnv(utils.ENV_PANTAHUB_S3_SECRET_ACCESS_KEY),
-		AnonymousCredentials: utils.GetEnv(utils.ENV_PANTAHUB_S3_USE_ANONYMOUS_CREDENTIALS) == "true",
-		Region:               utils.GetEnv(utils.ENV_PANTAHUB_S3_REGION),
-		Bucket:               utils.GetEnv(utils.ENV_PANTAHUB_S3_BUCKET),
-		Endpoint:             utils.GetEnv(utils.ENV_PANTAHUB_S3_ENDPOINT),
+		AccessKey: utils.GetEnv(utils.ENV_PANTAHUB_S3_ACCESS_KEY_ID),
+		SecretKey: utils.GetEnv(utils.ENV_PANTAHUB_S3_SECRET_ACCESS_KEY),
+		Region:    utils.GetEnv(utils.ENV_PANTAHUB_S3_REGION),
+		Bucket:    utils.GetEnv(utils.ENV_PANTAHUB_S3_BUCKET),
+		Endpoint:  utils.GetEnv(utils.ENV_PANTAHUB_S3_ENDPOINT),
 	}
 
 	return &S3FileUploadServer{

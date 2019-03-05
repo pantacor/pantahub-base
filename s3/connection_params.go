@@ -18,25 +18,22 @@ package s3
 import "log"
 
 type S3ConnectionParameters struct {
-	AccessKey            string
-	SecretKey            string
-	AnonymousCredentials bool
-	Region               string
-	Bucket               string
-	Endpoint             string
+	AccessKey string
+	SecretKey string
+	Region    string
+	Bucket    string
+	Endpoint  string
 }
 
 func (s S3ConnectionParameters) IsValid() bool {
-	if !s.AnonymousCredentials {
-		if s.AccessKey == "" {
-			log.Println("Empty S3 AccessKey")
-			return false
-		}
+	if s.AccessKey == "" {
+		log.Println("Empty S3 AccessKey")
+		return false
+	}
 
-		if s.SecretKey == "" {
-			log.Println("Empty S3 SecretKey")
-			return false
-		}
+	if s.SecretKey == "" {
+		log.Println("Empty S3 SecretKey")
+		return false
 	}
 
 	if s.Region == "" {
