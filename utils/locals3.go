@@ -22,6 +22,10 @@ import (
 )
 
 func PantahubS3Path() string {
+	if GetEnv(ENV_PANTAHUB_STORAGE_DRIVER) == "s3" {
+		return GetEnv(ENV_PANTAHUB_STORAGE_PATH)
+	}
+
 	basePath := path.Join(GetEnv(ENV_PANTAHUB_S3PATH), GetEnv(ENV_PANTAHUB_STORAGE_PATH))
 
 	if basePath == "" {
