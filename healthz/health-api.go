@@ -67,7 +67,7 @@ func (a *HealthzApp) handle_healthz(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 	// check storage
-	s3Path := utils.GetEnv(utils.ENV_PANTAHUB_S3PATH)
+	s3Path := utils.GetEnv(utils.ENV_PANTAHUB_STORAGE_PATH)
 
 	_, err = os.Stat(path.Join(s3Path, "HEALTHZ.txt"))
 

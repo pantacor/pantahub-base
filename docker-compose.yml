@@ -11,16 +11,20 @@ services:
       - elasticsearch
     volumes:
       - ${PWD}:/go/src/gitlab.com/pantacor/pantahub-base
-    environment:
-      - FLUENT_HOST=fluentd
-      - MONGO_HOST=mongo
-      - ELASTIC_URL=http://elasticsearch:9200
+    ports:
+      - 12365:12365
+    links:
+      - localstack
+    env_file: ./env.default
+
   mongo:
     image: mongo
     environment:
-      - MONGO_INITDB_DATABASE=pantabase-serv
+      - MONGO_INITDB_DATABASE=testdb-pantabase-serv
+
   fluentd:
     image: fluent/fluentd
+
   elasticsearch:
     container_name: elasticsearch
     image: docker.elastic.co/elasticsearch/elasticsearch:6.5.4
@@ -36,3 +40,12 @@ services:
         soft: -1
         hard: -1
     restart: always
+
+  localstack:
+    image: localstack/localstack:0.9.0
+    environment:
+      - SERVICES=s3:5000
+      - DEFAULT_REGION=us-east-1
+      - HOSTNAME=localstack-s3
+    ports:
+      - "5000:5000"

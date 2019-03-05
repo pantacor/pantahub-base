@@ -1,4 +1,3 @@
-//
 // Copyright 2017,2018  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -171,8 +170,32 @@ const (
 	// default: <none>
 	ENV_REG_EMAIL = "REG_EMAIL"
 
-	// PANTAHUB_S3PATH for backing storage
+	// PANTAHUB_STORAGE_DRIVER used to store objects
+	ENV_PANTAHUB_STORAGE_DRIVER = "PANTAHUB_STORAGE_DRIVER"
+
+	// PANTAHUB_S3_ACCESS_KEY_ID access key of s3 storage credentials
+	ENV_PANTAHUB_S3_ACCESS_KEY_ID = "PANTAHUB_S3_ACCESS_KEY_ID"
+
+	// PANTAHUB_S3_SECRET_ACCESS_KEY secret access key of s3 storage credentials
+	ENV_PANTAHUB_S3_SECRET_ACCESS_KEY = "PANTAHUB_S3_SECRET_ACCESS_KEY"
+
+	// PANTAHUB_S3_USE_ANONYMOUS_CREDENTIALS use anonymous credentials
+	ENV_PANTAHUB_S3_USE_ANONYMOUS_CREDENTIALS = "PANTAHUB_S3_USE_ANONYMOUS_CREDENTIALS"
+
+	// PANTAHUB_S3_REGION region where to store objects
+	ENV_PANTAHUB_S3_REGION = "PANTAHUB_S3_REGION"
+
+	// PANTAHUB_S3_BUCKET bucket where to store objects
+	ENV_PANTAHUB_S3_BUCKET = "PANTAHUB_S3_BUCKET"
+
+	// PANTAHUB_S3_ENDPOINT enpoint of s3 server
+	ENV_PANTAHUB_S3_ENDPOINT = "PANTAHUB_S3_ENDPOINT"
+
+	// PANTAHUB_STORAGE_PATH for backing storage
 	// default: ../local-s3/
+	ENV_PANTAHUB_STORAGE_PATH = "PANTAHUB_STORAGE_PATH"
+
+	// PANTAHUB_S3PATH deprecated, please use ENV_PANTAHUB_STORAGE_PATH instead
 	ENV_PANTAHUB_S3PATH = "PANTAHUB_S3PATH"
 
 	// enable resty client debugging if env is set
@@ -253,8 +276,34 @@ var defaultEnvs = map[string]string{
 	ENV_REG_EMAIL: "admin@pantacor.com",
 
 	// pantahub internal envs
-	ENV_PANTAHUB_AUTH:   "https://localhost:12366/auth",
-	ENV_PANTAHUB_S3PATH: "../local-s3/",
+	ENV_PANTAHUB_AUTH: "https://localhost:12366/auth",
+
+	// storage driver used to store objects
+	ENV_PANTAHUB_STORAGE_DRIVER: "local",
+
+	// access key of s3 storage credentials
+	ENV_PANTAHUB_S3_ACCESS_KEY_ID: "",
+
+	// secret access key of s3 storage credentials
+	ENV_PANTAHUB_S3_SECRET_ACCESS_KEY: "",
+
+	// use anonymous credentials
+	ENV_PANTAHUB_S3_USE_ANONYMOUS_CREDENTIALS: "true",
+
+	// region where to store objects
+	ENV_PANTAHUB_S3_REGION: "us-east-1",
+
+	// bucket where to store objects
+	ENV_PANTAHUB_S3_BUCKET: "pantahub",
+
+	// enpoint of s3 server
+	ENV_PANTAHUB_S3_ENDPOINT: "",
+
+	// object storage path (when using "local" driver)
+	ENV_PANTAHUB_STORAGE_PATH: "/tmp/local-s3/",
+
+	// object storage path (deprecated, please use PANTAHUB_STORAGE_PATH)
+	ENV_PANTAHUB_S3PATH: "/tmp/local-s3/",
 
 	// resty REST client configs
 	ENV_RESTY_DEBUG: "",
@@ -286,5 +335,6 @@ func GetEnv(key string) string {
 	if !f {
 		v = defaultEnvs[key]
 	}
+
 	return v
 }

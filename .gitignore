@@ -1,6 +1,8 @@
+tags
 debug.test
 pantahub-base
 init.env
 docker.env
 debug
 pantahub-base.exe
+s3-storage/
