@@ -32,7 +32,7 @@ type S3Downloader interface {
 }
 
 func (s *s3impl) Download(key string, w io.WriterAt) error {
-	log.Printf("INFO: downloading file %s\n", key)
+	log.Printf("INFO: downloading file %s using parameters %+v\n", key, s.connectionParams)
 	input := &s3.GetObjectInput{
 		Bucket: aws.String(s.connectionParams.Bucket),
 		Key:    aws.String(key),
