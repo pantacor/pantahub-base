@@ -1,0 +1,12 @@
+#!/bin/sh
+
+set -x
+
+dirname=`sh -c "cd $(dirname $0); pwd"`
+
+ENVFILE=${ENVFILE:-$dirname/env.default}
+
+. $ENVFILE
+
+sh -c "cd /opt/ph/bin; exec ./pantahub-gc"
+

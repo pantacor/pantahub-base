@@ -40,7 +40,7 @@ type PrnInfo struct {
 // XXX: make this a nice prn helper tool
 func PrnGetId(prn string) string {
 	idx := strings.Index(prn, "/")
-	return prn[idx+1 : len(prn)]
+	return prn[idx+1:]
 }
 
 func IdGetPrn(id bson.ObjectId, serviceName string) string {

@@ -43,16 +43,18 @@ type ObjectsApp struct {
 	Api            *rest.Api
 	mgoSession     *mgo.Session
 	subService     subscriptions.SubscriptionService
-
-	awsS3Bucket string
-	awsRegion   string
 }
 
-var pantahubS3Path string
+var pantahubStoragePath string
 var pantahubHttpsUrl string
 
 func init() {
-	pantahubS3Path = utils.GetEnv(utils.ENV_PANTAHUB_S3PATH)
+	// handle deprecated S3Path
+	pantahubStoragePath = utils.GetEnv(utils.ENV_PANTAHUB_S3PATH)
+	if pantahubStoragePath == "" {
+		pantahubStoragePath = utils.GetEnv(utils.ENV_PANTAHUB_STORAGE_PATH)
+	}
+
 	pantahubHost := utils.GetEnv(utils.ENV_PANTAHUB_HOST)
 	pantahubPort := utils.GetEnv(utils.ENV_PANTAHUB_PORT)
 	pantahubScheme := utils.GetEnv(utils.ENV_PANTAHUB_SCHEME)
@@ -65,7 +67,7 @@ func init() {
 }
 
 func PantahubS3Path() string {
-	return pantahubS3Path
+	return pantahubStoragePath
 }
 
 func PantahubS3DevUrl() string {
@@ -87,22 +89,17 @@ func MakeStorageId(owner string, sha []byte) string {
 }
 
 func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
-
-	newObject := Object{}
-
-	r.DecodeJsonPayload(&newObject)
-
-	var ownerStr string
-
 	caller, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
-	callerStr, ok := caller.(string)
 
+	var ownerStr string
+	callerStr, ok := caller.(string)
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+
 	if authType.(string) == "USER" {
 		ownerStr = callerStr
 	} else {
@@ -121,6 +118,11 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
+	newObject := Object{}
+
+	r.DecodeJsonPayload(&newObject)
+
+	// Set object ownership to request user
 	newObject.Owner = ownerStr
 
 	collection := a.mgoSession.DB("").C("pantahub_objects")
@@ -294,7 +296,6 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 }
 
 func (a *ObjectsApp) GetDiskQuota(prn string) (float64, error) {
-
 	sub, err := a.subService.LoadBySubject(utils.Prn(prn))
 	if err == mgo.ErrNotFound {
 		sub = a.subService.GetDefaultSubscription(utils.Prn(prn))
@@ -593,10 +594,6 @@ func New(jwtMiddleware *jwt.JWTMiddleware, subService subscriptions.Subscription
 	app.jwt_middleware = jwtMiddleware
 	app.mgoSession = session
 	app.subService = subService
-
-	// XXX: allow config through env
-	app.awsS3Bucket = "systemcloud-001"
-	app.awsRegion = "us-east-1"
 
 	// Indexing for the owner,garbage fields in pantahub_objects
 	index := mgo.Index{

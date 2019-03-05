@@ -177,6 +177,27 @@ docker run -it --rm \
 Want to build your own docker images? Check out https://gitlab.com/pantacor/pantahub-containers/
 and the readmes there
 
+# Docker Compose
+
+Get start with `docker-compose`:
+
+```bash
+$ docker-compose up -d
+```
+
+Create the test local s3 bucket
+
+```bash
+$ ./locals3.bash mb s3://testing/
+make_bucket: testing
+```
+
+Run all tests
+
+```bash
+$ docker-compose exec base go test ./...
+```
+
 # Kubernetes
 
 Check our example deployment manifest in https://gitlab.com/pantacor/pantahub-containers/api/k8s directory.

@@ -1,0 +1,3 @@
+#!/bin/bash
+
+aws --endpoint-url=http://localhost:5000 --region=us-east-1 s3 $@

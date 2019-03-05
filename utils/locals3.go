@@ -16,19 +16,33 @@ package utils
 
 import (
 	"errors"
+	"log"
 	"path"
 	"path/filepath"
 	"strings"
 )
+
+func PantahubS3Path() string {
+	basePath := GetEnv(ENV_PANTAHUB_STORAGE_PATH)
+	if basePath == "" {
+		log.Println("WARN: Please use PANTAHUB_STORAGE_PATH instead of PANTAHUB_S3PATH")
+		basePath = GetEnv(ENV_PANTAHUB_S3PATH)
+	}
+
+	if basePath == "" {
+		basePath = "."
+	}
+
+	return basePath
+}
 
 func MakeLocalS3PathForName(name string) (string, error) {
 	if filepath.Separator != '/' && strings.ContainsRune(name, filepath.Separator) ||
 		strings.Contains(name, "\x00") {
 		return "", errors.New("http: invalid character in file path")
 	}
-	dir := GetEnv(ENV_PANTAHUB_S3PATH)
-	if dir == "" {
-		dir = "."
-	}
-	return filepath.Join(dir, filepath.FromSlash(path.Clean("/"+name))), nil
+
+	basePath := PantahubS3Path()
+
+	return filepath.Join(basePath, filepath.FromSlash(path.Clean(name))), nil
 }
