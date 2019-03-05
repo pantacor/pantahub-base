@@ -934,7 +934,13 @@ func (a *DevicesApp) handle_deletedevice(w rest.ResponseWriter, r *rest.Request)
 	}).One(&device)
 
 	if device.Owner == owner {
-		result := MarkDeviceAsGarbage(w, delId)
+		result, res := MarkDeviceAsGarbage(w, delId)
+		if res.StatusCode() != 200 {
+			log.Print(res)
+			log.Print(result)
+			rest.Error(w, "Error calling GC API for Marking Device Garbage", http.StatusInternalServerError)
+			return
+		}
 		if result.Status == 1 {
 			device.Garbage = true
 		}
@@ -944,7 +950,13 @@ func (a *DevicesApp) handle_deletedevice(w rest.ResponseWriter, r *rest.Request)
 }
 
 // MarkDeviceAsGarbage : Mark Device as Garbage
-func MarkDeviceAsGarbage(w rest.ResponseWriter, deviceID string) gcapi.MarkDeviceGarbage {
+func MarkDeviceAsGarbage(
+	w rest.ResponseWriter,
+	deviceID string,
+) (
+	gcapi.MarkDeviceGarbage,
+	*resty.Response,
+) {
 	response := gcapi.MarkDeviceGarbage{}
 	APIEndPoint := utils.GetEnv("PANTAHUB_GC_API") + "/markgarbage/device/" + deviceID
 	res, err := resty.R().Put(APIEndPoint)
@@ -952,7 +964,7 @@ func MarkDeviceAsGarbage(w rest.ResponseWriter, deviceID string) gcapi.MarkDevic
 		rest.Error(w, "internal error calling test server: "+err.Error(), http.StatusInternalServerError)
 	}
 	err = json.Unmarshal(res.Body(), &response)
-	return response
+	return response, res
 }
 
 func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *DevicesApp {
