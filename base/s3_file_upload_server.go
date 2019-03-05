@@ -18,6 +18,7 @@ package base
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -68,6 +69,7 @@ func (s *S3FileUploadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		w.Header().Add("Content-Disposition", "attachment; filename=\""+objClaims.DispositionName+"\"")
+		w.Header().Add("Content-Length", fmt.Sprintf("%d", objClaims.Size))
 
 		writeAt := aws.NewWriteAtBuffer([]byte{})
 		err := s.s3.Download(finalName, writeAt)
