@@ -27,6 +27,7 @@ func NewS3(params S3ConnectionParameters) S3 {
 	}
 
 	awsConfig := &aws.Config{
+		LogLevel:         aws.LogLevel(aws.LogDebugWithHTTPBody),
 		S3ForcePathStyle: aws.Bool(true),
 		Region:           aws.String(params.Region),
 	}

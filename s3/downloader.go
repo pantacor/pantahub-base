@@ -16,6 +16,7 @@ package s3
 
 import (
 	"io"
+	"log"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -31,6 +32,7 @@ type S3Downloader interface {
 }
 
 func (s *s3impl) Download(key string, w io.WriterAt) error {
+	log.Printf("INFO: downloading file %s\n", key)
 	input := &s3.GetObjectInput{
 		Bucket: aws.String(s.connectionParams.Bucket),
 		Key:    aws.String(key),
