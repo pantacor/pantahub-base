@@ -16,18 +16,13 @@ package utils
 
 import (
 	"errors"
-	"log"
 	"path"
 	"path/filepath"
 	"strings"
 )
 
 func PantahubS3Path() string {
-	basePath := GetEnv(ENV_PANTAHUB_STORAGE_PATH)
-	if basePath == "" {
-		log.Println("WARN: Please use PANTAHUB_STORAGE_PATH instead of PANTAHUB_S3PATH")
-		basePath = GetEnv(ENV_PANTAHUB_S3PATH)
-	}
+	basePath := path.Join(GetEnv(ENV_PANTAHUB_S3PATH), GetEnv(ENV_PANTAHUB_STORAGE_PATH))
 
 	if basePath == "" {
 		basePath = "."
