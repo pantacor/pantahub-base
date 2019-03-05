@@ -32,15 +32,11 @@ func NewS3(params S3ConnectionParameters) S3 {
 		Region:           aws.String(params.Region),
 	}
 
-	if params.AnonymousCredentials {
-		awsConfig.Credentials = credentials.AnonymousCredentials
-	} else {
-		awsConfig.Credentials = credentials.NewStaticCredentials(
-			params.AccessKey,
-			params.SecretKey,
-			"", //
-		)
-	}
+	awsConfig.Credentials = credentials.NewStaticCredentials(
+		params.AccessKey,
+		params.SecretKey,
+		"", //
+	)
 
 	if params.Endpoint != "" {
 		awsConfig.Endpoint = aws.String(params.Endpoint)
