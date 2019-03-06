@@ -358,12 +358,12 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 			},
 		},
 	}
-	pipelineData, err := bson.Marshal(pipeline)
+	//pipelineData, err := bson.Marshal(pipeline)
 	if err != nil {
 		rest.Error(w, "ERROR Marshalling pipeline: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	cur, err = oCol.Aggregate(ctx, pipelineData)
+	cur, err = oCol.Aggregate(ctx, pipeline)
 	if err != nil {
 		rest.Error(w, "ERROR Aggregate pipeline data: "+err.Error(), http.StatusInternalServerError)
 		return

@@ -11,10 +11,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mongodb/mongo-go-driver/bson/bsoncodec"
-	"github.com/mongodb/mongo-go-driver/bson/bsontype"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
-	"github.com/mongodb/mongo-go-driver/x/bsonx/bsoncore"
+	"go.mongodb.org/mongo-driver/bson/bsoncodec"
+	"go.mongodb.org/mongo-driver/bson/bsontype"
+	"go.mongodb.org/mongo-driver/x/bsonx/bsoncore"
 )
 
 func TestRawValue(t *testing.T) {
@@ -44,9 +43,9 @@ func TestRawValue(t *testing.T) {
 		t.Run("Returns error when registry is nil", func(t *testing.T) {
 			want := ErrNilRegistry
 			var val RawValue
-			got := val.UnmarshalWithRegistry(nil, bsonx.Doc{})
+			got := val.UnmarshalWithRegistry(nil, &D{})
 			if got != want {
-				t.Errorf("Exepcted errors to match. got %v; want %v", got, want)
+				t.Errorf("Expected errors to match. got %v; want %v", got, want)
 			}
 		})
 		t.Run("Returns lookup error", func(t *testing.T) {
@@ -56,7 +55,7 @@ func TestRawValue(t *testing.T) {
 			want := bsoncodec.ErrNoDecoder{Type: reflect.TypeOf(s)}
 			got := val.UnmarshalWithRegistry(reg, &s)
 			if !compareErrors(got, want) {
-				t.Errorf("Execpted errors to match. got %v; want %v", got, want)
+				t.Errorf("Expected errors to match. got %v; want %v", got, want)
 			}
 		})
 		t.Run("Returns DecodeValue error", func(t *testing.T) {
@@ -75,6 +74,47 @@ func TestRawValue(t *testing.T) {
 			val := RawValue{Type: bsontype.Double, Value: bsoncore.AppendDouble(nil, want)}
 			var got float64
 			err := val.UnmarshalWithRegistry(reg, &got)
+			noerr(t, err)
+			if got != want {
+				t.Errorf("Expected results to match. got %g; want %g", got, want)
+			}
+		})
+	})
+	t.Run("UnmarshalWithContext", func(t *testing.T) {
+		t.Run("Returns error when DecodeContext is nil", func(t *testing.T) {
+			want := ErrNilContext
+			var val RawValue
+			got := val.UnmarshalWithContext(nil, &D{})
+			if got != want {
+				t.Errorf("Expected errors to match. got %v; want %v", got, want)
+			}
+		})
+		t.Run("Returns lookup error", func(t *testing.T) {
+			dc := bsoncodec.DecodeContext{Registry: bsoncodec.NewRegistryBuilder().Build()}
+			var val RawValue
+			var s string
+			want := bsoncodec.ErrNoDecoder{Type: reflect.TypeOf(s)}
+			got := val.UnmarshalWithContext(&dc, &s)
+			if !compareErrors(got, want) {
+				t.Errorf("Expected errors to match. got %v; want %v", got, want)
+			}
+		})
+		t.Run("Returns DecodeValue error", func(t *testing.T) {
+			dc := bsoncodec.DecodeContext{Registry: NewRegistryBuilder().Build()}
+			val := RawValue{Type: bsontype.Double, Value: bsoncore.AppendDouble(nil, 3.14159)}
+			var s string
+			want := fmt.Errorf("cannot decode %v into a string type", bsontype.Double)
+			got := val.UnmarshalWithContext(&dc, &s)
+			if !compareErrors(got, want) {
+				t.Errorf("Expected errors to match. got %v; want %v", got, want)
+			}
+		})
+		t.Run("Success", func(t *testing.T) {
+			dc := bsoncodec.DecodeContext{Registry: NewRegistryBuilder().Build()}
+			want := float64(3.14159)
+			val := RawValue{Type: bsontype.Double, Value: bsoncore.AppendDouble(nil, want)}
+			var got float64
+			err := val.UnmarshalWithContext(&dc, &got)
 			noerr(t, err)
 			if got != want {
 				t.Errorf("Expected results to match. got %g; want %g", got, want)

@@ -50,11 +50,7 @@ func CalcUsageAfterPost(owner string, mongoClient *mongo.Client,
 			},
 		},
 	}
-	pipelineData, err := bson.Marshal(pipeline)
-	if err != nil {
-		return nil, err
-	}
-	cur, err := oCol.Aggregate(ctx, pipelineData)
+	cur, err := oCol.Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, err
 	}
@@ -92,11 +88,7 @@ func CalcUsageAfterPut(owner string, mongoClient *mongo.Client,
 			},
 		},
 	}
-	pipelineData, err := bson.Marshal(pipeline)
-	if err != nil {
-		return nil, err
-	}
-	cur, err := oCol.Aggregate(ctx, pipelineData)
+	cur, err := oCol.Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, err
 	}

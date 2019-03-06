@@ -9,8 +9,8 @@ package mongo
 import (
 	"fmt"
 
-	"github.com/mongodb/mongo-go-driver/bson"
-	"github.com/mongodb/mongo-go-driver/x/network/result"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/x/network/result"
 )
 
 // BulkWriteResult holds the result of a bulk write operation.
@@ -78,6 +78,8 @@ type UpdateResult struct {
 	MatchedCount int64
 	// The number of documents that were modified.
 	ModifiedCount int64
+	// The number of documents that were upserted.
+	UpsertedCount int64
 	// The identifier of the inserted document if an upsert took place.
 	UpsertedID interface{}
 }

@@ -9,16 +9,16 @@ package driver
 import (
 	"context"
 
-	"github.com/mongodb/mongo-go-driver/mongo/options"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/x/bsonx"
 
-	"github.com/mongodb/mongo-go-driver/mongo/writeconcern"
-	"github.com/mongodb/mongo-go-driver/x/mongo/driver/session"
-	"github.com/mongodb/mongo-go-driver/x/mongo/driver/topology"
-	"github.com/mongodb/mongo-go-driver/x/mongo/driver/uuid"
-	"github.com/mongodb/mongo-go-driver/x/network/command"
-	"github.com/mongodb/mongo-go-driver/x/network/description"
-	"github.com/mongodb/mongo-go-driver/x/network/result"
+	"go.mongodb.org/mongo-driver/mongo/writeconcern"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/session"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/topology"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/uuid"
+	"go.mongodb.org/mongo-driver/x/network/command"
+	"go.mongodb.org/mongo-driver/x/network/description"
+	"go.mongodb.org/mongo-driver/x/network/result"
 )
 
 // Insert handles the full cycle dispatch and execution of an insert command against the provided
@@ -72,8 +72,8 @@ func Insert(
 	res, originalErr := insert(ctx, cmd, ss, nil)
 
 	// Retry if appropriate
-	if cerr, ok := originalErr.(command.Error); ok && cerr.Retryable() ||
-		res.WriteConcernError != nil && command.IsWriteConcernErrorRetryable(res.WriteConcernError) {
+	if cerr, ok := originalErr.(command.Error); (ok && cerr.Retryable()) ||
+		(res.WriteConcernError != nil && command.IsWriteConcernErrorRetryable(res.WriteConcernError)) {
 		ss, err := topo.SelectServer(ctx, selector)
 
 		// Return original error if server selection fails or new server does not support retryable writes
@@ -114,5 +114,7 @@ func insert(
 	}
 	defer conn.Close()
 
-	return cmd.RoundTrip(ctx, desc, conn)
+	res, err := cmd.RoundTrip(ctx, desc, conn)
+	ss.ProcessWriteConcernError(res.WriteConcernError)
+	return res, err
 }

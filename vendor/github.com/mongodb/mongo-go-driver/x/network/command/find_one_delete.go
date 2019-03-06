@@ -9,13 +9,13 @@ package command
 import (
 	"context"
 
-	"github.com/mongodb/mongo-go-driver/bson"
-	"github.com/mongodb/mongo-go-driver/mongo/writeconcern"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
-	"github.com/mongodb/mongo-go-driver/x/mongo/driver/session"
-	"github.com/mongodb/mongo-go-driver/x/network/description"
-	"github.com/mongodb/mongo-go-driver/x/network/result"
-	"github.com/mongodb/mongo-go-driver/x/network/wiremessage"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/writeconcern"
+	"go.mongodb.org/mongo-driver/x/bsonx"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/session"
+	"go.mongodb.org/mongo-driver/x/network/description"
+	"go.mongodb.org/mongo-driver/x/network/result"
+	"go.mongodb.org/mongo-driver/x/network/wiremessage"
 )
 
 // FindOneAndDelete represents the findOneAndDelete operation.
@@ -55,13 +55,16 @@ func (f *FindOneAndDelete) encode(desc description.SelectedServer) (*Write, erro
 	}
 	command = append(command, f.Opts...)
 
-	return &Write{
-		Clock:        f.Clock,
-		DB:           f.NS.DB,
-		Command:      command,
-		WriteConcern: f.WriteConcern,
-		Session:      f.Session,
-	}, nil
+	write := &Write{
+		Clock:   f.Clock,
+		DB:      f.NS.DB,
+		Command: command,
+		Session: f.Session,
+	}
+	if desc.WireVersion != nil && desc.WireVersion.Max >= 4 {
+		write.WriteConcern = f.WriteConcern
+	}
+	return write, nil
 }
 
 // Decode will decode the wire message using the provided server description. Errors during decoding

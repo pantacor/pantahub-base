@@ -10,7 +10,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
-	"github.com/mongodb/mongo-go-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"io"
 	"math"
 	"sort"
@@ -621,7 +621,7 @@ func formatDouble(f float64) string {
 		// Print exactly one decimalType place for integers; otherwise, print as many are necessary to
 		// perfectly represent it.
 		s = strconv.FormatFloat(f, 'G', -1, 64)
-		if !strings.ContainsRune(s, '.') {
+		if !strings.ContainsRune(s, 'E') && !strings.ContainsRune(s, '.') {
 			s += ".0"
 		}
 	}

@@ -10,9 +10,10 @@ import (
 	"context"
 	"errors"
 
-	"github.com/mongodb/mongo-go-driver/internal/testutil"
-	"github.com/mongodb/mongo-go-driver/mongo"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
+	"go.mongodb.org/mongo-driver/internal/testutil"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/x/bsonx"
 )
 
 const (
@@ -27,7 +28,7 @@ func getClientDB(ctx context.Context) (*mongo.Database, error) {
 	if err != nil {
 		return nil, err
 	}
-	client, err := mongo.NewClient(cs.String())
+	client, err := mongo.NewClient(options.Client().ApplyURI(cs.String()))
 	if err != nil {
 		return nil, err
 	}

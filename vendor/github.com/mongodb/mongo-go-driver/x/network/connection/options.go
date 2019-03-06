@@ -10,8 +10,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/mongodb/mongo-go-driver/event"
-	"github.com/mongodb/mongo-go-driver/x/network/compressor"
+	"go.mongodb.org/mongo-driver/event"
+	"go.mongodb.org/mongo-driver/x/network/compressor"
 )
 
 type config struct {
@@ -44,7 +44,10 @@ func newConfig(opts ...Option) (*config, error) {
 	}
 
 	if cfg.dialer == nil {
-		cfg.dialer = &net.Dialer{Timeout: cfg.connectTimeout}
+		cfg.dialer = &net.Dialer{
+			KeepAlive: tcpKeepalive,
+			Timeout:   cfg.connectTimeout,
+		}
 	}
 
 	return cfg, nil

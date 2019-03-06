@@ -11,8 +11,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/mongodb/mongo-go-driver/bson/bsonrw"
-	"github.com/mongodb/mongo-go-driver/bson/bsontype"
+	"go.mongodb.org/mongo-driver/bson/bsonrw"
+	"go.mongodb.org/mongo-driver/bson/bsontype"
 )
 
 func TestRegistry(t *testing.T) {
@@ -253,8 +253,8 @@ func TestRegistry(t *testing.T) {
 				{
 					"map non-string key",
 					reflect.TypeOf(map[int]int{}),
+					fmc,
 					nil,
-					ErrNoEncoder{Type: reflect.TypeOf(map[int]int{})},
 					false,
 				},
 				{

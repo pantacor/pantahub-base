@@ -8,14 +8,34 @@ package integration
 
 import (
 	"context"
+	"io"
 	"testing"
 
-	"github.com/mongodb/mongo-go-driver/bson"
-	"github.com/mongodb/mongo-go-driver/internal/testutil"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
-	"github.com/mongodb/mongo-go-driver/x/network/command"
-	"github.com/mongodb/mongo-go-driver/x/network/description"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/internal/testutil"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/x/bsonx/bsoncore"
+	"go.mongodb.org/mongo-driver/x/mongo/driver"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/session"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/uuid"
+	"go.mongodb.org/mongo-driver/x/network/command"
+	"go.mongodb.org/mongo-driver/x/network/description"
 )
+
+func runCommand(t *testing.T, cmd command.ListIndexes, opts ...*options.ListIndexesOptions) (*driver.BatchCursor, error) {
+	clientID, err := uuid.New()
+	noerr(t, err)
+
+	return driver.ListIndexes(
+		context.Background(),
+		cmd,
+		testutil.Topology(t),
+		description.WriteSelector(),
+		clientID,
+		&session.Pool{},
+		opts...,
+	)
+}
 
 func TestCommandListIndexes(t *testing.T) {
 	noerr := func(t *testing.T, err error) {
@@ -25,69 +45,24 @@ func TestCommandListIndexes(t *testing.T) {
 			t.FailNow()
 		}
 	}
+
 	t.Run("InvalidDatabaseName", func(t *testing.T) {
-		server, err := testutil.Topology(t).SelectServer(context.Background(), description.WriteSelector())
-		noerr(t, err)
-		conn, err := server.Connection(context.Background())
-		noerr(t, err)
+		skipIfBelow30(t)
 		ns := command.Namespace{DB: "ex", Collection: "space"}
-		cursor, err := (&command.ListIndexes{NS: ns}).RoundTrip(context.Background(), server.SelectedDescription(), server, conn)
-		noerr(t, err)
-
-		indexes := []string{}
-		var next bsonx.Doc
-
-		for cursor.Next(context.Background()) {
-			err = cursor.Decode(&next)
-			noerr(t, err)
-
-			val, err := next.LookupErr("name")
-			noerr(t, err)
-			if val.Type() != bson.TypeString {
-				t.Errorf("Incorrect type for 'name'. got %v; want %v", val.Type(), bson.TypeString)
-				t.FailNow()
-			}
-			indexes = append(indexes, val.StringValue())
-		}
-
-		if len(indexes) != 0 {
-			t.Errorf("Expected no indexes from invalid database. got %d; want %d", len(indexes), 0)
+		_, err := runCommand(t, command.ListIndexes{NS: ns})
+		if err != command.ErrEmptyCursor {
+			t.Errorf("Expected to receive empty cursor, but didn't. got %v; want %v", err, command.ErrEmptyCursor)
 		}
 	})
 	t.Run("InvalidCollectionName", func(t *testing.T) {
-		server, err := testutil.Topology(t).SelectServer(context.Background(), description.WriteSelector())
-		noerr(t, err)
-		conn, err := server.Connection(context.Background())
-		noerr(t, err)
+		skipIfBelow30(t)
 		ns := command.Namespace{DB: "ex", Collection: testutil.ColName(t)}
-		cursor, err := (&command.ListIndexes{NS: ns}).RoundTrip(context.Background(), server.SelectedDescription(), server, conn)
-		noerr(t, err)
-
-		indexes := []string{}
-		var next bsonx.Doc
-
-		for cursor.Next(context.Background()) {
-			err = cursor.Decode(&next)
-			noerr(t, err)
-
-			val, err := next.LookupErr("name")
-			noerr(t, err)
-			if val.Type() != bson.TypeString {
-				t.Errorf("Incorrect type for 'name'. got %v; want %v", val.Type(), bson.TypeString)
-				t.FailNow()
-			}
-			indexes = append(indexes, val.StringValue())
-		}
-
-		if len(indexes) != 0 {
-			t.Errorf("Expected no indexes from invalid database. got %d; want %d", len(indexes), 0)
+		_, err := runCommand(t, command.ListIndexes{NS: ns})
+		if err != command.ErrEmptyCursor {
+			t.Errorf("Expected to receive empty cursor, but didn't. got %v; want %v", err, command.ErrEmptyCursor)
 		}
 	})
 	t.Run("SingleBatch", func(t *testing.T) {
-		server, err := testutil.Topology(t).SelectServer(context.Background(), description.WriteSelector())
-		noerr(t, err)
-		conn, err := server.Connection(context.Background())
-		noerr(t, err)
 		testutil.AutoDropCollection(t)
 		testutil.AutoCreateIndexes(t, []string{"a"})
 		testutil.AutoCreateIndexes(t, []string{"b"})
@@ -95,24 +70,29 @@ func TestCommandListIndexes(t *testing.T) {
 		testutil.AutoCreateIndexes(t, []string{"d", "e"})
 
 		ns := command.NewNamespace(dbName, testutil.ColName(t))
-		cursor, err := (&command.ListIndexes{NS: ns}).RoundTrip(context.Background(), server.SelectedDescription(), server, conn)
+		cursor, err := runCommand(t, command.ListIndexes{NS: ns})
 		noerr(t, err)
 
 		indexes := []string{}
-		var next bsonx.Doc
 
 		for cursor.Next(context.Background()) {
-			next = next[:0]
-			err = cursor.Decode(&next)
-			noerr(t, err)
+			docs := cursor.Batch()
+			var next bsoncore.Document
+			for {
+				next, err = docs.Next()
+				if err == io.EOF {
+					break
+				}
+				noerr(t, err)
 
-			val, err := next.LookupErr("name")
-			noerr(t, err)
-			if val.Type() != bson.TypeString {
-				t.Errorf("Incorrect type for 'name'. got %v; want %v", val.Type(), bson.TypeString)
-				t.FailNow()
+				val, err := next.LookupErr("name")
+				noerr(t, err)
+				if val.Type != bson.TypeString {
+					t.Errorf("Incorrect type for 'name'. got %v; want %v", val.Type, bson.TypeString)
+					t.FailNow()
+				}
+				indexes = append(indexes, val.StringValue())
 			}
-			indexes = append(indexes, val.StringValue())
 		}
 
 		if len(indexes) != 5 {
@@ -126,37 +106,35 @@ func TestCommandListIndexes(t *testing.T) {
 		}
 	})
 	t.Run("MultipleBatch", func(t *testing.T) {
-		server, err := testutil.Topology(t).SelectServer(context.Background(), description.WriteSelector())
-		noerr(t, err)
-		conn, err := server.Connection(context.Background())
-		noerr(t, err)
 		testutil.AutoDropCollection(t)
 		testutil.AutoCreateIndexes(t, []string{"a"})
 		testutil.AutoCreateIndexes(t, []string{"b"})
 		testutil.AutoCreateIndexes(t, []string{"c"})
 
 		ns := command.NewNamespace(dbName, testutil.ColName(t))
-		opts := []bsonx.Elem{
-			{"batchSize", bsonx.Int32(1)},
-		}
-		cursor, err := (&command.ListIndexes{NS: ns, Opts: opts}).RoundTrip(context.Background(), server.SelectedDescription(), server, conn)
+		cursor, err := runCommand(t, command.ListIndexes{NS: ns}, options.ListIndexes().SetBatchSize(1))
 		noerr(t, err)
 
 		indexes := []string{}
-		var next bsonx.Doc
 
 		for cursor.Next(context.Background()) {
-			next = next[:0]
-			err = cursor.Decode(&next)
-			noerr(t, err)
+			docs := cursor.Batch()
+			var next bsoncore.Document
+			for {
+				next, err = docs.Next()
+				if err == io.EOF {
+					break
+				}
+				noerr(t, err)
 
-			val, err := next.LookupErr("name")
-			noerr(t, err)
-			if val.Type() != bson.TypeString {
-				t.Errorf("Incorrect type for 'name'. got %v; want %v", val.Type(), bson.TypeString)
-				t.FailNow()
+				val, err := next.LookupErr("name")
+				noerr(t, err)
+				if val.Type != bson.TypeString {
+					t.Errorf("Incorrect type for 'name'. got %v; want %v", val.Type, bson.TypeString)
+					t.FailNow()
+				}
+				indexes = append(indexes, val.StringValue())
 			}
-			indexes = append(indexes, val.StringValue())
 		}
 
 		if len(indexes) != 4 {

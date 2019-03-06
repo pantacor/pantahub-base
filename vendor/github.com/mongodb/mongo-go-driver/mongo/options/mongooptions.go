@@ -10,9 +10,9 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/mongodb/mongo-go-driver/bson"
-	"github.com/mongodb/mongo-go-driver/bson/bsoncodec"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/bsoncodec"
+	"go.mongodb.org/mongo-driver/x/bsonx/bsoncore"
 )
 
 // Collation allows users to specify language-specific rules for string comparison, such as
@@ -25,36 +25,41 @@ type Collation struct {
 	NumericOrdering bool   `bson:",omitempty"` // Whether to order numbers based on numerical order and not collation order
 	Alternate       string `bson:",omitempty"` // Whether spaces and punctuation are considered base characters
 	MaxVariable     string `bson:",omitempty"` // Which characters are affected by alternate: "shifted"
+	Normalization   bool   `bson:",omitempty"` // Causes text to be normalized into Unicode NFD
 	Backwards       bool   `bson:",omitempty"` // Causes secondary differences to be considered in reverse order, as it is done in the French language
 }
 
-// ToDocument converts the Collation to a *bsonx.Document
-func (co *Collation) ToDocument() bsonx.Doc {
-	doc := bsonx.Doc{}
+// ToDocument converts the Collation to a bson.Raw.
+func (co *Collation) ToDocument() bson.Raw {
+	idx, doc := bsoncore.AppendDocumentStart(nil)
 	if co.Locale != "" {
-		doc = append(doc, bsonx.Elem{"locale", bsonx.String(co.Locale)})
+		doc = bsoncore.AppendStringElement(doc, "locale", co.Locale)
 	}
 	if co.CaseLevel {
-		doc = append(doc, bsonx.Elem{"caseLevel", bsonx.Boolean(true)})
+		doc = bsoncore.AppendBooleanElement(doc, "caseLevel", true)
 	}
 	if co.CaseFirst != "" {
-		doc = append(doc, bsonx.Elem{"caseFirst", bsonx.String(co.CaseFirst)})
+		doc = bsoncore.AppendStringElement(doc, "caseFirst", co.CaseFirst)
 	}
 	if co.Strength != 0 {
-		doc = append(doc, bsonx.Elem{"strength", bsonx.Int32(int32(co.Strength))})
+		doc = bsoncore.AppendInt32Element(doc, "strength", int32(co.Strength))
 	}
 	if co.NumericOrdering {
-		doc = append(doc, bsonx.Elem{"numericOrdering", bsonx.Boolean(true)})
+		doc = bsoncore.AppendBooleanElement(doc, "numericOrdering", true)
 	}
 	if co.Alternate != "" {
-		doc = append(doc, bsonx.Elem{"alternate", bsonx.String(co.Alternate)})
+		doc = bsoncore.AppendStringElement(doc, "alternate", co.Alternate)
 	}
 	if co.MaxVariable != "" {
-		doc = append(doc, bsonx.Elem{"maxVariable", bsonx.String(co.MaxVariable)})
+		doc = bsoncore.AppendStringElement(doc, "maxVariable", co.MaxVariable)
+	}
+	if co.Normalization {
+		doc = bsoncore.AppendBooleanElement(doc, "normalization", true)
 	}
 	if co.Backwards {
-		doc = append(doc, bsonx.Elem{"backwards", bsonx.Boolean(true)})
+		doc = bsoncore.AppendBooleanElement(doc, "backwards", true)
 	}
+	doc, _ = bsoncore.AppendDocumentEnd(doc, idx)
 	return doc
 }
 
@@ -102,23 +107,21 @@ type ArrayFilters struct {
 	Filters  []interface{}       // The filters to apply
 }
 
-// ToArray builds a bsonx.Arr from the provided ArrayFilters.
-func (af *ArrayFilters) ToArray() (bsonx.Arr, error) {
-	docs := make([]bsonx.Doc, 0, len(af.Filters))
+// ToArray builds a []bson.Raw from the provided ArrayFilters.
+func (af *ArrayFilters) ToArray() ([]bson.Raw, error) {
+	registry := af.Registry
+	if registry == nil {
+		registry = bson.DefaultRegistry
+	}
+	filters := make([]bson.Raw, 0, len(af.Filters))
 	for _, f := range af.Filters {
-		d, err := transformDocument(af.Registry, f)
+		filter, err := bson.MarshalWithRegistry(registry, f)
 		if err != nil {
 			return nil, err
 		}
-		docs = append(docs, d)
+		filters = append(filters, filter)
 	}
-
-	arr := bsonx.Arr{}
-	for _, doc := range docs {
-		arr = append(arr, bsonx.Document(doc))
-	}
-
-	return arr, nil
+	return filters, nil
 }
 
 // MarshalError is returned when attempting to transform a value into a document
@@ -130,30 +133,7 @@ type MarshalError struct {
 
 // Error implements the error interface.
 func (me MarshalError) Error() string {
-	return fmt.Sprintf("cannot transform type %s to a *bsonx.Document", reflect.TypeOf(me.Value))
+	return fmt.Sprintf("cannot transform type %s to a bson.Raw", reflect.TypeOf(me.Value))
 }
 
 var defaultRegistry = bson.DefaultRegistry
-
-func transformDocument(registry *bsoncodec.Registry, val interface{}) (bsonx.Doc, error) {
-	if val == nil {
-		return bsonx.Doc{}, nil
-	}
-	reg := defaultRegistry
-	if registry != nil {
-		reg = registry
-	}
-
-	if bs, ok := val.([]byte); ok {
-		// Slight optimization so we'll just use MarshalBSON and not go through the codec machinery.
-		val = bson.Raw(bs)
-	}
-
-	// TODO(skriptble): Use a pool of these instead.
-	buf := make([]byte, 0, 256)
-	b, err := bson.MarshalAppendWithRegistry(reg, buf, val)
-	if err != nil {
-		return nil, MarshalError{Value: val, Err: err}
-	}
-	return bsonx.ReadDoc(b)
-}

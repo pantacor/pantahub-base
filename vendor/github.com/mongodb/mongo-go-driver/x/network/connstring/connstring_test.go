@@ -12,8 +12,8 @@ import (
 
 	"time"
 
-	"github.com/mongodb/mongo-go-driver/x/network/connstring"
 	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/x/network/connstring"
 )
 
 func TestAppName(t *testing.T) {
@@ -98,10 +98,8 @@ func TestConnect(t *testing.T) {
 		expected connstring.ConnectMode
 		err      bool
 	}{
-		{s: "connect=auto", expected: connstring.AutoConnect},
 		{s: "connect=automatic", expected: connstring.AutoConnect},
-		{s: "connect=AUTO", expected: connstring.AutoConnect},
-		{s: "connect=single", expected: connstring.SingleConnect},
+		{s: "connect=AUTOMATIC", expected: connstring.AutoConnect},
 		{s: "connect=direct", expected: connstring.SingleConnect},
 		{s: "connect=blah", err: true},
 	}
@@ -141,6 +139,7 @@ func TestConnectTimeout(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, test.expected, cs.ConnectTimeout)
+				require.True(t, cs.ConnectTimeoutSet)
 			}
 		})
 	}
@@ -398,6 +397,7 @@ func TestServerSelectionTimeout(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, test.expected, cs.ServerSelectionTimeout)
+				require.True(t, cs.ServerSelectionTimeoutSet)
 			}
 		})
 	}
@@ -424,6 +424,7 @@ func TestSocketTimeout(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, test.expected, cs.SocketTimeout)
+				require.True(t, cs.SocketTimeoutSet)
 			}
 		})
 	}
@@ -450,6 +451,7 @@ func TestWTimeout(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, test.expected, cs.WTimeout)
+				require.True(t, cs.WTimeoutSet)
 			}
 		})
 	}

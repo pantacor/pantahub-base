@@ -4,7 +4,7 @@
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package mongo
+package mongo // import "go.mongodb.org/mongo-driver/mongo"
 
 import (
 	"context"
@@ -14,12 +14,13 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/mongodb/mongo-go-driver/mongo/options"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/x/bsonx"
 
-	"github.com/mongodb/mongo-go-driver/bson"
-	"github.com/mongodb/mongo-go-driver/bson/bsoncodec"
-	"github.com/mongodb/mongo-go-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/bsoncodec"
+	"go.mongodb.org/mongo-driver/bson/bsontype"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // Dialer is used to make network connections.
@@ -54,7 +55,7 @@ type MarshalError struct {
 
 // Error implements the error interface.
 func (me MarshalError) Error() string {
-	return fmt.Sprintf("cannot transform type %s to a *bsonx.Document", reflect.TypeOf(me.Value))
+	return fmt.Sprintf("cannot transform type %s to a BSON Document: %v", reflect.TypeOf(me.Value), me.Err)
 }
 
 // Pipeline is a type that makes creating aggregation pipelines easier. It is a
@@ -62,10 +63,10 @@ func (me MarshalError) Error() string {
 //
 // Example usage:
 //
-// 		mongo.Pipeline{{
-// 			{"$group", bson.D{{"_id", "$state"}, {"totalPop", bson.D{"$sum", "$pop"}}}},
-// 			{"$match": bson.D{{"totalPop", bson.D{"$gte", 10*1000*1000}}}},
-// 		}}
+//		mongo.Pipeline{
+//			{{"$group", bson.D{{"_id", "$state"}, {"totalPop", bson.D{{"$sum", "$pop"}}}}}},
+//			{{"$match", bson.D{{"totalPop", bson.D{{"$gte", 10*1000*1000}}}}}},
+//		}
 //
 type Pipeline []bson.D
 
@@ -80,7 +81,7 @@ func transformAndEnsureID(registry *bsoncodec.Registry, val interface{}) (bsonx.
 	}
 	switch tt := val.(type) {
 	case nil:
-		val = bsonx.Doc{}
+		return nil, nil, ErrNilDocument
 	case bsonx.Doc:
 		val = tt.Copy()
 	case []byte:
@@ -102,17 +103,31 @@ func transformAndEnsureID(registry *bsoncodec.Registry, val interface{}) (bsonx.
 
 	var id interface{}
 
-	v, err := bson.Raw(b).LookupErr("_id")
-	switch err.(type) {
-	case nil:
-		if err := v.Unmarshal(&id); err != nil {
-			return nil, nil, err
-		}
+	idx := d.IndexOf("_id")
+	var idElem bsonx.Elem
+	switch idx {
+	case -1:
+		idElem = bsonx.Elem{"_id", bsonx.ObjectID(primitive.NewObjectID())}
+		d = append(d, bsonx.Elem{})
+		copy(d[1:], d)
+		d[0] = idElem
 	default:
-		oid := primitive.NewObjectID()
-		d = append(d, bsonx.Elem{"_id", bsonx.ObjectID(oid)})
-		id = oid
+		idElem = d[idx]
+		copy(d[1:idx+1], d[0:idx])
+		d[0] = idElem
 	}
+
+	idBuf := make([]byte, 0, 256)
+	t, data, err := idElem.Value.MarshalAppendBSONValue(idBuf[:0])
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = bson.RawValue{Type: t, Value: data}.UnmarshalWithRegistry(registry, &id)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	return d, id, nil
 }
 
@@ -121,7 +136,7 @@ func transformDocument(registry *bsoncodec.Registry, val interface{}) (bsonx.Doc
 		registry = bson.NewRegistryBuilder().Build()
 	}
 	if val == nil {
-		return bsonx.Doc{}, nil
+		return nil, ErrNilDocument
 	}
 	if doc, ok := val.(bsonx.Doc); ok {
 		return doc.Copy(), nil
@@ -156,7 +171,10 @@ func ensureID(d bsonx.Doc) (bsonx.Doc, interface{}) {
 }
 
 func ensureDollarKey(doc bsonx.Doc) error {
-	if len(doc) > 0 && !strings.HasPrefix(doc[0].Key, "$") {
+	if len(doc) == 0 {
+		return errors.New("update document must have at least one element")
+	}
+	if !strings.HasPrefix(doc[0].Key, "$") {
 		return errors.New("update document must contain key beginning with '$'")
 	}
 	return nil
@@ -165,42 +183,29 @@ func ensureDollarKey(doc bsonx.Doc) error {
 func transformAggregatePipeline(registry *bsoncodec.Registry, pipeline interface{}) (bsonx.Arr, error) {
 	pipelineArr := bsonx.Arr{}
 	switch t := pipeline.(type) {
-	case Pipeline:
-		for _, d := range t {
-			doc, err := transformDocument(registry, d)
-			if err != nil {
-				return nil, err
-			}
-			pipelineArr = append(pipelineArr, bsonx.Document(doc))
-		}
-	case bsonx.Arr:
-		pipelineArr = make(bsonx.Arr, len(t))
-		copy(pipelineArr, t)
-	case []bsonx.Doc:
-		pipelineArr = bsonx.Arr{}
-
-		for _, doc := range t {
-			pipelineArr = append(pipelineArr, bsonx.Document(doc))
-		}
-	case []interface{}:
-		pipelineArr = bsonx.Arr{}
-
-		for _, val := range t {
-			doc, err := transformDocument(registry, val)
-			if err != nil {
-				return nil, err
-			}
-
-			pipelineArr = append(pipelineArr, bsonx.Document(doc))
-		}
-	default:
-		p, err := transformDocument(registry, pipeline)
+	case bsoncodec.ValueMarshaler:
+		btype, val, err := t.MarshalBSONValue()
 		if err != nil {
 			return nil, err
 		}
-
-		for _, elem := range p {
-			pipelineArr = append(pipelineArr, elem.Value)
+		if btype != bsontype.Array {
+			return nil, fmt.Errorf("ValueMarshaler returned a %v, but was expecting %v", btype, bsontype.Array)
+		}
+		err = pipelineArr.UnmarshalBSONValue(btype, val)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		val := reflect.ValueOf(t)
+		if !val.IsValid() || (val.Kind() != reflect.Slice && val.Kind() != reflect.Array) {
+			return nil, fmt.Errorf("can only transform slices and arrays into aggregation pipelines, but got %v", val.Kind())
+		}
+		for idx := 0; idx < val.Len(); idx++ {
+			elem, err := transformDocument(registry, val.Index(idx).Interface())
+			if err != nil {
+				return nil, err
+			}
+			pipelineArr = append(pipelineArr, bsonx.Document(elem))
 		}
 	}
 

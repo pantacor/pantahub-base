@@ -12,10 +12,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mongodb/mongo-go-driver/bson/bsoncodec"
-	"github.com/mongodb/mongo-go-driver/bson/bsonrw"
-	"github.com/mongodb/mongo-go-driver/bson/bsonrw/bsonrwtest"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
+	"go.mongodb.org/mongo-driver/bson/bsoncodec"
+	"go.mongodb.org/mongo-driver/bson/bsonrw"
+	"go.mongodb.org/mongo-driver/bson/bsonrw/bsonrwtest"
 )
 
 func TestBasicEncode(t *testing.T) {
@@ -44,8 +43,7 @@ func TestEncoderEncode(t *testing.T) {
 			got := make(bsonrw.SliceWriter, 0, 1024)
 			vw, err := bsonrw.NewBSONValueWriter(&got)
 			noerr(t, err)
-			reg := DefaultRegistry
-			enc, err := NewEncoder(reg, vw)
+			enc, err := NewEncoder(vw)
 			noerr(t, err)
 			err = enc.Encode(tc.val)
 			noerr(t, err)
@@ -103,8 +101,7 @@ func TestEncoderEncode(t *testing.T) {
 					vw, err = bsonrw.NewBSONValueWriter(&b)
 					noerr(t, err)
 				}
-
-				enc, err := NewEncoder(DefaultRegistry, vw)
+				enc, err := NewEncoder(vw)
 				noerr(t, err)
 				got := enc.Encode(marshaler)
 				want := tc.wanterr
@@ -129,16 +126,8 @@ type testMarshaler struct {
 
 func (tm testMarshaler) MarshalBSON() ([]byte, error) { return tm.buf, tm.err }
 
-func docToBytes(d bsonx.Doc) []byte {
-	b, err := d.MarshalBSON()
-	if err != nil {
-		panic(err)
-	}
-	return b
-}
-
-func arrToBytes(a bsonx.Arr) []byte {
-	_, b, err := a.MarshalBSONValue()
+func docToBytes(d interface{}) []byte {
+	b, err := Marshal(d)
 	if err != nil {
 		panic(err)
 	}

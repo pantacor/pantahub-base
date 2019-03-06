@@ -9,19 +9,21 @@ package testutil
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
 
-	"github.com/mongodb/mongo-go-driver/event"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
-	"github.com/mongodb/mongo-go-driver/x/mongo/driver/topology"
-	"github.com/mongodb/mongo-go-driver/x/network/command"
-	"github.com/mongodb/mongo-go-driver/x/network/connection"
-	"github.com/mongodb/mongo-go-driver/x/network/connstring"
-	"github.com/mongodb/mongo-go-driver/x/network/description"
+	"go.mongodb.org/mongo-driver/event"
+	"go.mongodb.org/mongo-driver/x/bsonx"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/topology"
+	"go.mongodb.org/mongo-driver/x/network/command"
+	"go.mongodb.org/mongo-driver/x/network/connection"
+	"go.mongodb.org/mongo-driver/x/network/connstring"
+	"go.mongodb.org/mongo-driver/x/network/description"
 	"github.com/stretchr/testify/require"
 )
 
@@ -282,4 +284,30 @@ func Integration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
+}
+
+// compareVersions compares two version number strings (i.e. positive integers separated by
+// periods). Comparisons are done to the lesser precision of the two versions. For example, 3.2 is
+// considered equal to 3.2.11, whereas 3.2.0 is considered less than 3.2.11.
+//
+// Returns a positive int if version1 is greater than version2, a negative int if version1 is less
+// than version2, and 0 if version1 is equal to version2.
+func CompareVersions(t *testing.T, v1 string, v2 string) int {
+	n1 := strings.Split(v1, ".")
+	n2 := strings.Split(v2, ".")
+
+	for i := 0; i < int(math.Min(float64(len(n1)), float64(len(n2)))); i++ {
+		i1, err := strconv.Atoi(n1[i])
+		require.NoError(t, err)
+
+		i2, err := strconv.Atoi(n2[i])
+		require.NoError(t, err)
+
+		difference := i1 - i2
+		if difference != 0 {
+			return difference
+		}
+	}
+
+	return 0
 }

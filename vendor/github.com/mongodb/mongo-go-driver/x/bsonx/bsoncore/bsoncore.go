@@ -23,7 +23,7 @@
 // given dst slice. If the slice has enough capacity, it will not grow the
 // slice. The Append*Element functions within this package operate in the same
 // way, but additionally append the BSON type and the key before the value.
-package bsoncore
+package bsoncore // import "go.mongodb.org/mongo-driver/x/bsonx/bsoncore"
 
 import (
 	"bytes"
@@ -31,8 +31,8 @@ import (
 	"math"
 	"time"
 
-	"github.com/mongodb/mongo-go-driver/bson/bsontype"
-	"github.com/mongodb/mongo-go-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/bson/bsontype"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // AppendType will append t to dst and return the extended buffer.
@@ -216,6 +216,18 @@ func AppendDocumentElement(dst []byte, key string, doc []byte) []byte {
 func BuildDocument(dst []byte, elems []byte) []byte {
 	idx, dst := ReserveLength(dst)
 	dst = append(dst, elems...)
+	dst = append(dst, 0x00)
+	dst = UpdateLength(dst, idx, int32(len(dst[idx:])))
+	return dst
+}
+
+// BuildDocumentFromElements will create a document with the given slice of elements and will append
+// it to dst and return the extended buffer.
+func BuildDocumentFromElements(dst []byte, elems ...[]byte) []byte {
+	idx, dst := ReserveLength(dst)
+	for _, elem := range elems {
+		dst = append(dst, elem...)
+	}
 	dst = append(dst, 0x00)
 	dst = UpdateLength(dst, idx, int32(len(dst[idx:])))
 	return dst

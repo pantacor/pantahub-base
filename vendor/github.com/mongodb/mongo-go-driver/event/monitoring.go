@@ -4,39 +4,17 @@
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package event
+package event // import "go.mongodb.org/mongo-driver/event"
 
 import (
 	"context"
-	"time"
 
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
+	"go.mongodb.org/mongo-driver/bson"
 )
-
-// CommandMetadata contains metadata about a command sent to the server.
-type CommandMetadata struct {
-	Name string
-	Time time.Time
-}
-
-// CreateMetadata creates metadata for a command.
-func CreateMetadata(name string) *CommandMetadata {
-	return &CommandMetadata{
-		Name: name,
-		Time: time.Now(),
-	}
-}
-
-// TimeDifference returns the difference between now and the time a command was sent in nanoseconds.
-func (cm *CommandMetadata) TimeDifference() int64 {
-	t := time.Now()
-	duration := t.Sub(cm.Time)
-	return duration.Nanoseconds()
-}
 
 // CommandStartedEvent represents an event generated when a command is sent to a server.
 type CommandStartedEvent struct {
-	Command      bsonx.Doc
+	Command      bson.Raw
 	DatabaseName string
 	CommandName  string
 	RequestID    int64
@@ -54,7 +32,7 @@ type CommandFinishedEvent struct {
 // CommandSucceededEvent represents an event generated when a command's execution succeeds.
 type CommandSucceededEvent struct {
 	CommandFinishedEvent
-	Reply bsonx.Doc
+	Reply bson.Raw
 }
 
 // CommandFailedEvent represents an event generated when a command's execution fails.

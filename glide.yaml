@@ -39,4 +39,4 @@ import:
   - suite
   - mock
 - package: github.com/mongodb/mongo-go-driver
-  version: ~0.1.0
+  version: ~1.0.0-rc1

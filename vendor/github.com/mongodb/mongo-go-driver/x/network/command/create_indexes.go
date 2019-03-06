@@ -9,13 +9,13 @@ package command
 import (
 	"context"
 
-	"github.com/mongodb/mongo-go-driver/bson"
-	"github.com/mongodb/mongo-go-driver/mongo/writeconcern"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
-	"github.com/mongodb/mongo-go-driver/x/mongo/driver/session"
-	"github.com/mongodb/mongo-go-driver/x/network/description"
-	"github.com/mongodb/mongo-go-driver/x/network/result"
-	"github.com/mongodb/mongo-go-driver/x/network/wiremessage"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/writeconcern"
+	"go.mongodb.org/mongo-driver/x/bsonx"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/session"
+	"go.mongodb.org/mongo-driver/x/network/description"
+	"go.mongodb.org/mongo-driver/x/network/result"
+	"go.mongodb.org/mongo-driver/x/network/wiremessage"
 )
 
 // CreateIndexes represents the createIndexes command.
@@ -50,13 +50,16 @@ func (ci *CreateIndexes) encode(desc description.SelectedServer) (*Write, error)
 	}
 	cmd = append(cmd, ci.Opts...)
 
-	return &Write{
-		Clock:        ci.Clock,
-		DB:           ci.NS.DB,
-		Command:      cmd,
-		WriteConcern: ci.WriteConcern,
-		Session:      ci.Session,
-	}, nil
+	write := &Write{
+		Clock:   ci.Clock,
+		DB:      ci.NS.DB,
+		Command: cmd,
+		Session: ci.Session,
+	}
+	if desc.WireVersion != nil && desc.WireVersion.Max >= 5 {
+		write.WriteConcern = ci.WriteConcern
+	}
+	return write, nil
 }
 
 // Decode will decode the wire message using the provided server description. Errors during decoding

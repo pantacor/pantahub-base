@@ -1,3 +1,0 @@
-[submodule "vendor/github.com/dgrijalva/jwt-go"]
-	path = vendor/github.com/dgrijalva/jwt-go
-	url = https://github.com/dgrijalva/jwt-go

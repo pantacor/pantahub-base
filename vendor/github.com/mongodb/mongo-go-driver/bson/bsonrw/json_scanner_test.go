@@ -9,6 +9,7 @@ package bsonrw
 import (
 	"strings"
 	"testing"
+	"testing/iotest"
 
 	"github.com/google/go-cmp/cmp"
 )
@@ -232,6 +233,10 @@ func TestJsonScannerValidInputs(t *testing.T) {
 			tokens: []jsonToken{{t: jttDouble, v: -1.2e-10}},
 		},
 		{
+			desc: "valid double: 8005332285744496613785600", input: "8005332285744496613785600",
+			tokens: []jsonToken{{t: jttDouble, v: float64(8005332285744496613785600)}},
+		},
+		{
 			desc:  "valid object, only spaces",
 			input: `{"key": "string", "key2": 2, "key3": {}, "key4": [], "key5": false }`,
 			tokens: []jsonToken{
@@ -280,6 +285,20 @@ func TestJsonScannerValidInputs(t *testing.T) {
 		}
 
 		c, err := js.nextToken()
+		jttDiff(t, jttEOF, c.t, tc.desc)
+		noerr(t, err)
+
+		// testing early EOF reading
+		js = &jsonScanner{r: iotest.DataErrReader(strings.NewReader(tc.input))}
+
+		for _, token := range tc.tokens {
+			c, err := js.nextToken()
+			jttDiff(t, token.t, c.t, tc.desc)
+			jtvDiff(t, token.v, c.v, tc.desc)
+			expectNoError(t, err, tc.desc)
+		}
+
+		c, err = js.nextToken()
 		jttDiff(t, jttEOF, c.t, tc.desc)
 		noerr(t, err)
 	}

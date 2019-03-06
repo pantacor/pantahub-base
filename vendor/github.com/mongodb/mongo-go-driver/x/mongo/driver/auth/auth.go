@@ -10,11 +10,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mongodb/mongo-go-driver/x/network/address"
-	"github.com/mongodb/mongo-go-driver/x/network/command"
-	"github.com/mongodb/mongo-go-driver/x/network/connection"
-	"github.com/mongodb/mongo-go-driver/x/network/description"
-	"github.com/mongodb/mongo-go-driver/x/network/wiremessage"
+	"go.mongodb.org/mongo-driver/x/network/address"
+	"go.mongodb.org/mongo-driver/x/network/command"
+	"go.mongodb.org/mongo-driver/x/network/connection"
+	"go.mongodb.org/mongo-driver/x/network/description"
+	"go.mongodb.org/mongo-driver/x/network/wiremessage"
 )
 
 // AuthenticatorFactory constructs an authenticator.
@@ -95,10 +95,11 @@ func RegisterAuthenticatorFactory(name string, factory AuthenticatorFactory) {
 // function.  DBUser is optional but must be of the form <dbname.username>;
 // if non-empty, then the connection will do SASL mechanism negotiation.
 type HandshakeOptions struct {
-	AppName       string
-	Authenticator Authenticator
-	Compressors   []string
-	DBUser        string
+	AppName               string
+	Authenticator         Authenticator
+	Compressors           []string
+	DBUser                string
+	PerformAuthentication func(description.Server) bool
 }
 
 // Handshaker creates a connection handshaker for the given authenticator.
@@ -114,9 +115,21 @@ func Handshaker(h connection.Handshaker, options *HandshakeOptions) connection.H
 			return description.Server{}, newAuthError("handshake failure", err)
 		}
 
-		err = options.Authenticator.Auth(ctx, desc, rw)
-		if err != nil {
-			return description.Server{}, newAuthError("auth error", err)
+		performAuth := options.PerformAuthentication
+		if performAuth == nil {
+			performAuth = func(serv description.Server) bool {
+				return serv.Kind == description.RSPrimary ||
+					serv.Kind == description.RSSecondary ||
+					serv.Kind == description.Mongos ||
+					serv.Kind == description.Standalone
+			}
+		}
+		if performAuth(desc) && options.Authenticator != nil {
+			err = options.Authenticator.Auth(ctx, desc, rw)
+			if err != nil {
+				return description.Server{}, newAuthError("auth error", err)
+			}
+
 		}
 		if h == nil {
 			return desc, nil

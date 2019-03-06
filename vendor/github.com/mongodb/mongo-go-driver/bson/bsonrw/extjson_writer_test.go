@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mongodb/mongo-go-driver/bson/bsontype"
-	"github.com/mongodb/mongo-go-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/bson/bsontype"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func TestExtJSONValueWriter(t *testing.T) {
@@ -248,5 +248,13 @@ func TestExtJSONValueWriter(t *testing.T) {
 				t.Errorf("Did not received expected error. got %v; want %v", got, want)
 			}
 		})
+	})
+
+	t.Run("FormatDoubleWithExponent", func(t *testing.T) {
+		want := "3E-12"
+		got := formatDouble(float64(0.000000000003))
+		if got != want {
+			t.Errorf("Did not receive expected string. got %s: want %s", got, want)
+		}
 	})
 }

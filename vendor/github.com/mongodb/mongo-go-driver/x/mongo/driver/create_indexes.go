@@ -11,14 +11,14 @@ import (
 
 	"time"
 
-	"github.com/mongodb/mongo-go-driver/mongo/options"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
-	"github.com/mongodb/mongo-go-driver/x/mongo/driver/session"
-	"github.com/mongodb/mongo-go-driver/x/mongo/driver/topology"
-	"github.com/mongodb/mongo-go-driver/x/mongo/driver/uuid"
-	"github.com/mongodb/mongo-go-driver/x/network/command"
-	"github.com/mongodb/mongo-go-driver/x/network/description"
-	"github.com/mongodb/mongo-go-driver/x/network/result"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/x/bsonx"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/session"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/topology"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/uuid"
+	"go.mongodb.org/mongo-driver/x/network/command"
+	"go.mongodb.org/mongo-driver/x/network/description"
+	"go.mongodb.org/mongo-driver/x/network/result"
 )
 
 // CreateIndexes handles the full cycle dispatch and execution of a createIndexes
@@ -36,6 +36,11 @@ func CreateIndexes(
 	ss, err := topo.SelectServer(ctx, selector)
 	if err != nil {
 		return result.CreateIndexes{}, err
+	}
+
+	desc := ss.Description()
+	if desc.WireVersion.Max < 5 && hasCollation(cmd) {
+		return result.CreateIndexes{}, ErrCollation
 	}
 
 	conn, err := ss.Connection(ctx)
@@ -59,4 +64,14 @@ func CreateIndexes(
 	}
 
 	return cmd.RoundTrip(ctx, ss.Description(), conn)
+}
+
+func hasCollation(cmd command.CreateIndexes) bool {
+	for _, ind := range cmd.Indexes {
+		if _, err := ind.Document().LookupErr("collation"); err == nil {
+			return true
+		}
+	}
+
+	return false
 }

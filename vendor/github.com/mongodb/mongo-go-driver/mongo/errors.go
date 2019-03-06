@@ -11,11 +11,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/mongodb/mongo-go-driver/bson"
-	"github.com/mongodb/mongo-go-driver/x/mongo/driver"
-	"github.com/mongodb/mongo-go-driver/x/mongo/driver/topology"
-	"github.com/mongodb/mongo-go-driver/x/network/command"
-	"github.com/mongodb/mongo-go-driver/x/network/result"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/x/mongo/driver"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/topology"
+	"go.mongodb.org/mongo-driver/x/network/command"
+	"go.mongodb.org/mongo-driver/x/network/result"
 )
 
 // ErrUnacknowledgedWrite is returned from functions that have an unacknowledged
@@ -26,11 +26,50 @@ var ErrUnacknowledgedWrite = errors.New("unacknowledged write")
 // disconnected client
 var ErrClientDisconnected = errors.New("client is disconnected")
 
-func replaceTopologyErr(err error) error {
+// ErrNilDocument is returned when a user attempts to pass a nil document or filter
+// to a function where the field is required.
+var ErrNilDocument = errors.New("document is nil")
+
+// ErrEmptySlice is returned when a user attempts to pass an empty slice as input
+// to a function wehere the field is required.
+var ErrEmptySlice = errors.New("must provide at least one element in input slice")
+
+func replaceErrors(err error) error {
 	if err == topology.ErrTopologyClosed {
 		return ErrClientDisconnected
 	}
+	if ce, ok := err.(command.Error); ok {
+		return CommandError{Code: ce.Code, Message: ce.Message, Labels: ce.Labels, Name: ce.Name}
+	}
 	return err
+}
+
+// CommandError represents an error in execution of a command against the database.
+type CommandError struct {
+	Code    int32
+	Message string
+	Labels  []string
+	Name    string
+}
+
+// Error implements the error interface.
+func (e CommandError) Error() string {
+	if e.Name != "" {
+		return fmt.Sprintf("(%v) %v", e.Name, e.Message)
+	}
+	return e.Message
+}
+
+// HasErrorLabel returns true if the error contains the specified label.
+func (e CommandError) HasErrorLabel(label string) bool {
+	if e.Labels != nil {
+		for _, l := range e.Labels {
+			if l == label {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // WriteError is a non-write concern failure that occurred as a result of a write
@@ -77,6 +116,20 @@ type WriteConcernError struct {
 }
 
 func (wce WriteConcernError) Error() string { return wce.Message }
+
+// WriteException is an error for a non-bulk write operation.
+type WriteException struct {
+	WriteConcernError *WriteConcernError
+	WriteErrors       WriteErrors
+}
+
+func (mwe WriteException) Error() string {
+	var buf bytes.Buffer
+	fmt.Fprint(&buf, "multiple write errors: [")
+	fmt.Fprintf(&buf, "{%s}, ", mwe.WriteErrors)
+	fmt.Fprintf(&buf, "{%s}]", mwe.WriteConcernError)
+	return buf.String()
+}
 
 func convertBulkWriteErrors(errors []driver.BulkWriteError) []BulkWriteError {
 	bwErrors := make([]BulkWriteError, 0, len(errors))
@@ -152,11 +205,12 @@ func processWriteError(wce *result.WriteConcernError, wes []result.WriteError, e
 	case err == command.ErrUnacknowledgedWrite:
 		return rrAll, ErrUnacknowledgedWrite
 	case err != nil:
-		return rrNone, replaceTopologyErr(err)
-	case wce != nil:
-		return rrMany, WriteConcernError{Code: wce.Code, Message: wce.ErrMsg}
-	case len(wes) > 0:
-		return rrMany, writeErrorsFromResult(wes)
+		return rrNone, replaceErrors(err)
+	case wce != nil || len(wes) > 0:
+		return rrMany, WriteException{
+			WriteConcernError: convertWriteConcernError(wce),
+			WriteErrors:       writeErrorsFromResult(wes),
+		}
 	default:
 		return rrAll, nil
 	}

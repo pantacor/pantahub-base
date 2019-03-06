@@ -9,12 +9,12 @@ package command
 import (
 	"context"
 
-	"github.com/mongodb/mongo-go-driver/bson"
-	"github.com/mongodb/mongo-go-driver/mongo/writeconcern"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
-	"github.com/mongodb/mongo-go-driver/x/mongo/driver/session"
-	"github.com/mongodb/mongo-go-driver/x/network/description"
-	"github.com/mongodb/mongo-go-driver/x/network/wiremessage"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/writeconcern"
+	"go.mongodb.org/mongo-driver/x/bsonx"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/session"
+	"go.mongodb.org/mongo-driver/x/network/description"
+	"go.mongodb.org/mongo-driver/x/network/wiremessage"
 )
 
 // DropDatabase represents the DropDatabase command.
@@ -43,13 +43,16 @@ func (dd *DropDatabase) Encode(desc description.SelectedServer) (wiremessage.Wir
 func (dd *DropDatabase) encode(desc description.SelectedServer) (*Write, error) {
 	cmd := bsonx.Doc{{"dropDatabase", bsonx.Int32(1)}}
 
-	return &Write{
-		Clock:        dd.Clock,
-		DB:           dd.DB,
-		Command:      cmd,
-		WriteConcern: dd.WriteConcern,
-		Session:      dd.Session,
-	}, nil
+	write := &Write{
+		Clock:   dd.Clock,
+		DB:      dd.DB,
+		Command: cmd,
+		Session: dd.Session,
+	}
+	if desc.WireVersion != nil && desc.WireVersion.Max >= 5 {
+		write.WriteConcern = dd.WriteConcern
+	}
+	return write, nil
 }
 
 // Decode will decode the wire message using the provided server description. Errors during decoding

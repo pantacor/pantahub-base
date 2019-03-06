@@ -10,9 +10,10 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/mongodb/mongo-go-driver/bson/bsoncodec"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/bson/bsoncodec"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func TestMarshalAppendWithRegistry(t *testing.T) {
@@ -26,6 +27,28 @@ func TestMarshalAppendWithRegistry(t *testing.T) {
 				reg = DefaultRegistry
 			}
 			got, err := MarshalAppendWithRegistry(reg, dst, tc.val)
+			noerr(t, err)
+
+			if !bytes.Equal(got, tc.want) {
+				t.Errorf("Bytes are not equal. got %v; want %v", got, tc.want)
+				t.Errorf("Bytes:\n%v\n%v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestMarshalAppendWithContext(t *testing.T) {
+	for _, tc := range marshalingTestCases {
+		t.Run(tc.name, func(t *testing.T) {
+			dst := make([]byte, 0, 1024)
+			var reg *bsoncodec.Registry
+			if tc.reg != nil {
+				reg = tc.reg
+			} else {
+				reg = DefaultRegistry
+			}
+			ec := bsoncodec.EncodeContext{Registry: reg}
+			got, err := MarshalAppendWithContext(ec, dst, tc.val)
 			noerr(t, err)
 
 			if !bytes.Equal(got, tc.want) {
@@ -56,6 +79,27 @@ func TestMarshalWithRegistry(t *testing.T) {
 	}
 }
 
+func TestMarshalWithContext(t *testing.T) {
+	for _, tc := range marshalingTestCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var reg *bsoncodec.Registry
+			if tc.reg != nil {
+				reg = tc.reg
+			} else {
+				reg = DefaultRegistry
+			}
+			ec := bsoncodec.EncodeContext{Registry: reg}
+			got, err := MarshalWithContext(ec, tc.val)
+			noerr(t, err)
+
+			if !bytes.Equal(got, tc.want) {
+				t.Errorf("Bytes are not equal. got %v; want %v", got, tc.want)
+				t.Errorf("Bytes:\n%v\n%v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestMarshalAppend(t *testing.T) {
 	for _, tc := range marshalingTestCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -72,6 +116,37 @@ func TestMarshalAppend(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMarshalExtJSONAppendWithContext(t *testing.T) {
+	t.Run("MarshalExtJSONAppendWithContext", func(t *testing.T) {
+		dst := make([]byte, 0, 1024)
+		type teststruct struct{ Foo int }
+		val := teststruct{1}
+		ec := bsoncodec.EncodeContext{Registry: DefaultRegistry}
+		got, err := MarshalExtJSONAppendWithContext(ec, dst, val, true, false)
+		noerr(t, err)
+		want := []byte(`{"foo":{"$numberInt":"1"}}`)
+		if !bytes.Equal(got, want) {
+			t.Errorf("Bytes are not equal. got %v; want %v", got, want)
+			t.Errorf("Bytes:\n%s\n%s", got, want)
+		}
+	})
+}
+
+func TestMarshalExtJSONWithContext(t *testing.T) {
+	t.Run("MarshalExtJSONWithContext", func(t *testing.T) {
+		type teststruct struct{ Foo int }
+		val := teststruct{1}
+		ec := bsoncodec.EncodeContext{Registry: DefaultRegistry}
+		got, err := MarshalExtJSONWithContext(ec, val, true, false)
+		noerr(t, err)
+		want := []byte(`{"foo":{"$numberInt":"1"}}`)
+		if !bytes.Equal(got, want) {
+			t.Errorf("Bytes are not equal. got %v; want %v", got, want)
+			t.Errorf("Bytes:\n%s\n%s", got, want)
+		}
+	})
 }
 
 func TestMarshal_roundtripFromBytes(t *testing.T) {
@@ -106,7 +181,7 @@ func TestMarshal_roundtripFromBytes(t *testing.T) {
 		0x0,
 	}
 
-	var doc bsonx.Doc
+	var doc D
 	require.NoError(t, Unmarshal(before, &doc))
 
 	after, err := Marshal(doc)
@@ -116,17 +191,19 @@ func TestMarshal_roundtripFromBytes(t *testing.T) {
 }
 
 func TestMarshal_roundtripFromDoc(t *testing.T) {
-	before := bsonx.Doc{
-		{"foo", bsonx.String("bar")},
-		{"baz", bsonx.Int32(-27)},
-		{"bing", bsonx.Array(bsonx.Arr{bsonx.Null(), bsonx.Regex("word", "i")})},
+	before := D{
+		{"foo", "bar"},
+		{"baz", int64(-27)},
+		{"bing", A{nil, primitive.Regex{Pattern: "word", Options: "i"}}},
 	}
 
 	b, err := Marshal(before)
 	require.NoError(t, err)
 
-	var after bsonx.Doc
+	var after D
 	require.NoError(t, Unmarshal(b, &after))
 
-	require.True(t, before.Equal(after))
+	if !cmp.Equal(after, before) {
+		t.Errorf("Documents to not match. got %v; want %v", after, before)
+	}
 }

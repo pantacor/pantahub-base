@@ -11,16 +11,16 @@ import (
 
 	"time"
 
-	"github.com/mongodb/mongo-go-driver/bson/bsoncodec"
-	"github.com/mongodb/mongo-go-driver/mongo/options"
-	"github.com/mongodb/mongo-go-driver/mongo/writeconcern"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
-	"github.com/mongodb/mongo-go-driver/x/mongo/driver/session"
-	"github.com/mongodb/mongo-go-driver/x/mongo/driver/topology"
-	"github.com/mongodb/mongo-go-driver/x/mongo/driver/uuid"
-	"github.com/mongodb/mongo-go-driver/x/network/command"
-	"github.com/mongodb/mongo-go-driver/x/network/description"
-	"github.com/mongodb/mongo-go-driver/x/network/result"
+	"go.mongodb.org/mongo-driver/bson/bsoncodec"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/writeconcern"
+	"go.mongodb.org/mongo-driver/x/bsonx"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/session"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/topology"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/uuid"
+	"go.mongodb.org/mongo-driver/x/network/command"
+	"go.mongodb.org/mongo-driver/x/network/description"
+	"go.mongodb.org/mongo-driver/x/network/result"
 )
 
 // FindOneAndUpdate handles the full cycle dispatch and execution of a FindOneAndUpdate command against the provided
@@ -53,11 +53,19 @@ func FindOneAndUpdate(
 
 	uo := options.MergeFindOneAndUpdateOptions(opts...)
 	if uo.ArrayFilters != nil {
-		arr, err := uo.ArrayFilters.ToArray()
+		filters, err := uo.ArrayFilters.ToArray()
 		if err != nil {
 			return result.FindAndModify{}, err
 		}
 
+		arr := make(bsonx.Arr, 0, len(filters))
+		for _, filter := range filters {
+			doc, err := bsonx.ReadDoc(filter)
+			if err != nil {
+				return result.FindAndModify{}, err
+			}
+			arr = append(arr, bsonx.Document(doc))
+		}
 		cmd.Opts = append(cmd.Opts, bsonx.Elem{"arrayFilters", bsonx.Array(arr)})
 	}
 	if uo.BypassDocumentValidation != nil {
@@ -67,7 +75,11 @@ func FindOneAndUpdate(
 		if ss.Description().WireVersion.Max < 5 {
 			return result.FindAndModify{}, ErrCollation
 		}
-		cmd.Opts = append(cmd.Opts, bsonx.Elem{"collation", bsonx.Document(uo.Collation.ToDocument())})
+		collDoc, err := bsonx.ReadDoc(uo.Collation.ToDocument())
+		if err != nil {
+			return result.FindAndModify{}, err
+		}
+		cmd.Opts = append(cmd.Opts, bsonx.Elem{"collation", bsonx.Document(collDoc)})
 	}
 	if uo.MaxTime != nil {
 		cmd.Opts = append(cmd.Opts, bsonx.Elem{"maxTimeMS", bsonx.Int64(int64(*uo.MaxTime / time.Millisecond))})
@@ -109,12 +121,13 @@ func FindOneAndUpdate(
 	res, originalErr := findOneAndUpdate(ctx, cmd, ss, nil)
 
 	// Retry if appropriate
-	if cerr, ok := originalErr.(command.Error); ok && cerr.Retryable() {
+	if cerr, ok := originalErr.(command.Error); (ok && cerr.Retryable()) ||
+		(res.WriteConcernError != nil && command.IsWriteConcernErrorRetryable(res.WriteConcernError)) {
 		ss, err := topo.SelectServer(ctx, selector)
 
 		// Return original error if server selection fails or new server does not support retryable writes
 		if err != nil || !retrySupported(topo, ss.Description(), cmd.Session, cmd.WriteConcern) {
-			return result.FindAndModify{}, originalErr
+			return res, originalErr
 		}
 
 		return findOneAndUpdate(ctx, cmd, ss, cerr)
@@ -150,5 +163,7 @@ func findOneAndUpdate(
 	}
 	defer conn.Close()
 
-	return cmd.RoundTrip(ctx, desc, conn)
+	res, err := cmd.RoundTrip(ctx, desc, conn)
+	ss.ProcessWriteConcernError(res.WriteConcernError)
+	return res, err
 }

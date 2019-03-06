@@ -19,20 +19,20 @@ import (
 	"os"
 	"path"
 
-	"github.com/mongodb/mongo-go-driver/bson"
-	"github.com/mongodb/mongo-go-driver/bson/bsontype"
-	"github.com/mongodb/mongo-go-driver/event"
-	"github.com/mongodb/mongo-go-driver/internal/testutil"
-	"github.com/mongodb/mongo-go-driver/internal/testutil/helpers"
-	"github.com/mongodb/mongo-go-driver/mongo/options"
-	"github.com/mongodb/mongo-go-driver/mongo/readconcern"
-	"github.com/mongodb/mongo-go-driver/mongo/readpref"
-	"github.com/mongodb/mongo-go-driver/mongo/writeconcern"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
-	"github.com/mongodb/mongo-go-driver/x/mongo/driver/session"
-	"github.com/mongodb/mongo-go-driver/x/network/command"
-	"github.com/mongodb/mongo-go-driver/x/network/description"
 	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/bsontype"
+	"go.mongodb.org/mongo-driver/event"
+	"go.mongodb.org/mongo-driver/internal/testutil"
+	"go.mongodb.org/mongo-driver/internal/testutil/helpers"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readconcern"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"go.mongodb.org/mongo-driver/mongo/writeconcern"
+	"go.mongodb.org/mongo-driver/x/bsonx"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/session"
+	"go.mongodb.org/mongo-driver/x/network/command"
+	"go.mongodb.org/mongo-driver/x/network/description"
 )
 
 const transactionTestsDir = "../data/transactions"
@@ -218,6 +218,10 @@ func runTransactionsTestCase(t *testing.T, test *transTestCase, testfile transTe
 		}
 
 		for _, op := range test.Operations {
+			if op.Name == "count" {
+				t.Skip("count has been deprecated")
+			}
+
 			// create collection with default read preference Primary (needed to prevent server selection fail)
 			coll = db.Collection(collName, options.Collection().SetReadPreference(readpref.Primary()))
 			addCollectionOptions(coll, op.CollectionOptions)
@@ -388,8 +392,8 @@ func executeSessionOperation(op *transOperation, sess *sessionImpl) error {
 
 func executeCollectionOperation(t *testing.T, op *transOperation, sess *sessionImpl, coll *Collection) error {
 	switch op.Name {
-	case "count":
-		_, err := executeCount(sess, coll, op.ArgMap)
+	case "countDocuments":
+		_, err := executeCountDocuments(sess, coll, op.ArgMap)
 		// no results to verify with count
 		return err
 	case "distinct":
@@ -467,7 +471,7 @@ func executeCollectionOperation(t *testing.T, op *transOperation, sess *sessionI
 	case "aggregate":
 		res, err := executeAggregate(sess, coll, op.ArgMap)
 		if !resultHasError(t, op.Result) {
-			verifyCursorResult(t, res, op.Result)
+			verifyCursorResult2(t, res, op.Result)
 		}
 		return err
 	case "bulkWrite":
@@ -500,7 +504,7 @@ func verifyError(t *testing.T, e error, result json.RawMessage) {
 		return
 	}
 
-	if cerr, ok := e.(command.Error); ok {
+	if cerr, ok := e.(CommandError); ok {
 		if expected.ErrorCodeName != "" {
 			require.NotNil(t, cerr)
 			require.Equal(t, expected.ErrorCodeName, cerr.Name)
@@ -524,7 +528,7 @@ func verifyError(t *testing.T, e error, result json.RawMessage) {
 	} else {
 		require.Equal(t, expected.ErrorCodeName, "")
 		require.Equal(t, len(expected.ErrorLabelsContain), 0)
-		// ErrorLabelsOmit can contain anything, since they are all omitted for e not type command.Error
+		// ErrorLabelsOmit can contain anything, since they are all omitted for e not type CommandError
 		// so we do not check that here
 
 		if expected.ErrorContains != "" {
@@ -588,7 +592,7 @@ func checkExpectations(t *testing.T, expectations []*transExpectation, id0 bsonx
 
 			// Keys that may be nil
 			if val.Type() == bson.TypeNull {
-				require.Equal(t, actual.LookupElement(key), bsonx.Elem{}, "Expected %s to be nil", key)
+				require.Equal(t, actual.Lookup(key), bson.RawValue{}, "Expected %s to be nil", key)
 				continue
 			} else if key == "ordered" {
 				// TODO: some tests specify that "ordered" must be a key in the event but ordered isn't a valid option for some of these cases (e.g. insertOne)
@@ -596,13 +600,18 @@ func checkExpectations(t *testing.T, expectations []*transExpectation, id0 bsonx
 			}
 
 			// Keys that should not be nil
-			require.NotEqual(t, actualVal.Type(), bsontype.Null, "Expected %v, got nil for key: %s", elem, key)
+			require.NotEqual(t, actualVal.Type, bsontype.Null, "Expected %v, got nil for key: %s", elem, key)
+			require.NoError(t, actualVal.Validate())
 			if key == "lsid" {
 				if val.StringValue() == "session0" {
-					require.True(t, id0.Equal(actualVal.Document()), "Session ID mismatch")
+					doc, err := bsonx.ReadDoc(actualVal.Document())
+					require.NoError(t, err)
+					require.True(t, id0.Equal(doc), "Session ID mismatch")
 				}
 				if val.StringValue() == "session1" {
-					require.True(t, id1.Equal(actualVal.Document()), "Session ID mismatch")
+					doc, err := bsonx.ReadDoc(actualVal.Document())
+					require.NoError(t, err)
+					require.True(t, id1.Equal(doc), "Session ID mismatch")
 				}
 			} else if key == "getMore" {
 				require.NotNil(t, actualVal, "Expected %v, got nil for key: %s", elem, key)
@@ -620,10 +629,14 @@ func checkExpectations(t *testing.T, expectations []*transExpectation, id0 bsonx
 					require.NotNil(t, rcActualDoc.Lookup("afterClusterTime"))
 				}
 				if level.Type() != bsontype.Null {
-					compareElements(t, rcExpectDoc.LookupElement("level"), rcActualDoc.LookupElement("level"))
+					doc, err := bsonx.ReadDoc(rcActualDoc)
+					require.NoError(t, err)
+					compareElements(t, rcExpectDoc.LookupElement("level"), doc.LookupElement("level"))
 				}
 			} else {
-				compareElements(t, elem, actual.LookupElement(key))
+				doc, err := bsonx.ReadDoc(actual)
+				require.NoError(t, err)
+				compareElements(t, elem, doc.LookupElement(key))
 			}
 
 		}
