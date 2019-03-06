@@ -16,9 +16,10 @@
 package s3
 
 import (
-	"io"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 )
 
@@ -27,19 +28,14 @@ type inputS3Uploader interface {
 }
 
 type S3Uploader interface {
-	Upload(key string, r io.ReadSeeker) error
+	UploadURL(key string) (string, error)
 }
 
-func (s *s3impl) Upload(key string, r io.ReadSeeker) error {
-	// reset reader to start of stream
-	r.Seek(0, 0)
-
-	input := &s3manager.UploadInput{
+func (s *s3impl) UploadURL(key string) (string, error) {
+	resp, _ := s.session.PutObjectRequest(&s3.PutObjectInput{
 		Bucket: aws.String(s.connectionParams.Bucket),
 		Key:    aws.String(key),
-		Body:   r,
-	}
+	})
 
-	_, err := s.uploader.Upload(input)
-	return err
+	return resp.Presign(60 * time.Minute)
 }

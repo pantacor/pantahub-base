@@ -16,7 +16,7 @@ package s3
 
 import (
 	"io"
-	"log"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -28,16 +28,14 @@ type inputS3Downloader interface {
 }
 
 type S3Downloader interface {
-	Download(key string, w io.WriterAt) error
+	DownloadURL(key string) (string, error)
 }
 
-func (s *s3impl) Download(key string, w io.WriterAt) error {
-	log.Printf("INFO: downloading file %s using parameters %+v\n", key, s.connectionParams)
-	input := &s3.GetObjectInput{
+func (s *s3impl) DownloadURL(key string) (string, error) {
+	req, _ := s.session.GetObjectRequest(&s3.GetObjectInput{
 		Bucket: aws.String(s.connectionParams.Bucket),
 		Key:    aws.String(key),
-	}
+	})
 
-	_, err := s.downloader.Download(w, input)
-	return err
+	return req.Presign(60 * time.Minute)
 }

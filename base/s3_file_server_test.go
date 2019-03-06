@@ -13,41 +13,55 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
-package objects
+package base
 
 import (
 	"bytes"
 	"crypto/sha256"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
-	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/objects"
 )
 
-type LocalFileUploadServerTestSuite struct {
+type mockUploader struct {
+	mock.Mock
+}
+
+func (m mockUploader) Upload(key string, r io.ReadSeeker) error {
+	return m.Called(key).Error(0)
+}
+
+type mockDownloader struct {
+	mock.Mock
+	ContentToWrite []byte
+}
+
+func (m mockDownloader) Download(key string, w io.WriterAt) error {
+	if len(m.ContentToWrite) > 0 {
+		w.WriteAt(m.ContentToWrite, 0)
+	}
+	return m.Called(key, w).Error(0)
+}
+
+type S3FileServerTestSuite struct {
 	suite.Suite
-	server *LocalFileUploadServer
+	server *S3FileServer
 }
 
-func (suite *LocalFileUploadServerTestSuite) SetupTest() {
-	basePath := utils.PantahubS3Path()
-	fileServer := http.FileServer(http.Dir(basePath))
-	suite.server = &LocalFileUploadServer{fileServer: fileServer}
+func (suite *S3FileServerTestSuite) SetupTest() {
+	suite.server = NewS3FileServer()
 }
 
-func (suite *LocalFileUploadServerTestSuite) TestOpenForWrite() {
-	file, err := suite.server.openForWrite("testing")
-	assert.NoError(suite.T(), err)
-	assert.NotNil(suite.T(), file)
-}
-
-func (suite *LocalFileUploadServerTestSuite) generateSignedToken(method string, content []byte) string {
+func (suite *S3FileServerTestSuite) generateSignedToken(method string, content []byte) string {
 	sha := fmt.Sprintf("%x", sha256.Sum256(content))
-	o := NewObjectAccessForSec(
+	o := objects.NewObjectAccessForSec(
 		"testing",
 		method,
 		int64(len(content)),
@@ -67,7 +81,7 @@ func (suite *LocalFileUploadServerTestSuite) generateSignedToken(method string, 
 
 }
 
-func (suite *LocalFileUploadServerTestSuite) TestPushObjectMatchingSHA() {
+func (suite *S3FileServerTestSuite) TestPushObjectMatchingSHA() {
 	content := []byte("testing")
 	token := suite.generateSignedToken(http.MethodPut, content)
 	req, err := http.NewRequest(http.MethodPut, "/local-s3/"+token, bytes.NewReader(content))
@@ -78,7 +92,7 @@ func (suite *LocalFileUploadServerTestSuite) TestPushObjectMatchingSHA() {
 	assert.Equal(suite.T(), http.StatusOK, rr.Code)
 }
 
-func (suite *LocalFileUploadServerTestSuite) TestPushObjectNotMatchingSHA() {
+func (suite *S3FileServerTestSuite) TestPushObjectNotMatchingSHA() {
 	correct := []byte("content")
 	invalid := []byte("invalid-content")
 	token := suite.generateSignedToken(http.MethodPut, correct)
@@ -90,7 +104,7 @@ func (suite *LocalFileUploadServerTestSuite) TestPushObjectNotMatchingSHA() {
 	assert.Equal(suite.T(), http.StatusBadRequest, rr.Code)
 }
 
-func (suite *LocalFileUploadServerTestSuite) TestGetObjectNotUploaded() {
+func (suite *S3FileServerTestSuite) TestGetObjectNotUploaded() {
 	token := suite.generateSignedToken(http.MethodPut, nil)
 	req, err := http.NewRequest(http.MethodGet, "/local-s3/"+token, nil)
 	assert.NoError(suite.T(), err)
@@ -100,7 +114,7 @@ func (suite *LocalFileUploadServerTestSuite) TestGetObjectNotUploaded() {
 	assert.Equal(suite.T(), http.StatusForbidden, rr.Code)
 }
 
-func (suite *LocalFileUploadServerTestSuite) TestGetObjectWithInvalidToken() {
+func (suite *S3FileServerTestSuite) TestGetObjectWithInvalidToken() {
 	req, err := http.NewRequest(http.MethodGet, "/local-s3/invalid-token", nil)
 	assert.NoError(suite.T(), err)
 
@@ -109,6 +123,6 @@ func (suite *LocalFileUploadServerTestSuite) TestGetObjectWithInvalidToken() {
 	assert.Equal(suite.T(), http.StatusForbidden, rr.Code)
 }
 
-func TestLocalFileUploadServerTestSuite(t *testing.T) {
-	suite.Run(t, new(LocalFileUploadServerTestSuite))
+func TestS3FileServerTestSuite(t *testing.T) {
+	suite.Run(t, new(S3FileServerTestSuite))
 }

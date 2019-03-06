@@ -13,7 +13,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
-package objects
+package base
 
 import (
 	"crypto/sha256"
@@ -28,15 +28,20 @@ import (
 
 	"gopkg.in/mgo.v2/bson"
 
+	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
 
-type LocalFileUploadServer struct {
+type LocalFileServer struct {
 	fileServer http.Handler
 	directory  string
 }
 
-func (d LocalFileUploadServer) openForWrite(name string) (*os.File, error) {
+func falseAuthenticator(userId string, password string) bool {
+	return false
+}
+
+func (d LocalFileServer) openForWrite(name string) (*os.File, error) {
 	fpath, err := utils.MakeLocalS3PathForName(name)
 	if err != nil {
 		return nil, err
@@ -54,23 +59,18 @@ func (d LocalFileUploadServer) openForWrite(name string) (*os.File, error) {
 	return f, nil
 }
 
-func (f LocalFileUploadServer) Exists(key string) bool {
-	_, err := os.Stat(key)
-	return os.IsExist(err)
-}
-
-func (f LocalFileUploadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (f LocalFileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	dirName := filepath.Dir(r.URL.Path)
 	fileBase := filepath.Base(r.URL.Path)
 
-	tok, err := NewFromValidToken(fileBase)
+	tok, err := objects.NewFromValidToken(fileBase)
 	if err != nil {
 		log.Println("Invalid local-s3 request (" + fileBase + "): " + err.Error())
 		w.WriteHeader(http.StatusForbidden)
 		return
 	}
 
-	objClaims := tok.Token.Claims.(*ObjectAccessClaims)
+	objClaims := tok.Token.Claims.(*objects.ObjectAccessClaims)
 	storageId := objClaims.Audience
 	p, _ := url.Parse(path.Join(dirName, storageId))
 	r.URL = r.URL.ResolveReference(p)
@@ -160,6 +160,8 @@ fail:
 	}
 }
 
-func NewLocalFileUploadServer() FileUploadServer {
-	return &LocalFileUploadServer{fileServer: http.FileServer(http.Dir(utils.PantahubS3Path())), directory: utils.PantahubS3Path()}
+var fserver *LocalFileServer
+
+func GetLocalFileServer() *LocalFileServer {
+	return fserver
 }
