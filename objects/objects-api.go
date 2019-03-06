@@ -16,6 +16,7 @@
 package objects
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -30,31 +31,31 @@ import (
 
 	jwtgo "github.com/dgrijalva/jwt-go"
 	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
+	"github.com/mongodb/mongo-go-driver/mongo"
+	"github.com/mongodb/mongo-go-driver/mongo/options"
+	"github.com/mongodb/mongo-go-driver/x/bsonx"
 
 	"github.com/alecthomas/units"
 	"github.com/ant0ine/go-json-rest/rest"
 	"gitlab.com/pantacor/pantahub-base/utils"
-	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
 type ObjectsApp struct {
 	jwt_middleware *jwt.JWTMiddleware
 	Api            *rest.Api
-	mgoSession     *mgo.Session
+	mongoClient    *mongo.Client
 	subService     subscriptions.SubscriptionService
+
+	awsS3Bucket string
+	awsRegion   string
 }
 
-var pantahubStoragePath string
+var pantahubS3Path string
 var pantahubHttpsUrl string
 
 func init() {
-	// handle deprecated S3Path
-	pantahubStoragePath = utils.GetEnv(utils.ENV_PANTAHUB_S3PATH)
-	if pantahubStoragePath == "" {
-		pantahubStoragePath = utils.GetEnv(utils.ENV_PANTAHUB_STORAGE_PATH)
-	}
-
+	pantahubS3Path = utils.GetEnv(utils.ENV_PANTAHUB_S3PATH)
 	pantahubHost := utils.GetEnv(utils.ENV_PANTAHUB_HOST)
 	pantahubPort := utils.GetEnv(utils.ENV_PANTAHUB_PORT)
 	pantahubScheme := utils.GetEnv(utils.ENV_PANTAHUB_SCHEME)
@@ -67,7 +68,7 @@ func init() {
 }
 
 func PantahubS3Path() string {
-	return pantahubStoragePath
+	return pantahubS3Path
 }
 
 func PantahubS3DevUrl() string {
@@ -89,17 +90,22 @@ func MakeStorageId(owner string, sha []byte) string {
 }
 
 func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
+
+	newObject := Object{}
+
+	r.DecodeJsonPayload(&newObject)
+
+	var ownerStr string
+
 	caller, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		rest.Error(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
-
-	var ownerStr string
 	callerStr, ok := caller.(string)
-	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 	if authType.(string) == "USER" {
 		ownerStr = callerStr
 	} else {
@@ -118,14 +124,9 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	newObject := Object{}
-
-	r.DecodeJsonPayload(&newObject)
-
-	// Set object ownership to request user
 	newObject.Owner = ownerStr
 
-	collection := a.mgoSession.DB("").C("pantahub_objects")
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -154,7 +155,7 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 
 	SyncObjectSizes(&newObject)
 
-	result, err := CalcUsageAfterPost(ownerStr, a.mgoSession, bson.ObjectId(newObject.Id), newObject.SizeInt)
+	result, err := CalcUsageAfterPost(ownerStr, a.mongoClient, newObject.Id, newObject.SizeInt)
 
 	if err != nil {
 		log.Printf("ERROR: CalcUsageAfterPost failed: %s\n", err.Error())
@@ -177,7 +178,12 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 			http.StatusPreconditionFailed)
 	}
 
-	err = collection.Insert(newObject)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err = collection.InsertOne(
+		ctx,
+		newObject,
+	)
 
 	if err != nil {
 		filePath, err := utils.MakeLocalS3PathForName(storageId)
@@ -196,8 +202,18 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 			goto conflict
 		}
 
-		err = collection.UpdateId(newObject.StorageId, newObject)
-
+		ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		updatedResult, err := collection.UpdateOne(
+			ctx,
+			bson.M{"_id": newObject.StorageId},
+			bson.M{"$set": newObject},
+		)
+		if updatedResult.MatchedCount == 0 {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Header().Add("X-PH-Error", "Error updating previously failed object in database ")
+			return
+		}
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Header().Add("X-PH-Error", "Error updating previously failed object in database "+err.Error())
@@ -223,7 +239,7 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	collection := a.mgoSession.DB("").C("pantahub_objects")
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -246,11 +262,13 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	storageId := MakeStorageId(ownerStr, sha)
-
-	err = collection.Find(bson.M{
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err = collection.FindOne(ctx, bson.M{
 		"_id":     storageId,
 		"garbage": bson.M{"$ne": true},
-	}).One(&newObject)
+	}).Decode(&newObject)
+
 	if err != nil {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
@@ -268,8 +286,7 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 	newObject.Id = putId
 
 	SyncObjectSizes(&newObject)
-
-	result, err := CalcUsageAfterPut(ownerStr, a.mgoSession, bson.ObjectId(putId), newObject.SizeInt)
+	result, err := CalcUsageAfterPut(ownerStr, a.mongoClient, newObject.Id, newObject.SizeInt)
 
 	if err != nil {
 		log.Println("Error to calc diskquota: " + err.Error())
@@ -290,17 +307,29 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 			http.StatusPreconditionFailed)
 	}
 
-	collection.UpsertId(storageId, newObject)
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	updateOptions := options.Update()
+	updateOptions.SetUpsert(true)
+	_, err = collection.UpdateOne(
+		ctx,
+		bson.M{"_id": storageId},
+		bson.M{"$set": newObject},
+		updateOptions,
+	)
+	if err != nil {
+		rest.Error(w, "Error updating device public state", http.StatusForbidden)
+		return
+	}
 
 	w.WriteJson(newObject)
 }
 
 func (a *ObjectsApp) GetDiskQuota(prn string) (float64, error) {
+
 	sub, err := a.subService.LoadBySubject(utils.Prn(prn))
-	if err == mgo.ErrNotFound {
+	if err != nil {
 		sub = a.subService.GetDefaultSubscription(utils.Prn(prn))
-	} else if err != nil {
-		return 0, err
 	}
 
 	quota := sub.GetProperty("OBJECTS").(string)
@@ -390,7 +419,7 @@ func (a *ObjectsApp) handle_getobject(w rest.ResponseWriter, r *rest.Request) {
 		}
 	}
 
-	collection := a.mgoSession.DB("").C("pantahub_objects")
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -416,11 +445,12 @@ func (a *ObjectsApp) handle_getobject(w rest.ResponseWriter, r *rest.Request) {
 	storageId := MakeStorageId(ownerStr, sha)
 
 	var filesObj Object
-
-	err = collection.Find(bson.M{
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err = collection.FindOne(ctx, bson.M{
 		"_id":     storageId,
 		"garbage": bson.M{"$ne": true},
-	}).One(&filesObj)
+	}).Decode(&filesObj)
 
 	if err != nil {
 		rest.Error(w, "No Access", http.StatusForbidden)
@@ -453,7 +483,7 @@ func (a *ObjectsApp) handle_getobjectfile(w rest.ResponseWriter, r *rest.Request
 		}
 	}
 
-	collection := a.mgoSession.DB("").C("pantahub_objects")
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -478,10 +508,12 @@ func (a *ObjectsApp) handle_getobjectfile(w rest.ResponseWriter, r *rest.Request
 	storageId := MakeStorageId(ownerStr, sha)
 
 	var filesObj Object
-	err = collection.Find(bson.M{
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err = collection.FindOne(ctx, bson.M{
 		"_id":     storageId,
 		"garbage": bson.M{"$ne": true},
-	}).One(&filesObj)
+	}).Decode(&filesObj)
 
 	if err != nil {
 		rest.Error(w, "No Access", http.StatusForbidden)
@@ -513,7 +545,7 @@ func (a *ObjectsApp) handle_getobjects(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	collection := a.mgoSession.DB("").C("pantahub_objects")
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -533,7 +565,28 @@ func (a *ObjectsApp) handle_getobjects(w rest.ResponseWriter, r *rest.Request) {
 	m["garbage"] = bson.M{"$ne": true}
 
 	newObjects := make([]Object, 0)
-	collection.Find(m).All(&newObjects)
+	findOptions := options.Find()
+	findOptions.SetNoCursorTimeout(true)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	cur, err := collection.Find(ctx, bson.M{
+		"owner":   owner,
+		"garbage": bson.M{"$ne": true},
+	}, findOptions)
+	if err != nil {
+		rest.Error(w, "Error on fetching objects:"+err.Error(), http.StatusForbidden)
+		return
+	}
+	defer cur.Close(ctx)
+	for cur.Next(ctx) {
+		result := Object{}
+		err := cur.Decode(&result)
+		if err != nil {
+			rest.Error(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
+			return
+		}
+		newObjects = append(newObjects, result)
+	}
 
 	w.WriteJson(newObjects)
 }
@@ -547,7 +600,7 @@ func (a *ObjectsApp) handle_deleteobject(w rest.ResponseWriter, r *rest.Request)
 		return
 	}
 
-	collection := a.mgoSession.DB("").C("pantahub_objects")
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -572,40 +625,69 @@ func (a *ObjectsApp) handle_deleteobject(w rest.ResponseWriter, r *rest.Request)
 	storageId := MakeStorageId(ownerStr, sha)
 
 	newObject := Object{}
-	collection.Find(bson.M{
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err = collection.FindOne(ctx, bson.M{
 		"_id":     storageId,
 		"garbage": bson.M{"$ne": true},
-	}).One(&newObject)
+	}).Decode(&newObject)
+	if err != nil {
+		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
+		return
+	}
 
 	if newObject.Owner == owner {
-		collection.RemoveId(storageId)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		deleteResult, err := collection.DeleteOne(ctx, bson.M{
+			"_id":     storageId,
+			"garbage": bson.M{"$ne": true},
+		})
+		if err != nil {
+			rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
+			return
+		}
+		if deleteResult.DeletedCount == 0 {
+			rest.Error(w, "Object not deleted", http.StatusForbidden)
+			return
+		}
 	}
 
 	w.WriteJson(newObject)
 }
 
 func New(jwtMiddleware *jwt.JWTMiddleware, subService subscriptions.SubscriptionService,
-	session *mgo.Session) *ObjectsApp {
+	mongoClient *mongo.Client) *ObjectsApp {
 
 	app := new(ObjectsApp)
 	if defaultObjectsApp == nil {
 		defaultObjectsApp = app
 	}
 	app.jwt_middleware = jwtMiddleware
-	app.mgoSession = session
+	app.mongoClient = mongoClient
 	app.subService = subService
 
-	// Indexing for the owner,garbage fields in pantahub_objects
-	index := mgo.Index{
-		Key:        []string{"owner", "garbage"},
-		Unique:     false,
-		Background: true,
-		Sparse:     false,
-	}
+	// XXX: allow config through env
+	app.awsS3Bucket = "systemcloud-001"
+	app.awsRegion = "us-east-1"
 
-	err := app.mgoSession.DB("").C("pantahub_objects").EnsureIndex(index)
+	// Indexing for the owner,garbage fields in pantahub_objects
+	collection := app.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
+	indexOptions := options.CreateIndexes().SetMaxTime(10 * time.Second)
+	index := mongo.IndexModel{
+		Keys: bsonx.Doc{
+			{Key: "owner", Value: bsonx.Int32(1)},
+			{Key: "garbage", Value: bsonx.Int32(1)},
+		},
+		Options: bsonx.Doc{
+			{Key: "unique", Value: bsonx.Boolean(false)},
+			{Key: "sparse", Value: bsonx.Boolean(false)},
+			{Key: "background", Value: bsonx.Boolean(true)},
+		},
+	}
+	_, err := collection.Indexes().CreateOne(context.Background(), index, indexOptions)
 	if err != nil {
-		log.Println("Error setting up index {owner,garbage} for pantahub_objects: " + err.Error())
+		log.Fatalln("Error setting up index for pantahub_objects: " + err.Error())
 		return nil
 	}
 

@@ -16,6 +16,7 @@
 package devices
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"math/rand"
@@ -29,10 +30,13 @@ import (
 	petname "github.com/dustinkirkland/golang-petname"
 	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
 	"github.com/go-resty/resty"
+	"github.com/mongodb/mongo-go-driver/bson/primitive"
+	"github.com/mongodb/mongo-go-driver/mongo"
+	"github.com/mongodb/mongo-go-driver/mongo/options"
+	"github.com/mongodb/mongo-go-driver/x/bsonx"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/gcapi"
 	"gitlab.com/pantacor/pantahub-base/utils"
-	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -46,11 +50,11 @@ func init() {
 type DevicesApp struct {
 	jwt_middleware *jwt.JWTMiddleware
 	Api            *rest.Api
-	mgoSession     *mgo.Session
+	mongoClient    *mongo.Client
 }
 
 type Device struct {
-	Id           bson.ObjectId          `json:"id" bson:"_id"`
+	Id           primitive.ObjectID     `json:"id" bson:"_id"`
 	Prn          string                 `json:"prn"`
 	Nick         string                 `json:"nick"`
 	Owner        string                 `json:"owner"`
@@ -98,7 +102,6 @@ func (a *DevicesApp) handle_putuserdata(w rest.ResponseWriter, r *rest.Request) 
 	}
 
 	deviceId := r.PathParam("id")
-	bsonId := bson.ObjectIdHex(deviceId)
 
 	data := map[string]interface{}{}
 	err := r.DecodeJsonPayload(&data)
@@ -108,25 +111,33 @@ func (a *DevicesApp) handle_putuserdata(w rest.ResponseWriter, r *rest.Request) 
 	}
 	data = utils.BsonQuoteMap(&data)
 
-	collection := a.mgoSession.DB("").C("pantahub_devices")
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
-
-	var device Device
-	err = collection.Find(
-		bson.M{"_id": bsonId, "owner": owner.(string)},
-	).One(&device)
-
-	for key, value := range data {
-		device.UserMeta[key] = value
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	deviceObjectID, err := primitive.ObjectIDFromHex(deviceId)
+	if err != nil {
+		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		return
 	}
-
-	err = collection.Update(
-		bson.M{"_id": bsonId, "owner": owner.(string)},
-		bson.M{"$set": bson.M{"user-meta": device.UserMeta, "timemodified": time.Now()}},
+	updateResult, err := collection.UpdateOne(
+		ctx,
+		bson.M{
+			"_id":   deviceObjectID,
+			"owner": owner.(string),
+		},
+		bson.M{"$set": bson.M{
+			"user-meta":    data,
+			"timemodified": time.Now(),
+		}},
 	)
+	if updateResult.MatchedCount == 0 {
+		rest.Error(w, "Error updating device user-meta: not found", http.StatusBadRequest)
+		return
+	}
 	if err != nil {
 		rest.Error(w, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
 		return
@@ -163,23 +174,43 @@ func (a *DevicesApp) handle_putdevicedata(w rest.ResponseWriter, r *rest.Request
 	}
 
 	deviceId := r.PathParam("id")
-	bsonId := bson.ObjectIdHex(deviceId)
+	deviceObjectID, err := primitive.ObjectIDFromHex(deviceId)
+	if err != nil {
+		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	data := map[string]interface{}{}
-	err := r.DecodeJsonPayload(&data)
+	err = r.DecodeJsonPayload(&data)
 	if err != nil {
 		rest.Error(w, "Error parsing data: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	data = utils.BsonQuoteMap(&data)
 
-	collection := a.mgoSession.DB("").C("pantahub_devices")
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
-	err = collection.Update(bson.M{"_id": bsonId, "prn": owner.(string)}, bson.M{"$set": bson.M{"device-meta": data, "timemodified": time.Now()}})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	updateResult, err := collection.UpdateOne(
+		ctx,
+		bson.M{
+			"_id": deviceObjectID,
+			"prn": owner.(string),
+		},
+		bson.M{"$set": bson.M{
+			"device-meta":  data,
+			"timemodified": time.Now(),
+		}},
+	)
+	if updateResult.MatchedCount == 0 {
+		rest.Error(w, "Error updating device user-meta: not found", http.StatusBadRequest)
+		return
+	}
 	if err != nil {
 		rest.Error(w, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
 		return
@@ -195,7 +226,12 @@ func (a *DevicesApp) handle_postdevice(w rest.ResponseWriter, r *rest.Request) {
 	r.DecodeJsonPayload(&newDevice)
 
 	mgoid := bson.NewObjectId()
-	newDevice.Id = mgoid
+	ObjectID, err := primitive.ObjectIDFromHex(mgoid.Hex())
+	if err != nil {
+		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	newDevice.Id = ObjectID
 	newDevice.Prn = "prn:::devices:/" + newDevice.Id.Hex()
 
 	// if user does not provide a secret, we invent one ...
@@ -254,14 +290,25 @@ func (a *DevicesApp) handle_postdevice(w rest.ResponseWriter, r *rest.Request) {
 		newDevice.Nick = petname.Generate(3, "_")
 	}
 
-	collection := a.mgoSession.DB("").C("pantahub_devices")
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
-	_, err := collection.UpsertId(mgoid, newDevice)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	updateOptions := options.Update()
+	updateOptions.SetUpsert(true)
+	_, err = collection.UpdateOne(
+		ctx,
+		bson.M{"_id": ObjectID},
+		bson.M{"$set": newDevice},
+		updateOptions,
+	)
+
 	if err != nil {
+		log.Print(newDevice)
 		rest.Error(w, "Error creating device "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -299,17 +346,22 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 		callerIsUser = true
 	}
 
-	collection := a.mgoSession.DB("").C("pantahub_devices")
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
-
-	err := collection.Find(bson.M{
-		"_id":     bson.ObjectIdHex(putId),
-		"garbage": bson.M{"$ne": true},
-	}).One(&newDevice)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	deviceObjectID, err := primitive.ObjectIDFromHex(putId)
+	if err != nil {
+		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	err = collection.FindOne(ctx,
+		bson.M{"_id": deviceObjectID}).
+		Decode(&newDevice)
 
 	if err != nil {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
@@ -386,7 +438,16 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	newDevice.TimeModified = time.Now()
-	collection.UpsertId(newDevice.Id, newDevice)
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	updateOptions := options.Update()
+	updateOptions.SetUpsert(true)
+	_, err = collection.UpdateOne(
+		ctx,
+		bson.M{"_id": newDevice.Id},
+		bson.M{"$set": newDevice},
+		updateOptions,
+	)
 
 	// unquote back to original format
 	newDevice.UserMeta = utils.BsonUnquoteMap(&newDevice.UserMeta)
@@ -425,24 +486,29 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 		callerIsUser = true
 	}
 
-	collection := a.mgoSession.DB("").C("pantahub_devices")
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
-	collectionAccounts := a.mgoSession.DB("").C("pantahub_accounts")
+	collectionAccounts := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
 
 	if collectionAccounts == nil {
 		rest.Error(w, "Error with Database (accounts) connectivity", http.StatusInternalServerError)
 		return
 	}
-
-	err := collection.Find(bson.M{
-		"_id":     mgoid,
-		"garbage": bson.M{"$ne": true},
-	}).One(&device)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	deviceObjectID, err := primitive.ObjectIDFromHex(mgoid.Hex())
+	if err != nil {
+		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	err = collection.FindOne(ctx,
+		bson.M{"_id": deviceObjectID}).
+		Decode(&device)
 
 	if err != nil {
 		rest.Error(w, "No Access", http.StatusForbidden)
@@ -474,7 +540,11 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 		// first check default accounts like user1, user2, etc...
 		ownerAccount, ok := accounts.DefaultAccounts[device.Owner]
 		if !ok {
-			err = collectionAccounts.Find(bson.M{"prn": device.Owner}).One(&ownerAccount)
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			err := collectionAccounts.FindOne(ctx,
+				bson.M{"prn": device.Owner}).
+				Decode(&ownerAccount)
 
 			if err != nil {
 				rest.Error(w, "Owner account not Found", http.StatusInternalServerError)
@@ -538,43 +608,40 @@ func (a *DevicesApp) handle_getuserdevice(w rest.ResponseWriter, r *rest.Request
 	// if not a default, lets look for proper accounts in db...
 	if !isDefaultAccount {
 
-		collAccounts := a.mgoSession.DB("").C("pantahub_accounts")
+		collAccounts := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
 		if collAccounts == nil {
 			rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 			return
 		}
 
-		err := collAccounts.Find(bson.M{"nick": usernick}).One(&account)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		err := collAccounts.FindOne(ctx,
+			bson.M{"nick": usernick}).
+			Decode(&account)
 
-		if err == mgo.ErrNotFound {
-			log.Println("ERROR: error getting account by nick: " + err.Error())
-			rest.Error(w, "Not Found", http.StatusNotFound)
-			return
-		} else if err != nil {
+		if err != nil {
 			log.Println("ERROR: error getting account by nick: " + err.Error())
 			rest.Error(w, "Internal Error", http.StatusInternalServerError)
 			return
 		}
 	}
 
-	collDevices := a.mgoSession.DB("").C("pantahub_devices")
+	collDevices := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
 	if collDevices == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
-
-	err := collDevices.Find(bson.M{
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err := collDevices.FindOne(ctx, bson.M{
 		"nick":    devicenick,
 		"owner":   account.Prn,
 		"garbage": bson.M{"$ne": true},
-	}).One(&device)
+	}).Decode(&device)
 
-	if err == mgo.ErrNotFound {
-		log.Println("ERROR: error getting device by nick: " + err.Error())
-		rest.Error(w, "Not Found", http.StatusNotFound)
-		return
-	} else if err != nil {
+	if err != nil {
 		log.Println("ERROR: error getting device by nick: " + err.Error())
 		rest.Error(w, "Internal Error", http.StatusNotFound)
 		return
@@ -630,17 +697,24 @@ func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) 
 		return
 	}
 
-	collection := a.mgoSession.DB("").C("pantahub_devices")
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
-	err := collection.Find(bson.M{
-		"_id":     bson.ObjectIdHex(patchId),
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	deviceID, err := primitive.ObjectIDFromHex(patchId)
+	if err != nil {
+		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	err = collection.FindOne(ctx, bson.M{
+		"_id":     deviceID,
 		"garbage": bson.M{"$ne": true},
-	}).One(&newDevice)
+	}).Decode(&newDevice)
 	if err != nil {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
@@ -667,11 +741,15 @@ func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) 
 
 	if patched {
 		newDevice.TimeModified = time.Now()
-		_, err = collection.UpsertId(newDevice.Id, newDevice)
-		if mgo.IsDup(err) {
-			rest.Error(w, "Device unique constraint violated", http.StatusConflict)
-			return
-		} else if err != nil {
+		updateOptions := options.Update()
+		updateOptions.SetUpsert(true)
+		_, err = collection.UpdateOne(
+			ctx,
+			bson.M{"_id": newDevice.Id},
+			bson.M{"$set": newDevice},
+			updateOptions,
+		)
+		if err != nil {
 			rest.Error(w, "Error updating patched device state", http.StatusForbidden)
 			return
 		}
@@ -685,7 +763,7 @@ func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) 
 
 func (a *DevicesApp) handle_patchdevicedata(w rest.ResponseWriter, r *rest.Request) {
 
-	collection := a.mgoSession.DB("").C("pantahub_devices")
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
@@ -718,12 +796,17 @@ func (a *DevicesApp) handle_patchdevicedata(w rest.ResponseWriter, r *rest.Reque
 	}
 
 	deviceId := r.PathParam("id")
-	bsonId := bson.ObjectIdHex(deviceId)
-
-	err := collection.Find(bson.M{
-		"_id":     bsonId,
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	deviceObjectID, err := primitive.ObjectIDFromHex(deviceId)
+	if err != nil {
+		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	err = collection.FindOne(ctx, bson.M{
+		"_id":     deviceObjectID,
 		"garbage": bson.M{"$ne": true},
-	}).One(&device)
+	}).Decode(&device)
 	if err != nil {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
@@ -741,9 +824,25 @@ func (a *DevicesApp) handle_patchdevicedata(w rest.ResponseWriter, r *rest.Reque
 			delete(device.DeviceMeta, k)
 		}
 	}
-	err = collection.Update(bson.M{"_id": bsonId, "prn": owner.(string)}, bson.M{"$set": bson.M{"device-meta": device.DeviceMeta, "timemodified": time.Now()}})
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	updateResult, err := collection.UpdateOne(
+		ctx,
+		bson.M{
+			"_id": deviceObjectID,
+			"prn": owner.(string),
+		},
+		bson.M{"$set": bson.M{
+			"device-meta":  device.DeviceMeta,
+			"timemodified": time.Now(),
+		}},
+	)
+	if updateResult.MatchedCount == 0 {
+		rest.Error(w, "Error updating device-meta: not found", http.StatusBadRequest)
+		return
+	}
 	if err != nil {
-		rest.Error(w, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
+		rest.Error(w, "Error updating device-meta: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -776,17 +875,24 @@ func (a *DevicesApp) handle_putpublic(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	collection := a.mgoSession.DB("").C("pantahub_devices")
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
-
-	err := collection.Find(bson.M{
-		"_id":     bson.ObjectIdHex(putId),
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	deviceObjectID, err := primitive.ObjectIDFromHex(putId)
+	if err != nil {
+		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	err = collection.FindOne(ctx, bson.M{
+		"_id":     deviceObjectID,
 		"garbage": bson.M{"$ne": true},
-	}).One(&newDevice)
+	}).Decode(&newDevice)
+
 	if err != nil {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
@@ -800,7 +906,16 @@ func (a *DevicesApp) handle_putpublic(w rest.ResponseWriter, r *rest.Request) {
 	newDevice.IsPublic = true
 	newDevice.TimeModified = time.Now()
 
-	_, err = collection.UpsertId(newDevice.Id, newDevice)
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	updateOptions := options.Update()
+	updateOptions.SetUpsert(true)
+	_, err = collection.UpdateOne(
+		ctx,
+		bson.M{"_id": newDevice.Id},
+		bson.M{"$set": newDevice},
+		updateOptions,
+	)
 	if err != nil {
 		rest.Error(w, "Error updating device public state", http.StatusForbidden)
 		return
@@ -835,17 +950,23 @@ func (a *DevicesApp) handle_deletepublic(w rest.ResponseWriter, r *rest.Request)
 		return
 	}
 
-	collection := a.mgoSession.DB("").C("pantahub_devices")
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
-
-	err := collection.Find(bson.M{
-		"_id":     bson.ObjectIdHex(putId),
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	deviceObjectID, err := primitive.ObjectIDFromHex(putId)
+	if err != nil {
+		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	err = collection.FindOne(ctx, bson.M{
+		"_id":     deviceObjectID,
 		"garbage": bson.M{"$ne": true},
-	}).One(&newDevice)
+	}).Decode(&newDevice)
 	if err != nil {
 		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
@@ -859,7 +980,16 @@ func (a *DevicesApp) handle_deletepublic(w rest.ResponseWriter, r *rest.Request)
 	newDevice.IsPublic = false
 	newDevice.TimeModified = time.Now()
 
-	_, err = collection.UpsertId(newDevice.Id, newDevice)
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	updateOptions := options.Update()
+	updateOptions.SetUpsert(true)
+	_, err = collection.UpdateOne(
+		ctx,
+		bson.M{"_id": newDevice.Id},
+		bson.M{"$set": newDevice},
+		updateOptions,
+	)
 	if err != nil {
 		rest.Error(w, "Error updating device public state", http.StatusForbidden)
 		return
@@ -885,7 +1015,7 @@ func (a *DevicesApp) handle_getdevices(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	collection := a.mgoSession.DB("").C("pantahub_devices")
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -894,15 +1024,30 @@ func (a *DevicesApp) handle_getdevices(w rest.ResponseWriter, r *rest.Request) {
 
 	devices := make([]Device, 0)
 
-	collection.Find(bson.M{
+	findOptions := options.Find()
+	findOptions.SetHint(bson.M{"_id": 1}) //Index fields
+	findOptions.SetNoCursorTimeout(true)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	cur, err := collection.Find(ctx, bson.M{
 		"owner":   owner,
 		"garbage": bson.M{"$ne": true},
-	}).All(&devices)
-
-	for k, v := range devices {
-		v.UserMeta = utils.BsonUnquoteMap(&v.UserMeta)
-		v.DeviceMeta = utils.BsonUnquoteMap(&v.DeviceMeta)
-		devices[k] = v
+	}, findOptions)
+	if err != nil {
+		rest.Error(w, "Error on fetching devices:"+err.Error(), http.StatusForbidden)
+		return
+	}
+	defer cur.Close(ctx)
+	for cur.Next(ctx) {
+		result := Device{}
+		err := cur.Decode(&result)
+		if err != nil {
+			rest.Error(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
+			return
+		}
+		result.UserMeta = utils.BsonUnquoteMap(&result.UserMeta)
+		result.DeviceMeta = utils.BsonUnquoteMap(&result.DeviceMeta)
+		devices = append(devices, result)
 	}
 
 	w.WriteJson(devices)
@@ -919,7 +1064,7 @@ func (a *DevicesApp) handle_deletedevice(w rest.ResponseWriter, r *rest.Request)
 		return
 	}
 
-	collection := a.mgoSession.DB("").C("pantahub_devices")
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -928,10 +1073,21 @@ func (a *DevicesApp) handle_deletedevice(w rest.ResponseWriter, r *rest.Request)
 
 	device := Device{}
 
-	collection.Find(bson.M{
-		"_id":     bson.ObjectIdHex(delId),
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	deviceObjectID, err := primitive.ObjectIDFromHex(delId)
+	if err != nil {
+		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	err = collection.FindOne(ctx, bson.M{
+		"_id":     deviceObjectID,
 		"garbage": bson.M{"$ne": true},
-	}).One(&device)
+	}).Decode(&device)
+	if err != nil {
+		rest.Error(w, "Device not found: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	if device.Owner == owner {
 		result, res := MarkDeviceAsGarbage(w, delId)
@@ -967,74 +1123,102 @@ func MarkDeviceAsGarbage(
 	return response, res
 }
 
-func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *DevicesApp {
+func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *DevicesApp {
 
 	app := new(DevicesApp)
 	app.jwt_middleware = jwtMiddleware
-	app.mgoSession = session
+	app.mongoClient = mongoClient
 
-	index := mgo.Index{
-		Key:        []string{"nick"},
-		Unique:     true,
-		Background: true,
-		Sparse:     false,
+	collection := app.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
+	indexOptions := options.CreateIndexes().SetMaxTime(10 * time.Second)
+
+	index := mongo.IndexModel{
+		Keys: bsonx.Doc{
+			{Key: "nick", Value: bsonx.Int32(1)},
+		},
+		Options: bsonx.Doc{
+			{Key: "unique", Value: bsonx.Boolean(true)},
+			{Key: "sparse", Value: bsonx.Boolean(false)},
+			{Key: "background", Value: bsonx.Boolean(true)},
+		},
 	}
-
-	err := app.mgoSession.DB("").C("pantahub_devices").EnsureIndex(index)
+	_, err := collection.Indexes().CreateOne(context.Background(), index, indexOptions)
 	if err != nil {
-		log.Println("Error setting up index for pantahub_devices: " + err.Error())
+		log.Fatalln("Error setting up index for pantahub_devices: " + err.Error())
 		return nil
 	}
 
-	index = mgo.Index{
-		Key:        []string{"timemodified"},
-		Unique:     false,
-		Background: true,
-		Sparse:     false,
+	index = mongo.IndexModel{
+		Keys: bsonx.Doc{
+			{Key: "timemodified", Value: bsonx.Int32(1)},
+		},
+		Options: bsonx.Doc{
+			{Key: "unique", Value: bsonx.Boolean(false)},
+			{Key: "sparse", Value: bsonx.Boolean(false)},
+			{Key: "background", Value: bsonx.Boolean(true)},
+		},
 	}
 
-	err = app.mgoSession.DB("").C("pantahub_devices").EnsureIndex(index)
+	collection = app.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
+	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
 	if err != nil {
-		log.Println("Error setting up index for pantahub_devices: " + err.Error())
+		log.Fatalln("Error setting up index for pantahub_devices: " + err.Error())
 		return nil
 	}
 
-	index = mgo.Index{
-		Key:        []string{"prn"},
-		Unique:     false,
-		Background: true,
-		Sparse:     false,
+	index = mongo.IndexModel{
+		Keys: bsonx.Doc{
+			{Key: "prn", Value: bsonx.Int32(1)},
+		},
+		Options: bsonx.Doc{
+			{Key: "unique", Value: bsonx.Boolean(false)},
+			{Key: "sparse", Value: bsonx.Boolean(false)},
+			{Key: "background", Value: bsonx.Boolean(true)},
+		},
 	}
 
-	err = app.mgoSession.DB("").C("pantahub_devices").EnsureIndex(index)
+	collection = app.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
+	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
 	if err != nil {
-		log.Println("Error setting up index prn for pantahub_devices: " + err.Error())
+		log.Fatalln("Error setting up index for pantahub_devices: " + err.Error())
 		return nil
 	}
 	// Indexing for the owner,garbage fields
-	index = mgo.Index{
-		Key:        []string{"owner", "garbage"},
-		Unique:     false,
-		Background: true,
-		Sparse:     false,
+	index = mongo.IndexModel{
+		Keys: bsonx.Doc{
+			{Key: "owner", Value: bsonx.Int32(1)},
+			{Key: "garbage", Value: bsonx.Int32(1)},
+		},
+		Options: bsonx.Doc{
+			{Key: "unique", Value: bsonx.Boolean(false)},
+			{Key: "sparse", Value: bsonx.Boolean(false)},
+			{Key: "background", Value: bsonx.Boolean(true)},
+		},
 	}
 
-	err = app.mgoSession.DB("").C("pantahub_devices").EnsureIndex(index)
+	collection = app.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
+	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
 	if err != nil {
-		log.Println("Error setting up index {owner,garbage} for pantahub_devices: " + err.Error())
+		log.Fatalln("Error setting up index for pantahub_devices: " + err.Error())
 		return nil
 	}
 	// Indexing for the device,garbage fields
-	index = mgo.Index{
-		Key:        []string{"device", "garbage"},
-		Unique:     false,
-		Background: true,
-		Sparse:     false,
+	index = mongo.IndexModel{
+		Keys: bsonx.Doc{
+			{Key: "device", Value: bsonx.Int32(1)},
+			{Key: "garbage", Value: bsonx.Int32(1)},
+		},
+		Options: bsonx.Doc{
+			{Key: "unique", Value: bsonx.Boolean(false)},
+			{Key: "sparse", Value: bsonx.Boolean(false)},
+			{Key: "background", Value: bsonx.Boolean(true)},
+		},
 	}
 
-	err = app.mgoSession.DB("").C("pantahub_devices").EnsureIndex(index)
+	collection = app.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
+	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
 	if err != nil {
-		log.Println("Error setting up index {device,garbage} for pantahub_devices: " + err.Error())
+		log.Fatalln("Error setting up index for pantahub_devices: " + err.Error())
 		return nil
 	}
 

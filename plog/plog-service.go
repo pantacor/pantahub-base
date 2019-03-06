@@ -25,6 +25,7 @@ package plog
 // be available later or for users of organization accounts.
 //
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -32,21 +33,23 @@ import (
 
 	jwtgo "github.com/dgrijalva/jwt-go"
 	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
+	"github.com/mongodb/mongo-go-driver/bson/primitive"
+	"github.com/mongodb/mongo-go-driver/mongo"
+	"github.com/mongodb/mongo-go-driver/mongo/options"
+	"gopkg.in/mgo.v2/bson"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"gitlab.com/pantacor/pantahub-base/utils"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
 )
 
 type PlogApp struct {
 	jwt_middleware *jwt.JWTMiddleware
 	Api            *rest.Api
-	mgoSession     *mgo.Session
+	mongoClient    *mongo.Client
 }
 
 type PlogPost struct {
-	Id          bson.ObjectId          `json:"id" bson:"_id"`
+	Id          primitive.ObjectID     `json:"id" bson:"_id"`
 	Owner       string                 `json:"owner"`
 	LastInSync  time.Time              `json:"last-insync" bson:"last-insync"`
 	LastTouched time.Time              `json:"last-touched" bson:"last-touched"`
@@ -75,7 +78,7 @@ func (a *PlogApp) handle_getplogposts(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	collPlogPosts := a.mgoSession.DB("").C("pantahub_plogposts")
+	collPlogPosts := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_plogposts")
 
 	if collPlogPosts == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -90,16 +93,37 @@ func (a *PlogApp) handle_getplogposts(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	plogPosts := make([]PlogPost, 0)
-	collPlogPosts.Find(bson.M{"owner": owner}).All(&plogPosts)
+	findOptions := options.Find()
+	findOptions.SetHint(bson.M{"_id": 1}) //Index fields
+	findOptions.SetNoCursorTimeout(true)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	cur, err := collPlogPosts.Find(ctx, bson.M{
+		"owner": owner,
+	}, findOptions)
+	if err != nil {
+		rest.Error(w, "Error on fetching plogposts:"+err.Error(), http.StatusForbidden)
+		return
+	}
+	defer cur.Close(ctx)
+	for cur.Next(ctx) {
+		result := PlogPost{}
+		err := cur.Decode(&result)
+		if err != nil {
+			rest.Error(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
+			return
+		}
+		plogPosts = append(plogPosts, result)
+	}
 
 	w.WriteJson(plogPosts)
 }
 
-func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *PlogApp {
+func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *PlogApp {
 
 	app := new(PlogApp)
 	app.jwt_middleware = jwtMiddleware
-	app.mgoSession = session
+	app.mongoClient = mongoClient
 
 	app.Api = rest.NewApi()
 

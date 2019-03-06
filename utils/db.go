@@ -16,55 +16,69 @@
 package utils
 
 import (
-	"log"
+	"context"
+	"time"
 
-	"gopkg.in/mgo.v2"
+	"github.com/mongodb/mongo-go-driver/mongo/options"
+
+	"github.com/mongodb/mongo-go-driver/mongo"
 )
 
-func GetMongoSession() (*mgo.Session, error) {
-	// XXX: make mongo host configurable through env
-	mongoDb := GetEnv(ENV_MONGO_DB)
-	mongoHost := GetEnv(ENV_MONGO_HOST)
-	mongoPort := GetEnv(ENV_MONGO_PORT)
+// MongoDb : Holds Mongo Db Name
+var MongoDb string
+
+// GetMongoClient : To Get Mongo Client Object
+func GetMongoClient() (*mongo.Client, error) {
+	MongoDb = GetEnv(ENV_MONGO_DB)
+	host := GetEnv(ENV_MONGO_HOST)
+	port := GetEnv(ENV_MONGO_PORT)
 	mongoUser := GetEnv(ENV_MONGO_USER)
 	mongoPass := GetEnv(ENV_MONGO_PASS)
 	mongoRs := GetEnv(ENV_MONGO_RS)
 
-	mongoCreds := ""
-	if mongoUser != "" {
-		mongoCreds = mongoUser + ":" + mongoPass + "@"
+	//Setting Client Options
+	clientOptions := options.Client()
+	credentials := options.Credential{
+		Username:      mongoUser,
+		Password:      mongoPass,
+		AuthMechanism: "SCRAM-SHA-1",
+		AuthSource:    MongoDb,
 	}
+	clientOptions.SetAuth(credentials)
+	clientOptions.SetReplicaSet(mongoRs)
 
-	mongoConnect := "mongodb://" + mongoCreds + mongoHost + ":" + mongoPort + "/" + mongoDb
-
-	if mongoRs != "" {
-		mongoConnect = mongoConnect + "?replicaSet=" + mongoRs
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	client, err := mongo.Connect(ctx, "mongodb://"+host+":"+port+"/"+MongoDb, clientOptions)
+	if err != nil {
+		panic(err)
 	}
-	log.Println("Will connect to mongo PROD db with: " + mongoConnect)
-
-	return mgo.Dial(mongoConnect)
+	return client, err
 }
 
-func GetMongoSessionTest() (*mgo.Session, error) {
-	// XXX: make mongo host configurable through env
-	mongoDb := "testdb-" + GetEnv(ENV_MONGO_DB)
-	mongoHost := GetEnv(ENV_MONGO_HOST)
-	mongoPort := GetEnv(ENV_MONGO_PORT)
+// GetMongoClienttest : To Get Mongo Client Object of test db
+func GetMongoClientTest() (*mongo.Client, error) {
+	MongoDb = "testdb-" + GetEnv(ENV_MONGO_DB)
+	host := GetEnv(ENV_MONGO_HOST)
+	port := GetEnv(ENV_MONGO_PORT)
 	mongoUser := GetEnv(ENV_MONGO_USER)
 	mongoPass := GetEnv(ENV_MONGO_PASS)
 	mongoRs := GetEnv(ENV_MONGO_RS)
 
-	mongoCreds := ""
-	if mongoUser != "" {
-		mongoCreds = mongoUser + ":" + mongoPass + "@"
+	//Setting Client Options
+	clientOptions := options.Client()
+	credentials := options.Credential{
+		Username: mongoUser,
+		Password: mongoPass,
 	}
+	clientOptions.SetAuth(credentials)
+	clientOptions.SetReplicaSet(mongoRs)
 
-	mongoConnect := "mongodb://" + mongoCreds + mongoHost + ":" + mongoPort + "/" + mongoDb
-
-	if mongoRs != "" {
-		mongoConnect = mongoConnect + "?replicaSet=" + mongoRs
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	client, err := mongo.Connect(ctx, "mongodb://"+host+":"+port+"/"+MongoDb, clientOptions)
+	if err != nil {
+		panic(err)
 	}
-	log.Println("Will connect to mongo TEST db with: " + mongoConnect)
-
-	return mgo.Dial(mongoConnect)
+	return client, err
 }
