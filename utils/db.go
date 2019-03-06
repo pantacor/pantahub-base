@@ -17,6 +17,7 @@ package utils
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/mongodb/mongo-go-driver/mongo/options"
@@ -49,10 +50,13 @@ func GetMongoClient() (*mongo.Client, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	mongoConnect := "mongodb://" + mongoUser + ":" + mongoPass + "@" + host + ":" + port + "/" + MongoDb
 	client, err := mongo.Connect(ctx, "mongodb://"+host+":"+port+"/"+MongoDb, clientOptions)
 	if err != nil {
 		panic(err)
 	}
+	log.Println("Will connect to mongo PROD db with: " + mongoConnect)
+
 	return client, err
 }
 
@@ -76,9 +80,11 @@ func GetMongoClientTest() (*mongo.Client, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	client, err := mongo.Connect(ctx, "mongodb://"+host+":"+port+"/"+MongoDb, clientOptions)
+	mongoConnect := "mongodb://" + mongoUser + ":" + mongoPass + "@" + host + ":" + port + "/" + MongoDb
+	client, err := mongo.Connect(ctx, mongoConnect, clientOptions)
 	if err != nil {
 		panic(err)
 	}
+	log.Println("Will connect to mongo PROD db with: " + mongoConnect)
 	return client, err
 }
