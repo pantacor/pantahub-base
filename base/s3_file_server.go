@@ -20,25 +20,22 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"path"
 	"path/filepath"
 
-	"github.com/aws/aws-sdk-go/aws"
 	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/s3"
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
 
-type S3FileUploadServer struct {
+type S3FileServer struct {
 	s3 s3.S3
 }
 
-func (s *S3FileUploadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	dirName := filepath.Dir(r.URL.Path)
 	fileBase := filepath.Base(r.URL.Path)
 
@@ -71,15 +68,21 @@ func (s *S3FileUploadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Disposition", "attachment; filename=\""+objClaims.DispositionName+"\"")
 		w.Header().Add("Content-Length", fmt.Sprintf("%d", objClaims.Size))
 
-		writeAt := aws.NewWriteAtBuffer([]byte{})
-		err := s.s3.Download(finalName, writeAt)
+		downloadURL, err := s.s3.DownloadURL(finalName)
 		if err != nil {
-			log.Printf("ERROR: downloading file, %v", err)
+			log.Printf("ERROR: getting download url, %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
-		w.Write(writeAt.Bytes())
+		s3resp, err := http.Get(downloadURL)
+		if err != nil {
+			log.Printf("ERROR: requesting download file, %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		io.CopyN(w, s3resp.Body, objClaims.Size)
 		return
 	}
 
@@ -97,28 +100,39 @@ func (s *S3FileUploadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	defer r.Body.Close()
 
+	tempName := finalName + "_part"
+	preSignedURL, err := s.s3.UploadURL(tempName)
+	if err != nil {
+		log.Printf("ERROR: failed to generate upload url, %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// avoid body close for later sha256 calc
 	hasher := sha256.New()
-	tmpFile, err := ioutil.TempFile(os.TempDir(), "pantahub_s3_upload_*")
+	s3Body := io.TeeReader(r.Body, hasher)
+
+	s3req, err := http.NewRequest(http.MethodPut, preSignedURL, s3Body)
 	if err != nil {
-		log.Println("ERROR: error creating temporarly file: " + err.Error())
+		log.Printf("ERROR: failed to generate s3 request, %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	defer os.Remove(tmpFile.Name())
-
-	fw := io.MultiWriter(tmpFile, hasher)
-
-	written, err := io.CopyN(fw, r.Body, objClaims.Size)
+	s3resp, err := http.DefaultClient.Do(s3req)
 	if err != nil {
-		log.Println("ERROR: error syncing file upload to disk: " + err.Error())
+		defer s.s3.Delete(tempName)
+		log.Printf("ERROR: failed to upload to %s\n", preSignedURL)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	if written != objClaims.Size {
-		log.Println("WARNING: file upload size mismatch with claim")
-		w.WriteHeader(http.StatusBadRequest)
+	s.s3.Rename(tempName, finalName)
+	defer s3resp.Body.Close()
+
+	if s3resp.StatusCode != http.StatusOK {
+		log.Println("ERROR: unexpected response from remote S3 server")
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -131,18 +145,11 @@ func (s *S3FileUploadServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = s.s3.Upload(finalName, tmpFile)
-	if err != nil {
-		log.Printf("ERROR: failed to upload to remote S3 server, %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
 	w.WriteHeader(http.StatusOK)
 	return
 }
 
-func NewS3FileUploadServer() *S3FileUploadServer {
+func NewS3FileServer() *S3FileServer {
 	connParams := s3.S3ConnectionParameters{
 		AccessKey: utils.GetEnv(utils.ENV_PANTAHUB_S3_ACCESS_KEY_ID),
 		SecretKey: utils.GetEnv(utils.ENV_PANTAHUB_S3_SECRET_ACCESS_KEY),
@@ -151,7 +158,7 @@ func NewS3FileUploadServer() *S3FileUploadServer {
 		Endpoint:  utils.GetEnv(utils.ENV_PANTAHUB_S3_ENDPOINT),
 	}
 
-	return &S3FileUploadServer{
+	return &S3FileServer{
 		s3: s3.NewS3(connParams),
 	}
 }

@@ -118,9 +118,9 @@ func DoInit() {
 	var fservermux FileUploadServer
 	switch utils.GetEnv(utils.ENV_PANTAHUB_STORAGE_DRIVER) {
 	case "s3":
-		fservermux = NewS3FileUploadServer()
+		fservermux = NewS3FileServer()
 	default:
-		fservermux = &LocalFileUploadServer{fileServer: http.FileServer(http.Dir(objects.PantahubS3Path())), directory: objects.PantahubS3Path()}
+		fservermux = &LocalFileServer{fileServer: http.FileServer(http.Dir(objects.PantahubS3Path())), directory: objects.PantahubS3Path()}
 	}
 
 	// default cors - allow GET and POST from all origins
