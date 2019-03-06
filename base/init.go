@@ -18,6 +18,7 @@ package base
 import (
 	"net/http"
 	"time"
+	"log"
 
 	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
 	"github.com/rs/cors"
@@ -118,8 +119,10 @@ func DoInit() {
 	var fservermux FileUploadServer
 	switch utils.GetEnv(utils.ENV_PANTAHUB_STORAGE_DRIVER) {
 	case "s3":
+		log.Println("INFO: using 's3' driver to serve object blobs/files")
 		fservermux = NewS3FileServer()
 	default:
+		log.Println("INFO: using 'local' driver to serve object blobs/files")
 		fservermux = &LocalFileServer{fileServer: http.FileServer(http.Dir(objects.PantahubS3Path())), directory: objects.PantahubS3Path()}
 	}
 
