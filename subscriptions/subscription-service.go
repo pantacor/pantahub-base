@@ -14,10 +14,10 @@ import (
 	"log"
 	"time"
 
-	"github.com/mongodb/mongo-go-driver/mongo"
-	"github.com/mongodb/mongo-go-driver/mongo/options"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/x/bsonx"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -280,18 +280,21 @@ func (i subscriptionService) Now() time.Time {
 
 func (i subscriptionService) ensureIndices() error {
 	collection := i.mongoClient.Database(utils.MongoDb).Collection(collectionSubscription)
-	indexOptions := options.CreateIndexes().SetMaxTime(10 * time.Second)
+
+	CreateIndexesOptions := options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+
+	indexOptions := options.IndexOptions{}
+	indexOptions.SetUnique(true)
 
 	index := mongo.IndexModel{
 		Keys: bsonx.Doc{
 			{Key: "service", Value: bsonx.Int32(1)},
 			{Key: "subject", Value: bsonx.Int32(1)},
 		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(true)},
-		},
+		Options: &indexOptions,
 	}
-	_, err := collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+	_, err := collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
 	if err != nil {
 		log.Fatalln("Error setting up index for subscription: " + err.Error())
 		return nil

@@ -58,13 +58,13 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
-	"github.com/mongodb/mongo-go-driver/bson/primitive"
-	"github.com/mongodb/mongo-go-driver/mongo"
-	"github.com/mongodb/mongo-go-driver/mongo/options"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
 	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	pvrapi "gitlab.com/pantacor/pvr/api"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/x/bsonx"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -1955,19 +1955,23 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *TrailsApp
 
 	// Indexing for the owner,garbage fields in pantahub_trails
 	collection := app.mongoClient.Database(utils.MongoDb).Collection("pantahub_trails")
-	indexOptions := options.CreateIndexes().SetMaxTime(10 * time.Second)
+
+	CreateIndexesOptions := options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+
+	indexOptions := options.IndexOptions{}
+	indexOptions.SetUnique(false)
+	indexOptions.SetSparse(false)
+	indexOptions.SetBackground(true)
+
 	index := mongo.IndexModel{
 		Keys: bsonx.Doc{
 			{Key: "owner", Value: bsonx.Int32(1)},
 			{Key: "garbage", Value: bsonx.Int32(1)},
 		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(false)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+		Options: &indexOptions,
 	}
-	_, err := collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+	_, err := collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
 	if err != nil {
 		log.Fatalln("Error setting up index for pantahub_trails: " + err.Error())
 		return nil
@@ -1975,19 +1979,23 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *TrailsApp
 
 	// Indexing for the device,garbage fields in pantahub_trails
 	collection = app.mongoClient.Database(utils.MongoDb).Collection("pantahub_trails")
-	indexOptions = options.CreateIndexes().SetMaxTime(10 * time.Second)
+
+	CreateIndexesOptions = options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+
+	indexOptions = options.IndexOptions{}
+	indexOptions.SetUnique(false)
+	indexOptions.SetSparse(false)
+	indexOptions.SetBackground(true)
+
 	index = mongo.IndexModel{
 		Keys: bsonx.Doc{
 			{Key: "device", Value: bsonx.Int32(1)},
 			{Key: "garbage", Value: bsonx.Int32(1)},
 		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(false)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+		Options: &indexOptions,
 	}
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
 	if err != nil {
 		log.Fatalln("Error setting up index for pantahub_trails: " + err.Error())
 		return nil
@@ -1995,19 +2003,23 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *TrailsApp
 
 	// Indexing for the owner,garbage fields in pantahub_steps
 	collection = app.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
-	indexOptions = options.CreateIndexes().SetMaxTime(10 * time.Second)
+
+	CreateIndexesOptions = options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+
+	indexOptions = options.IndexOptions{}
+	indexOptions.SetUnique(false)
+	indexOptions.SetSparse(false)
+	indexOptions.SetBackground(true)
+
 	index = mongo.IndexModel{
 		Keys: bsonx.Doc{
 			{Key: "owner", Value: bsonx.Int32(1)},
 			{Key: "garbage", Value: bsonx.Int32(1)},
 		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(false)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+		Options: &indexOptions,
 	}
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
 	if err != nil {
 		log.Fatalln("Error setting up index for pantahub_steps: " + err.Error())
 		return nil
@@ -2015,19 +2027,23 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *TrailsApp
 
 	// Indexing for the device,garbage fields in pantahub_steps
 	collection = app.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
-	indexOptions = options.CreateIndexes().SetMaxTime(10 * time.Second)
+
+	CreateIndexesOptions = options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+
+	indexOptions = options.IndexOptions{}
+	indexOptions.SetUnique(false)
+	indexOptions.SetSparse(false)
+	indexOptions.SetBackground(true)
+
 	index = mongo.IndexModel{
 		Keys: bsonx.Doc{
 			{Key: "device", Value: bsonx.Int32(1)},
 			{Key: "garbage", Value: bsonx.Int32(1)},
 		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(false)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+		Options: &indexOptions,
 	}
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
 	if err != nil {
 		log.Fatalln("Error setting up index for pantahub_steps: " + err.Error())
 		return nil

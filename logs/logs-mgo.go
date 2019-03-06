@@ -22,10 +22,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mongodb/mongo-go-driver/mongo"
-	"github.com/mongodb/mongo-go-driver/mongo/options"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/x/bsonx"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -37,114 +37,139 @@ type mgoLogger struct {
 func (s *mgoLogger) register() error {
 	var err error
 	collection := s.mongoClient.Database(utils.MongoDb).Collection(s.mgoCollection)
-	indexOptions := options.CreateIndexes().SetMaxTime(10 * time.Second)
+
+	CreateIndexesOptions := options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+
+	indexOptions := options.IndexOptions{}
+	indexOptions.SetUnique(false)
+	indexOptions.SetSparse(false)
+	indexOptions.SetBackground(true)
 
 	index := mongo.IndexModel{
 		Keys: bsonx.Doc{
 			{Key: "own", Value: bsonx.Int32(1)},
 		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(false)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+		Options: &indexOptions,
 	}
 
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
 	if err != nil {
 		log.Fatalln("Error setting up index for " + s.mgoCollection + ": " + err.Error())
 		return nil
 	}
 
 	collection = s.mongoClient.Database(utils.MongoDb).Collection(s.mgoCollection)
-	indexOptions = options.CreateIndexes().SetMaxTime(10 * time.Second)
+
+	CreateIndexesOptions = options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+
+	indexOptions = options.IndexOptions{}
+	indexOptions.SetUnique(false)
+	indexOptions.SetSparse(false)
+	indexOptions.SetBackground(true)
+
 	index = mongo.IndexModel{
 		Keys: bsonx.Doc{
 			{Key: "dev", Value: bsonx.Int32(1)},
 		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(false)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+		Options: &indexOptions,
 	}
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+
+	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
 	if err != nil {
 		log.Fatalln("Error setting up index for " + s.mgoCollection + ": " + err.Error())
 		return nil
 	}
 
 	collection = s.mongoClient.Database(utils.MongoDb).Collection(s.mgoCollection)
-	indexOptions = options.CreateIndexes().SetMaxTime(10 * time.Second)
+
+	CreateIndexesOptions = options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+
+	indexOptions = options.IndexOptions{}
+	indexOptions.SetUnique(false)
+	indexOptions.SetSparse(false)
+	indexOptions.SetBackground(true)
+
 	index = mongo.IndexModel{
 		Keys: bsonx.Doc{
 			{Key: "time-created", Value: bsonx.Int32(1)},
 		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(false)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+		Options: &indexOptions,
 	}
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+
+	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
 	if err != nil {
 		log.Fatalln("Error setting up index for " + s.mgoCollection + ": " + err.Error())
 		return nil
 	}
 
 	collection = s.mongoClient.Database(utils.MongoDb).Collection(s.mgoCollection)
-	indexOptions = options.CreateIndexes().SetMaxTime(10 * time.Second)
+
+	CreateIndexesOptions = options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+
+	indexOptions = options.IndexOptions{}
+	indexOptions.SetUnique(false)
+	indexOptions.SetSparse(false)
+	indexOptions.SetBackground(true)
+
 	index = mongo.IndexModel{
 		Keys: bsonx.Doc{
 			{Key: "tsec", Value: bsonx.Int32(1)},
 			{Key: "tnano", Value: bsonx.Int32(1)},
 		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(false)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+		Options: &indexOptions,
 	}
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+
+	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
 	if err != nil {
 		log.Fatalln("Error setting up index for " + s.mgoCollection + ": " + err.Error())
 		return nil
 	}
 
 	collection = s.mongoClient.Database(utils.MongoDb).Collection(s.mgoCollection)
-	indexOptions = options.CreateIndexes().SetMaxTime(10 * time.Second)
+	CreateIndexesOptions = options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+
+	indexOptions = options.IndexOptions{}
+	indexOptions.SetUnique(false)
+	indexOptions.SetSparse(false)
+	indexOptions.SetBackground(true)
+
 	index = mongo.IndexModel{
 		Keys: bsonx.Doc{
 			{Key: "lvl", Value: bsonx.Int32(1)},
 		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(false)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+		Options: &indexOptions,
 	}
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+
+	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
 	if err != nil {
 		log.Fatalln("Error setting up index for " + s.mgoCollection + ": " + err.Error())
 		return nil
 	}
 
 	collection = s.mongoClient.Database(utils.MongoDb).Collection(s.mgoCollection)
-	indexOptions = options.CreateIndexes().SetMaxTime(10 * time.Second)
+	CreateIndexesOptions = options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+
+	indexOptions = options.IndexOptions{}
+	indexOptions.SetUnique(false)
+	indexOptions.SetSparse(false)
+	indexOptions.SetBackground(true)
+
 	index = mongo.IndexModel{
 		Keys: bsonx.Doc{
 			{Key: "dev", Value: bsonx.Int32(1)},
 			{Key: "own", Value: bsonx.Int32(1)},
 			{Key: "time-created", Value: bsonx.Int32(1)},
 		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(false)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+		Options: &indexOptions,
 	}
 
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
 	if err != nil {
 		log.Fatalln("Error setting up index for " + s.mgoCollection + ": " + err.Error())
 		return nil

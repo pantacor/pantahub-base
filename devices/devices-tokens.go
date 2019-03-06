@@ -27,10 +27,10 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
-	"github.com/mongodb/mongo-go-driver/mongo"
-	"github.com/mongodb/mongo-go-driver/mongo/options"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/x/bsonx"
 
 	petname "github.com/dustinkirkland/golang-petname"
 	"gopkg.in/mgo.v2/bson"
@@ -287,89 +287,106 @@ func (a *DevicesApp) getBase64AutoTokenInfo(tokenBase64 string) (*autoTokenInfo,
 func (a *DevicesApp) EnsureTokenIndices() error {
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
-	indexOptions := options.CreateIndexes().SetMaxTime(10 * time.Second)
+
+	CreateIndexesOptions := options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+
+	indexOptions := options.IndexOptions{}
+	indexOptions.SetUnique(false)
+	indexOptions.SetSparse(false)
+	indexOptions.SetBackground(true)
 
 	index := mongo.IndexModel{
 		Keys: bsonx.Doc{
 			{Key: "owner", Value: bsonx.Int32(1)},
 		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(false)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+		Options: &indexOptions,
 	}
-
-	_, err := collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+	_, err := collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
 	if err != nil {
 		log.Fatalln("Error setting up index for pantahub_devices: " + err.Error())
 		return nil
 	}
+
+	CreateIndexesOptions = options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+
+	indexOptions = options.IndexOptions{}
+	indexOptions.SetUnique(true)
+	indexOptions.SetSparse(false)
+	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
 		Keys: bsonx.Doc{
 			{Key: "nick", Value: bsonx.Int32(1)},
 		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(true)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+		Options: &indexOptions,
 	}
 	collection = a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
 	if err != nil {
 		log.Fatalln("Error setting up index for pantahub_devices: " + err.Error())
 		return nil
 	}
+
+	CreateIndexesOptions = options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+
+	indexOptions = options.IndexOptions{}
+	indexOptions.SetUnique(false)
+	indexOptions.SetSparse(false)
+	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
 		Keys: bsonx.Doc{
 			{Key: "disabled", Value: bsonx.Int32(1)},
 		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(false)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+		Options: &indexOptions,
 	}
 	collection = a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
 	if err != nil {
 		log.Fatalln("Error setting up index for pantahub_devices: " + err.Error())
 		return nil
 	}
+
+	CreateIndexesOptions = options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+
+	indexOptions = options.IndexOptions{}
+	indexOptions.SetUnique(true)
+	indexOptions.SetSparse(false)
+	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
 		Keys: bsonx.Doc{
 			{Key: "prn", Value: bsonx.Int32(1)},
 		},
-		Options: bsonx.Doc{
-			{Key: "name", Value: bsonx.String("device_tokens_prn")},
-			{Key: "unique", Value: bsonx.Boolean(true)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+		Options: &indexOptions,
 	}
 	collection = a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
 	if err != nil {
 		log.Fatalln("Error setting up index for pantahub_devices: " + err.Error())
 		return nil
 	}
 
+	CreateIndexesOptions = options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+
+	indexOptions = options.IndexOptions{}
+	indexOptions.SetUnique(true)
+	indexOptions.SetSparse(false)
+	indexOptions.SetBackground(true)
+
 	index = mongo.IndexModel{
 		Keys: bsonx.Doc{
 			{Key: "tokensha", Value: bsonx.Int32(1)},
 		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(true)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+		Options: &indexOptions,
 	}
 	collection = a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
 	if err != nil {
 		log.Fatalln("Error setting up index for pantahub_devices: " + err.Error())
 		return nil

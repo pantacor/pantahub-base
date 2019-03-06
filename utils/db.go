@@ -20,9 +20,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/mongodb/mongo-go-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"github.com/mongodb/mongo-go-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // MongoDb : Holds Mongo Db Name
@@ -40,21 +40,36 @@ func GetMongoClient() (*mongo.Client, error) {
 	//Setting Client Options
 	clientOptions := options.Client()
 	credentials := options.Credential{
-		Username:      mongoUser,
-		Password:      mongoPass,
-		AuthMechanism: "SCRAM-SHA-1",
-		AuthSource:    MongoDb,
+		//AuthMechanism: "SCRAM-SHA-1",
+		//AuthSource:  MongoDb,
+		PasswordSet: false,
 	}
 	clientOptions.SetAuth(credentials)
+	//mongoRs = "rs0"
 	clientOptions.SetReplicaSet(mongoRs)
+	mongoConnect := "mongodb://" + mongoUser + ":" + mongoPass + "@" + host + ":" + port + "/" + MongoDb
+	//mongoConnect := "mongodb://" + host + ":" + port + "/" + MongoDb
+	//mongoConnect := host + ":" + port
+	//mongoConnect := "http://127.0.0.1:27017"
+	/*hosts := []string{
+		mongoConnect,
+	} */
+	//clientOptions.SetHosts(hosts)
+	clientOptions.ApplyURI(mongoConnect)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	mongoConnect := "mongodb://" + mongoUser + ":" + mongoPass + "@" + host + ":" + port + "/" + MongoDb
-	client, err := mongo.Connect(ctx, "mongodb://"+host+":"+port+"/"+MongoDb, clientOptions)
-	if err != nil {
-		panic(err)
-	}
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://localhost:27017"))
+
+	/*
+		ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+		defer cancel()
+
+		client, err := mongo.Connect(ctx, clientOptions)
+		if err != nil {
+			panic(err)
+		}
+	*/
 	log.Println("Will connect to mongo PROD db with: " + mongoConnect)
 
 	return client, err
@@ -75,13 +90,19 @@ func GetMongoClientTest() (*mongo.Client, error) {
 		Username: mongoUser,
 		Password: mongoPass,
 	}
+	//mongoConnect := "mongodb://" + mongoUser + ":" + mongoPass + "@" + host + ":" + port + "/" + MongoDb
+	mongoConnect := "mongodb://" + host + ":" + port + "/" + MongoDb
+	hosts := []string{
+		mongoConnect,
+	}
+	clientOptions.SetHosts(hosts)
 	clientOptions.SetAuth(credentials)
 	clientOptions.SetReplicaSet(mongoRs)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	mongoConnect := "mongodb://" + mongoUser + ":" + mongoPass + "@" + host + ":" + port + "/" + MongoDb
-	client, err := mongo.Connect(ctx, mongoConnect, clientOptions)
+
+	client, err := mongo.Connect(ctx, clientOptions)
 	if err != nil {
 		panic(err)
 	}

@@ -31,9 +31,9 @@ import (
 
 	jwtgo "github.com/dgrijalva/jwt-go"
 	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
-	"github.com/mongodb/mongo-go-driver/mongo"
-	"github.com/mongodb/mongo-go-driver/mongo/options"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/x/bsonx"
 
 	"github.com/alecthomas/units"
 	"github.com/ant0ine/go-json-rest/rest"
@@ -673,19 +673,23 @@ func New(jwtMiddleware *jwt.JWTMiddleware, subService subscriptions.Subscription
 
 	// Indexing for the owner,garbage fields in pantahub_objects
 	collection := app.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
-	indexOptions := options.CreateIndexes().SetMaxTime(10 * time.Second)
+
+	CreateIndexesOptions := options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+
+	indexOptions := options.IndexOptions{}
+	indexOptions.SetUnique(false)
+	indexOptions.SetSparse(false)
+	indexOptions.SetBackground(true)
+
 	index := mongo.IndexModel{
 		Keys: bsonx.Doc{
 			{Key: "owner", Value: bsonx.Int32(1)},
 			{Key: "garbage", Value: bsonx.Int32(1)},
 		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(false)},
-			{Key: "sparse", Value: bsonx.Boolean(false)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+		Options: &indexOptions,
 	}
-	_, err := collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+	_, err := collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
 	if err != nil {
 		log.Fatalln("Error setting up index for pantahub_objects: " + err.Error())
 		return nil

@@ -18,7 +18,7 @@ package accounts
 import (
 	"time"
 
-	"github.com/mongodb/mongo-go-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type AccountType string

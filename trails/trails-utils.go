@@ -19,9 +19,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/mongodb/mongo-go-driver/bson/primitive"
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"gopkg.in/mgo.v2/bson"
 )
 

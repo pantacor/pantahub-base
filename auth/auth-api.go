@@ -23,17 +23,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mongodb/mongo-go-driver/bson/primitive"
-	"github.com/mongodb/mongo-go-driver/mongo/options"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/x/bsonx"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"github.com/fundapps/go-json-rest-middleware-jwt"
-	"github.com/mongodb/mongo-go-driver/mongo"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"go.mongodb.org/mongo-driver/mongo"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -490,59 +490,64 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 	//key := flag.String("nick", "", "The field you'd like to place an index on")
 	//unique := flag.Bool("unique", true, "Would you like the index to be unique?")
 	//value := flag.Int("type", 1, "would you like the index to be ascending (1) or descending (-1)?")
+	CreateIndexesOptions := options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(10 * time.Second)
 
-	indexOptions := options.CreateIndexes().SetMaxTime(10 * time.Second)
+	indexOptions := options.IndexOptions{}
+	indexOptions.SetUnique(true)
+	indexOptions.SetSparse(true)
+	indexOptions.SetBackground(true)
 
 	index := mongo.IndexModel{
 		Keys: bsonx.Doc{
 			{Key: "nick", Value: bsonx.Int32(1)},
 		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(true)},
-			{Key: "sparse", Value: bsonx.Boolean(true)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+		Options: &indexOptions,
 	}
 	collection := app.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
-	_, err := collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+	_, err := collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
 	if err != nil {
 		log.Fatalln("Error setting up index for pantahub_accounts: " + err.Error())
 		return nil
 	}
 
-	indexOptions = options.CreateIndexes().SetMaxTime(10 * time.Second)
+	CreateIndexesOptions = options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+
+	indexOptions = options.IndexOptions{}
+	indexOptions.SetUnique(false)
+	indexOptions.SetSparse(true)
+	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
 		Keys: bsonx.Doc{
 			{Key: "prn", Value: bsonx.Int32(1)},
 		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(false)},
-			{Key: "sparse", Value: bsonx.Boolean(true)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+		Options: &indexOptions,
 	}
 	collection = app.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
 	if err != nil {
 		log.Fatalln("Error setting up index for pantahub_accounts: " + err.Error())
 		return nil
 	}
 
-	indexOptions = options.CreateIndexes().SetMaxTime(10 * time.Second)
+	CreateIndexesOptions = options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+
+	indexOptions = options.IndexOptions{}
+	indexOptions.SetUnique(true)
+	indexOptions.SetSparse(true)
+	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
 		Keys: bsonx.Doc{
 			{Key: "email", Value: bsonx.Int32(1)},
 		},
-		Options: bsonx.Doc{
-			{Key: "unique", Value: bsonx.Boolean(true)},
-			{Key: "sparse", Value: bsonx.Boolean(true)},
-			{Key: "background", Value: bsonx.Boolean(true)},
-		},
+		Options: &indexOptions,
 	}
 	collection = app.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
-	_, err = collection.Indexes().CreateOne(context.Background(), index, indexOptions)
+	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
 	if err != nil {
 		log.Fatalln("Error setting up index for pantahub_accounts: " + err.Error())
 		return nil
