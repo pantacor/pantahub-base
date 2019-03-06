@@ -276,7 +276,7 @@ var defaultEnvs = map[string]string{
 	ENV_REG_EMAIL: "admin@pantacor.com",
 
 	// pantahub internal envs
-	ENV_PANTAHUB_AUTH: "https://localhost:12366/auth",
+	ENV_PANTAHUB_AUTH: "http://localhost:12365/auth",
 
 	// storage driver used to store objects
 	ENV_PANTAHUB_STORAGE_DRIVER: "local",
@@ -300,10 +300,10 @@ var defaultEnvs = map[string]string{
 	ENV_PANTAHUB_S3_ENDPOINT: "",
 
 	// object storage path (when using "local" driver)
-	ENV_PANTAHUB_STORAGE_PATH: "/tmp/local-s3/",
+	ENV_PANTAHUB_STORAGE_PATH: "/",
 
 	// object storage path (deprecated, please use PANTAHUB_STORAGE_PATH)
-	ENV_PANTAHUB_S3PATH: "/tmp/local-s3/",
+	ENV_PANTAHUB_S3PATH: "../local-s3/",
 
 	// resty REST client configs
 	ENV_RESTY_DEBUG: "",
