@@ -1826,7 +1826,7 @@ func (a *TrailsApp) handle_gettrailstepsummary(w rest.ResponseWriter, r *rest.Re
 		return
 	}
 
-	summaryCol := a.mongoClient.Database("pantabase_devicesummary").Collection("device_summary_short_new_v1")
+	summaryCol := a.mongoClient.Database("pantabase_devicesummary").Collection("device_summary_short_new_v2")
 
 	if summaryCol == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -1874,7 +1874,7 @@ func (a *TrailsApp) handle_gettrailsummary(w rest.ResponseWriter, r *rest.Reques
 		return
 	}
 
-	summaryCol := a.mongoClient.Database("pantabase_devicesummary").Collection("device_summary_short_new_v1")
+	summaryCol := a.mongoClient.Database("pantabase_devicesummary").Collection("device_summary_short_new_v2")
 
 	if summaryCol == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)

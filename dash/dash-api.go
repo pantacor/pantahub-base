@@ -239,7 +239,7 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	summaryCol := a.mongoClient.Database("pantabase_devicesummary").Collection("device_summary_short_new_v1")
+	summaryCol := a.mongoClient.Database("pantabase_devicesummary").Collection("device_summary_short_new_v2")
 	if summaryCol == nil {
 		rest.Error(w, "Error with Database connectivity (summaryCol)", http.StatusInternalServerError)
 		return
