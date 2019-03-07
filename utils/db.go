@@ -61,14 +61,17 @@ func GetMongoClient() (*mongo.Client, error) {
 		mongoConnect += MongoDb
 	}
 
-	clientOptions.ApplyURI(mongoConnect)
-	clientOptions.SetReplicaSet(mongoRs)
+	mongoConnect += "?authMechanism=SCRAM-SHA-1"
 
+	clientOptions = clientOptions.ApplyURI(mongoConnect)
+	if mongoRs != "" {
+		clientOptions = clientOptions.SetReplicaSet(mongoRs)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://localhost:27017"))
 
 	log.Println("Will connect to mongo PROD db with: " + mongoConnect)
+	client, err := mongo.Connect(ctx, clientOptions)
 
 	return client, err
 }
