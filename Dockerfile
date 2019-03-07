@@ -3,8 +3,8 @@ FROM golang:alpine as builder
 WORKDIR /go/src/gitlab.com/pantacor/pantahub-base
 COPY . .
 
-RUN apk update; apk add git
-RUN go get -d -v ./...
+RUN apk update; apk add git curl
+RUN sh -c "curl https://glide.sh/get | sh"; glide install -v
 RUN go install -v ./...
 
 FROM alpine
