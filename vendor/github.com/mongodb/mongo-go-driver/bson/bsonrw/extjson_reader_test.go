@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/mongodb/mongo-go-driver/bson/bsontype"
+	"go.mongodb.org/mongo-driver/bson/bsontype"
 )
 
 func TestExtJSONReader(t *testing.T) {
@@ -105,7 +105,10 @@ func TestReadMultipleTopLevelDocuments(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := strings.NewReader(tc.input)
-			vr := NewExtJSONValueReader(r, false)
+			vr, err := NewExtJSONValueReader(r, false)
+			if err != nil {
+				t.Fatalf("expected no error, but got %v", err)
+			}
 
 			actual, err := readAllDocuments(vr)
 			if err != nil {

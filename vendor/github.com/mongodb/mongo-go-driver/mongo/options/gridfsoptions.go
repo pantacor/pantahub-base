@@ -9,17 +9,17 @@ package options
 import (
 	"time"
 
-	"github.com/mongodb/mongo-go-driver/mongo/readconcern"
-	"github.com/mongodb/mongo-go-driver/mongo/readpref"
-	"github.com/mongodb/mongo-go-driver/mongo/writeconcern"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
+	"go.mongodb.org/mongo-driver/bson/bsoncodec"
+	"go.mongodb.org/mongo-driver/mongo/readconcern"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 )
 
 // DefaultName is the default name for a GridFS bucket.
 var DefaultName = "fs"
 
 // DefaultChunkSize is the default size of each file chunk in bytes.
-var DefaultChunkSize int32 = 255 * 1000
+var DefaultChunkSize int32 = 255 * 1024 // 255 KiB
 
 // DefaultRevision is the default revision number for a download by name operation.
 var DefaultRevision int32 = -1
@@ -101,17 +101,17 @@ func MergeBucketOptions(opts ...*BucketOptions) *BucketOptions {
 	return b
 }
 
-// UploadOptions represents all possible options for a GridFS upload operation.
+// UploadOptions represents all possible options for a GridFS upload operation.  If a registry is nil, bson.DefaultRegistry
+// will be used when converting the Metadata interface to BSON.
 type UploadOptions struct {
-	ChunkSizeBytes *int32    // Chunk size in bytes. Defaults to the chunk size of the bucket.
-	Metadata       bsonx.Doc // User data for the 'metadata' field of the files collection document.
+	ChunkSizeBytes *int32              // Chunk size in bytes. Defaults to the chunk size of the bucket.
+	Metadata       interface{}         // User data for the 'metadata' field of the files collection document.
+	Registry       *bsoncodec.Registry // The registry to use for converting filters. Defaults to bson.DefaultRegistry.
 }
 
 // GridFSUpload creates a new *UploadOptions
 func GridFSUpload() *UploadOptions {
-	return &UploadOptions{
-		ChunkSizeBytes: &DefaultChunkSize,
-	}
+	return &UploadOptions{}
 }
 
 // SetChunkSizeBytes sets the chunk size in bytes for the upload. Defaults to 255KB if not set.
@@ -121,7 +121,7 @@ func (u *UploadOptions) SetChunkSizeBytes(i int32) *UploadOptions {
 }
 
 // SetMetadata specfies the metadata for the upload.
-func (u *UploadOptions) SetMetadata(doc bsonx.Doc) *UploadOptions {
+func (u *UploadOptions) SetMetadata(doc interface{}) *UploadOptions {
 	u.Metadata = doc
 	return u
 }
@@ -141,6 +141,9 @@ func MergeUploadOptions(opts ...*UploadOptions) *UploadOptions {
 		}
 		if opt.Metadata != nil {
 			u.Metadata = opt.Metadata
+		}
+		if opt.Registry != nil {
+			u.Registry = opt.Registry
 		}
 	}
 

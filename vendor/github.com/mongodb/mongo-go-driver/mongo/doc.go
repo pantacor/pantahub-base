@@ -11,7 +11,7 @@
 // Basic usage of the driver starts with creating a Client from a connection
 // string. To do so, call the NewClient and Connect functions:
 //
-// 		client, err := NewClient("mongodb://foo:bar@localhost:27017")
+// 		client, err := NewClient(options.Client().ApplyURI("mongodb://foo:bar@localhost:27017"))
 // 		if err != nil { return err }
 // 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 // 		defer cancel()
@@ -25,13 +25,13 @@
 //
 // A Collection can be used to query the database or insert documents:
 //
-//    res, err := collection.InsertOne(context.Background(), bson.M{"hello": "world"}))
+//    res, err := collection.InsertOne(context.Background(), bson.M{"hello": "world"})
 //    if err != nil { return err }
 //    id := res.InsertedID
 //
 // Several methods return a cursor, which can be used like this:
 //
-//    cur, err := collection.Find(context.Background(), nil)
+//    cur, err := collection.Find(context.Background(), bson.D{})
 //    if err != nil { log.Fatal(err) }
 //    defer cur.Close(context.Background())
 //    for cur.Next(context.Background()) {
@@ -51,9 +51,12 @@
 // 	  	Bar int32
 // 	  }{}
 //    filter := bson.D{{"hello", "world"}}
-//    err := collection.FindOne(context.Background(), filter).Decode(&result))
+//    err := collection.FindOne(context.Background(), filter).Decode(&result)
 //    if err != nil { return err }
 //    // do something with result...
+//
+// All Client, Collection, and Database methods that take parameters of type interface{}
+// will return ErrNilDocument if nil is passed in for an interface{}.
 //
 // Additional examples can be found under the examples directory in the driver's repository and
 // on the MongoDB website.

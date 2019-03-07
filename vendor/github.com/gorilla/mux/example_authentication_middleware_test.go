@@ -40,7 +40,7 @@ func Example_authenticationMiddleware() {
 	r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// Do something here
 	})
-	amw := authenticationMiddleware{make(map[string]string)}
+	amw := authenticationMiddleware{}
 	amw.Populate()
 	r.Use(amw.Middleware)
 }

@@ -1,8 +1,8 @@
 <p align="center"><img src="etc/assets/mongo-gopher.png" width="250"></p>
 <p align="center">
-  <a href="https://goreportcard.com/report/github.com/mongodb/mongo-go-driver"><img src="https://goreportcard.com/badge/github.com/mongodb/mongo-go-driver"></a>
-  <a href="https://godoc.org/github.com/mongodb/mongo-go-driver/mongo"><img src="etc/assets/godoc-mongo-blue.svg" alt="GoDoc"></a>
-  <a href="https://godoc.org/github.com/mongodb/mongo-go-driver/bson"><img src="etc/assets/godoc-bson-blue.svg" alt="GoDoc"></a>
+  <a href="https://goreportcard.com/report/go.mongodb.org/mongo-driver"><img src="https://goreportcard.com/badge/go.mongodb.org/mongo-driver"></a>
+  <a href="https://godoc.org/go.mongodb.org/mongo-driver/mongo"><img src="etc/assets/godoc-mongo-blue.svg" alt="GoDoc"></a>
+  <a href="https://godoc.org/go.mongodb.org/mongo-driver/bson"><img src="etc/assets/godoc-bson-blue.svg" alt="GoDoc"></a>
   <a href="https://docs.mongodb.com/ecosystem/drivers/go/"><img src="etc/assets/docs-mongodb-green.svg"></a>
 </p>
 
@@ -23,7 +23,7 @@ The MongoDB supported driver for Go.
 ## Requirements
 
 - Go 1.10 or higher. We aim to support the latest supported versions of go.
-- MongoDB 3.2 and higher.
+- MongoDB 2.6 and higher.
 
 -------------------------
 ## Installation
@@ -31,7 +31,7 @@ The MongoDB supported driver for Go.
 The recommended way to get started using the MongoDB Go driver is by using `dep` to install the dependency in your project.
 
 ```bash
-dep ensure -add github.com/mongodb/mongo-go-driver/mongo
+dep ensure -add go.mongodb.org/mongo-driver/mongo
 ```
 
 -------------------------
@@ -40,9 +40,9 @@ dep ensure -add github.com/mongodb/mongo-go-driver/mongo
 To get started with the driver, import the `mongo` package, create a `mongo.Client`:
 
 ```go
-import "github.com/mongodb/mongo-go-driver/mongo"
+import "go.mongodb.org/mongo-driver/mongo"
 
-client, err := mongo.NewClient("mongodb://localhost:27017")
+client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://localhost:27017"))
 ```
 
 And connect it to your running MongoDB server:
@@ -56,7 +56,7 @@ To do this in a single step, you can use the `Connect` function:
 
 ```go
 ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-client, err := mongo.Connect(ctx, "mongodb://localhost:27017")
+client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://localhost:27017"))
 ```
 
 Calling `Connect` does not block for server discovery. If you wish to know if a MongoDB server has been found and connected to,
@@ -85,7 +85,7 @@ Several query methods return a cursor, which can be used like this:
 
 ```go
 ctx, _ = context.WithTimeout(context.Background(), 30*time.Second)
-cur, err := collection.Find(ctx, nil)
+cur, err := collection.Find(ctx, bson.D{})
 if err != nil { log.Fatal(err) }
 defer cur.Close(ctx)
 for cur.Next(ctx) {
@@ -134,6 +134,11 @@ for tickets that need completing. See our [contribution guidelines](CONTRIBUTING
 ## Continuous Integration
 
 Commits to master are run automatically on [evergreen](https://evergreen.mongodb.com/waterfall/mongo-go-driver).
+
+-------------------------
+## Thanks and Acknowledgement 
+
+<a href="https://github.com/ashleymcnamara">@ashleymcnamara</a> - Mongo Gopher Artwork
 
 -------------------------
 ## License

@@ -15,12 +15,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mongodb/mongo-go-driver/bson"
-	"github.com/mongodb/mongo-go-driver/internal/testutil/helpers"
-	"github.com/mongodb/mongo-go-driver/mongo/readconcern"
-	"github.com/mongodb/mongo-go-driver/mongo/writeconcern"
-	"github.com/mongodb/mongo-go-driver/x/network/connstring"
 	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/internal/testutil/helpers"
+	"go.mongodb.org/mongo-driver/mongo/readconcern"
+	"go.mongodb.org/mongo-driver/mongo/writeconcern"
+	"go.mongodb.org/mongo-driver/x/network/connstring"
 )
 
 type connectionStringTest struct {
@@ -124,10 +124,10 @@ func runConnectionStringTest(t *testing.T, testName string, testCase *connection
 				rc = readconcern.New()
 			}
 
-			rcBSON, err := rc.MarshalBSONElement()
+			typ, data, err := rc.MarshalBSONValue()
 			require.NoError(t, err)
 
-			rcDoc := rcBSON.Value.Document()
+			rcDoc := bson.RawValue{Type: typ, Value: data}.Document()
 			expectedLevel, expectedFound := testCase.ReadConcern["level"]
 			actualLevel, actualErr := rcDoc.LookupErr("level")
 			require.Equal(t, expectedFound, actualErr == nil)
@@ -143,10 +143,18 @@ func runConnectionStringTest(t *testing.T, testName string, testCase *connection
 				wc = writeconcern.New()
 			}
 
-			wcBSON, err := wc.MarshalBSONElement()
+			typ, data, err := wc.MarshalBSONValue()
+			if err == writeconcern.ErrEmptyWriteConcern {
+				if len(testCase.WriteConcern) == 0 {
+					return
+				}
+				if _, exists := testCase.WriteConcern["journal"]; exists && len(testCase.WriteConcern) == 1 {
+					return
+				}
+			}
 			require.NoError(t, err)
 
-			wcDoc := wcBSON.Value.Document()
+			wcDoc := bson.RawValue{Type: typ, Value: data}.Document()
 
 			// Don't count journal=false since our write concern type doesn't encode it.
 			expectedLength := len(testCase.WriteConcern)
@@ -154,11 +162,14 @@ func runConnectionStringTest(t *testing.T, testName string, testCase *connection
 				expectedLength--
 			}
 
-			require.Equal(t, len(wcDoc), expectedLength)
+			elems, err := wcDoc.Elements()
+			require.NoError(t, err)
 
-			for _, e := range wcDoc {
+			require.Equal(t, len(elems), expectedLength)
 
-				switch e.Key {
+			for _, e := range elems {
+
+				switch e.Key() {
 				case "w":
 					v, found := testCase.WriteConcern["w"]
 					require.True(t, found)
@@ -166,24 +177,24 @@ func runConnectionStringTest(t *testing.T, testName string, testCase *connection
 					vInt := testhelpers.GetIntFromInterface(v)
 
 					if vInt == nil {
-						require.Equal(t, e.Value.Type(), bson.TypeString)
+						require.Equal(t, e.Value().Type, bson.TypeString)
 
 						vString, ok := v.(string)
 						require.True(t, ok)
-						require.Equal(t, vString, e.Value.StringValue())
+						require.Equal(t, vString, e.Value().StringValue())
 
 						break
 					}
 
-					require.Equal(t, e.Value.Type(), bson.TypeInt32)
-					require.Equal(t, *vInt, int64(e.Value.Int32()))
+					require.Equal(t, e.Value().Type, bson.TypeInt32)
+					require.Equal(t, *vInt, int64(e.Value().Int32()))
 				case "wtimeout":
 					v, found := testCase.WriteConcern["wtimeoutMS"]
 					require.True(t, found)
 
 					i := testhelpers.GetIntFromInterface(v)
 					require.NotNil(t, i)
-					require.Equal(t, *i, e.Value.Int64())
+					require.Equal(t, *i, e.Value().Int64())
 				case "j":
 					v, found := testCase.WriteConcern["journal"]
 					require.True(t, found)
@@ -191,7 +202,7 @@ func runConnectionStringTest(t *testing.T, testName string, testCase *connection
 					vBool, ok := v.(bool)
 					require.True(t, ok)
 
-					require.Equal(t, vBool, e.Value.Boolean())
+					require.Equal(t, vBool, e.Value().Boolean())
 				}
 			}
 		}
@@ -202,10 +213,10 @@ func runDocumentTest(t *testing.T, testName string, testCase *documentTest) {
 	t.Run(testName, func(t *testing.T) {
 		if testCase.ReadConcern != nil {
 			rc := readConcernFromStruct(*testCase.ReadConcern)
-			rcDoc, err := rc.MarshalBSONElement()
+			typ, data, err := rc.MarshalBSONValue()
 			require.NoError(t, err)
 
-			rcBytes, _ := rcDoc.Value.Document().MarshalBSON()
+			rcBytes := bson.RawValue{Type: typ, Value: data}.Document()
 
 			actual := make(map[string]interface{})
 			err = bson.Unmarshal(rcBytes, &actual)
@@ -221,15 +232,23 @@ func runDocumentTest(t *testing.T, testName string, testCase *documentTest) {
 				require.Equal(t, *testCase.IsAcknowledged, wc.Acknowledged())
 			}
 
-			wcDoc, err := wc.MarshalBSONElement()
+			typ, data, err := wc.MarshalBSONValue()
 			if !testCase.Valid {
 				require.Error(t, err)
 				return
 			}
 
+			if err == writeconcern.ErrEmptyWriteConcern {
+				if len(testCase.WriteConcernDocument) == 0 {
+					return
+				}
+				if _, exists := testCase.WriteConcernDocument["j"]; exists && len(testCase.WriteConcernDocument) == 1 {
+					return
+				}
+			}
 			require.NoError(t, err)
 
-			wcBytes, _ := wcDoc.Value.Document().MarshalBSON()
+			wcBytes := bson.RawValue{Type: typ, Value: data}.Document()
 
 			actual := make(map[string]interface{})
 			err = bson.Unmarshal(wcBytes, &actual)
@@ -315,4 +334,51 @@ func writeConcernFromStruct(wc writeConcern) (*writeconcern.WriteConcern, error)
 func int64FitsInInt(i int64) bool {
 	// If casting an int64 to an int changes the value, then it doesn't fit in an int.
 	return int64(int(i)) == i
+}
+
+func readConcernFromConnString(cs *connstring.ConnString) *readconcern.ReadConcern {
+	if len(cs.ReadConcernLevel) == 0 {
+		return nil
+	}
+
+	rc := &readconcern.ReadConcern{}
+	readconcern.Level(cs.ReadConcernLevel)(rc)
+
+	return rc
+}
+
+func writeConcernFromConnString(cs *connstring.ConnString) *writeconcern.WriteConcern {
+	var wc *writeconcern.WriteConcern
+
+	if len(cs.WString) > 0 {
+		if wc == nil {
+			wc = writeconcern.New()
+		}
+
+		writeconcern.WTagSet(cs.WString)(wc)
+	} else if cs.WNumberSet {
+		if wc == nil {
+			wc = writeconcern.New()
+		}
+
+		writeconcern.W(cs.WNumber)(wc)
+	}
+
+	if cs.JSet {
+		if wc == nil {
+			wc = writeconcern.New()
+		}
+
+		writeconcern.J(cs.J)(wc)
+	}
+
+	if cs.WTimeoutSet {
+		if wc == nil {
+			wc = writeconcern.New()
+		}
+
+		writeconcern.WTimeout(cs.WTimeout)(wc)
+	}
+
+	return wc
 }

@@ -4,15 +4,15 @@
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package bsoncodec
+package bsoncodec // import "go.mongodb.org/mongo-driver/bson/bsoncodec"
 
 import (
 	"fmt"
 	"reflect"
 	"strings"
 
-	"github.com/mongodb/mongo-go-driver/bson/bsonrw"
-	"github.com/mongodb/mongo-go-driver/bson/bsontype"
+	"go.mongodb.org/mongo-driver/bson/bsonrw"
+	"go.mongodb.org/mongo-driver/bson/bsontype"
 )
 
 // Marshaler is an interface implemented by types that can marshal themselves
@@ -114,6 +114,11 @@ type EncodeContext struct {
 type DecodeContext struct {
 	*Registry
 	Truncate bool
+	// Ancestor is the type of a containing document. This is mainly used to determine what type
+	// should be used when decoding an embedded document into an empty interface. For example, if
+	// Ancestor is a bson.M, BSON embedded document values being decoded into an empty interface
+	// will be decoded into a bson.M.
+	Ancestor reflect.Type
 }
 
 // ValueCodec is the interface that groups the methods to encode and decode

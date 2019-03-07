@@ -14,11 +14,10 @@ import (
 
 	"path"
 
-	"github.com/mongodb/mongo-go-driver/bson"
-	"github.com/mongodb/mongo-go-driver/internal/testutil/helpers"
-	"github.com/mongodb/mongo-go-driver/mongo/options"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
-	"github.com/mongodb/mongo-go-driver/x/network/command"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/internal/testutil/helpers"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/x/bsonx"
 )
 
 const csTestsDir = "../data/change-streams"
@@ -70,7 +69,7 @@ func TestChangeStreamSpec(t *testing.T) {
 	}
 }
 
-func closeCursor(stream Cursor) {
+func closeCursor(stream *ChangeStream) {
 	_ = stream.Close(ctx)
 }
 
@@ -84,18 +83,26 @@ func getStreamOptions(test *csTest) *options.ChangeStreamOptions {
 }
 
 func changeStreamCompareErrors(t *testing.T, expected map[string]interface{}, actual error) {
-	if cmdErr, ok := actual.(command.Error); ok {
+	if cmdErr, ok := actual.(CommandError); ok {
 		expectedCode := int32(expected["code"].(float64))
 
 		if cmdErr.Code != expectedCode {
 			t.Fatalf("error code mismatch. expected %d, got %d", expectedCode, cmdErr.Code)
 		}
 	} else {
-		t.Fatalf("error was not of type command.Error")
+		t.Fatalf("error was not of type CommandError")
 	}
 }
 
-func compareCommands(t *testing.T, expected bsonx.Doc, actual bsonx.Doc) {
+func compareCommands(t *testing.T, expectedraw, actualraw bson.Raw) {
+	expected, err := bsonx.ReadDoc(expectedraw)
+	if err != nil {
+		t.Fatalf("could not parse document: %v", err)
+	}
+	actual, err := bsonx.ReadDoc(actualraw)
+	if err != nil {
+		t.Fatalf("could not parse document: %v", err)
+	}
 	for _, expectedElem := range expected {
 
 		aVal, err := actual.LookupErr(expectedElem.Key)
@@ -140,7 +147,7 @@ func compareCsStartedEvent(t *testing.T, expected json.RawMessage) {
 		t.Fatalf("db name mismatch. expected %s got %s", expectedDbName, actual.DatabaseName)
 	}
 
-	expectedCmd := expectedDoc.Lookup("command").Document()
+	expectedCmd, _ := expectedDoc.Lookup("command").Document().MarshalBSON()
 	compareCommands(t, expectedCmd, actual.Command)
 }
 
@@ -206,7 +213,7 @@ func runCsTestFile(t *testing.T, globalClient *Client, path string) {
 
 			drainChannels()
 			opts := getStreamOptions(&test)
-			var cursor Cursor
+			var cursor *ChangeStream
 			switch test.Target {
 			case "collection":
 				cursor, err = clientColl.Watch(ctx, test.Pipeline, opts)

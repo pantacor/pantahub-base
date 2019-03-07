@@ -9,15 +9,14 @@ package mongo
 import (
 	"context"
 
-	"github.com/mongodb/mongo-go-driver/bson/bsoncodec"
-	"github.com/mongodb/mongo-go-driver/mongo/options"
-	"github.com/mongodb/mongo-go-driver/mongo/readconcern"
-	"github.com/mongodb/mongo-go-driver/mongo/readpref"
-	"github.com/mongodb/mongo-go-driver/mongo/writeconcern"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
-	"github.com/mongodb/mongo-go-driver/x/mongo/driver"
-	"github.com/mongodb/mongo-go-driver/x/network/command"
-	"github.com/mongodb/mongo-go-driver/x/network/description"
+	"go.mongodb.org/mongo-driver/bson/bsoncodec"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readconcern"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"go.mongodb.org/mongo-driver/mongo/writeconcern"
+	"go.mongodb.org/mongo-driver/x/mongo/driver"
+	"go.mongodb.org/mongo-driver/x/network/command"
+	"go.mongodb.org/mongo-driver/x/network/description"
 )
 
 // Database performs operations on a given database.
@@ -97,7 +96,7 @@ func (db *Database) processRunCommand(ctx context.Context, cmd interface{}, opts
 	sess := sessionFromContext(ctx)
 	runCmd := options.MergeRunCmdOptions(opts...)
 
-	if err := db.client.ValidSession(sess); err != nil {
+	if err := db.client.validSession(sess); err != nil {
 		return command.Read{}, nil, err
 	}
 
@@ -150,12 +149,12 @@ func (db *Database) RunCommand(ctx context.Context, runCommand interface{}, opts
 		db.client.topology.SessionPool,
 	)
 
-	return &SingleResult{err: replaceTopologyErr(err), rdr: doc}
+	return &SingleResult{err: replaceErrors(err), rdr: doc, reg: db.registry}
 }
 
 // RunCommandCursor runs a command on the database and returns a cursor over the resulting reader. A user can supply
 // a custom context to this method, or nil to default to context.Background().
-func (db *Database) RunCommandCursor(ctx context.Context, runCommand interface{}, opts ...*options.RunCmdOptions) (Cursor, error) {
+func (db *Database) RunCommandCursor(ctx context.Context, runCommand interface{}, opts ...*options.RunCmdOptions) (*Cursor, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -165,7 +164,7 @@ func (db *Database) RunCommandCursor(ctx context.Context, runCommand interface{}
 		return nil, err
 	}
 
-	result, err := driver.ReadCursor(
+	batchCursor, err := driver.ReadCursor(
 		ctx,
 		readCmd,
 		db.client.topology,
@@ -173,8 +172,12 @@ func (db *Database) RunCommandCursor(ctx context.Context, runCommand interface{}
 		db.client.id,
 		db.client.topology.SessionPool,
 	)
+	if err != nil {
+		return nil, replaceErrors(err)
+	}
 
-	return result, replaceTopologyErr(err)
+	cursor, err := newCursor(batchCursor, db.registry)
+	return cursor, replaceErrors(err)
 }
 
 // Drop drops this database from mongodb.
@@ -185,7 +188,7 @@ func (db *Database) Drop(ctx context.Context) error {
 
 	sess := sessionFromContext(ctx)
 
-	err := db.client.ValidSession(sess)
+	err := db.client.validSession(sess)
 	if err != nil {
 		return err
 	}
@@ -203,54 +206,55 @@ func (db *Database) Drop(ctx context.Context) error {
 		db.client.topology.SessionPool,
 	)
 	if err != nil && !command.IsNotFound(err) {
-		return replaceTopologyErr(err)
+		return replaceErrors(err)
 	}
 	return nil
 }
 
 // ListCollections list collections from mongodb database.
-func (db *Database) ListCollections(ctx context.Context, filter interface{}, opts ...*options.ListCollectionsOptions) (Cursor, error) {
+func (db *Database) ListCollections(ctx context.Context, filter interface{}, opts ...*options.ListCollectionsOptions) (*Cursor, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
 	sess := sessionFromContext(ctx)
 
-	err := db.client.ValidSession(sess)
+	err := db.client.validSession(sess)
 	if err != nil {
 		return nil, err
 	}
 
-	var filterDoc bsonx.Doc
-	if filter != nil {
-		filterDoc, err = transformDocument(db.registry, filter)
-		if err != nil {
-			return nil, err
-		}
+	filterDoc, err := transformDocument(db.registry, filter)
+	if err != nil {
+		return nil, err
 	}
 
 	cmd := command.ListCollections{
 		DB:       db.name,
 		Filter:   filterDoc,
-		ReadPref: db.readPreference,
+		ReadPref: readpref.Primary(), // list collections must be run on a primary by default
 		Session:  sess,
 		Clock:    db.client.clock,
 	}
 
-	cursor, err := driver.ListCollections(
+	readSelector := description.CompositeSelector([]description.ServerSelector{
+		description.ReadPrefSelector(readpref.Primary()),
+		description.LatencySelector(db.client.localThreshold),
+	})
+	batchCursor, err := driver.ListCollections(
 		ctx, cmd,
 		db.client.topology,
-		db.readSelector,
+		readSelector,
 		db.client.id,
 		db.client.topology.SessionPool,
 		opts...,
 	)
-	if err != nil && !command.IsNotFound(err) {
-		return nil, replaceTopologyErr(err)
+	if err != nil {
+		return nil, replaceErrors(err)
 	}
 
-	return cursor, nil
-
+	cursor, err := newCursor(batchCursor, db.registry)
+	return cursor, replaceErrors(err)
 }
 
 // ReadConcern returns the read concern of this database.
@@ -272,7 +276,7 @@ func (db *Database) WriteConcern() *writeconcern.WriteConcern {
 // to running a raw aggregation with a $changeStream stage because it supports resumability in the case of some errors.
 // The database must have read concern majority or no read concern for a change stream to be created successfully.
 func (db *Database) Watch(ctx context.Context, pipeline interface{},
-	opts ...*options.ChangeStreamOptions) (Cursor, error) {
+	opts ...*options.ChangeStreamOptions) (*ChangeStream, error) {
 
 	return newDbChangeStream(ctx, db, pipeline, opts...)
 }

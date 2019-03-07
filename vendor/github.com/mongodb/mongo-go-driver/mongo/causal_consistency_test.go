@@ -11,13 +11,14 @@ import (
 	"os"
 	"testing"
 
-	"github.com/mongodb/mongo-go-driver/bson/primitive"
-	"github.com/mongodb/mongo-go-driver/event"
-	"github.com/mongodb/mongo-go-driver/internal/testutil/helpers"
-	"github.com/mongodb/mongo-go-driver/mongo/options"
-	"github.com/mongodb/mongo-go-driver/mongo/readconcern"
-	"github.com/mongodb/mongo-go-driver/mongo/writeconcern"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/event"
+	"go.mongodb.org/mongo-driver/internal/testutil/helpers"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readconcern"
+	"go.mongodb.org/mongo-driver/mongo/writeconcern"
+	"go.mongodb.org/mongo-driver/x/bsonx"
 )
 
 var ccStarted *event.CommandStartedEvent
@@ -44,11 +45,11 @@ func compareOperationTimes(t *testing.T, expected *primitive.Timestamp, actual *
 	}
 }
 
-func checkOperationTime(t *testing.T, cmd bsonx.Doc, shouldInclude bool) {
+func checkOperationTime(t *testing.T, cmd bson.Raw, shouldInclude bool) {
 	rc, err := cmd.LookupErr("readConcern")
 	testhelpers.RequireNil(t, err, "key read concern not found")
 
-	_, err = rc.Document().LookupErr("afterClusterTime")
+	_, err = bson.Raw(rc.Value).LookupErr("afterClusterTime")
 	if shouldInclude {
 		testhelpers.RequireNil(t, err, "afterClusterTime not found")
 	} else {
@@ -56,11 +57,11 @@ func checkOperationTime(t *testing.T, cmd bsonx.Doc, shouldInclude bool) {
 	}
 }
 
-func getOperationTime(t *testing.T, cmd bsonx.Doc) *primitive.Timestamp {
+func getOperationTime(t *testing.T, cmd bson.Raw) *primitive.Timestamp {
 	rc, err := cmd.LookupErr("readConcern")
 	testhelpers.RequireNil(t, err, "key read concern not found")
 
-	ct, err := rc.Document().LookupErr("afterClusterTime")
+	ct, err := bson.Raw(rc.Value).LookupErr("afterClusterTime")
 	testhelpers.RequireNil(t, err, "key afterClusterTime not found")
 
 	timeT, timeI := ct.Timestamp()
@@ -80,8 +81,8 @@ func createReadFuncMap(t *testing.T, dbName string, collName string) (*Client, *
 	coll.writeConcern = writeconcern.New(writeconcern.WMajority())
 
 	functions := []CollFunction{
-		{"Aggregate", coll, nil, func(mctx SessionContext) error { _, err := coll.Aggregate(mctx, emptyDoc); return err }},
-		{"Count", coll, nil, func(mctx SessionContext) error { _, err := coll.Count(mctx, emptyDoc); return err }},
+		{"Aggregate", coll, nil, func(mctx SessionContext) error { _, err := coll.Aggregate(mctx, emptyArr); return err }},
+		{"EstimatedDocumentCount", coll, nil, func(mctx SessionContext) error { _, err := coll.EstimatedDocumentCount(mctx); return err }},
 		{"Distinct", coll, nil, func(mctx SessionContext) error { _, err := coll.Distinct(mctx, "field", emptyDoc); return err }},
 		{"Find", coll, nil, func(mctx SessionContext) error { _, err := coll.Find(mctx, emptyDoc); return err }},
 		{"FindOne", coll, nil, func(mctx SessionContext) error { res := coll.FindOne(mctx, emptyDoc); return res.err }},
@@ -93,11 +94,11 @@ func createReadFuncMap(t *testing.T, dbName string, collName string) (*Client, *
 	return client, db, coll, functions
 }
 
-func checkReadConcern(t *testing.T, cmd bsonx.Doc, levelIncluded bool, expectedLevel string, optimeIncluded bool, expectedTime *primitive.Timestamp) {
+func checkReadConcern(t *testing.T, cmd bson.Raw, levelIncluded bool, expectedLevel string, optimeIncluded bool, expectedTime *primitive.Timestamp) {
 	rc, err := cmd.LookupErr("readConcern")
 	testhelpers.RequireNil(t, err, "key readConcern not found")
 
-	rcDoc := rc.Document()
+	rcDoc := bson.Raw(rc.Value)
 	levelVal, err := rcDoc.LookupErr("level")
 	if levelIncluded {
 		testhelpers.RequireNil(t, err, "key level not found")
@@ -179,6 +180,8 @@ func skipIfSessionsSupported(t *testing.T, db *Database) {
 }
 
 func TestCausalConsistency(t *testing.T) {
+	skipIfBelow36(t)
+
 	t.Run("TestOperationTimeNil", func(t *testing.T) {
 		// When a ClientSession is first created the operationTime has no value
 

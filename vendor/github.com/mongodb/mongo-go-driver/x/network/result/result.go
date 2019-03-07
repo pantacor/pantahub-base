@@ -5,14 +5,14 @@
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
 // Package result contains the results from various operations.
-package result
+package result // import "go.mongodb.org/mongo-driver/x/network/result"
 
 import (
 	"time"
 
-	"github.com/mongodb/mongo-go-driver/bson"
-	"github.com/mongodb/mongo-go-driver/bson/primitive"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/x/bsonx"
 )
 
 // Upsert contains the information for a single upsert.
@@ -64,6 +64,7 @@ type FindAndModify struct {
 		UpdatedExisting bool
 		Upserted        interface{}
 	}
+	WriteConcernError *WriteConcernError `bson:"writeConcernError"`
 }
 
 // WriteError is an error from a write operation that is not a write concern
@@ -81,6 +82,8 @@ type WriteConcernError struct {
 	ErrInfo bson.Raw
 }
 
+func (wce WriteConcernError) Error() string { return wce.ErrMsg }
+
 // ListDatabases is the result from a listDatabases command.
 type ListDatabases struct {
 	Databases []struct {
@@ -95,7 +98,7 @@ type ListDatabases struct {
 type IsMaster struct {
 	Arbiters                     []string           `bson:"arbiters,omitempty"`
 	ArbiterOnly                  bool               `bson:"arbiterOnly,omitempty"`
-	ClusterTime                  bsonx.Doc          `bson:"$clusterTime,omitempty"`
+	ClusterTime                  bson.Raw           `bson:"$clusterTime,omitempty"`
 	Compression                  []string           `bson:"compression,omitempty"`
 	ElectionID                   primitive.ObjectID `bson:"electionId,omitempty"`
 	Hidden                       bool               `bson:"hidden,omitempty"`

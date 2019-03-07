@@ -18,7 +18,7 @@ package accounts
 import (
 	"time"
 
-	"gopkg.in/mgo.v2/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type AccountType string
@@ -32,7 +32,7 @@ const (
 )
 
 type Account struct {
-	Id bson.ObjectId `json:"-" bson:"_id"`
+	Id primitive.ObjectID `json:"-" bson:"_id"`
 
 	Type  AccountType `json:"type" bson:"type"`
 	Email string      `json:"email" bson:"email"`

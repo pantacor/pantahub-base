@@ -17,15 +17,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mongodb/mongo-go-driver/mongo/options"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/x/bsonx"
 
 	"fmt"
 
-	"github.com/mongodb/mongo-go-driver/bson"
-	"github.com/mongodb/mongo-go-driver/internal/testutil/helpers"
-	"github.com/mongodb/mongo-go-driver/mongo/writeconcern"
 	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/internal/testutil/helpers"
+	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 )
 
 type testFile struct {
@@ -198,7 +198,7 @@ func aggregateTest(t *testing.T, db *Database, coll *Collection, test *testCase)
 		}
 
 		if collation, found := test.Operation.Arguments["collation"]; found {
-			opts = opts.SetCollation(newCollationFromMap(collation.(map[string]interface{})))
+			opts = opts.SetCollation(collationFromMap(collation.(map[string]interface{})))
 		}
 
 		out := false
@@ -212,7 +212,7 @@ func aggregateTest(t *testing.T, db *Database, coll *Collection, test *testCase)
 		require.NoError(t, err)
 
 		if !out {
-			verifyCursorResult(t, cursor, test.Outcome.Result)
+			verifyCursorResult2(t, cursor, test.Outcome.Result)
 		}
 
 		if test.Outcome.Collection != nil {
@@ -292,76 +292,76 @@ func bulkWriteTest(t *testing.T, coll *Collection, test *testCase) {
 			case "deleteOne":
 				dom := NewDeleteOneModel()
 				if filter != nil {
-					dom = dom.Filter(filter)
+					dom = dom.SetFilter(filter)
 				}
 				if collation != nil {
-					dom = dom.Collation(collation)
+					dom = dom.SetCollation(collation)
 				}
 				model = dom
 			case "deleteMany":
 				dmm := NewDeleteManyModel()
 				if filter != nil {
-					dmm = dmm.Filter(filter)
+					dmm = dmm.SetFilter(filter)
 				}
 				if collation != nil {
-					dmm = dmm.Collation(collation)
+					dmm = dmm.SetCollation(collation)
 				}
 				model = dmm
 			case "insertOne":
 				iom := NewInsertOneModel()
 				if document != nil {
-					iom = iom.Document(document)
+					iom = iom.SetDocument(document)
 				}
 				model = iom
 			case "replaceOne":
 				rom := NewReplaceOneModel()
 				if filter != nil {
-					rom = rom.Filter(filter)
+					rom = rom.SetFilter(filter)
 				}
 				if replacement != nil {
-					rom = rom.Replacement(replacement)
+					rom = rom.SetReplacement(replacement)
 				}
 				if upsertSet {
-					rom = rom.Upsert(upsert)
+					rom = rom.SetUpsert(upsert)
 				}
 				if collation != nil {
-					rom = rom.Collation(collation)
+					rom = rom.SetCollation(collation)
 				}
 				model = rom
 			case "updateOne":
 				uom := NewUpdateOneModel()
 				if filter != nil {
-					uom = uom.Filter(filter)
+					uom = uom.SetFilter(filter)
 				}
 				if update != nil {
-					uom = uom.Update(update)
+					uom = uom.SetUpdate(update)
 				}
 				if upsertSet {
-					uom = uom.Upsert(upsert)
+					uom = uom.SetUpsert(upsert)
 				}
 				if collation != nil {
-					uom = uom.Collation(collation)
+					uom = uom.SetCollation(collation)
 				}
 				if arrayFiltersSet {
-					uom = uom.ArrayFilters(arrayFilters)
+					uom = uom.SetArrayFilters(arrayFilters)
 				}
 				model = uom
 			case "updateMany":
 				umm := NewUpdateManyModel()
 				if filter != nil {
-					umm = umm.Filter(filter)
+					umm = umm.SetFilter(filter)
 				}
 				if update != nil {
-					umm = umm.Update(update)
+					umm = umm.SetUpdate(update)
 				}
 				if upsertSet {
-					umm = umm.Upsert(upsert)
+					umm = umm.SetUpsert(upsert)
 				}
 				if collation != nil {
-					umm = umm.Collation(collation)
+					umm = umm.SetCollation(collation)
 				}
 				if arrayFiltersSet {
-					umm = umm.ArrayFilters(arrayFilters)
+					umm = umm.SetArrayFilters(arrayFilters)
 				}
 				model = umm
 			default:

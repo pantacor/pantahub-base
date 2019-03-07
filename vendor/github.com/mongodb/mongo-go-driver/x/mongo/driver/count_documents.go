@@ -10,15 +10,14 @@ import (
 	"context"
 	"time"
 
-	"github.com/mongodb/mongo-go-driver/bson/bsoncodec"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
-
-	"github.com/mongodb/mongo-go-driver/mongo/options"
-	"github.com/mongodb/mongo-go-driver/x/mongo/driver/session"
-	"github.com/mongodb/mongo-go-driver/x/mongo/driver/topology"
-	"github.com/mongodb/mongo-go-driver/x/mongo/driver/uuid"
-	"github.com/mongodb/mongo-go-driver/x/network/command"
-	"github.com/mongodb/mongo-go-driver/x/network/description"
+	"go.mongodb.org/mongo-driver/bson/bsoncodec"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/x/bsonx"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/session"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/topology"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/uuid"
+	"go.mongodb.org/mongo-driver/x/network/command"
+	"go.mongodb.org/mongo-driver/x/network/description"
 )
 
 // CountDocuments handles the full cycle dispatch and execution of a countDocuments command against the provided
@@ -66,14 +65,18 @@ func CountDocuments(
 	// ignore Skip and Limit because we already have these options in the pipeline
 	if countOpts.MaxTime != nil {
 		cmd.Opts = append(cmd.Opts, bsonx.Elem{
-			"maxTimeMS", bsonx.Int64(int64(time.Duration(*countOpts.MaxTime) / time.Millisecond)),
+			"maxTimeMS", bsonx.Int64(int64(*countOpts.MaxTime / time.Millisecond)),
 		})
 	}
 	if countOpts.Collation != nil {
 		if desc.WireVersion.Max < 5 {
 			return 0, ErrCollation
 		}
-		cmd.Opts = append(cmd.Opts, bsonx.Elem{"collation", bsonx.Document(countOpts.Collation.ToDocument())})
+		collDoc, err := bsonx.ReadDoc(countOpts.Collation.ToDocument())
+		if err != nil {
+			return 0, err
+		}
+		cmd.Opts = append(cmd.Opts, bsonx.Elem{"collation", bsonx.Document(collDoc)})
 	}
 	if countOpts.Hint != nil {
 		hintElem, err := interfaceToElement("hint", countOpts.Hint, registry)
@@ -84,5 +87,5 @@ func CountDocuments(
 		cmd.Opts = append(cmd.Opts, hintElem)
 	}
 
-	return cmd.RoundTrip(ctx, desc, ss, conn)
+	return cmd.RoundTrip(ctx, desc, conn)
 }

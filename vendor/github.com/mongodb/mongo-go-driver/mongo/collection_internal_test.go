@@ -8,23 +8,30 @@ package mongo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"testing"
 
-	"github.com/mongodb/mongo-go-driver/mongo/options"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/x/bsonx"
+
+	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/mongodb/mongo-go-driver/bson"
-	"github.com/mongodb/mongo-go-driver/bson/primitive"
-	"github.com/mongodb/mongo-go-driver/internal/testutil"
-	"github.com/mongodb/mongo-go-driver/mongo/readconcern"
-	"github.com/mongodb/mongo-go-driver/mongo/readpref"
-	"github.com/mongodb/mongo-go-driver/mongo/writeconcern"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/internal/testutil"
+	"go.mongodb.org/mongo-driver/mongo/readconcern"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"go.mongodb.org/mongo-driver/mongo/writeconcern"
+	"go.mongodb.org/mongo-driver/x/mongo/driver"
+	"go.mongodb.org/mongo-driver/x/network/command"
 )
+
+var impossibleWriteConcern = writeconcern.New(writeconcern.W(50), writeconcern.WTimeout(time.Second))
 
 func createTestCollection(t *testing.T, dbName *string, collName *string, opts ...*options.CollectionOptions) *Collection {
 	if collName == nil {
@@ -48,33 +55,17 @@ func skipIfBelow34(t *testing.T, db *Database) {
 }
 
 func initCollection(t *testing.T, coll *Collection) {
-	doc1 := bsonx.Doc{{"x", bsonx.Int32(1)}}
-	doc2 := bsonx.Doc{{"x", bsonx.Int32(2)}}
-	doc3 := bsonx.Doc{{"x", bsonx.Int32(3)}}
-	doc4 := bsonx.Doc{{"x", bsonx.Int32(4)}}
-	doc5 := bsonx.Doc{{"x", bsonx.Int32(5)}}
+	docs := []interface{}{}
+	var i int32
+	for i = 1; i <= 5; i++ {
+		docs = append(docs, bsonx.Doc{{"x", bsonx.Int32(i)}})
+	}
 
-	var err error
-
-	_, err = coll.InsertOne(context.Background(), doc1)
-	require.Nil(t, err)
-
-	_, err = coll.InsertOne(context.Background(), doc2)
-	require.Nil(t, err)
-
-	_, err = coll.InsertOne(context.Background(), doc3)
-	require.Nil(t, err)
-
-	_, err = coll.InsertOne(context.Background(), doc4)
-	require.Nil(t, err)
-
-	_, err = coll.InsertOne(context.Background(), doc5)
+	_, err := coll.InsertMany(ctx, docs)
 	require.Nil(t, err)
 }
 
 func TestCollection_initialize(t *testing.T) {
-	t.Parallel()
-
 	dbName := "foo"
 	collName := "bar"
 
@@ -153,14 +144,12 @@ func TestCollection_InheritOptions(t *testing.T) {
 }
 
 func TestCollection_ReplaceTopologyError(t *testing.T) {
-	t.Parallel()
-
 	if testing.Short() {
 		t.Skip()
 	}
 
 	cs := testutil.ConnString(t)
-	c, err := NewClient(cs.String())
+	c, err := NewClient(options.Client().ApplyURI(cs.String()))
 	require.NoError(t, err)
 	require.NotNil(t, c)
 
@@ -212,16 +201,16 @@ func TestCollection_ReplaceTopologyError(t *testing.T) {
 	_, err = coll.Aggregate(context.Background(), pipeline, options.Aggregate())
 	require.Equal(t, err, ErrClientDisconnected)
 
-	_, err = coll.Count(context.Background(), nil)
+	_, err = coll.EstimatedDocumentCount(context.Background())
 	require.Equal(t, err, ErrClientDisconnected)
 
-	_, err = coll.CountDocuments(context.Background(), nil)
+	_, err = coll.CountDocuments(context.Background(), bsonx.Doc{})
 	require.Equal(t, err, ErrClientDisconnected)
 
 	_, err = coll.EstimatedDocumentCount(context.Background())
 	require.Equal(t, err, ErrClientDisconnected)
 
-	_, err = coll.Distinct(context.Background(), "x", nil)
+	_, err = coll.Distinct(context.Background(), "x", bsonx.Doc{})
 	require.Equal(t, err, ErrClientDisconnected)
 
 	_, err = coll.Find(context.Background(), doc1)
@@ -241,8 +230,6 @@ func TestCollection_ReplaceTopologyError(t *testing.T) {
 }
 
 func TestCollection_namespace(t *testing.T) {
-	t.Parallel()
-
 	dbName := "foo"
 	collName := "bar"
 
@@ -253,8 +240,6 @@ func TestCollection_namespace(t *testing.T) {
 }
 
 func TestCollection_name_accessor(t *testing.T) {
-	t.Parallel()
-
 	dbName := "foo"
 	collName := "bar"
 
@@ -266,8 +251,6 @@ func TestCollection_name_accessor(t *testing.T) {
 }
 
 func TestCollection_database_accessor(t *testing.T) {
-	t.Parallel()
-
 	dbName := "foo"
 	collName := "bar"
 
@@ -279,8 +262,6 @@ func TestCollection_InsertOne(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
-
-	t.Parallel()
 
 	id := primitive.NewObjectID()
 	want := id
@@ -300,8 +281,6 @@ func TestCollection_InsertOne_WriteError(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
-
 	want := WriteError{Code: 11000}
 	doc := bsonx.Doc{{"_id", bsonx.ObjectID(primitive.NewObjectID())}}
 	coll := createTestCollection(t, nil, nil)
@@ -309,16 +288,16 @@ func TestCollection_InsertOne_WriteError(t *testing.T) {
 	_, err := coll.InsertOne(context.Background(), doc)
 	require.NoError(t, err)
 	_, err = coll.InsertOne(context.Background(), doc)
-	got, ok := err.(WriteErrors)
+	got, ok := err.(WriteException)
 	if !ok {
-		t.Errorf("Did not receive correct type of error. got %T; want %T", err, WriteErrors{})
+		t.Errorf("Did not receive correct type of error. got %T; want %T", err, WriteException{})
 	}
-	if len(got) != 1 {
-		t.Errorf("Incorrect number of errors receieved. got %d; want %d", len(got), 1)
+	if len(got.WriteErrors) != 1 {
+		t.Errorf("Incorrect number of errors receieved. got %d; want %d", len(got.WriteErrors), 1)
 		t.FailNow()
 	}
-	if got[0].Code != want.Code {
-		t.Errorf("Did not receive the correct error code. got %d; want %d", got[0].Code, want.Code)
+	if got.WriteErrors[0].Code != want.Code {
+		t.Errorf("Did not receive the correct error code. got %d; want %d", got.WriteErrors[0].Code, want.Code)
 	}
 
 }
@@ -332,31 +311,109 @@ func TestCollection_InsertOne_WriteConcernError(t *testing.T) {
 		t.Skip()
 	}
 
-	want := WriteConcernError{Code: 100, Message: "Not enough data-bearing nodes"}
 	doc := bsonx.Doc{{"_id", bsonx.ObjectID(primitive.NewObjectID())}}
-	coll := createTestCollection(t, nil, nil,
-		options.Collection().SetWriteConcern(writeconcern.New(writeconcern.W(25))))
+	coll := createTestCollection(t, nil, nil, options.Collection().SetWriteConcern(impossibleWriteConcern))
 
 	_, err := coll.InsertOne(context.Background(), doc)
-	got, ok := err.(WriteConcernError)
+	writeErr, ok := err.(WriteException)
 	if !ok {
-		t.Errorf("Did not receive correct type of error. got %T; want %T", err, WriteConcernError{})
+		t.Errorf("incorrect error type returned: %T", writeErr)
 	}
-	if got.Code != want.Code {
-		t.Errorf("Did not receive the correct error code. got %d; want %d", got.Code, want.Code)
+	if writeErr.WriteConcernError == nil {
+		t.Errorf("write concern error is nil: %+v", writeErr)
 	}
-	if got.Message != want.Message {
-		t.Errorf("Did not receive the correct error message. got %s; want %s", got.Message, want.Message)
+}
+
+func TestCollection_NilDocumentError(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
 	}
 
+	coll := createTestCollection(t, nil, nil)
+
+	_, err := coll.InsertOne(context.Background(), nil)
+	require.Equal(t, err, ErrNilDocument)
+
+	_, err = coll.InsertMany(context.Background(), nil)
+	require.Equal(t, err, ErrEmptySlice)
+
+	_, err = coll.InsertMany(context.Background(), []interface{}{})
+	require.Equal(t, err, ErrEmptySlice)
+
+	_, err = coll.InsertMany(context.Background(), []interface{}{bsonx.Doc{bsonx.Elem{"_id", bsonx.Int32(1)}}, nil})
+	require.Equal(t, err, ErrNilDocument)
+
+	_, err = coll.DeleteOne(context.Background(), nil)
+	require.Equal(t, err, ErrNilDocument)
+
+	_, err = coll.DeleteMany(context.Background(), nil)
+	require.Equal(t, err, ErrNilDocument)
+
+	_, err = coll.UpdateOne(context.Background(), nil, bsonx.Doc{{"$set", bsonx.Document(bsonx.Doc{{"_id", bsonx.Double(3.14159)}})}})
+	require.Equal(t, err, ErrNilDocument)
+
+	_, err = coll.UpdateOne(context.Background(), bsonx.Doc{{"_id", bsonx.Double(3.14159)}}, nil)
+	require.Equal(t, err, ErrNilDocument)
+
+	_, err = coll.UpdateMany(context.Background(), nil, bsonx.Doc{{"$set", bsonx.Document(bsonx.Doc{{"_id", bsonx.Double(3.14159)}})}})
+	require.Equal(t, err, ErrNilDocument)
+
+	_, err = coll.UpdateMany(context.Background(), bsonx.Doc{{"_id", bsonx.Double(3.14159)}}, nil)
+	require.Equal(t, err, ErrNilDocument)
+
+	_, err = coll.ReplaceOne(context.Background(), bsonx.Doc{{"_id", bsonx.Double(3.14159)}}, nil)
+	require.Equal(t, err, ErrNilDocument)
+
+	_, err = coll.ReplaceOne(context.Background(), nil, bsonx.Doc{{"_id", bsonx.Double(3.14159)}})
+	require.Equal(t, err, ErrNilDocument)
+
+	_, err = coll.CountDocuments(context.Background(), nil)
+	require.Equal(t, err, ErrNilDocument)
+
+	_, err = coll.Distinct(context.Background(), "field", nil)
+	require.Equal(t, err, ErrNilDocument)
+
+	_, err = coll.Find(context.Background(), nil)
+	require.Equal(t, err, ErrNilDocument)
+
+	res := coll.FindOne(context.Background(), nil)
+	require.Equal(t, res.err, ErrNilDocument)
+
+	res = coll.FindOneAndDelete(context.Background(), nil)
+	require.Equal(t, res.err, ErrNilDocument)
+
+	res = coll.FindOneAndReplace(context.Background(), bsonx.Doc{{"_id", bsonx.Double(3.14159)}}, nil)
+	require.Equal(t, res.err, ErrNilDocument)
+
+	res = coll.FindOneAndReplace(context.Background(), nil, bsonx.Doc{{"_id", bsonx.Double(3.14159)}})
+	require.Equal(t, res.err, ErrNilDocument)
+
+	res = coll.FindOneAndUpdate(context.Background(), bsonx.Doc{{"_id", bsonx.Double(3.14159)}}, nil)
+	require.Equal(t, res.err, ErrNilDocument)
+
+	res = coll.FindOneAndUpdate(context.Background(), nil, bsonx.Doc{{"_id", bsonx.Double(3.14159)}})
+	require.Equal(t, res.err, ErrNilDocument)
+
+	_, err = coll.BulkWrite(context.Background(), nil)
+	require.Equal(t, err, ErrEmptySlice)
+
+	_, err = coll.BulkWrite(context.Background(), []WriteModel{})
+	require.Equal(t, err, ErrEmptySlice)
+
+	_, err = coll.BulkWrite(context.Background(), []WriteModel{nil})
+	require.Equal(t, err, ErrNilDocument)
+
+	_, err = coll.Aggregate(context.Background(), nil)
+	require.Equal(t, err, errors.New("can only transform slices and arrays into aggregation pipelines, but got invalid"))
+
+	_, err = coll.Watch(context.Background(), nil)
+	require.Equal(t, err, errors.New("can only transform slices and arrays into aggregation pipelines, but got invalid"))
 }
 
 func TestCollection_InsertMany(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
-
-	t.Parallel()
 
 	want1 := int32(11)
 	want2 := int32(12)
@@ -392,7 +449,7 @@ func TestCollection_InsertMany_Batches(t *testing.T) {
 		t.Skip("skipping long running integration test outside of evergreen")
 	}
 
-	//t.Parallel()
+	////t.Parallel()
 
 	const (
 		megabyte = 10 * 10 * 10 * 10 * 10 * 10
@@ -428,8 +485,6 @@ func TestCollection_InsertMany_ErrorCases(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
-
-	t.Parallel()
 
 	want := WriteError{Code: 11000}
 	docs := []interface{}{
@@ -491,7 +546,7 @@ func TestCollection_InsertMany_ErrorCases(t *testing.T) {
 			bsonx.Doc{{"_id", bsonx.ObjectID(primitive.NewObjectID())}},
 		}
 
-		copyColl, err := coll.Clone(options.Collection().SetWriteConcern(writeconcern.New(writeconcern.W(42))))
+		copyColl, err := coll.Clone(options.Collection().SetWriteConcern(impossibleWriteConcern))
 		if err != nil {
 			t.Errorf("err copying collection: %s", err)
 		}
@@ -520,14 +575,13 @@ func TestCollection_InsertMany_WriteConcernError(t *testing.T) {
 		t.Skip()
 	}
 
-	want := WriteConcernError{Code: 100, Message: "Not enough data-bearing nodes"}
 	docs := []interface{}{
 		bsonx.Doc{{"_id", bsonx.ObjectID(primitive.NewObjectID())}},
 		bsonx.Doc{{"_id", bsonx.ObjectID(primitive.NewObjectID())}},
 		bsonx.Doc{{"_id", bsonx.ObjectID(primitive.NewObjectID())}},
 	}
 	coll := createTestCollection(t, nil, nil,
-		options.Collection().SetWriteConcern(writeconcern.New(writeconcern.W(25))))
+		options.Collection().SetWriteConcern(impossibleWriteConcern))
 
 	_, err := coll.InsertMany(context.Background(), docs)
 	got, ok := err.(BulkWriteException)
@@ -535,21 +589,15 @@ func TestCollection_InsertMany_WriteConcernError(t *testing.T) {
 		t.Errorf("Did not receive correct type of error. got %T; want %T\nError message: %s", err, BulkWriteException{}, err)
 		t.Errorf("got error message %v", err)
 	}
-	if got.WriteConcernError.Code != want.Code {
-		t.Errorf("Did not receive the correct error code. got %d; want %d", got.WriteConcernError.Code, want.Code)
+	if got.WriteConcernError == nil {
+		t.Errorf("write concern error was nil")
 	}
-	if got.WriteConcernError.Message != want.Message {
-		t.Errorf("Did not receive the correct error message. got %s; want %s", got.WriteConcernError.Message, want.Message)
-	}
-
 }
 
 func TestCollection_DeleteOne_found(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
-
-	t.Parallel()
 
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
@@ -567,8 +615,6 @@ func TestCollection_DeleteOne_notFound(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
-
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
 
@@ -583,8 +629,6 @@ func TestCollection_DeleteOne_notFound_withOption(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
-
-	t.Parallel()
 
 	coll := createTestCollection(t, nil, nil)
 	skipIfBelow34(t, coll.db)
@@ -604,9 +648,6 @@ func TestCollection_DeleteOne_WriteError(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
-
-	want := WriteError{Code: 20}
 	filter := bsonx.Doc{{"x", bsonx.Int32(1)}}
 	db := createTestDatabase(t, nil)
 	err := db.RunCommand(
@@ -621,18 +662,18 @@ func TestCollection_DeleteOne_WriteError(t *testing.T) {
 	coll := db.Collection(testutil.ColName(t))
 
 	_, err = coll.DeleteOne(context.Background(), filter)
-	got, ok := err.(WriteErrors)
+	got, ok := err.(WriteException)
 	if !ok {
-		t.Errorf("Did not receive correct type of error. got %T; want %T", err, WriteErrors{})
+		t.Errorf("Did not receive correct type of error. got %T; want %T", err, WriteException{})
 	}
-	if len(got) != 1 {
-		t.Errorf("Incorrect number of errors receieved. got %d; want %d", len(got), 1)
+	if len(got.WriteErrors) != 1 {
+		t.Errorf("Incorrect number of errors receieved. got %d; want %d", len(got.WriteErrors), 1)
 		t.FailNow()
 	}
-	if got[0].Code != want.Code {
-		t.Errorf("Did not receive the correct error code. got %d; want %d", got[0].Code, want.Code)
+	// 2.6 returns 10101 instead of 20
+	if got.WriteErrors[0].Code != 20 && got.WriteErrors[0].Code != 10101 {
+		t.Errorf("Did not receive the correct error code. got %d; want 20 or 10101", got.WriteErrors[0].Code)
 	}
-
 }
 
 func TestCollection_DeleteMany_WriteConcernError(t *testing.T) {
@@ -644,31 +685,33 @@ func TestCollection_DeleteMany_WriteConcernError(t *testing.T) {
 		t.Skip()
 	}
 
-	want := WriteConcernError{Code: 100, Message: "Not enough data-bearing nodes"}
 	filter := bsonx.Doc{{"x", bsonx.Int32(1)}}
-	coll := createTestCollection(t, nil, nil,
-		options.Collection().SetWriteConcern(writeconcern.New(writeconcern.W(25))))
+	coll := createTestCollection(t, nil, nil)
 
-	_, err := coll.DeleteOne(context.Background(), filter)
-	got, ok := err.(WriteConcernError)
+	// 2.6 server returns right away if the document doesn't exist
+	_, err := coll.InsertOne(ctx, filter)
+	if err != nil {
+		t.Fatalf("error inserting doc: %s", err)
+	}
+
+	cloned, err := coll.Clone(options.Collection().SetWriteConcern(impossibleWriteConcern))
+	if err != nil {
+		t.Fatalf("error cloning collection: %s", err)
+	}
+	_, err = cloned.DeleteOne(context.Background(), filter)
+	writeErr, ok := err.(WriteException)
 	if !ok {
-		t.Errorf("Did not receive correct type of error. got %T; want %T", err, WriteConcernError{})
+		t.Errorf("incorrect error type returned: %T", writeErr)
 	}
-	if got.Code != want.Code {
-		t.Errorf("Did not receive the correct error code. got %d; want %d", got.Code, want.Code)
+	if writeErr.WriteConcernError == nil {
+		t.Errorf("write concern error is nil: %+v", writeErr)
 	}
-	if got.Message != want.Message {
-		t.Errorf("Did not receive the correct error message. got %s; want %s", got.Message, want.Message)
-	}
-
 }
 
 func TestCollection_DeleteMany_found(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
-
-	t.Parallel()
 
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
@@ -686,8 +729,6 @@ func TestCollection_DeleteMany_notFound(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
-
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
 
@@ -703,8 +744,6 @@ func TestCollection_DeleteMany_notFound_withOption(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
-
-	t.Parallel()
 
 	coll := createTestCollection(t, nil, nil)
 	skipIfBelow34(t, coll.db)
@@ -724,9 +763,6 @@ func TestCollection_DeleteMany_WriteError(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
-
-	want := WriteError{Code: 20}
 	filter := bsonx.Doc{{"x", bsonx.Int32(1)}}
 	db := createTestDatabase(t, nil)
 	err := db.RunCommand(
@@ -741,18 +777,18 @@ func TestCollection_DeleteMany_WriteError(t *testing.T) {
 	coll := db.Collection(testutil.ColName(t))
 
 	_, err = coll.DeleteMany(context.Background(), filter)
-	got, ok := err.(WriteErrors)
+	got, ok := err.(WriteException)
 	if !ok {
-		t.Errorf("Did not receive correct type of error. got %T; want %T", err, WriteErrors{})
+		t.Errorf("Did not receive correct type of error. got %T; want %T", err, WriteException{})
 	}
-	if len(got) != 1 {
-		t.Errorf("Incorrect number of errors receieved. got %d; want %d", len(got), 1)
+	if len(got.WriteErrors) != 1 {
+		t.Errorf("Incorrect number of errors receieved. got %d; want %d", len(got.WriteErrors), 1)
 		t.FailNow()
 	}
-	if got[0].Code != want.Code {
-		t.Errorf("Did not receive the correct error code. got %d; want %d", got[0].Code, want.Code)
+	// 2.6 returns 10101 instead of 20
+	if got.WriteErrors[0].Code != 20 && got.WriteErrors[0].Code != 10101 {
+		t.Errorf("Did not receive the correct error code. got %d; want 20 or 10101", got.WriteErrors[0].Code)
 	}
-
 }
 
 func TestCollection_DeleteOne_WriteConcernError(t *testing.T) {
@@ -764,31 +800,40 @@ func TestCollection_DeleteOne_WriteConcernError(t *testing.T) {
 		t.Skip()
 	}
 
-	want := WriteConcernError{Code: 100, Message: "Not enough data-bearing nodes"}
 	filter := bsonx.Doc{{"x", bsonx.Int32(1)}}
-	coll := createTestCollection(t, nil, nil,
-		options.Collection().SetWriteConcern(writeconcern.New(writeconcern.W(25))))
+	coll := createTestCollection(t, nil, nil)
 
-	_, err := coll.DeleteMany(context.Background(), filter)
-	got, ok := err.(WriteConcernError)
+	// 2.6 server returns right away if the document doesn't exist
+	_, err := coll.InsertOne(ctx, filter)
+	if err != nil {
+		t.Fatalf("error inserting document: %s", err)
+	}
+
+	cloned, err := coll.Clone(options.Collection().SetWriteConcern(impossibleWriteConcern))
+	if err != nil {
+		t.Fatalf("error cloning collection: %s", err)
+	}
+
+	_, err = cloned.DeleteMany(context.Background(), filter)
+	writeErr, ok := err.(WriteException)
 	if !ok {
-		t.Errorf("Did not receive correct type of error. got %T; want %T", err, WriteConcernError{})
+		t.Errorf("incorrect error type returned: %T", writeErr)
 	}
-	if got.Code != want.Code {
-		t.Errorf("Did not receive the correct error code. got %d; want %d", got.Code, want.Code)
+	if writeErr.WriteConcernError == nil {
+		t.Errorf("write concern error is nil: %+v", writeErr)
 	}
-	if got.Message != want.Message {
-		t.Errorf("Did not receive the correct error message. got %s; want %s", got.Message, want.Message)
-	}
+}
 
+func TestCollection_UpdateOne_EmptyUpdate(t *testing.T) {
+	coll := createTestCollection(t, nil, nil)
+	_, err := coll.UpdateOne(ctx, bsonx.Doc{}, bsonx.Doc{})
+	require.NotNil(t, err)
 }
 
 func TestCollection_UpdateOne_found(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
-
-	t.Parallel()
 
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
@@ -810,8 +855,6 @@ func TestCollection_UpdateOne_notFound(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
-
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
 
@@ -830,8 +873,6 @@ func TestCollection_UpdateOne_upsert(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
-
-	t.Parallel()
 
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
@@ -852,8 +893,6 @@ func TestCollection_UpdateOne_WriteError(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
-
 	want := WriteError{Code: 66}
 	filter := bsonx.Doc{{"_id", bsonx.String("foo")}}
 	update := bsonx.Doc{{"$set", bsonx.Document(bsonx.Doc{{"_id", bsonx.Double(3.14159)}})}}
@@ -863,16 +902,16 @@ func TestCollection_UpdateOne_WriteError(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = coll.UpdateOne(context.Background(), filter, update)
-	got, ok := err.(WriteErrors)
+	got, ok := err.(WriteException)
 	if !ok {
-		t.Errorf("Did not receive correct type of error. got %T; want %T", err, WriteErrors{})
+		t.Errorf("Did not receive correct type of error. got %T; want %T", err, WriteException{})
 	}
-	if len(got) != 1 {
-		t.Errorf("Incorrect number of errors receieved. got %d; want %d", len(got), 1)
+	if len(got.WriteErrors) != 1 {
+		t.Errorf("Incorrect number of errors receieved. got %d; want %d", len(got.WriteErrors), 1)
 		t.FailNow()
 	}
-	if got[0].Code != want.Code {
-		t.Errorf("Did not receive the correct error code. got %d; want %d", got[0].Code, want.Code)
+	if got.WriteErrors[0].Code != want.Code {
+		t.Errorf("Did not receive the correct error code. got %d; want %d", got.WriteErrors[0].Code, want.Code)
 	}
 
 }
@@ -886,32 +925,40 @@ func TestCollection_UpdateOne_WriteConcernError(t *testing.T) {
 		t.Skip()
 	}
 
-	want := WriteConcernError{Code: 100, Message: "Not enough data-bearing nodes"}
 	filter := bsonx.Doc{{"_id", bsonx.String("foo")}}
 	update := bsonx.Doc{{"$set", bsonx.Document(bsonx.Doc{{"pi", bsonx.Double(3.14159)}})}}
-	coll := createTestCollection(t, nil, nil,
-		options.Collection().SetWriteConcern(writeconcern.New(writeconcern.W(25))))
+	coll := createTestCollection(t, nil, nil)
 
-	_, err := coll.UpdateOne(context.Background(), filter, update)
-	got, ok := err.(WriteConcernError)
+	// 2.6 server returns right away if the document doesn't exist
+	_, err := coll.InsertOne(ctx, filter)
+	if err != nil {
+		t.Fatalf("error inserting document: %s", err)
+	}
+
+	cloned, err := coll.Clone(options.Collection().SetWriteConcern(impossibleWriteConcern))
+	if err != nil {
+		t.Fatalf("error cloning collection: %s", err)
+	}
+	_, err = cloned.UpdateOne(context.Background(), filter, update)
+	writeErr, ok := err.(WriteException)
 	if !ok {
-		t.Errorf("Did not receive correct type of error. got %T; want %T", err, WriteConcernError{})
+		t.Errorf("incorrect error type returned: %T", writeErr)
 	}
-	if got.Code != want.Code {
-		t.Errorf("Did not receive the correct error code. got %d; want %d", got.Code, want.Code)
+	if writeErr.WriteConcernError == nil {
+		t.Errorf("write concern error is nil: %+v", writeErr)
 	}
-	if got.Message != want.Message {
-		t.Errorf("Did not receive the correct error message. got %s; want %s", got.Message, want.Message)
-	}
+}
 
+func TestCollection_UpdateMany_EmptyUpdate(t *testing.T) {
+	coll := createTestCollection(t, nil, nil)
+	_, err := coll.UpdateMany(ctx, bsonx.Doc{}, bsonx.Doc{})
+	require.NotNil(t, err)
 }
 
 func TestCollection_UpdateMany_found(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
-
-	t.Parallel()
 
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
@@ -933,8 +980,6 @@ func TestCollection_UpdateMany_notFound(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
-
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
 
@@ -954,8 +999,6 @@ func TestCollection_UpdateMany_upsert(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
-
-	t.Parallel()
 
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
@@ -977,8 +1020,6 @@ func TestCollection_UpdateMany_WriteError(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
-
 	want := WriteError{Code: 66}
 	filter := bsonx.Doc{{"_id", bsonx.String("foo")}}
 	update := bsonx.Doc{{"$set", bsonx.Document(bsonx.Doc{{"_id", bsonx.Double(3.14159)}})}}
@@ -988,16 +1029,16 @@ func TestCollection_UpdateMany_WriteError(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = coll.UpdateMany(context.Background(), filter, update)
-	got, ok := err.(WriteErrors)
+	got, ok := err.(WriteException)
 	if !ok {
-		t.Errorf("Did not receive correct type of error. got %T; want %T", err, WriteErrors{})
+		t.Errorf("Did not receive correct type of error. got %T; want %T", err, WriteException{})
 	}
-	if len(got) != 1 {
-		t.Errorf("Incorrect number of errors receieved. got %d; want %d", len(got), 1)
+	if len(got.WriteErrors) != 1 {
+		t.Errorf("Incorrect number of errors receieved. got %d; want %d", len(got.WriteErrors), 1)
 		t.FailNow()
 	}
-	if got[0].Code != want.Code {
-		t.Errorf("Did not receive the correct error code. got %d; want %d", got[0].Code, want.Code)
+	if got.WriteErrors[0].Code != want.Code {
+		t.Errorf("Did not receive the correct error code. got %d; want %d", got.WriteErrors[0].Code, want.Code)
 	}
 
 }
@@ -1011,32 +1052,34 @@ func TestCollection_UpdateMany_WriteConcernError(t *testing.T) {
 		t.Skip()
 	}
 
-	want := WriteConcernError{Code: 100, Message: "Not enough data-bearing nodes"}
 	filter := bsonx.Doc{{"_id", bsonx.String("foo")}}
 	update := bsonx.Doc{{"$set", bsonx.Document(bsonx.Doc{{"pi", bsonx.Double(3.14159)}})}}
-	coll := createTestCollection(t, nil, nil,
-		options.Collection().SetWriteConcern(writeconcern.New(writeconcern.W(25))))
+	coll := createTestCollection(t, nil, nil)
 
-	_, err := coll.UpdateMany(context.Background(), filter, update)
-	got, ok := err.(WriteConcernError)
+	// 2.6 server returns right away if the document doesn't exist
+	_, err := coll.InsertOne(ctx, filter)
+	if err != nil {
+		t.Fatalf("error inserting document: %s", err)
+	}
+
+	cloned, err := coll.Clone(options.Collection().SetWriteConcern(impossibleWriteConcern))
+	if err != nil {
+		t.Fatalf("error cloning collection: %s", err)
+	}
+	_, err = cloned.UpdateMany(context.Background(), filter, update)
+	writeErr, ok := err.(WriteException)
 	if !ok {
-		t.Errorf("Did not receive correct type of error. got %T; want %T", err, WriteConcernError{})
+		t.Errorf("incorrect error type returned: %T", writeErr)
 	}
-	if got.Code != want.Code {
-		t.Errorf("Did not receive the correct error code. got %d; want %d", got.Code, want.Code)
+	if writeErr.WriteConcernError == nil {
+		t.Errorf("write concern error is nil: %+v", writeErr)
 	}
-	if got.Message != want.Message {
-		t.Errorf("Did not receive the correct error message. got %s; want %s", got.Message, want.Message)
-	}
-
 }
 
 func TestCollection_ReplaceOne_found(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
-
-	t.Parallel()
 
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
@@ -1058,8 +1101,6 @@ func TestCollection_ReplaceOne_notFound(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
-
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
 
@@ -1078,8 +1119,6 @@ func TestCollection_ReplaceOne_upsert(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
-
-	t.Parallel()
 
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
@@ -1100,8 +1139,6 @@ func TestCollection_ReplaceOne_WriteError(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
-
 	filter := bsonx.Doc{{"_id", bsonx.String("foo")}}
 	replacement := bsonx.Doc{{"_id", bsonx.Double(3.14159)}}
 	coll := createTestCollection(t, nil, nil)
@@ -1110,19 +1147,19 @@ func TestCollection_ReplaceOne_WriteError(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = coll.ReplaceOne(context.Background(), filter, replacement)
-	got, ok := err.(WriteErrors)
+	got, ok := err.(WriteException)
 	if !ok {
-		t.Errorf("Did not receive correct type of error. got %T; want %T", err, WriteErrors{})
+		t.Errorf("Did not receive correct type of error. got %T; want %T", err, WriteException{})
 	}
-	if len(got) != 1 {
-		t.Errorf("Incorrect number of errors receieved. got %d; want %d", len(got), 1)
+	if len(got.WriteErrors) != 1 {
+		t.Errorf("Incorrect number of errors receieved. got %d; want %d", len(got.WriteErrors), 1)
 		t.FailNow()
 	}
-	switch got[0].Code {
+	switch got.WriteErrors[0].Code {
 	case 66: // mongod v3.6
 	case 16837: //mongod v3.4, mongod v3.2
 	default:
-		t.Errorf("Did not receive the correct error code. got %d; want (one of) %d", got[0].Code, []int{66, 16837})
+		t.Errorf("Did not receive the correct error code. got %d; want (one of) %d", got.WriteErrors[0].Code, []int{66, 16837})
 		fmt.Printf("%#v\n", got)
 	}
 
@@ -1137,32 +1174,34 @@ func TestCollection_ReplaceOne_WriteConcernError(t *testing.T) {
 		t.Skip()
 	}
 
-	want := WriteConcernError{Code: 100, Message: "Not enough data-bearing nodes"}
 	filter := bsonx.Doc{{"_id", bsonx.String("foo")}}
 	update := bsonx.Doc{{"pi", bsonx.Double(3.14159)}}
-	coll := createTestCollection(t, nil, nil,
-		options.Collection().SetWriteConcern(writeconcern.New(writeconcern.W(25))))
+	coll := createTestCollection(t, nil, nil)
 
-	_, err := coll.ReplaceOne(context.Background(), filter, update)
-	got, ok := err.(WriteConcernError)
+	// 2.6 server returns right away if the document doesn't exist
+	_, err := coll.InsertOne(ctx, filter)
+	if err != nil {
+		t.Fatalf("error inserting document: %s", err)
+	}
+
+	cloned, err := coll.Clone(options.Collection().SetWriteConcern(impossibleWriteConcern))
+	if err != nil {
+		t.Fatalf("error cloning collection: %s", err)
+	}
+	_, err = cloned.ReplaceOne(context.Background(), filter, update)
+	writeErr, ok := err.(WriteException)
 	if !ok {
-		t.Errorf("Did not receive correct type of error. got %T; want %T", err, WriteConcernError{})
+		t.Errorf("incorrect error type returned: %T", writeErr)
 	}
-	if got.Code != want.Code {
-		t.Errorf("Did not receive the correct error code. got %d; want %d", got.Code, want.Code)
+	if writeErr.WriteConcernError == nil {
+		t.Errorf("write concern error is nil: %+v", writeErr)
 	}
-	if got.Message != want.Message {
-		t.Errorf("Did not receive the correct error message. got %s; want %s", got.Message, want.Message)
-	}
-
 }
 
 func TestCollection_Aggregate(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
-
-	t.Parallel()
 
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
@@ -1190,7 +1229,7 @@ func TestCollection_Aggregate(t *testing.T) {
 
 	for i := 2; i < 5; i++ {
 		var doc bsonx.Doc
-		cursor.Next(context.Background())
+		require.True(t, cursor.Next(context.Background()))
 		err = cursor.Decode(&doc)
 		require.NoError(t, err)
 
@@ -1268,8 +1307,6 @@ func TestCollection_Aggregate_IndexHint(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
-
 	//hint := aggregateopt.Hint(bson.NewDocument(bson.EC.Int32("x", 1)))
 	aggOpts := options.Aggregate().SetHint(bsonx.Doc{{"x", bsonx.Int32(1)}})
 
@@ -1282,71 +1319,47 @@ func TestCollection_Aggregate_withOptions(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
-
 	aggOpts := options.Aggregate().SetAllowDiskUse(true)
 
 	err := testAggregateWithOptions(t, false, aggOpts)
 	require.NoError(t, err)
 }
 
-func TestCollection_Count(t *testing.T) {
+func TestCollection_Aggregate_WriteConcernError(t *testing.T) {
+	skipIfBelow36(t)
+
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
-
-	coll := createTestCollection(t, nil, nil)
-	initCollection(t, coll)
-
-	count, err := coll.Count(context.Background(), nil)
-	require.Nil(t, err)
-	require.Equal(t, count, int64(5))
-}
-
-func TestCollection_Count_withFilter(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
+	if os.Getenv("TOPOLOGY") != "replica_set" {
+		t.Skip()
 	}
 
-	t.Parallel()
+	coll := createTestCollection(t, nil, nil, options.Collection().SetWriteConcern(impossibleWriteConcern))
 
-	coll := createTestCollection(t, nil, nil)
-	initCollection(t, coll)
-
-	filter := bsonx.Doc{{"x", bsonx.Document(bsonx.Doc{{"$gt", bsonx.Int32(2)}})}}
-
-	count, err := coll.Count(context.Background(), filter)
-	require.Nil(t, err)
-	require.Equal(t, count, int64(3))
-}
-
-func TestCollection_Count_withOption(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
+	pipeline := Pipeline{
+		{{"$out", testutil.ColName(t)}},
 	}
 
-	t.Parallel()
-
-	coll := createTestCollection(t, nil, nil)
-	initCollection(t, coll)
-
-	count, err := coll.Count(context.Background(), nil, options.Count().SetLimit(int64(3)))
-	require.Nil(t, err)
-	require.Equal(t, count, int64(3))
+	cursor, err := coll.Aggregate(context.Background(), pipeline)
+	require.Nil(t, cursor)
+	require.Error(t, err)
+	_, ok := err.(WriteConcernError)
+	if !ok {
+		t.Errorf("incorrect error type returned: %T", err)
+	}
 }
 
 func TestCollection_CountDocuments(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
-	t.Parallel()
 
 	col1 := createTestCollection(t, nil, nil)
 	initCollection(t, col1)
 
-	count, err := col1.CountDocuments(context.Background(), nil)
+	count, err := col1.CountDocuments(context.Background(), bsonx.Doc{})
 	require.Nil(t, err)
 	require.Equal(t, count, int64(5))
 }
@@ -1355,8 +1368,6 @@ func TestCollection_CountDocuments_withFilter(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
-
-	t.Parallel()
 
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
@@ -1374,12 +1385,10 @@ func TestCollection_CountDocuments_withLimitOptions(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
-
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
 
-	count, err := coll.CountDocuments(context.Background(), nil, options.Count().SetLimit(3))
+	count, err := coll.CountDocuments(context.Background(), bsonx.Doc{}, options.Count().SetLimit(3))
 	require.Nil(t, err)
 	require.Equal(t, count, int64(3))
 }
@@ -1389,12 +1398,10 @@ func TestCollection_CountDocuments_withSkipOptions(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
-
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
 
-	count, err := coll.CountDocuments(context.Background(), nil, options.Count().SetSkip(3))
+	count, err := coll.CountDocuments(context.Background(), bsonx.Doc{}, options.Count().SetSkip(3))
 	require.Nil(t, err)
 	require.Equal(t, count, int64(2))
 }
@@ -1403,8 +1410,6 @@ func TestCollection_EstimatedDocumentCount(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
-
-	t.Parallel()
 
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
@@ -1420,8 +1425,6 @@ func TestCollection_EstimatedDocumentCount_withOption(t *testing.T) {
 		t.Skip("Skipping integration test in short mode")
 	}
 
-	t.Parallel()
-
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
 
@@ -1435,12 +1438,10 @@ func TestCollection_Distinct(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
-
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
 
-	results, err := coll.Distinct(context.Background(), "x", nil)
+	results, err := coll.Distinct(context.Background(), "x", bsonx.Doc{})
 	require.Nil(t, err)
 	require.Equal(t, results, []interface{}{int32(1), int32(2), int32(3), int32(4), int32(5)})
 }
@@ -1449,8 +1450,6 @@ func TestCollection_Distinct_withFilter(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
-
-	t.Parallel()
 
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
@@ -1467,12 +1466,10 @@ func TestCollection_Distinct_withOption(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
-
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
 
-	results, err := coll.Distinct(context.Background(), "x", nil,
+	results, err := coll.Distinct(context.Background(), "x", bsonx.Doc{},
 		options.Distinct().SetMaxTime(5000000000))
 	require.Nil(t, err)
 	require.Equal(t, results, []interface{}{int32(1), int32(2), int32(3), int32(4), int32(5)})
@@ -1483,13 +1480,11 @@ func TestCollection_Find_found(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
-
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
 
 	cursor, err := coll.Find(context.Background(),
-		nil,
+		bsonx.Doc{},
 		options.Find().SetSort(bsonx.Doc{{"x", bsonx.Int32(1)}}),
 	)
 	require.Nil(t, err)
@@ -1521,8 +1516,6 @@ func TestCollection_Find_notFound(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
-
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
 
@@ -1532,12 +1525,39 @@ func TestCollection_Find_notFound(t *testing.T) {
 	require.False(t, cursor.Next(context.Background()))
 }
 
+func TestCollection_Find_Error(t *testing.T) {
+	t.Run("TestInvalidIdentifier", func(t *testing.T) {
+		coll := createTestCollection(t, nil, nil)
+		cursor, err := coll.Find(context.Background(), bsonx.Doc{{"$foo", bsonx.Int32(1)}})
+		require.NotNil(t, err, "expected error for invalid identifier, got nil")
+		require.Nil(t, cursor, "expected nil cursor for invalid identifier, got non-nil")
+	})
+
+	t.Run("TestKillCursor", func(t *testing.T) {
+		coll := createTestCollection(t, nil, nil)
+		initCollection(t, coll)
+		c, err := coll.Find(context.Background(), bsonx.Doc{}, options.Find().SetBatchSize(2))
+		require.Nil(t, err, "error running find: %s", err)
+
+		// exhaust first batch
+		require.True(t, c.Next(context.Background()))
+		require.True(t, c.Next(context.Background()))
+
+		_, err = driver.KillCursors(ctx, command.Namespace{
+			DB:         coll.db.name,
+			Collection: coll.name,
+		}, c.bc.Server(), c.ID())
+		require.NoError(t, err)
+		require.False(t, c.Next(context.Background()))
+		require.NotNil(t, c.Err())
+		_ = c.Close(context.Background())
+	})
+}
+
 func TestCollection_FindOne_found(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
-
-	t.Parallel()
 
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
@@ -1568,8 +1588,6 @@ func TestCollection_FindOne_found_withOption(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
-
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
 
@@ -1599,8 +1617,6 @@ func TestCollection_FindOne_notFound(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
-
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
 
@@ -1613,8 +1629,6 @@ func TestCollection_FindOneAndDelete_found(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
-
-	t.Parallel()
 
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
@@ -1636,8 +1650,6 @@ func TestCollection_FindOneAndDelete_found_ignoreResult(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
-
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
 
@@ -1651,8 +1663,6 @@ func TestCollection_FindOneAndDelete_notFound(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
-
-	t.Parallel()
 
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
@@ -1668,8 +1678,6 @@ func TestCollection_FindOneAndDelete_notFound_ignoreResult(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
-
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
 
@@ -1679,12 +1687,34 @@ func TestCollection_FindOneAndDelete_notFound_ignoreResult(t *testing.T) {
 	require.Equal(t, ErrNoDocuments, err)
 }
 
-func TestCollection_FindOneAndReplace_found(t *testing.T) {
+func TestCollection_FindOneAndDelete_WriteConcernError(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
+	if os.Getenv("TOPOLOGY") != "replica_set" {
+		t.Skip()
+	}
+
+	skipIfBelow32(t)
+
+	coll := createTestCollection(t, nil, nil, options.Collection().SetWriteConcern(impossibleWriteConcern))
+
+	filter := bsonx.Doc{{"x", bsonx.Int32(3)}}
+
+	var result bsonx.Doc
+	err := coll.FindOneAndDelete(context.Background(), filter).Decode(&result)
+	require.Error(t, err)
+	_, ok := err.(WriteConcernError)
+	if !ok {
+		t.Errorf("incorrect error type returned: %T", err)
+	}
+}
+
+func TestCollection_FindOneAndReplace_found(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
 
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
@@ -1707,8 +1737,6 @@ func TestCollection_FindOneAndReplace_found_ignoreResult(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
-
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
 
@@ -1723,8 +1751,6 @@ func TestCollection_FindOneAndReplace_notFound(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
-
-	t.Parallel()
 
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
@@ -1741,8 +1767,6 @@ func TestCollection_FindOneAndReplace_notFound_ignoreResult(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
-
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
 
@@ -1753,12 +1777,35 @@ func TestCollection_FindOneAndReplace_notFound_ignoreResult(t *testing.T) {
 	require.Equal(t, err, ErrNoDocuments)
 }
 
-func TestCollection_FindOneAndUpdate_found(t *testing.T) {
+func TestCollection_FindOneAndReplace_WriteConcernError(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
+	if os.Getenv("TOPOLOGY") != "replica_set" {
+		t.Skip()
+	}
+
+	skipIfBelow32(t)
+
+	coll := createTestCollection(t, nil, nil, options.Collection().SetWriteConcern(impossibleWriteConcern))
+
+	filter := bsonx.Doc{{"x", bsonx.Int32(3)}}
+	replacement := bsonx.Doc{{"y", bsonx.Int32(3)}}
+
+	var result bsonx.Doc
+	err := coll.FindOneAndReplace(context.Background(), filter, replacement).Decode(&result)
+	require.Error(t, err)
+	writeErr, ok := err.(WriteConcernError)
+	if !ok {
+		t.Errorf("incorrect error type returned: %T", writeErr)
+	}
+}
+
+func TestCollection_FindOneAndUpdate_found(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
 
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
@@ -1776,12 +1823,16 @@ func TestCollection_FindOneAndUpdate_found(t *testing.T) {
 	require.Equal(t, int(elem.Int32()), 3)
 }
 
+func TestCollection_FindOneAndUpdate_EmptyUpdate(t *testing.T) {
+	coll := createTestCollection(t, nil, nil)
+	res := coll.FindOneAndUpdate(context.Background(), bsonx.Doc{}, bsonx.Doc{})
+	require.NotNil(t, res.Err())
+}
+
 func TestCollection_FindOneAndUpdate_found_ignoreResult(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
-
-	t.Parallel()
 
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
@@ -1798,8 +1849,6 @@ func TestCollection_FindOneAndUpdate_notFound(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
-
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
 
@@ -1815,8 +1864,6 @@ func TestCollection_FindOneAndUpdate_notFound_ignoreResult(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	t.Parallel()
-
 	coll := createTestCollection(t, nil, nil)
 	initCollection(t, coll)
 
@@ -1825,4 +1872,28 @@ func TestCollection_FindOneAndUpdate_notFound_ignoreResult(t *testing.T) {
 
 	err := coll.FindOneAndUpdate(context.Background(), filter, update).Decode(nil)
 	require.Equal(t, err, ErrNoDocuments)
+}
+
+func TestCollection_FindOneAndUpdate_WriteConcernError(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	if os.Getenv("TOPOLOGY") != "replica_set" {
+		t.Skip()
+	}
+
+	skipIfBelow32(t)
+
+	coll := createTestCollection(t, nil, nil, options.Collection().SetWriteConcern(impossibleWriteConcern))
+
+	filter := bsonx.Doc{{"x", bsonx.Int32(3)}}
+	update := bsonx.Doc{{"$set", bsonx.Document(bsonx.Doc{{"x", bsonx.Int32(6)}})}}
+
+	var result bsonx.Doc
+	err := coll.FindOneAndUpdate(context.Background(), filter, update).Decode(&result)
+	require.Error(t, err)
+	if writeErr, ok := err.(WriteConcernError); !ok {
+		t.Errorf("incorrect error type returned: %T", writeErr)
+	}
 }

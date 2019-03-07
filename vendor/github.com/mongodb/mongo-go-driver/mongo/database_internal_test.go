@@ -8,20 +8,23 @@ package mongo
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"fmt"
 	"os"
 
-	"github.com/mongodb/mongo-go-driver/bson"
-	"github.com/mongodb/mongo-go-driver/bson/primitive"
-	"github.com/mongodb/mongo-go-driver/internal/testutil"
-	"github.com/mongodb/mongo-go-driver/mongo/options"
-	"github.com/mongodb/mongo-go-driver/mongo/readconcern"
-	"github.com/mongodb/mongo-go-driver/mongo/readpref"
-	"github.com/mongodb/mongo-go-driver/mongo/writeconcern"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
 	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/internal/testutil"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readconcern"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"go.mongodb.org/mongo-driver/mongo/writeconcern"
+	"go.mongodb.org/mongo-driver/x/bsonx"
+	"go.mongodb.org/mongo-driver/x/network/connstring"
+	"go.mongodb.org/mongo-driver/x/network/description"
 )
 
 func createTestDatabase(t *testing.T, name *string, opts ...*options.DatabaseOptions) *Database {
@@ -111,7 +114,7 @@ func TestDatabase_ReplaceTopologyError(t *testing.T) {
 	}
 
 	cs := testutil.ConnString(t)
-	c, err := NewClient(cs.String())
+	c, err := NewClient(options.Client().ApplyURI(cs.String()))
 	require.NoError(t, err)
 	require.NotNil(t, c)
 
@@ -123,7 +126,7 @@ func TestDatabase_ReplaceTopologyError(t *testing.T) {
 	err = db.Drop(ctx)
 	require.Equal(t, err, ErrClientDisconnected)
 
-	_, err = db.ListCollections(ctx, nil)
+	_, err = db.ListCollections(ctx, bsonx.Doc{})
 	require.Equal(t, err, ErrClientDisconnected)
 }
 
@@ -147,6 +150,37 @@ func TestDatabase_RunCommand(t *testing.T) {
 	require.Equal(t, ok.Double(), 1.0)
 }
 
+func TestDatabase_RunCommand_DecodeStruct(t *testing.T) {
+	t.Parallel()
+
+	db := createTestDatabase(t, nil)
+
+	result := struct {
+		Ismaster bool    `bson:"ismaster"`
+		Ok       float64 `bson:"ok"`
+	}{}
+
+	err := db.RunCommand(context.Background(), bsonx.Doc{{"ismaster", bsonx.Int32(1)}}).Decode(&result)
+	require.NoError(t, err)
+	require.Equal(t, result.Ismaster, true)
+	require.Equal(t, result.Ok, 1.0)
+}
+
+func TestDatabase_NilDocumentError(t *testing.T) {
+	t.Parallel()
+
+	db := createTestDatabase(t, nil)
+
+	err := db.RunCommand(context.Background(), nil).Err()
+	require.Equal(t, err, ErrNilDocument)
+
+	_, err = db.Watch(context.Background(), nil)
+	require.Equal(t, err, errors.New("can only transform slices and arrays into aggregation pipelines, but got invalid"))
+
+	_, err = db.ListCollections(context.Background(), nil)
+	require.Equal(t, err, ErrNilDocument)
+}
+
 func TestDatabase_Drop(t *testing.T) {
 	t.Parallel()
 
@@ -157,7 +191,7 @@ func TestDatabase_Drop(t *testing.T) {
 	client := createTestClient(t)
 	err := db.Drop(context.Background())
 	require.NoError(t, err)
-	list, err := client.ListDatabaseNames(context.Background(), nil)
+	list, err := client.ListDatabaseNames(context.Background(), bsonx.Doc{})
 
 	require.NoError(t, err)
 	require.NotContains(t, list, name)
@@ -201,12 +235,12 @@ func setupListCollectionsDb(db *Database) (uncappedName string, cappedName strin
 
 // verifies both collection names are found in cursor, cursor does not have extra collections, and cursor has no
 // duplicates
-func verifyListCollections(cursor Cursor, uncappedName string, cappedName string, cappedOnly bool) (err error) {
+func verifyListCollections(cursor *Cursor, uncappedName string, cappedName string, cappedOnly bool) (err error) {
 	var uncappedFound bool
 	var cappedFound bool
 
 	for cursor.Next(context.Background()) {
-		next := bsonx.Doc{}
+		next := &bsonx.Doc{}
 		err = cursor.Decode(next)
 		if err != nil {
 			return err
@@ -223,9 +257,9 @@ func verifyListCollections(cursor Cursor, uncappedName string, cappedName string
 
 		elemName := elem.StringValue()
 
-		if elemName != uncappedName && elemName != cappedName {
-			return fmt.Errorf("incorrect collection name. got: %s. wanted: %s or %s", elemName, uncappedName,
-				cappedName)
+		// legacy servers can return an indexes collection that shouldn't be considered here
+		if elemName != cappedName && elemName != uncappedName {
+			continue
 		}
 
 		if elemName == uncappedName && !uncappedFound {
@@ -257,19 +291,16 @@ func verifyListCollections(cursor Cursor, uncappedName string, cappedName string
 	return nil
 }
 
-func listCollectionsTest(db *Database, cappedOnly bool) error {
-	uncappedName, cappedName, err := setupListCollectionsDb(db)
-	if err != nil {
-		return err
-	}
-
+func listCollectionsTest(db *Database, cappedOnly bool, cappedName, uncappedName string) error {
 	var filter bsonx.Doc
 	if cappedOnly {
 		filter = bsonx.Doc{{"options.capped", bsonx.Boolean(true)}}
 	}
 
+	var cursor *Cursor
+	var err error
 	for i := 0; i < 10; i++ {
-		cursor, err := db.ListCollections(context.Background(), filter)
+		cursor, err = db.ListCollections(context.Background(), filter)
 		if err != nil {
 			return err
 		}
@@ -283,40 +314,69 @@ func listCollectionsTest(db *Database, cappedOnly bool) error {
 	return err // all tests failed
 }
 
-func TestDatabase_ListCollections(t *testing.T) {
-	rpPrimary := readpref.Primary()
-	rpSecondary := readpref.Secondary()
+// get the connection string for a direct connection to a secondary in a replica set
+func getSecondaryConnString(t *testing.T) connstring.ConnString {
+	topo := testutil.Topology(t)
+	for _, server := range topo.Description().Servers {
+		if server.Kind != description.RSSecondary {
+			continue
+		}
 
+		fullAddr := "mongodb://" + server.Addr.String() + "/?connect=direct"
+		cs, err := connstring.Parse(fullAddr)
+		require.NoError(t, err)
+		return cs
+	}
+
+	t.Fatalf("no secondary found for %s", t.Name())
+	return connstring.ConnString{}
+}
+
+func TestDatabase_ListCollections(t *testing.T) {
 	var listCollectionsTable = []struct {
 		name             string
 		expectedTopology string
 		cappedOnly       bool
-		rp               *readpref.ReadPref
+		direct           bool
 	}{
-		{"standalone_nofilter", "server", false, rpPrimary},
-		{"standalone_filter", "server", true, rpPrimary},
-		{"replicaset_nofilter", "replica_set", false, rpPrimary},
-		{"replicaset_filter", "replica_set", true, rpPrimary},
-		{"replicaset_secondary_nofilter", "replica_set", false, rpSecondary},
-		{"replicaset_secondary_filter", "replica_set", true, rpSecondary},
-		{"sharded_nofilter", "sharded_cluster", false, rpPrimary},
-		{"sharded_filter", "sharded_cluster", true, rpPrimary},
+		{"standalone_nofilter", "server", false, false},
+		{"standalone_filter", "server", true, false},
+		{"replicaset_nofilter", "replica_set", false, false},
+		{"replicaset_filter", "replica_set", true, false},
+		{"replicaset_secondary_nofilter", "replica_set", false, true},
+		{"replicaset_secondary_filter", "replica_set", true, true},
+		{"sharded_nofilter", "sharded_cluster", false, false},
+		{"sharded_filter", "sharded_cluster", true, false},
 	}
 
 	for _, tt := range listCollectionsTable {
 		t.Run(tt.name, func(t *testing.T) {
-			if os.Getenv("topology") != tt.expectedTopology {
+			if os.Getenv("TOPOLOGY") != tt.expectedTopology {
 				t.Skip()
 			}
-			dbName := tt.name
-			db := createTestDatabase(t, &dbName, options.Database().SetReadPreference(tt.rp))
 
+			createDb := createTestDatabase(t, &tt.name, options.Database().SetWriteConcern(wcMajority))
 			defer func() {
-				err := db.Drop(context.Background())
+				err := createDb.Drop(context.Background())
 				require.NoError(t, err)
 			}()
 
-			err := listCollectionsTest(db, tt.cappedOnly)
+			uncappedName, cappedName, err := setupListCollectionsDb(createDb)
+			require.NoError(t, err)
+
+			var cs connstring.ConnString
+			if tt.direct {
+				// TODO(GODRIVER-641) - correctly set read preference on direct connections for OP_MSG
+				t.Skip()
+				cs = getSecondaryConnString(t)
+			} else {
+				cs = testutil.ConnString(t)
+			}
+
+			client := createTestClientWithConnstring(t, cs)
+			db := client.Database(tt.name)
+
+			err = listCollectionsTest(db, tt.cappedOnly, cappedName, uncappedName)
 			require.NoError(t, err)
 		})
 	}

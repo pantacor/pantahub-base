@@ -4,7 +4,7 @@
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-package connstring
+package connstring // import "go.mongodb.org/mongo-driver/x/network/connstring"
 
 import (
 	"errors"
@@ -16,9 +16,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mongodb/mongo-go-driver/internal"
-	"github.com/mongodb/mongo-go-driver/mongo/writeconcern"
-	"github.com/mongodb/mongo-go-driver/x/network/wiremessage"
+	"go.mongodb.org/mongo-driver/internal"
+	"go.mongodb.org/mongo-driver/mongo/writeconcern"
+	"go.mongodb.org/mongo-driver/x/network/wiremessage"
 )
 
 // Parse parses the provided uri and returns a URI object.
@@ -84,6 +84,7 @@ type ConnString struct {
 	WNumberSet                         bool
 	Username                           string
 	ZlibLevel                          int
+	ZlibLevelSet                       bool
 
 	WTimeout              time.Duration
 	WTimeoutSet           bool
@@ -486,8 +487,8 @@ func (p *parser) addOption(pair string) error {
 		p.Compressors = compressors
 	case "connect":
 		switch strings.ToLower(value) {
-		case "auto", "automatic":
-		case "direct", "single":
+		case "automatic":
+		case "direct":
 			p.Connect = SingleConnect
 		default:
 			return fmt.Errorf("invalid 'connect' value: %s", value)
@@ -573,12 +574,14 @@ func (p *parser) addOption(pair string) error {
 			return fmt.Errorf("invalid value for %s: %s", key, value)
 		}
 		p.ServerSelectionTimeout = time.Duration(n) * time.Millisecond
+		p.ServerSelectionTimeoutSet = true
 	case "sockettimeoutms":
 		n, err := strconv.Atoi(value)
 		if err != nil || n < 0 {
 			return fmt.Errorf("invalid value for %s: %s", key, value)
 		}
 		p.SocketTimeout = time.Duration(n) * time.Millisecond
+		p.SocketTimeoutSet = true
 	case "ssl":
 		switch value {
 		case "true":
@@ -656,6 +659,7 @@ func (p *parser) addOption(pair string) error {
 			level = wiremessage.DefaultZlibLevel
 		}
 		p.ZlibLevel = level
+		p.ZlibLevelSet = true
 	default:
 		if p.UnknownOptions == nil {
 			p.UnknownOptions = make(map[string][]string)

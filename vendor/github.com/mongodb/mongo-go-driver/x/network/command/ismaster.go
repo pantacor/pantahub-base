@@ -10,10 +10,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mongodb/mongo-go-driver/bson"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
-	"github.com/mongodb/mongo-go-driver/x/network/result"
-	"github.com/mongodb/mongo-go-driver/x/network/wiremessage"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/x/bsonx"
+	"go.mongodb.org/mongo-driver/x/bsonx/bsoncore"
+	"go.mongodb.org/mongo-driver/x/network/result"
+	"go.mongodb.org/mongo-driver/x/network/wiremessage"
 )
 
 // IsMaster represents the isMaster command.
@@ -84,7 +85,7 @@ func (im *IsMaster) Decode(wm wiremessage.WireMessage) *IsMaster {
 
 	// Reconstructs the $clusterTime doc after decode
 	if im.res.ClusterTime != nil {
-		im.res.ClusterTime = bsonx.Doc{{"$clusterTime", bsonx.Document(im.res.ClusterTime)}}
+		im.res.ClusterTime = bsoncore.BuildDocument(nil, bsoncore.AppendDocumentElement(nil, "$clusterTime", im.res.ClusterTime))
 	}
 	return im
 }

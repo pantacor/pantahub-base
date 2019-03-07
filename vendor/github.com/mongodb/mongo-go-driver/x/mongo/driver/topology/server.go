@@ -9,24 +9,26 @@ package topology
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/mongodb/mongo-go-driver/bson"
-	"github.com/mongodb/mongo-go-driver/event"
-	"github.com/mongodb/mongo-go-driver/x/bsonx"
-	"github.com/mongodb/mongo-go-driver/x/mongo/driver/auth"
-	"github.com/mongodb/mongo-go-driver/x/mongo/driver/session"
-	"github.com/mongodb/mongo-go-driver/x/network/address"
-	"github.com/mongodb/mongo-go-driver/x/network/command"
-	"github.com/mongodb/mongo-go-driver/x/network/connection"
-	"github.com/mongodb/mongo-go-driver/x/network/description"
+	"go.mongodb.org/mongo-driver/event"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/auth"
+	"go.mongodb.org/mongo-driver/x/network/address"
+	"go.mongodb.org/mongo-driver/x/network/command"
+	"go.mongodb.org/mongo-driver/x/network/connection"
+	"go.mongodb.org/mongo-driver/x/network/description"
+	"go.mongodb.org/mongo-driver/x/network/result"
 )
 
 const minHeartbeatInterval = 500 * time.Millisecond
 const connectionSemaphoreSize = math.MaxInt64
+
+var isMasterOrRecoveringCodes = []int32{11600, 11602, 10107, 13435, 13436, 189, 91}
 
 // ErrServerClosed occurs when an attempt to get a connection is made after
 // the server has been closed.
@@ -60,6 +62,21 @@ const (
 	connected
 	connecting
 )
+
+func connectionStateString(state int32) string {
+	switch state {
+	case 0:
+		return "Disconnected"
+	case 1:
+		return "Disconnecting"
+	case 2:
+		return "Connected"
+	case 3:
+		return "Connecting"
+	}
+
+	return ""
+}
 
 // Server is a single server within a topology.
 type Server struct {
@@ -255,6 +272,33 @@ func (s *Server) RequestImmediateCheck() {
 	}
 }
 
+// ProcessWriteConcernError checks if a WriteConcernError is an isNotMaster or
+// isRecovering error, and if so updates the server accordingly.
+func (s *Server) ProcessWriteConcernError(err *result.WriteConcernError) {
+	if err == nil || !wceIsNotMasterOrRecovering(err) {
+		return
+	}
+	desc := s.Description()
+	desc.Kind = description.Unknown
+	desc.LastError = err
+	// updates description to unknown
+	s.updateDescription(desc, false)
+	s.RequestImmediateCheck()
+	_ = s.pool.Drain()
+}
+
+func wceIsNotMasterOrRecovering(wce *result.WriteConcernError) bool {
+	for _, code := range isMasterOrRecoveringCodes {
+		if int32(wce.Code) == code {
+			return true
+		}
+	}
+	if strings.Contains(wce.ErrMsg, "not master") || strings.Contains(wce.ErrMsg, "node is recovering") {
+		return true
+	}
+	return false
+}
+
 // update handles performing heartbeats and updating any subscribers of the
 // newest description.Server retrieved.
 func (s *Server) update() {
@@ -370,6 +414,7 @@ func (s *Server) heartbeat(conn connection.Connection) (description.Server, conn
 			opts := []connection.Option{
 				connection.WithConnectTimeout(func(time.Duration) time.Duration { return s.cfg.heartbeatTimeout }),
 				connection.WithReadTimeout(func(time.Duration) time.Duration { return s.cfg.heartbeatTimeout }),
+				connection.WithWriteTimeout(func(time.Duration) time.Duration { return s.cfg.heartbeatTimeout }),
 			}
 			opts = append(opts, s.cfg.connectionOpts...)
 			// We override whatever handshaker is currently attached to the options with an empty
@@ -389,6 +434,13 @@ func (s *Server) heartbeat(conn connection.Connection) (description.Server, conn
 					conn.Close()
 				}
 				conn = nil
+				if _, ok := err.(*connection.NetworkError); ok {
+					_ = s.pool.Drain()
+					// If the server is not connected, give up and exit loop
+					if s.Description().Kind == description.Unknown {
+						break
+					}
+				}
 				continue
 			}
 		}
@@ -397,10 +449,18 @@ func (s *Server) heartbeat(conn connection.Connection) (description.Server, conn
 
 		isMasterCmd := &command.IsMaster{Compressors: s.cfg.compressionOpts}
 		isMaster, err := isMasterCmd.RoundTrip(ctx, conn)
+		// we do a retry if the server is connected, if succeed return new server desc (see below)
 		if err != nil {
 			saved = err
 			conn.Close()
 			conn = nil
+			if _, ok := err.(connection.NetworkError); ok {
+				_ = s.pool.Drain()
+				// If the server is not connected, give up and exit loop
+				if s.Description().Kind == description.Unknown {
+					break
+				}
+			}
 			continue
 		}
 
@@ -421,6 +481,7 @@ func (s *Server) heartbeat(conn connection.Connection) (description.Server, conn
 		desc = description.Server{
 			Addr:      s.address,
 			LastError: saved,
+			Kind:      description.Unknown,
 		}
 	}
 
@@ -445,9 +506,23 @@ func (s *Server) updateAverageRTT(delay time.Duration) time.Duration {
 // logic for handling errors in the Client type.
 func (s *Server) Drain() error { return s.pool.Drain() }
 
-// BuildCursor implements the command.CursorBuilder interface for the Server type.
-func (s *Server) BuildCursor(result bson.Raw, clientSession *session.Client, clock *session.ClusterClock, opts ...bsonx.Elem) (command.Cursor, error) {
-	return newCursor(result, clientSession, clock, s, opts...)
+// String implements the Stringer interface.
+func (s *Server) String() string {
+	desc := s.Description()
+	connState := atomic.LoadInt32(&s.connectionstate)
+	str := fmt.Sprintf("Addr: %s, Type: %s, State: %s",
+		s.address, desc.Kind, connectionStateString(connState))
+	if len(desc.Tags) != 0 {
+		str += fmt.Sprintf(", Tag sets: %s", desc.Tags)
+	}
+	if connState == connected {
+		str += fmt.Sprintf(", Avergage RTT: %d", desc.AverageRTT)
+	}
+	if desc.LastError != nil {
+		str += fmt.Sprintf(", Last error: %s", desc.LastError)
+	}
+
+	return str
 }
 
 // ServerSubscription represents a subscription to the description.Server updates for

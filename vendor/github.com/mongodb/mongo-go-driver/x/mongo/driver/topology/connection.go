@@ -12,10 +12,10 @@ import (
 
 	"strings"
 
-	"github.com/mongodb/mongo-go-driver/x/network/command"
-	"github.com/mongodb/mongo-go-driver/x/network/connection"
-	"github.com/mongodb/mongo-go-driver/x/network/description"
-	"github.com/mongodb/mongo-go-driver/x/network/wiremessage"
+	"go.mongodb.org/mongo-driver/x/network/command"
+	"go.mongodb.org/mongo-driver/x/network/connection"
+	"go.mongodb.org/mongo-driver/x/network/description"
+	"go.mongodb.org/mongo-driver/x/network/wiremessage"
 )
 
 // sconn is a wrapper around a connection.Connection. This type is returned by
@@ -48,7 +48,6 @@ func (sc *sconn) WriteWireMessage(ctx context.Context, wm wiremessage.WireMessag
 }
 
 func (sc *sconn) processErr(err error) {
-	// TODO(GODRIVER-524) handle the rest of sdam error handling
 	// Invalidate server description if not master or node recovering error occurs
 	if cerr, ok := err.(command.Error); ok && (isRecoveringError(cerr) || isNotMasterError(cerr)) {
 		desc := sc.s.Description()
@@ -56,6 +55,9 @@ func (sc *sconn) processErr(err error) {
 		desc.LastError = err
 		// updates description to unknown
 		sc.s.updateDescription(desc, false)
+		sc.s.RequestImmediateCheck()
+		_ = sc.s.pool.Drain()
+		return
 	}
 
 	ne, ok := err.(connection.NetworkError)

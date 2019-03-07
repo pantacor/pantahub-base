@@ -16,11 +16,12 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/mongodb/mongo-go-driver/bson/bsonrw"
-	"github.com/mongodb/mongo-go-driver/bson/bsonrw/bsonrwtest"
-	"github.com/mongodb/mongo-go-driver/bson/bsontype"
-	"github.com/mongodb/mongo-go-driver/bson/primitive"
-	"github.com/mongodb/mongo-go-driver/x/bsonx/bsoncore"
+	"go.mongodb.org/mongo-driver/bson/bsonrw"
+	"go.mongodb.org/mongo-driver/bson/bsonrw/bsonrwtest"
+	"go.mongodb.org/mongo-driver/bson/bsontype"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/x/bsonx/bsoncore"
+	"math"
 )
 
 func TestDefaultValueEncoders(t *testing.T) {
@@ -97,20 +98,28 @@ func TestDefaultValueEncoders(t *testing.T) {
 				{"int16/fast path", int16(32767), nil, nil, bsonrwtest.WriteInt32, nil},
 				{"int32/fast path", int32(2147483647), nil, nil, bsonrwtest.WriteInt32, nil},
 				{"int64/fast path", int64(1234567890987), nil, nil, bsonrwtest.WriteInt64, nil},
-				{"int/fast path", int(1234567), nil, nil, bsonrwtest.WriteInt64, nil},
-				{"int64/fast path - minsize", int64(2147483647), &EncodeContext{MinSize: true}, nil, bsonrwtest.WriteInt32, nil},
-				{"int/fast path - minsize", int(2147483647), &EncodeContext{MinSize: true}, nil, bsonrwtest.WriteInt32, nil},
-				{"int64/fast path - minsize too large", int64(2147483648), &EncodeContext{MinSize: true}, nil, bsonrwtest.WriteInt64, nil},
-				{"int/fast path - minsize too large", int(2147483648), &EncodeContext{MinSize: true}, nil, bsonrwtest.WriteInt64, nil},
+				{"int64/fast path - minsize", int64(math.MaxInt32), &EncodeContext{MinSize: true}, nil, bsonrwtest.WriteInt32, nil},
+				{"int64/fast path - minsize too large", int64(math.MaxInt32 + 1), &EncodeContext{MinSize: true}, nil, bsonrwtest.WriteInt64, nil},
+				{"int64/fast path - minsize too small", int64(math.MinInt32 - 1), &EncodeContext{MinSize: true}, nil, bsonrwtest.WriteInt64, nil},
+				{"int/fast path - positive int32", int(math.MaxInt32 - 1), nil, nil, bsonrwtest.WriteInt32, nil},
+				{"int/fast path - negative int32", int(math.MinInt32 + 1), nil, nil, bsonrwtest.WriteInt32, nil},
+				{"int/fast path - MaxInt32", int(math.MaxInt32), nil, nil, bsonrwtest.WriteInt32, nil},
+				{"int/fast path - MinInt32", int(math.MinInt32), nil, nil, bsonrwtest.WriteInt32, nil},
+				{"int/fast path - larger than MaxInt32", int(math.MaxInt32 + 1), nil, nil, bsonrwtest.WriteInt64, nil},
+				{"int/fast path - smaller than MinInt32", int(math.MinInt32 - 1), nil, nil, bsonrwtest.WriteInt64, nil},
 				{"int8/reflection path", myint8(127), nil, nil, bsonrwtest.WriteInt32, nil},
 				{"int16/reflection path", myint16(32767), nil, nil, bsonrwtest.WriteInt32, nil},
 				{"int32/reflection path", myint32(2147483647), nil, nil, bsonrwtest.WriteInt32, nil},
 				{"int64/reflection path", myint64(1234567890987), nil, nil, bsonrwtest.WriteInt64, nil},
-				{"int/reflection path", myint(1234567890987), nil, nil, bsonrwtest.WriteInt64, nil},
-				{"int64/reflection path - minsize", myint64(2147483647), &EncodeContext{MinSize: true}, nil, bsonrwtest.WriteInt32, nil},
-				{"int/reflection path - minsize", myint(2147483647), &EncodeContext{MinSize: true}, nil, bsonrwtest.WriteInt32, nil},
-				{"int64/reflection path - minsize too large", myint64(2147483648), &EncodeContext{MinSize: true}, nil, bsonrwtest.WriteInt64, nil},
-				{"int/reflection path - minsize too large", myint(2147483648), &EncodeContext{MinSize: true}, nil, bsonrwtest.WriteInt64, nil},
+				{"int64/reflection path - minsize", myint64(math.MaxInt32), &EncodeContext{MinSize: true}, nil, bsonrwtest.WriteInt32, nil},
+				{"int64/reflection path - minsize too large", myint64(math.MaxInt32 + 1), &EncodeContext{MinSize: true}, nil, bsonrwtest.WriteInt64, nil},
+				{"int64/reflection path - minsize too small", myint64(math.MinInt32 - 1), &EncodeContext{MinSize: true}, nil, bsonrwtest.WriteInt64, nil},
+				{"int/reflection path - positive int32", myint(math.MaxInt32 - 1), nil, nil, bsonrwtest.WriteInt32, nil},
+				{"int/reflection path - negative int32", myint(math.MinInt32 + 1), nil, nil, bsonrwtest.WriteInt32, nil},
+				{"int/reflection path - MaxInt32", myint(math.MaxInt32), nil, nil, bsonrwtest.WriteInt32, nil},
+				{"int/reflection path - MinInt32", myint(math.MinInt32), nil, nil, bsonrwtest.WriteInt32, nil},
+				{"int/reflection path - larger than MaxInt32", myint(math.MaxInt32 + 1), nil, nil, bsonrwtest.WriteInt64, nil},
+				{"int/reflection path - smaller than MinInt32", myint(math.MinInt32 - 1), nil, nil, bsonrwtest.WriteInt64, nil},
 			},
 		},
 		{
@@ -304,6 +313,14 @@ func TestDefaultValueEncoders(t *testing.T) {
 					bsonrwtest.WriteDocumentEnd,
 					nil,
 				},
+				{
+					"[1]primitive.E/success",
+					[1]primitive.E{{"hello", nil}},
+					&EncodeContext{Registry: buildDefaultRegistry()},
+					nil,
+					bsonrwtest.WriteDocumentEnd,
+					nil,
+				},
 			},
 		},
 		{
@@ -353,6 +370,14 @@ func TestDefaultValueEncoders(t *testing.T) {
 				{
 					"D/success",
 					primitive.D{{"hello", "world"}},
+					&EncodeContext{Registry: buildDefaultRegistry()},
+					nil,
+					bsonrwtest.WriteDocumentEnd,
+					nil,
+				},
+				{
+					"D/success",
+					primitive.D{{"hello", nil}},
 					&EncodeContext{Registry: buildDefaultRegistry()},
 					nil,
 					bsonrwtest.WriteDocumentEnd,
