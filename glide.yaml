@@ -38,5 +38,5 @@ import:
   - assert
   - suite
   - mock
-- package: github.com/mongodb/mongo-go-driver
+- package: go.mongodb.org/mongo-driver
   version: ~1.0.0-rc1
