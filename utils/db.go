@@ -31,45 +31,43 @@ var MongoDb string
 // GetMongoClient : To Get Mongo Client Object
 func GetMongoClient() (*mongo.Client, error) {
 	MongoDb = GetEnv(ENV_MONGO_DB)
+	user := GetEnv(ENV_MONGO_USER)
+	pass := GetEnv(ENV_MONGO_PASS)
 	host := GetEnv(ENV_MONGO_HOST)
 	port := GetEnv(ENV_MONGO_PORT)
-	mongoUser := GetEnv(ENV_MONGO_USER)
-	mongoPass := GetEnv(ENV_MONGO_PASS)
 	mongoRs := GetEnv(ENV_MONGO_RS)
 
 	//Setting Client Options
 	clientOptions := options.Client()
-	credentials := options.Credential{
-		//AuthMechanism: "SCRAM-SHA-1",
-		//AuthSource:  MongoDb,
-		PasswordSet: false,
+	mongoConnect := "mongodb://"
+	if user != "" {
+		mongoConnect += user
+		if pass != "" {
+			mongoConnect += ":"
+			mongoConnect += pass
+		}
+		mongoConnect += "@"
 	}
-	clientOptions.SetAuth(credentials)
-	//mongoRs = "rs0"
-	clientOptions.SetReplicaSet(mongoRs)
-	mongoConnect := "mongodb://" + mongoUser + ":" + mongoPass + "@" + host + ":" + port + "/" + MongoDb
-	//mongoConnect := "mongodb://" + host + ":" + port + "/" + MongoDb
-	//mongoConnect := host + ":" + port
-	//mongoConnect := "http://127.0.0.1:27017"
-	/*hosts := []string{
-		mongoConnect,
-	} */
-	//clientOptions.SetHosts(hosts)
+	mongoConnect += host
+
+	if port != "" {
+		mongoConnect += ":"
+		mongoConnect += port
+	}
+
+	mongoConnect += "/"
+
+	if MongoDb != "" {
+		mongoConnect += MongoDb
+	}
+
 	clientOptions.ApplyURI(mongoConnect)
+	clientOptions.SetReplicaSet(mongoRs)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://localhost:27017"))
 
-	/*
-		ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
-		defer cancel()
-
-		client, err := mongo.Connect(ctx, clientOptions)
-		if err != nil {
-			panic(err)
-		}
-	*/
 	log.Println("Will connect to mongo PROD db with: " + mongoConnect)
 
 	return client, err
