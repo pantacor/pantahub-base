@@ -22,6 +22,7 @@ import (
 	"os"
 	"path"
 	"time"
+	"context"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"gitlab.com/pantacor/pantahub-base/utils"
