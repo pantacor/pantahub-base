@@ -1853,6 +1853,7 @@ func (a *TrailsApp) handle_gettrailstepsummary(w rest.ResponseWriter, r *rest.Re
 	err := summaryCol.FindOne(ctx, bson.M{
 		"deviceid": trailId,
 		"owner":    owner,
+		"garbage":  bson.M{"$ne": true},
 	}).Decode(&summary)
 
 	if err != nil {
@@ -1921,7 +1922,8 @@ func (a *TrailsApp) handle_gettrailsummary(w rest.ResponseWriter, r *rest.Reques
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	cur, err := summaryCol.Find(ctx, bson.M{
-		"owner": owner,
+		"owner":   owner,
+		"garbage": bson.M{"$ne": true},
 	}, findOptions)
 	if err != nil {
 		rest.Error(w, "Error on fetching summaries:"+err.Error(), http.StatusForbidden)
