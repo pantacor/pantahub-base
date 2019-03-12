@@ -1025,7 +1025,6 @@ func (a *DevicesApp) handle_getdevices(w rest.ResponseWriter, r *rest.Request) {
 	devices := make([]Device, 0)
 
 	findOptions := options.Find()
-	findOptions.SetHint(bson.M{"_id": 1}) //Index fields
 	findOptions.SetNoCursorTimeout(true)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
