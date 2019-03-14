@@ -1,6 +1,9 @@
 package: gitlab.com/pantacor/pantahub-base
 import:
 - package: github.com/fundapps/go-json-rest-middleware-jwt
+  repo: https://github.com/pantacor/go-json-rest-middleware-jwt
+  version: fundapps
+  vcs: git
 - package: github.com/alecthomas/units
 - package: github.com/ant0ine/go-json-rest
   version: cab770813df3db97a11bd04239ac1890c3caf188
