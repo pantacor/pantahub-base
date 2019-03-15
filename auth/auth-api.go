@@ -615,17 +615,26 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 	}
 	jwtMiddleware.Authenticator = func(userId string, password string) bool {
 
+		var loginUser string
+
 		if userId == "" || password == "" {
 			return false
 		}
 
-		testUserId := "prn:pantahub.com:auth:/" + userId
+		userTup := strings.SplitN(userId, "==>", 2)
+		if len(userTup) > 1 {
+			loginUser = userTup[0]
+		} else {
+			loginUser = userId
+		}
+
+		testUserId := "prn:pantahub.com:auth:/" + loginUser
 
 		if plm, ok := accounts.DefaultAccounts[testUserId]; !ok {
-			if strings.HasPrefix(userId, "prn:::devices:") {
-				return app.deviceAuth(userId, password)
+			if strings.HasPrefix(loginUser, "prn:::devices:") {
+				return app.deviceAuth(loginUser, password)
 			} else {
-				return app.accountAuth(userId, password)
+				return app.accountAuth(loginUser, password)
 			}
 		} else {
 			return plm.Password == password
@@ -634,16 +643,34 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 
 	jwtMiddleware.PayloadFunc = func(userId string) map[string]interface{} {
 
-		testUserId := "prn:pantahub.com:auth:/" + userId
+		var loginUser, callUser string
+		var payload map[string]interface{}
+
+		userTup := strings.SplitN(userId, "==>", 2)
+		if len(userTup) > 1 {
+			loginUser = userTup[0]
+			callUser = userTup[1]
+		} else {
+			loginUser = userId
+		}
+
+		testUserId := "prn:pantahub.com:auth:/" + loginUser
 		if plm, ok := accounts.DefaultAccounts[testUserId]; !ok {
 			if strings.HasPrefix(userId, "prn:::devices:") {
-				return app.devicePayload(userId)
+				payload = app.devicePayload(loginUser)
 			} else {
-				return app.accountPayload(userId)
+				payload = app.accountPayload(loginUser)
 			}
 		} else {
-			return AccountToPayload(plm)
+			payload = AccountToPayload(plm)
 		}
+
+		if callUser != "" {
+			callPayload := jwtMiddleware.PayloadFunc(callUser)
+			payload["call-as"] = callPayload
+		}
+
+		return payload
 	}
 
 	app.Api = rest.NewApi()

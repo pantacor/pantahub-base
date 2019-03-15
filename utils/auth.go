@@ -45,10 +45,19 @@ func GetAuthInfo(r *rest.Request) *AuthInfo {
 
 func (s *AuthMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFunc {
 	return func(w rest.ResponseWriter, r *rest.Request) {
+		var origCallerClaims, callerClaims jwtgo.MapClaims
 		env := r.Env
 
+		origCallerClaims = r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)
+		callerClaims = origCallerClaims
+
+		if callerClaims["call-as"] != nil {
+			callerClaims = jwtgo.MapClaims(callerClaims["call-as"].(map[string]interface{}))
+		}
+		r.Env["JWT_PAYLOAD"] = callerClaims
+
 		authInfo := AuthInfo{}
-		caller, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+		caller, ok := callerClaims["prn"]
 		if !ok {
 			// XXX: find right error
 			rest.Error(w, "You need to be logged in", http.StatusForbidden)
@@ -58,7 +67,7 @@ func (s *AuthMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFu
 		prn := Prn(callerStr)
 		authInfo.Caller = prn
 
-		authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+		authType, ok := callerClaims["type"]
 		if !ok {
 			// XXX: find right error
 			rest.Error(w, "You need to be logged in", http.StatusForbidden)
@@ -67,28 +76,28 @@ func (s *AuthMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFu
 		authTypeStr := authType.(string)
 		authInfo.CallerType = authTypeStr
 
-		owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["owner"]
+		owner, ok := callerClaims["owner"]
 		if ok {
 			ownerStr := owner.(string)
 			prn := Prn(ownerStr)
 			authInfo.Owner = prn
 		}
-		roles, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["roles"]
+		roles, ok := callerClaims["roles"]
 		if ok {
 			rolesStr := roles.(string)
 			authInfo.Roles = rolesStr
 		}
-		aud, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["aud"]
+		aud, ok := callerClaims["aud"]
 		if ok {
 			audStr := aud.(string)
 			authInfo.Audience = audStr
 		}
-		scopes, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["scopes"]
+		scopes, ok := callerClaims["scopes"]
 		if ok {
 			scopesStr := scopes.(string)
 			authInfo.Audience = scopesStr
 		}
-		nick, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["nick"]
+		nick, ok := callerClaims["nick"]
 		if ok {
 			nickStr := nick.(string)
 			authInfo.Nick = nickStr
