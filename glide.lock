@@ -1,5 +1,5 @@
 hash: 760a2a5999d277eb5e2c7d8f50f064deee5eea453ac01942c185164f44348d1c
-updated: 2019-03-14T16:18:34.23993904+01:00
+updated: 2019-03-15T15:32:47.718403268+01:00
 imports:
 - name: github.com/alecthomas/units
   version: 2efee857e7cfd4f3d0138cc3cbb1b4966962b93a
@@ -54,7 +54,7 @@ imports:
   subpackages:
   - fluent
 - name: github.com/fundapps/go-json-rest-middleware-jwt
-  version: 21597ca656a4b640bedd967c224061d6f1370b8d
+  version: f617d52f1ee78461ca2922f845a29864b19a6fe6
   repo: https://github.com/pantacor/go-json-rest-middleware-jwt
   vcs: git
 - name: github.com/gibson042/canonicaljson-go
