@@ -29,6 +29,9 @@ type AuthInfo struct {
 	Caller     Prn
 	CallerType string
 	Owner      Prn
+	Roles      string
+	Audience   string
+	Nick       string
 }
 
 func GetAuthInfo(r *rest.Request) *AuthInfo {
@@ -69,6 +72,26 @@ func (s *AuthMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFu
 			ownerStr := owner.(string)
 			prn := Prn(ownerStr)
 			authInfo.Owner = prn
+		}
+		roles, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["roles"]
+		if ok {
+			rolesStr := roles.(string)
+			authInfo.Roles = rolesStr
+		}
+		aud, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["aud"]
+		if ok {
+			audStr := aud.(string)
+			authInfo.Audience = audStr
+		}
+		scopes, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["scopes"]
+		if ok {
+			scopesStr := scopes.(string)
+			authInfo.Audience = scopesStr
+		}
+		nick, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["nick"]
+		if ok {
+			nickStr := nick.(string)
+			authInfo.Nick = nickStr
 		}
 
 		env["PH_AUTH_INFO"] = authInfo
