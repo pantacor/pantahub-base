@@ -1261,7 +1261,6 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *DevicesAp
 		AccessControlMaxAge:           3600,
 	})
 
-	// no authentication needed for /login
 	app.Api.Use(&rest.IfMiddleware{
 		Condition: func(request *rest.Request) bool {
 			// if call is coming with authorization attempt, ensure JWT middleware
@@ -1275,6 +1274,20 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *DevicesAp
 			return !(request.Method == "POST" && request.URL.Path == "/")
 		},
 		IfTrue: app.jwt_middleware,
+	})
+	app.Api.Use(&rest.IfMiddleware{
+		Condition: func(request *rest.Request) bool {
+			// if call is coming with authorization attempt, ensure JWT middleware
+			// is used... otherwise let through anonymous POST for registration
+			auth := request.Header.Get("Authorization")
+			if auth != "" && strings.HasPrefix(strings.ToLower(strings.TrimSpace(auth)), "bearer ") {
+				return true
+			}
+
+			// post new device means to register... allow this unauthenticated
+			return !(request.Method == "POST" && request.URL.Path == "/")
+		},
+		IfTrue: &utils.AuthMiddleware{},
 	})
 
 	// /auth_status endpoints
