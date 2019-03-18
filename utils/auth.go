@@ -32,6 +32,7 @@ type AuthInfo struct {
 	Roles      string
 	Audience   string
 	Nick       string
+	RemoteUser string
 }
 
 func GetAuthInfo(r *rest.Request) *AuthInfo {
@@ -55,6 +56,7 @@ func (s *AuthMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFu
 			callerClaims = jwtgo.MapClaims(callerClaims["call-as"].(map[string]interface{}))
 		}
 		r.Env["JWT_PAYLOAD"] = callerClaims
+		r.Env["JWT_ORIG_PAYLOAD"] = origCallerClaims
 
 		authInfo := AuthInfo{}
 		caller, ok := callerClaims["prn"]
@@ -102,10 +104,17 @@ func (s *AuthMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFu
 			nickStr := nick.(string)
 			authInfo.Nick = nickStr
 		}
-
+		origNick, ok := origCallerClaims["nick"]
+		if ok {
+			origNickStr := origNick.(string)
+			authInfo.RemoteUser = origNickStr + "==>" + authInfo.Nick
+		} else {
+			authInfo.RemoteUser = "_unknown_==>" + authInfo.Nick
+		}
+		env["REMOTE_USER"] = authInfo.RemoteUser
 		env["PH_AUTH_INFO"] = authInfo
-		r.Env = env
 
+		r.Env = env
 		handler(w, r)
 	}
 }
