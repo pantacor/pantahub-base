@@ -29,11 +29,11 @@ Server: nginx/1.10.0 (Ubuntu)
 X-Powered-By: go-json-rest
 
 {
-    "email": "asac@pantacor.com", 
-    "id": "58dc21d76e2bc30224f160b0", 
-    "nick": "asac", 
-    "password": "XXXXXX", 
-    "password-new": "", 
+    "email": "asac@pantacor.com",
+    "id": "58dc21d76e2bc30224f160b0",
+    "nick": "asac",
+    "password": "XXXXXX",
+    "password-new": "",
     "prn": "prn:::accounts:/58dc21d76e2bc30224f160b0", 
     "time-created": "2017-03-29T16:06:31.345913416-05:00", 
     "time-modified": "2017-03-29T16:06:31.345913416-05:00"
@@ -183,3 +183,55 @@ X-Runtime: 0.000000
     "type": "USER"
 }
 ```
+
+# sudo: Admins an log in as any user
+
+If your user has the "admin" role you get the ability to support other users.
+
+## Get Info about all accounts
+
+As "admin" user you can query the /accounts endpoint to retrieve account info of any user in the system:
+
+```
+http http://localhost:12365/auth/accounts?asadmin=yes Authorization:" Bearer $TOK" 
+
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Date: Mon, 18 Mar 2019 09:49:08 GMT
+Transfer-Encoding: chunked
+X-Powered-By: go-json-rest
+X-Runtime: 0.006500
+
+[
+    {
+        "email": "asac@pantacor.com",
+        "nick": "asac",
+        "prn": "prn:::accounts:/58dc21d76e2bc30224f160b0"
+        "time-created": "2017-03-29T23:06:31.345+02:00",
+        "time-modified": "2017-03-29T23:08:56.688+02:00",
+        "type": "USER"
+    },
+    {
+...
+```
+
+## login as another user
+
+To login as another user you can use the /auth/login endpoint by specifying the special username: "$youradminuser==>$loginasuser", e.g. 
+
+```
+http POST  localhost:12365/auth/login username='user1==>user2' password=user1
+
+HTTP/1.1 200 OK
+Content-Length: 469
+Content-Type: application/json; charset=utf-8
+Date: Mon, 18 Mar 2019 09:53:08 GMT
+X-Powered-By: go-json-rest
+X-Runtime: 0.000183
+
+{
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjYWxsLWFzIjp7ImlkIjoicHJuOnBhbnRhaHViLmNvbTphdXRoOi91c2VyMiIsIm5pY2siOiJ1c2VyMiIsInBybiI6InBybjpwYW50YWh1Yi5jb206YXV0aDovdXNlcjIiLCJyb2xlcyI6ImFkbWluIiwidHlwZSI6IlVTRVIifSwiZXhwIjoxNTUyOTA2Mzg4LCJpZCI6InVzZXIxPT1cdTAwM2V1c2VyMiIsIm5pY2siOiJ1c2VyMSIsIm9yaWdfaWF0IjoxNTUyOTAyNzg4LCJwcm4iOiJwcm46cGFudGFodWIuY29tOmF1dGg6L3VzZXIxIiwicm9sZXMiOiJhZG1pbiIsInR5cGUiOiJVU0VSIn0.yhUwT4ExaY0KyO2_uRDlHb9kOp04lEvoL8MZ2ui3_Sk"
+}
+
+```
+
