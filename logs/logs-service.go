@@ -482,12 +482,18 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *logsApp {
 		AccessControlMaxAge:           3600,
 	})
 
-	// no authentication needed for /login
 	app.Api.Use(&rest.IfMiddleware{
 		Condition: func(request *rest.Request) bool {
 			return true
 		},
 		IfTrue: app.jwt_middleware,
+	})
+
+	app.Api.Use(&rest.IfMiddleware{
+		Condition: func(request *rest.Request) bool {
+			return true
+		},
+		IfTrue: &utils.AuthMiddleware{},
 	})
 
 	// XXX: this is all needs to be done so that paths that do not trail with /

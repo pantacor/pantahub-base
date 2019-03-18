@@ -23,19 +23,19 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mongodb/mongo-go-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/x/bsonx"
+	mgo "gopkg.in/mgo.v2"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
-	"github.com/fundapps/go-json-rest-middleware-jwt"
+	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/mongo"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
 )
 
 func init() {
@@ -101,6 +101,67 @@ func handle_auth(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(jwtClaims)
 }
 
+func (a *AuthApp) handle_getaccounts(w rest.ResponseWriter, r *rest.Request) {
+	var err error
+	var cur *mongo.Cursor
+
+	authInfo := utils.GetAuthInfo(r)
+	r.ParseForm()
+	asAdminMode := r.FormValue("asadmin")
+
+	if asAdminMode != "" && authInfo.Roles != "admin" {
+		utils.RestError(w, nil, "user has no admin role", http.StatusForbidden)
+		return
+	}
+
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
+
+	if collection == nil {
+		utils.RestError(w, nil, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+
+	resultSet := make([]accounts.AccountPublic, 0)
+	findOptions := options.Find()
+	findOptions.SetNoCursorTimeout(true)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// NO ADMIN: FILTER
+	if asAdminMode == "" {
+		cur, err = collection.Find(ctx, bson.M{
+			"$or": bson.A{
+				bson.M{"prn": authInfo.Caller},
+				bson.M{"owner": authInfo.Caller},
+			},
+			"garbage": bson.M{"$ne": true},
+		}, findOptions)
+	} else {
+		// ADMIN: get all
+		cur, err = collection.Find(ctx, bson.M{
+			"garbage": bson.M{"$ne": true},
+		}, findOptions)
+	}
+
+	if err != nil {
+		utils.RestError(w, err, "Error on fetching accounts.", http.StatusInternalServerError)
+		return
+	}
+	defer cur.Close(ctx)
+
+	for cur.Next(ctx) {
+		result := accounts.AccountPublic{}
+		err := cur.Decode(&result)
+		if err != nil {
+			utils.RestError(w, err, "Cursor Decode Error", http.StatusInternalServerError)
+			return
+		}
+		resultSet = append(resultSet, result)
+	}
+
+	w.WriteJson(&resultSet)
+}
+
 func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 	newAccount := accounts.Account{}
 
@@ -126,7 +187,7 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	mgoid := bson.NewObjectId()
+	mgoid := primitive.NewObjectID()
 	ObjectID, err := primitive.ObjectIDFromHex(mgoid.Hex())
 	if err != nil {
 		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
@@ -355,11 +416,11 @@ type tokenRequest struct {
 	Comment string `json:"comment"`
 }
 type tokenStore struct {
-	ID      bson.ObjectId `json:"id", bson:"_id"`
-	Client  string        `json:"client"`
-	Owner   string        `json:"owner"`
-	Comment string        `json:"comment"`
-	Claims  jwtgo.Claims  `json:"jwt-claims"`
+	ID      primitive.ObjectID `json:"id", bson:"_id"`
+	Client  string             `json:"client"`
+	Owner   string             `json:"owner"`
+	Comment string             `json:"comment"`
+	Claims  jwtgo.Claims       `json:"jwt-claims"`
 }
 
 type tokenResult struct {
@@ -428,7 +489,7 @@ func (app *AuthApp) handle_posttoken(writer rest.ResponseWriter, r *rest.Request
 	}
 
 	// claim for a scoped token
-	tokenClaims["token_id"] = bson.NewObjectId()
+	tokenClaims["token_id"] = primitive.NewObjectID()
 	tokenClaims["id"] = user
 	tokenClaims["aud"] = service
 	tokenClaims["scopes"] = scopes
@@ -453,7 +514,7 @@ func (app *AuthApp) handle_posttoken(writer rest.ResponseWriter, r *rest.Request
 	}
 
 	tokenStore := tokenStore{
-		ID:      tokenClaims["token_id"].(bson.ObjectId),
+		ID:      tokenClaims["token_id"].(primitive.ObjectID),
 		Client:  service,
 		Owner:   user,
 		Comment: tokenRequest.Comment,
@@ -554,17 +615,28 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 	}
 	jwtMiddleware.Authenticator = func(userId string, password string) bool {
 
+		var loginUser string
+
 		if userId == "" || password == "" {
 			return false
 		}
 
-		testUserId := "prn:pantahub.com:auth:/" + userId
+		userTup := strings.SplitN(userId, "==>", 2)
+		if len(userTup) > 1 {
+			loginUser = userTup[0]
+		} else {
+			loginUser = userId
+		}
 
+		testUserId := loginUser
+		if !strings.HasPrefix(loginUser, "prn:") {
+			testUserId = "prn:pantahub.com:auth:/" + loginUser
+		}
 		if plm, ok := accounts.DefaultAccounts[testUserId]; !ok {
-			if strings.HasPrefix(userId, "prn:::devices:") {
-				return app.deviceAuth(userId, password)
+			if strings.HasPrefix(loginUser, "prn:::devices:") {
+				return app.deviceAuth(loginUser, password)
 			} else {
-				return app.accountAuth(userId, password)
+				return app.accountAuth(loginUser, password)
 			}
 		} else {
 			return plm.Password == password
@@ -573,16 +645,38 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 
 	jwtMiddleware.PayloadFunc = func(userId string) map[string]interface{} {
 
-		testUserId := "prn:pantahub.com:auth:/" + userId
+		var loginUser, callUser string
+		var payload map[string]interface{}
+
+		userTup := strings.SplitN(userId, "==>", 2)
+		if len(userTup) > 1 {
+			loginUser = userTup[0]
+			callUser = userTup[1]
+		} else {
+			loginUser = userId
+		}
+
+		testUserId := loginUser
+		if !strings.HasPrefix(loginUser, "prn:") {
+			testUserId = "prn:pantahub.com:auth:/" + loginUser
+		}
 		if plm, ok := accounts.DefaultAccounts[testUserId]; !ok {
 			if strings.HasPrefix(userId, "prn:::devices:") {
-				return app.devicePayload(userId)
+				payload = app.devicePayload(loginUser)
 			} else {
-				return app.accountPayload(userId)
+				payload = app.accountPayload(loginUser)
 			}
 		} else {
-			return AccountToPayload(plm)
+			payload = AccountToPayload(plm)
 		}
+
+		if callUser != "" {
+			callPayload := jwtMiddleware.PayloadFunc(callUser)
+			callPayload["id"] = payload["id"].(string) + "==>" + callPayload["id"].(string)
+			payload["call-as"] = callPayload
+		}
+
+		return payload
 	}
 
 	app.Api = rest.NewApi()
@@ -612,6 +706,16 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 		IfTrue: app.jwt_middleware,
 	})
 
+	// no authentication needed for /login
+	app.Api.Use(&rest.IfMiddleware{
+		Condition: func(request *rest.Request) bool {
+			return request.URL.Path != "/login" &&
+				!(request.URL.Path == "/accounts" && request.Method == "POST") &&
+				!(request.URL.Path == "/verify" && request.Method == "GET")
+		},
+		IfTrue: &utils.AuthMiddleware{},
+	})
+
 	// /login /auth_status and /refresh_token endpoints
 	api_router, _ := rest.MakeRouter(
 		rest.Get("/", app.handle_getprofile),
@@ -620,6 +724,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 		rest.Post("/code", app.handle_postcode),
 		rest.Get("/auth_status", handle_auth),
 		rest.Get("/login", app.jwt_middleware.RefreshHandler),
+		rest.Get("/accounts", app.handle_getaccounts),
 		rest.Post("/accounts", app.handle_postaccount),
 		rest.Get("/verify", app.handle_verify),
 	)
@@ -750,7 +855,10 @@ func (a *AuthApp) deviceAuth(deviceId string, secret string) bool {
 	c := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
 	id := utils.PrnGetId(deviceId)
-	mgoId := bson.ObjectIdHex(id)
+	mgoId, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return false
+	}
 
 	device := devices.Device{}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -777,7 +885,10 @@ func (a *AuthApp) devicePayload(deviceId string) map[string]interface{} {
 	c := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
 	id := utils.PrnGetId(deviceId)
-	mgoId := bson.ObjectIdHex(id)
+	mgoId, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil
+	}
 
 	device := devices.Device{}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

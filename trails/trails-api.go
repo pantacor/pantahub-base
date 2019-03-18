@@ -2071,12 +2071,17 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *TrailsApp
 	})
 	app.Api.Use(&utils.URLCleanMiddleware{})
 
-	// no authentication needed for /login
 	app.Api.Use(&rest.IfMiddleware{
 		Condition: func(request *rest.Request) bool {
 			return true
 		},
 		IfTrue: app.jwt_middleware,
+	})
+	app.Api.Use(&rest.IfMiddleware{
+		Condition: func(request *rest.Request) bool {
+			return true
+		},
+		IfTrue: &utils.AuthMiddleware{},
 	})
 
 	// /auth_status endpoints

@@ -45,3 +45,15 @@ type Account struct {
 	TimeCreated  time.Time `json:"time-created" bson:"time-created"`
 	TimeModified time.Time `json:"time-modified" bson:"time-modified"`
 }
+
+type AccountPublic struct {
+	Id primitive.ObjectID `json:"-" bson:"_id"`
+
+	Type  AccountType `json:"type" bson:"type"`
+	Email string      `json:"email" bson:"email"`
+	Nick  string      `json:"nick" bson:"nick"`
+	Prn   string      `json:"prn" bson:"prn"`
+
+	TimeCreated  time.Time `json:"time-created" bson:"time-created"`
+	TimeModified time.Time `json:"time-modified" bson:"time-modified"`
+}

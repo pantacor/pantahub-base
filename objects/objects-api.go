@@ -714,12 +714,17 @@ func New(jwtMiddleware *jwt.JWTMiddleware, subService subscriptions.Subscription
 		AccessControlMaxAge:           3600,
 	})
 
-	// no authentication needed for /login
 	app.Api.Use(&rest.IfMiddleware{
 		Condition: func(request *rest.Request) bool {
 			return true
 		},
 		IfTrue: app.jwt_middleware,
+	})
+	app.Api.Use(&rest.IfMiddleware{
+		Condition: func(request *rest.Request) bool {
+			return true
+		},
+		IfTrue: &utils.AuthMiddleware{},
 	})
 
 	// /auth_status endpoints
