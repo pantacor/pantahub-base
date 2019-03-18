@@ -628,8 +628,10 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 			loginUser = userId
 		}
 
-		testUserId := "prn:pantahub.com:auth:/" + loginUser
-
+		testUserId := loginUser
+		if !strings.HasPrefix(loginUser, "prn:") {
+			testUserId = "prn:pantahub.com:auth:/" + loginUser
+		}
 		if plm, ok := accounts.DefaultAccounts[testUserId]; !ok {
 			if strings.HasPrefix(loginUser, "prn:::devices:") {
 				return app.deviceAuth(loginUser, password)
@@ -654,7 +656,10 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 			loginUser = userId
 		}
 
-		testUserId := "prn:pantahub.com:auth:/" + loginUser
+		testUserId := loginUser
+		if !strings.HasPrefix(loginUser, "prn:") {
+			testUserId = "prn:pantahub.com:auth:/" + loginUser
+		}
 		if plm, ok := accounts.DefaultAccounts[testUserId]; !ok {
 			if strings.HasPrefix(userId, "prn:::devices:") {
 				payload = app.devicePayload(loginUser)
@@ -667,6 +672,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 
 		if callUser != "" {
 			callPayload := jwtMiddleware.PayloadFunc(callUser)
+			callPayload["id"] = payload["id"].(string) + "==>" + callPayload["id"].(string)
 			payload["call-as"] = callPayload
 		}
 

@@ -54,6 +54,8 @@ func (s *AuthMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFu
 
 		if callerClaims["call-as"] != nil {
 			callerClaims = jwtgo.MapClaims(callerClaims["call-as"].(map[string]interface{}))
+			callerClaims["exp"] = origCallerClaims["exp"]
+			callerClaims["orig_iat"] = origCallerClaims["orig_iat"]
 		}
 		r.Env["JWT_PAYLOAD"] = callerClaims
 		r.Env["JWT_ORIG_PAYLOAD"] = origCallerClaims
@@ -111,7 +113,7 @@ func (s *AuthMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFu
 		} else {
 			authInfo.RemoteUser = "_unknown_==>" + authInfo.Nick
 		}
-		env["REMOTE_USER"] = authInfo.RemoteUser
+
 		env["PH_AUTH_INFO"] = authInfo
 
 		r.Env = env
