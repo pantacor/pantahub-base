@@ -17,8 +17,10 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -27,7 +29,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/x/bsonx"
-	mgo "gopkg.in/mgo.v2"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
@@ -49,6 +50,7 @@ func init() {
 		if passwordOverwrite == "" {
 			delete(accounts.DefaultAccounts, k)
 		} else {
+			log.Println("enabling default account: " + v.Nick)
 			v.Password = passwordOverwrite
 			accounts.DefaultAccounts[k] = v
 		}
@@ -272,10 +274,6 @@ func (a *AuthApp) handle_getprofile(w rest.ResponseWriter, r *rest.Request) {
 
 		if err != nil {
 			switch err.(type) {
-			case *mgo.QueryError:
-				qErr := err.(*mgo.QueryError)
-				rest.Error(w, "Query Error: "+qErr.Error(), http.StatusInternalServerError)
-				break
 			default:
 				rest.Error(w, "Account "+err.Error(), http.StatusInternalServerError)
 				break
@@ -354,12 +352,17 @@ func (a *AuthApp) handle_verify(w rest.ResponseWriter, r *rest.Request) {
 }
 
 type codeRequest struct {
-	Service string `json:"service"`
-	Scopes  string `json:"scopes"`
+	Service     string `json:"service"`
+	Scopes      string `json:"scopes"`
+	State       string `json:"state"`
+	RedirectURI string `json:"redirect_uri"`
 }
 
 type codeResponse struct {
-	Code string `json:"code"`
+	Code        string `json:"code"`
+	Scopes      string `json:"scopes,omitempty"`
+	State       string `json:"state,omitempty"`
+	RedirectURI string `json:"redirect_uri,omitempty"`
 }
 
 func (app *AuthApp) handle_postcode(w rest.ResponseWriter, r *rest.Request) {
@@ -393,8 +396,19 @@ func (app *AuthApp) handle_postcode(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
+	// XXX: allow scopes registered as valid for service once we have scopes middleware
 	if req.Scopes != "*" {
 		rest.Error(w, "access code requested with invalid scope. During alpha, scopes '*' (all rights) is only valid scope", http.StatusBadRequest)
+		return
+	}
+
+	serviceAccount, err := app.getAccount(req.Service)
+	if err != nil && err != mongo.ErrNoDocuments {
+		utils.RestError(w, err, "error access code creation failed to look up service", http.StatusInternalServerError)
+		return
+	}
+	if serviceAccount.Oauth2RedirectURL != "" && !strings.HasPrefix(req.RedirectURI, serviceAccount.Oauth2RedirectURL) {
+		rest.Error(w, "error implicit access token failed; redirect URL does not match registered service", http.StatusBadRequest)
 		return
 	}
 
@@ -407,6 +421,134 @@ func (app *AuthApp) handle_postcode(w rest.ResponseWriter, r *rest.Request) {
 	code := jwtgo.New(jwtgo.GetSigningMethod(app.jwt_middleware.SigningAlgorithm))
 	code.Claims = mapClaim
 	response.Code, err = code.SignedString(app.jwt_middleware.Key)
+	response.Scopes = req.Scopes
+	response.RedirectURI = req.RedirectURI
+	w.WriteJson(response)
+}
+
+type implicitTokenRequest struct {
+	codeRequest
+	RedirectURI string `json:"redirect_uri"`
+}
+
+func (app *AuthApp) handle_postauthorizetoken(w rest.ResponseWriter, r *rest.Request) {
+	var err error
+
+	// this is the claim of the service authenticating itself
+	caller := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"].(string)
+	callerType := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"].(string)
+
+	if caller == "" {
+		rest.Error(w, "must be authenticated as user", http.StatusUnauthorized)
+		return
+	}
+
+	if callerType != "USER" {
+		rest.Error(w, "only USER's can request implicit access tokens", http.StatusForbidden)
+		return
+	}
+
+	req := implicitTokenRequest{}
+	err = r.DecodeJsonPayload(&req)
+
+	if err != nil {
+		rest.Error(w, "error decoding token request", http.StatusBadRequest)
+		log.Println("WARNING: implicit access token request received with wrong request body: " + err.Error())
+		return
+	}
+
+	if req.Service == "" {
+		rest.Error(w, "implicit  access token requested with invalid service", http.StatusBadRequest)
+		return
+	}
+
+	if req.Scopes != "*" {
+		rest.Error(w, "implicit access token requested with invalid scope. During alpha, scopes '*' (all rights) is only valid scope", http.StatusBadRequest)
+		return
+	}
+
+	token := jwtgo.New(jwtgo.GetSigningMethod(app.jwt_middleware.SigningAlgorithm))
+	tokenClaims := token.Claims.(jwtgo.MapClaims)
+
+	// lets get the standard payload for a user and modify it so its a service accesstoken
+	if app.jwt_middleware.PayloadFunc != nil {
+		for key, value := range app.jwt_middleware.PayloadFunc(caller) {
+			tokenClaims[key] = value
+		}
+	}
+
+	serviceAccount, err := app.getAccount(req.Service)
+
+	if err != nil && err != mongo.ErrNoDocuments {
+		log.Println("error implicit access token creation failed to look up service: " + err.Error())
+		rest.Error(w, "error  implicit access token creation failed to look up service", http.StatusInternalServerError)
+		return
+	}
+
+	if err == mongo.ErrNoDocuments {
+		rest.Error(w, "error access token failed, due to unknown service id", http.StatusBadRequest)
+		return
+	}
+
+	if serviceAccount.Oauth2RedirectURL != "" && !strings.HasPrefix(req.RedirectURI, serviceAccount.Oauth2RedirectURL) {
+		rest.Error(w, "error implicit access token failed; redirect URL does not match registered service", http.StatusBadRequest)
+		return
+	}
+
+	tokenClaims["token_id"] = primitive.NewObjectID()
+	tokenClaims["id"] = caller
+	tokenClaims["aud"] = req.Service
+	tokenClaims["scopes"] = req.Scopes
+	tokenClaims["prn"] = caller
+	tokenClaims["exp"] = time.Now().Add(time.Minute * 60)
+	tokenString, err := token.SignedString(app.jwt_middleware.Key)
+
+	if err != nil {
+		log.Println("WARNING: error signing implicit access token for service / user / scopes(" + req.Service + " / " + caller + " / " + req.Scopes + ")")
+		rest.Error(w, "error signing implicit access token for service / user / scopes("+req.Service+" / "+caller+" / "+req.Scopes+")", http.StatusUnauthorized)
+		return
+	}
+
+	tokenStore := tokenStore{
+		ID:      tokenClaims["token_id"].(primitive.ObjectID),
+		Client:  req.Service,
+		Owner:   caller,
+		Comment: "",
+		Claims:  tokenClaims,
+	}
+
+	collection := app.mongoClient.Database(utils.MongoDb).Collection("pantahub_oauth_accesstokens")
+
+	if collection == nil {
+		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+	// XXX: prototype: for production we need to prevent posting twice!!
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err = collection.InsertOne(
+		ctx,
+		tokenStore,
+	)
+	if err != nil {
+		rest.Error(w, "Error inserting oauth token into database "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	params := url.Values{}
+	params.Add("token_type", "bearer")
+	params.Add("access_token", tokenString)
+	params.Add("expires_in", "3600")
+	params.Add("scope", req.Scopes)
+	params.Add("state", req.State)
+
+	response := tokenResponse{
+		Token:       tokenString,
+		RedirectURI: req.RedirectURI + "?" + params.Encode(),
+		TokenType:   "bearer",
+		Scopes:      req.Scopes,
+	}
+
 	w.WriteJson(response)
 }
 
@@ -416,15 +558,19 @@ type tokenRequest struct {
 	Comment string `json:"comment"`
 }
 type tokenStore struct {
-	ID      primitive.ObjectID `json:"id", bson:"_id"`
-	Client  string             `json:"client"`
-	Owner   string             `json:"owner"`
-	Comment string             `json:"comment"`
-	Claims  jwtgo.Claims       `json:"jwt-claims"`
+	ID      primitive.ObjectID     `json:"id", bson:"_id"`
+	Client  string                 `json:"client"`
+	Owner   string                 `json:"owner"`
+	Comment string                 `json:"comment"`
+	Claims  map[string]interface{} `json:"jwt-claims"`
 }
 
-type tokenResult struct {
-	Token string `json:"token"`
+type tokenResponse struct {
+	Token       string `json:"token"`
+	RedirectURI string `json:"redirect_uri"`
+	State       string `json:"state"`
+	TokenType   string `json:"token_type"`
+	Scopes      string `json:"scopes"`
 }
 
 // handle_posttoken can be used by services to swap an accessCode to a long living accessToken.
@@ -529,8 +675,10 @@ func (app *AuthApp) handle_posttoken(writer rest.ResponseWriter, r *rest.Request
 		return
 	}
 
-	tokenResult := tokenResult{
-		Token: tokenString,
+	tokenResult := tokenResponse{
+		Token:     tokenString,
+		TokenType: "bearer",
+		Scopes:    scopes,
 	}
 
 	writer.WriteJson(tokenResult)
@@ -721,6 +869,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 		rest.Get("/", app.handle_getprofile),
 		rest.Post("/login", app.jwt_middleware.LoginHandler),
 		rest.Post("/token", app.handle_posttoken),
+		rest.Post("/authorize", app.handle_postauthorizetoken),
 		rest.Post("/code", app.handle_postcode),
 		rest.Get("/auth_status", handle_auth),
 		rest.Get("/login", app.jwt_middleware.RefreshHandler),
@@ -739,6 +888,19 @@ func (a *AuthApp) getAccount(prnEmailNick string) (accounts.Account, error) {
 		err     error
 		account accounts.Account
 	)
+	if strings.HasPrefix(prnEmailNick, "prn:::devices:") {
+		return account, errors.New("getAccount does not serve device accounts")
+	}
+
+	var ok, ok2 bool
+	if account, ok = accounts.DefaultAccounts[prnEmailNick]; !ok {
+		fullprn := "prn:pantahub.com:auth:/" + prnEmailNick
+		account, ok2 = accounts.DefaultAccounts[fullprn]
+	}
+
+	if ok || ok2 {
+		return account, nil
+	}
 
 	c := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
 

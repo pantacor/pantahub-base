@@ -76,37 +76,51 @@ func GetMongoClient() (*mongo.Client, error) {
 	return client, err
 }
 
-// GetMongoClienttest : To Get Mongo Client Object of test db
+// GetMongoClient : To Get Mongo Client Object
 func GetMongoClientTest() (*mongo.Client, error) {
-	MongoDb = "testdb-" + GetEnv(ENV_MONGO_DB)
+	MongoDb = GetEnv(ENV_MONGO_DB)
+	MongoDb = "testdb-" + MongoDb
+	user := GetEnv(ENV_MONGO_USER)
+	pass := GetEnv(ENV_MONGO_PASS)
 	host := GetEnv(ENV_MONGO_HOST)
 	port := GetEnv(ENV_MONGO_PORT)
-	mongoUser := GetEnv(ENV_MONGO_USER)
-	mongoPass := GetEnv(ENV_MONGO_PASS)
 	mongoRs := GetEnv(ENV_MONGO_RS)
 
 	//Setting Client Options
 	clientOptions := options.Client()
-	credentials := options.Credential{
-		Username: mongoUser,
-		Password: mongoPass,
+	mongoConnect := "mongodb://"
+	if user != "" {
+		mongoConnect += user
+		if pass != "" {
+			mongoConnect += ":"
+			mongoConnect += pass
+		}
+		mongoConnect += "@"
 	}
-	//mongoConnect := "mongodb://" + mongoUser + ":" + mongoPass + "@" + host + ":" + port + "/" + MongoDb
-	mongoConnect := "mongodb://" + host + ":" + port + "/" + MongoDb
-	hosts := []string{
-		mongoConnect,
-	}
-	clientOptions.SetHosts(hosts)
-	clientOptions.SetAuth(credentials)
-	clientOptions.SetReplicaSet(mongoRs)
+	mongoConnect += host
 
+	if port != "" {
+		mongoConnect += ":"
+		mongoConnect += port
+	}
+
+	mongoConnect += "/"
+
+	if MongoDb != "" {
+		mongoConnect += MongoDb
+	}
+
+	mongoConnect += "?authMechanism=SCRAM-SHA-1"
+
+	clientOptions = clientOptions.ApplyURI(mongoConnect)
+	if mongoRs != "" {
+		clientOptions = clientOptions.SetReplicaSet(mongoRs)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	client, err := mongo.Connect(ctx, clientOptions)
-	if err != nil {
-		panic(err)
-	}
 	log.Println("Will connect to mongo PROD db with: " + mongoConnect)
+	client, err := mongo.Connect(ctx, clientOptions)
+
 	return client, err
 }

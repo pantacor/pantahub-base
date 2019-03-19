@@ -235,3 +235,40 @@ X-Runtime: 0.000183
 
 ```
 
+# Client authorization with oauth'ish approach
+
+To mimic oauth2 implicit flow we offer /authorize endpoint that allows user to issue directly accesstoken for a preregistered client with redirect URI.
+
+To use simply call /authorize endpoint as user:
+
+```
+OTOK=`http POST localhost:12365/auth/authorize service=prn:pantahub.com:auth:/client1 scopes='*' redirect_uri=http://localhost:808 Authorization:" Bearer $TOK" | jq -r .token`
+```
+
+And client can then use that token to call api on behalf of user given the selected scopes:
+
+```
+http POST localhost:12365/auth/authorize 
+calhost:12365/devices/auth_status Authorization:" Bearer $OTOK"
+HTTP/1.1 200 OK
+Content-Length: 279
+Content-Type: application/json; charset=utf-8
+Date: Wed, 06 Mar 2019 13:38:42 GMT
+X-Powered-By: go-json-rest
+X-Runtime: 0.000193
+
+{
+    "aud": "prn:pantahub.com:auth:/client1",
+    "exp": "2019-03-06T15:21:28.929136745+01:00",
+    "id": "prn:::accounts:/59ef9e241e7e6b000d3d2bc7",
+    "nick": "asacasa",
+    "prn": "prn:::accounts:/59ef9e241e7e6b000d3d2bc7",
+    "roles": "admin",
+    "scopes": "*",
+    "token_id": "5c7fc958c094f6720b6a9bc8",
+    "type": "USER"
+}
+```
+
+Implicit access tokens need renewal after given expiry timeout (currently 1h)
+

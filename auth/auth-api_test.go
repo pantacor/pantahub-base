@@ -28,16 +28,16 @@ import (
 	"gitlab.com/pantacor/pantahub-base/utils"
 
 	"github.com/fundapps/go-json-rest-middleware-jwt"
-	"github.com/go-resty/resty"
 )
 
 var (
-	recorder       *httptest.ResponseRecorder
-	server         *httptest.Server
-	jwtMWA         *jwt.JWTMiddleware
-	jwtMWR         *jwt.JWTMiddleware
-	serverUrl      *url.URL
-	authTokenUser1 string
+	recorder         *httptest.ResponseRecorder
+	server           *httptest.Server
+	jwtMWA           *jwt.JWTMiddleware
+	jwtMWR           *jwt.JWTMiddleware
+	serverUrl        *url.URL
+	authTokenUser1   string
+	authTokenClient1 string
 )
 
 func setUp(t *testing.T) {
@@ -76,7 +76,7 @@ func testNoCredsLogin401(t *testing.T) {
 	u := *serverUrl
 	u.Path = "/login"
 
-	res, err := resty.R().SetBody(map[string]string{}).Post(u.String())
+	res, err := utils.R().SetBody(map[string]string{}).Post(u.String())
 
 	if err != nil {
 		t.Errorf("internal error calling test server " + err.Error())
@@ -93,7 +93,7 @@ func testBadCredsLogin401(t *testing.T) {
 	u := *serverUrl
 	u.Path = "/login"
 
-	res, err := resty.R().SetBody(map[string]string{
+	res, err := utils.R().SetBody(map[string]string{
 		"username": "NOTEXISTuser1",
 		"password": "NOTRIGHTuser1",
 	}).Post(u.String())
@@ -113,7 +113,7 @@ func testGoodLogin(t *testing.T) {
 	u := serverUrl
 	u.Path = "/login"
 
-	res, err := resty.R().SetBody(map[string]string{
+	res, err := utils.R().SetBody(map[string]string{
 		"username": "user1",
 		"password": "user1",
 	}).Post(u.String())
@@ -132,7 +132,7 @@ func testRefreshToken(t *testing.T) {
 	u := *serverUrl
 	u.Path = "/login"
 
-	res, err := resty.R().SetAuthToken(authTokenUser1).Get(u.String())
+	res, err := utils.R().SetAuthToken(authTokenUser1).Get(u.String())
 
 	if err != nil {
 		t.Errorf("internal error calling test server " + err.Error())
@@ -169,8 +169,223 @@ func TestAuthLogin(t *testing.T) {
 	t.Run("Good Login", testGoodLogin)
 
 	authTokenUser1 = testutils.DoLogin(t, serverUrl, "user1", "user1")
-
 	t.Run("Refresh Token", testRefreshToken)
+
+	tearDown(t)
+}
+
+func testAuthAuthTokenGood(t *testing.T) {
+	u := *serverUrl
+	u.Path = "/authorize"
+
+	body := map[string]interface{}{}
+
+	body["service"] = "prn:pantahub.com:auth:/client1"
+	body["scopes"] = "*"
+	body["redirect_uri"] = "http://localhost:8081"
+
+	res, err := utils.R().SetAuthToken(authTokenUser1).SetBody(&body).Post(u.String())
+
+	if err != nil {
+		t.Errorf("internal error calling test server " + err.Error())
+		t.Fail()
+	}
+
+	if res.StatusCode() != http.StatusOK {
+		t.Errorf("request implicit access token (oauth2) must yield OK (200)")
+	}
+
+	result := map[string]interface{}{}
+	err = json.Unmarshal(res.Body(), &result)
+	if err != nil {
+		t.Errorf("error parsing body result as json" + err.Error())
+		t.Fail()
+	}
+
+	// check all mandatory fields are in response json
+	_, ok := result["state"]
+	if !ok {
+		t.Errorf("implicit /authorize must include 'state' in response")
+	}
+	_, ok = result["token"]
+	if !ok {
+		t.Errorf("implicit /authorize must include 'token' in response")
+	}
+	_, ok = result["token_type"]
+	if !ok {
+		t.Errorf("implicit /authorize must include 'token' in response")
+	}
+	_, ok = result["scopes"]
+	if !ok {
+		t.Errorf("implicit /authorize must include 'scopes' in response")
+	}
+
+	// check that redirect_uri has proper format and fields
+	uriStr := result["redirect_uri"].(string)
+	uri, err := url.Parse(uriStr)
+
+	// protect against bad format
+	if err != nil {
+		t.Errorf("error parsing redirect_uri" + err.Error())
+		t.Fail()
+	}
+
+	uriToken := uri.Query().Get("access_token")
+	if uriToken == "" {
+		t.Errorf("'access_token' field must be included in redirect_uri: redirect_uri=" + uriStr)
+		t.Fail()
+	}
+	uriScope := uri.Query().Get("scope")
+	if uriScope == "" {
+		t.Errorf("'scope' field must be included in redirect_uri: redirect_uri=" + uriStr)
+		t.Fail()
+	}
+	uriTokenType := uri.Query().Get("token_type")
+	if uriTokenType == "" {
+		t.Errorf("'token_type' field must be included in redirect_uri: redirect_uri=" + uriStr)
+		t.Fail()
+	}
+	uriExpiresIn := uri.Query().Get("expires_in")
+	if uriExpiresIn == "" {
+		t.Errorf("'expires_in' field must be included in redirect_uri: redirect_uri=" + uriStr)
+		t.Fail()
+	}
+}
+
+func testAuthAuthTokenBadURL(t *testing.T) {
+	u := *serverUrl
+	u.Path = "/authorize"
+
+	body := map[string]interface{}{}
+
+	body["service"] = "prn:pantahub.com:auth:/client1"
+	body["scopes"] = "*"
+	body["redirect_uri"] = "http://something.unknown"
+
+	res, err := utils.R().SetAuthToken(authTokenUser1).SetBody(&body).Post(u.String())
+
+	if err != nil {
+		t.Errorf("internal error calling test server " + err.Error())
+		t.Fail()
+	}
+
+	if res.StatusCode() != http.StatusBadRequest {
+		t.Errorf("request implicit access token (oauth2) with URL not matching client must yield BadRequest (400)")
+	}
+}
+
+func testAuthAuthTokenBadClient(t *testing.T) {
+	u := *serverUrl
+	u.Path = "/authorize"
+
+	body := map[string]interface{}{}
+
+	body["service"] = "prn:pantahub.com:auth:/client1NONEXIST"
+	body["scopes"] = "*"
+	body["redirect_uri"] = "http://localhost:8081"
+
+	res, err := utils.R().SetAuthToken(authTokenUser1).SetBody(&body).Post(u.String())
+
+	if err != nil {
+		t.Errorf("internal error calling test server " + err.Error())
+		t.Fail()
+	}
+
+	if res.StatusCode() != http.StatusBadRequest {
+		t.Errorf("request implicit access token (oauth2) with client not matching registered client must yield BadRequest (400)")
+	}
+}
+
+func testAuthAuthTokenPreservesState(t *testing.T) {
+	u := *serverUrl
+	u.Path = "/authorize"
+
+	body := map[string]interface{}{}
+
+	body["service"] = "prn:pantahub.com:auth:/client1"
+	body["scopes"] = "*"
+	body["redirect_uri"] = "http://localhost:8081"
+	body["state"] = "MYSTATEHERE"
+
+	res, err := utils.R().SetAuthToken(authTokenUser1).SetBody(&body).Post(u.String())
+
+	if err != nil {
+		t.Errorf("internal error calling test server " + err.Error())
+		t.Fail()
+	}
+
+	if res.StatusCode() != http.StatusOK {
+		t.Errorf("request implicit access token (oauth2) with client not matching registered client must yield BadRequest (400)")
+	}
+
+	result := map[string]interface{}{}
+	err = json.Unmarshal(res.Body(), &result)
+	if err != nil {
+		t.Errorf("error parsing body result as json" + err.Error())
+		t.Fail()
+	}
+	uriStr := result["redirect_uri"].(string)
+	uri, err := url.Parse(uriStr)
+
+	if err != nil {
+		t.Errorf("error parsing redirect_uri" + err.Error())
+		t.Fail()
+	}
+
+	resultState := uri.Query().Get("state")
+	if resultState != body["state"].(string) {
+		t.Errorf("'state' field of result does not match 'state' passed to /authorize endpoint:" + resultState + "!=" + body["state"].(string))
+		t.Fail()
+	}
+}
+
+func testAuthAuthTokenClientUse(t *testing.T) {
+	u := *serverUrl
+	u.Path = "/auth_status"
+	res, err := utils.R().SetAuthToken(authTokenClient1).Get(u.String())
+
+	if err != nil {
+		t.Errorf("internal error calling test server " + err.Error())
+		t.Fail()
+	}
+
+	if res.StatusCode() != http.StatusOK {
+		t.Errorf("using implicit access token to retrieve auth_status must not fail with code != 200")
+		t.Fail()
+	}
+
+	var result map[string]interface{}
+	err = json.Unmarshal(res.Body(), &result)
+	if err != nil {
+		t.Errorf("internal error calling test server " + err.Error())
+		t.Fail()
+	}
+
+	prn, ok := result["prn"]
+
+	if !ok {
+		t.Errorf("/auth_status with oauth2 implicit access token must return json with 'prn' field")
+		t.Fail()
+	}
+
+	if prn != "prn:pantahub.com:auth:/user1" {
+		t.Errorf("/auth_status with oauth2 implicit access token must 'prn' field matching 'prn:pantahub.com:auth:/client1', but returned: " + prn.(string))
+		t.Fail()
+	}
+}
+
+func TestOauth2Implicit(t *testing.T) {
+	setUp(t)
+
+	authTokenUser1 = testutils.DoLogin(t, serverUrl, "user1", "user1")
+	t.Run("Get Authorize Token (Good) ", testAuthAuthTokenGood)
+	t.Run("Get Authorize Token (Bad URL) ", testAuthAuthTokenBadURL)
+	t.Run("Get Authorize Token (Bad Client) ", testAuthAuthTokenBadClient)
+	t.Run("Get Authorize Token (Preserve State) ", testAuthAuthTokenPreservesState)
+
+	authTokenClient1 = testutils.DoAuthorizeToken(t, serverUrl, authTokenUser1,
+		"prn:pantahub.com:auth:/client1", "*")
+	t.Run("User Client 1 implicit auth token", testAuthAuthTokenClientUse)
 
 	tearDown(t)
 }

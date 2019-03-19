@@ -31,6 +31,7 @@ var device2ObjectID primitive.ObjectID
 var service1ObjectID primitive.ObjectID
 var service2ObjectID primitive.ObjectID
 var service3ObjectID primitive.ObjectID
+var client1ObjectID primitive.ObjectID
 
 // SetAccountIDs : Set IDs for Demo accounts
 func SetAccountIDs() {
@@ -44,6 +45,7 @@ func SetAccountIDs() {
 	service1ObjectID, _ = primitive.ObjectIDFromHex("123651236512365123650008")
 	service2ObjectID, _ = primitive.ObjectIDFromHex("123651236512365123650009")
 	service3ObjectID, _ = primitive.ObjectIDFromHex("123651236512365123650010")
+	client1ObjectID, _ = primitive.ObjectIDFromHex("223651236512365123650010")
 }
 
 var DefaultAccounts = map[string]Account{
@@ -146,5 +148,16 @@ var DefaultAccounts = map[string]Account{
 		TimeCreated:  time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
 		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
 		Password:     "service3",
+	},
+	"prn:pantahub.com:auth:/client1": Account{
+		Id:                client1ObjectID,
+		Type:              ACCOUNT_TYPE_CLIENT,
+		Prn:               "prn:pantahub.com:auth:/client1",
+		Nick:              "client1",
+		Email:             "no-reply-service3@accounts.pantahub.com",
+		TimeCreated:       time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
+		TimeModified:      time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
+		Password:          "client1",
+		Oauth2RedirectURL: "http://localhost",
 	},
 }
