@@ -20,6 +20,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -534,9 +535,16 @@ func (app *AuthApp) handle_postauthorizetoken(w rest.ResponseWriter, r *rest.Req
 		return
 	}
 
+	params := url.Values{}
+	params.Add("token_type", "bearer")
+	params.Add("access_token", tokenString)
+	params.Add("expires_in", "3600")
+	params.Add("scope", req.Scopes)
+	params.Add("state", req.State)
+
 	response := tokenResponse{
 		Token:       tokenString,
-		RedirectURI: req.RedirectURI + "?token_type=bearer&access_token=" + tokenString + "&expires_in=3600&scope=" + req.Scopes + "&state=" + req.State,
+		RedirectURI: req.RedirectURI + "?" + params.Encode(),
 		TokenType:   "bearer",
 		Scopes:      req.Scopes,
 	}
@@ -559,10 +567,10 @@ type tokenStore struct {
 
 type tokenResponse struct {
 	Token       string `json:"token"`
-	RedirectURI string `json:"redirect_uri,omitempty"`
-	State       string `json:"state,omitempty"`
+	RedirectURI string `json:"redirect_uri"`
+	State       string `json:"state"`
 	TokenType   string `json:"token_type"`
-	Scopes      string `json:"scopes,omitempty"`
+	Scopes      string `json:"scopes"`
 }
 
 // handle_posttoken can be used by services to swap an accessCode to a long living accessToken.
