@@ -31,12 +31,13 @@ import (
 )
 
 var (
-	recorder       *httptest.ResponseRecorder
-	server         *httptest.Server
-	jwtMWA         *jwt.JWTMiddleware
-	jwtMWR         *jwt.JWTMiddleware
-	serverUrl      *url.URL
-	authTokenUser1 string
+	recorder         *httptest.ResponseRecorder
+	server           *httptest.Server
+	jwtMWA           *jwt.JWTMiddleware
+	jwtMWR           *jwt.JWTMiddleware
+	serverUrl        *url.URL
+	authTokenUser1   string
+	authTokenClient1 string
 )
 
 func setUp(t *testing.T) {
@@ -338,6 +339,41 @@ func testAuthAuthTokenPreservesState(t *testing.T) {
 	}
 }
 
+func testAuthAuthTokenClientUse(t *testing.T) {
+	u := *serverUrl
+	u.Path = "/auth_status"
+	res, err := utils.R().SetAuthToken(authTokenClient1).Get(u.String())
+
+	if err != nil {
+		t.Errorf("internal error calling test server " + err.Error())
+		t.Fail()
+	}
+
+	if res.StatusCode() != http.StatusOK {
+		t.Errorf("using implicit access token to retrieve auth_status must not fail with code != 200")
+		t.Fail()
+	}
+
+	var result map[string]interface{}
+	err = json.Unmarshal(res.Body(), &result)
+	if err != nil {
+		t.Errorf("internal error calling test server " + err.Error())
+		t.Fail()
+	}
+
+	prn, ok := result["prn"]
+
+	if !ok {
+		t.Errorf("/auth_status with oauth2 implicit access token must return json with 'prn' field")
+		t.Fail()
+	}
+
+	if prn != "prn:pantahub.com:auth:/user1" {
+		t.Errorf("/auth_status with oauth2 implicit access token must 'prn' field matching 'prn:pantahub.com:auth:/client1', but returned: " + prn.(string))
+		t.Fail()
+	}
+}
+
 func TestOauth2Implicit(t *testing.T) {
 	setUp(t)
 
@@ -346,6 +382,10 @@ func TestOauth2Implicit(t *testing.T) {
 	t.Run("Get Authorize Token (Bad URL) ", testAuthAuthTokenBadURL)
 	t.Run("Get Authorize Token (Bad Client) ", testAuthAuthTokenBadClient)
 	t.Run("Get Authorize Token (Preserve State) ", testAuthAuthTokenPreservesState)
+
+	authTokenClient1 = testutils.DoAuthorizeToken(t, serverUrl, authTokenUser1,
+		"prn:pantahub.com:auth:/client1", "*")
+	t.Run("User Client 1 implicit auth token", testAuthAuthTokenClientUse)
 
 	tearDown(t)
 }
