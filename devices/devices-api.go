@@ -1028,10 +1028,18 @@ func (a *DevicesApp) handle_getdevices(w rest.ResponseWriter, r *rest.Request) {
 	findOptions.SetNoCursorTimeout(true)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	cur, err := collection.Find(ctx, bson.M{
+	query := bson.M{
 		"owner":   owner,
 		"garbage": bson.M{"$ne": true},
-	}, findOptions)
+	}
+
+	for k, v := range r.URL.Query() {
+		if query[k] == nil {
+			query[k] = v
+		}
+	}
+
+	cur, err := collection.Find(ctx, query, findOptions)
 	if err != nil {
 		rest.Error(w, "Error on fetching devices:"+err.Error(), http.StatusForbidden)
 		return
