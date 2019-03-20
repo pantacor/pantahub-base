@@ -1035,7 +1035,7 @@ func (a *DevicesApp) handle_getdevices(w rest.ResponseWriter, r *rest.Request) {
 
 	for k, v := range r.URL.Query() {
 		if query[k] == nil {
-			query[k] = v
+			query[k] = v[0]
 		}
 	}
 
