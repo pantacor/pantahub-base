@@ -15,12 +15,14 @@ services:
       - 12365:12365
     links:
       - localstack
+      - mongo
     env_file: ./env.default
 
   mongo:
     image: mongo
-    environment:
-      - MONGO_INITDB_DATABASE=testdb-pantabase-serv
+    volumes:
+      - ./pantahub-base-mongo-docker-run:/docker-entrypoint
+    command: /docker-entrypoint
 
   fluentd:
     image: fluent/fluentd
