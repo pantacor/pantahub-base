@@ -28,6 +28,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/x/bsonx"
@@ -37,7 +38,7 @@ import (
 )
 
 type PantahubDevicesJoinToken struct {
-	Id              bson.ObjectId          `json:"id" bson:"_id"`
+	Id              primitive.ObjectID     `json:"id" bson:"_id"`
 	Prn             string                 `json:"prn"`
 	Nick            string                 `json:"nick"`
 	Owner           string                 `json:"owner"`
@@ -86,7 +87,7 @@ func (a *DevicesApp) handle_posttokens(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	req.Id = bson.NewObjectId()
+	req.Id = primitive.NewObjectID()
 	req.Prn = utils.IdGetPrn(req.Id, "devices-tokens")
 
 	if req.Nick == "" {
