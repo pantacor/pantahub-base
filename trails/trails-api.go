@@ -445,6 +445,11 @@ func (a *TrailsApp) handle_gettrailpvrinfo(w rest.ResponseWriter, r *rest.Reques
 		}, findOneOptions).Decode(&step)
 	}
 
+	if err == mongo.ErrNoDocuments {
+		rest.Error(w, "No access to device trail "+trailObjectID.Hex(), http.StatusForbidden)
+		return
+	}
+
 	if err != nil {
 		rest.Error(w, "No access to resource: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -521,6 +526,11 @@ func (a *TrailsApp) handle_getsteppvrinfo(w rest.ResponseWriter, r *rest.Request
 			"_id":     stepId,
 			"garbage": bson.M{"$ne": true},
 		}).Decode(&step)
+	}
+
+	if err == mongo.ErrNoDocuments {
+		rest.Error(w, "No access to device step trail "+stepId, http.StatusForbidden)
+		return
 	}
 
 	if err != nil {
