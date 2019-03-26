@@ -507,7 +507,10 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 	err = collection.FindOne(ctx,
-		bson.M{"_id": deviceObjectID}).
+		bson.M{
+			"_id":     deviceObjectID,
+			"garbage": bson.M{"$ne": true},
+		}).
 		Decode(&device)
 
 	if err != nil {
