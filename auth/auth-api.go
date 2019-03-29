@@ -420,9 +420,14 @@ func (app *AuthApp) handle_postcode(w rest.ResponseWriter, r *rest.Request) {
 
 	code := jwtgo.New(jwtgo.GetSigningMethod(app.jwt_middleware.SigningAlgorithm))
 	code.Claims = mapClaim
+
 	response.Code, err = code.SignedString(app.jwt_middleware.Key)
 	response.Scopes = req.Scopes
-	response.RedirectURI = req.RedirectURI
+
+	params := url.Values{}
+	params.Add("code", response.Code)
+	params.Add("state", req.State)
+	response.RedirectURI = req.RedirectURI + "?" + params.Encode()
 	w.WriteJson(response)
 }
 
@@ -544,7 +549,7 @@ func (app *AuthApp) handle_postauthorizetoken(w rest.ResponseWriter, r *rest.Req
 
 	response := tokenResponse{
 		Token:       tokenString,
-		RedirectURI: req.RedirectURI + "?" + params.Encode(),
+		RedirectURI: req.RedirectURI + "#" + params.Encode(),
 		TokenType:   "bearer",
 		Scopes:      req.Scopes,
 	}
