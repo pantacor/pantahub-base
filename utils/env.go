@@ -1,4 +1,3 @@
-//
 // Copyright 2017,2018  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,7 +14,9 @@
 //
 package utils
 
-import "os"
+import (
+	"os"
+)
 
 const (
 	// Pantahub Product Name (branding)
@@ -169,13 +170,49 @@ const (
 	// default: <none>
 	ENV_REG_EMAIL = "REG_EMAIL"
 
-	// PANTAHUB_S3PATH for backing storage
+	// PANTAHUB_STORAGE_DRIVER used to store objects
+	ENV_PANTAHUB_STORAGE_DRIVER = "PANTAHUB_STORAGE_DRIVER"
+
+	// PANTAHUB_S3_ACCESS_KEY_ID access key of s3 storage credentials
+	ENV_PANTAHUB_S3_ACCESS_KEY_ID = "PANTAHUB_S3_ACCESS_KEY_ID"
+
+	// PANTAHUB_S3_SECRET_ACCESS_KEY secret access key of s3 storage credentials
+	ENV_PANTAHUB_S3_SECRET_ACCESS_KEY = "PANTAHUB_S3_SECRET_ACCESS_KEY"
+
+	// PANTAHUB_S3_USE_ANONYMOUS_CREDENTIALS use anonymous credentials
+	ENV_PANTAHUB_S3_USE_ANONYMOUS_CREDENTIALS = "PANTAHUB_S3_USE_ANONYMOUS_CREDENTIALS"
+
+	// PANTAHUB_S3_REGION region where to store objects
+	ENV_PANTAHUB_S3_REGION = "PANTAHUB_S3_REGION"
+
+	// PANTAHUB_S3_BUCKET bucket where to store objects
+	ENV_PANTAHUB_S3_BUCKET = "PANTAHUB_S3_BUCKET"
+
+	// PANTAHUB_S3_ENDPOINT enpoint of s3 server
+	ENV_PANTAHUB_S3_ENDPOINT = "PANTAHUB_S3_ENDPOINT"
+
+	// PANTAHUB_STORAGE_PATH for backing storage
 	// default: ../local-s3/
+	ENV_PANTAHUB_STORAGE_PATH = "PANTAHUB_STORAGE_PATH"
+
+	// PANTAHUB_S3PATH deprecated, please use ENV_PANTAHUB_STORAGE_PATH instead
 	ENV_PANTAHUB_S3PATH = "PANTAHUB_S3PATH"
 
 	// enable resty client debugging if env is set
 	// default: ""
 	ENV_RESTY_DEBUG = "RESTY_DEBUG"
+
+	// Pantahub GC API end point
+	ENV_PANTAHUB_GC_API = "PANTAHUB_GC_API"
+
+	// Pantahub GC garbage removal flag
+	ENV_PANTAHUB_GC_REMOVE_GARBAGE = "PANTAHUB_GC_REMOVE_GARBAGE"
+
+	// Pantahub GC UnClaimed expiry for device to mark it as garbage
+	ENV_PANTAHUB_GC_UNCLAIMED_EXPIRY = "PANTAHUB_GC_UNCLAIMED_EXPIRY"
+
+	// Pantahub GC garbage expiry time to remove it
+	ENV_PANTAHUB_GC_GARBAGE_EXPIRY = "PANTAHUB_GC_GARBAGE_EXPIRY"
 )
 
 var defaultEnvs = map[string]string{
@@ -239,11 +276,58 @@ var defaultEnvs = map[string]string{
 	ENV_REG_EMAIL: "admin@pantacor.com",
 
 	// pantahub internal envs
-	ENV_PANTAHUB_AUTH:   "https://localhost:12366/auth",
+	ENV_PANTAHUB_AUTH: "http://localhost:12365/auth",
+
+	// storage driver used to store objects
+	ENV_PANTAHUB_STORAGE_DRIVER: "local",
+
+	// access key of s3 storage credentials
+	ENV_PANTAHUB_S3_ACCESS_KEY_ID: "",
+
+	// secret access key of s3 storage credentials
+	ENV_PANTAHUB_S3_SECRET_ACCESS_KEY: "",
+
+	// use anonymous credentials
+	ENV_PANTAHUB_S3_USE_ANONYMOUS_CREDENTIALS: "true",
+
+	// region where to store objects
+	ENV_PANTAHUB_S3_REGION: "us-east-1",
+
+	// bucket where to store objects
+	ENV_PANTAHUB_S3_BUCKET: "pantahub",
+
+	// enpoint of s3 server
+	ENV_PANTAHUB_S3_ENDPOINT: "",
+
+	// object storage path (when using "local" driver)
+	ENV_PANTAHUB_STORAGE_PATH: "/",
+
+	// object storage path (deprecated, please use PANTAHUB_STORAGE_PATH)
 	ENV_PANTAHUB_S3PATH: "../local-s3/",
 
 	// resty REST client configs
 	ENV_RESTY_DEBUG: "",
+
+	// Pantahub GC API end point
+	ENV_PANTAHUB_GC_API: "http://localhost:2000",
+
+	// Pantahub GC garbage removal flag
+	ENV_PANTAHUB_GC_REMOVE_GARBAGE: "false",
+
+	/* Pantahub GC UnClaimed expiry for device to mark it as garbage:
+	   If a device is unclaimed for 5 Days then it will be marked as garbage
+
+	   Format:ISO_8601: https://en.wikipedia.org/wiki/ISO_8601?oldformat=true#Durations
+	*/
+	ENV_PANTAHUB_GC_UNCLAIMED_EXPIRY: "P5D", // => 5 Days
+
+	/* Pantahub GC garbage expiry time to remove it:
+	Once a device/trail/step/object is marked as
+	garbage it will be removed after 2 days
+
+	Format:ISO_8601: https://en.wikipedia.org/wiki/ISO_8601?oldformat=true#Durations
+	*/
+	ENV_PANTAHUB_GC_GARBAGE_EXPIRY: "P2D", // => 2 Days
 }
 
 func GetEnv(key string) string {
@@ -251,5 +335,6 @@ func GetEnv(key string) string {
 	if !f {
 		v = defaultEnvs[key]
 	}
+
 	return v
 }

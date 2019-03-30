@@ -16,55 +16,111 @@
 package utils
 
 import (
+	"context"
 	"log"
+	"time"
 
-	"gopkg.in/mgo.v2"
+	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func GetMongoSession() (*mgo.Session, error) {
-	// XXX: make mongo host configurable through env
-	mongoDb := GetEnv(ENV_MONGO_DB)
-	mongoHost := GetEnv(ENV_MONGO_HOST)
-	mongoPort := GetEnv(ENV_MONGO_PORT)
-	mongoUser := GetEnv(ENV_MONGO_USER)
-	mongoPass := GetEnv(ENV_MONGO_PASS)
+// MongoDb : Holds Mongo Db Name
+var MongoDb string
+
+// GetMongoClient : To Get Mongo Client Object
+func GetMongoClient() (*mongo.Client, error) {
+	MongoDb = GetEnv(ENV_MONGO_DB)
+	user := GetEnv(ENV_MONGO_USER)
+	pass := GetEnv(ENV_MONGO_PASS)
+	host := GetEnv(ENV_MONGO_HOST)
+	port := GetEnv(ENV_MONGO_PORT)
 	mongoRs := GetEnv(ENV_MONGO_RS)
 
-	mongoCreds := ""
-	if mongoUser != "" {
-		mongoCreds = mongoUser + ":" + mongoPass + "@"
+	//Setting Client Options
+	clientOptions := options.Client()
+	mongoConnect := "mongodb://"
+	if user != "" {
+		mongoConnect += user
+		if pass != "" {
+			mongoConnect += ":"
+			mongoConnect += pass
+		}
+		mongoConnect += "@"
+	}
+	mongoConnect += host
+
+	if port != "" {
+		mongoConnect += ":"
+		mongoConnect += port
 	}
 
-	mongoConnect := "mongodb://" + mongoCreds + mongoHost + ":" + mongoPort + "/" + mongoDb
+	mongoConnect += "/"
 
+	if MongoDb != "" {
+		mongoConnect += MongoDb
+	}
+
+	mongoConnect += "?authMechanism=SCRAM-SHA-1"
+
+	clientOptions = clientOptions.ApplyURI(mongoConnect)
 	if mongoRs != "" {
-		mongoConnect = mongoConnect + "?replicaSet=" + mongoRs
+		clientOptions = clientOptions.SetReplicaSet(mongoRs)
 	}
-	log.Println("Will connect to mongo PROD db with: " + mongoConnect)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	return mgo.Dial(mongoConnect)
+	log.Println("Will connect to mongo PROD db with: " + mongoConnect)
+	client, err := mongo.Connect(ctx, clientOptions)
+
+	return client, err
 }
 
-func GetMongoSessionTest() (*mgo.Session, error) {
-	// XXX: make mongo host configurable through env
-	mongoDb := "testdb-" + GetEnv(ENV_MONGO_DB)
-	mongoHost := GetEnv(ENV_MONGO_HOST)
-	mongoPort := GetEnv(ENV_MONGO_PORT)
-	mongoUser := GetEnv(ENV_MONGO_USER)
-	mongoPass := GetEnv(ENV_MONGO_PASS)
+// GetMongoClient : To Get Mongo Client Object
+func GetMongoClientTest() (*mongo.Client, error) {
+	MongoDb = GetEnv(ENV_MONGO_DB)
+	MongoDb = "testdb-" + MongoDb
+	user := GetEnv(ENV_MONGO_USER)
+	pass := GetEnv(ENV_MONGO_PASS)
+	host := GetEnv(ENV_MONGO_HOST)
+	port := GetEnv(ENV_MONGO_PORT)
 	mongoRs := GetEnv(ENV_MONGO_RS)
 
-	mongoCreds := ""
-	if mongoUser != "" {
-		mongoCreds = mongoUser + ":" + mongoPass + "@"
+	//Setting Client Options
+	clientOptions := options.Client()
+	mongoConnect := "mongodb://"
+	if user != "" {
+		mongoConnect += user
+		if pass != "" {
+			mongoConnect += ":"
+			mongoConnect += pass
+		}
+		mongoConnect += "@"
+	}
+	mongoConnect += host
+
+	if port != "" {
+		mongoConnect += ":"
+		mongoConnect += port
 	}
 
-	mongoConnect := "mongodb://" + mongoCreds + mongoHost + ":" + mongoPort + "/" + mongoDb
+	mongoConnect += "/"
 
+	if MongoDb != "" {
+		mongoConnect += MongoDb
+	}
+
+	mongoConnect += "?authMechanism=SCRAM-SHA-1"
+
+	clientOptions = clientOptions.ApplyURI(mongoConnect)
 	if mongoRs != "" {
-		mongoConnect = mongoConnect + "?replicaSet=" + mongoRs
+		clientOptions = clientOptions.SetReplicaSet(mongoRs)
 	}
-	log.Println("Will connect to mongo TEST db with: " + mongoConnect)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	return mgo.Dial(mongoConnect)
+	log.Println("Will connect to mongo PROD db with: " + mongoConnect)
+	client, err := mongo.Connect(ctx, clientOptions)
+
+	return client, err
 }

@@ -21,7 +21,17 @@ $ go get -v u gitlab.com/pantacor/pantahub-base
 $ go build -o ~/bin/pantahub-base gitlab.com/pantacor/pantahub-base
 ...
 ``` 
+# Test
 
+* Note:Make Sure testharness project is accessible
+
+```
+$ git clone -b develop https://gitlab.com/pantacor/pantahub-testharness
+...
+
+```
+$ go test -v ./tests/...
+...
 
 # Run
 
@@ -166,6 +176,27 @@ docker run -it --rm \
 
 Want to build your own docker images? Check out https://gitlab.com/pantacor/pantahub-containers/
 and the readmes there
+
+# Docker Compose
+
+Get start with `docker-compose`:
+
+```bash
+$ docker-compose up -d
+```
+
+Create the test local s3 bucket
+
+```bash
+$ ./locals3.bash mb s3://testing/
+make_bucket: testing
+```
+
+Run all tests
+
+```bash
+$ docker-compose exec base go test ./...
+```
 
 # Kubernetes
 

@@ -30,14 +30,14 @@ func setupMongo(t *testing.T) error {
 
 	var err error
 
-	mgoSession, err := utils.GetMongoSession()
+	mongoClient, err := utils.GetMongoClientTest()
 
 	if err != nil {
-		log.Println("error initiating mgoSession " + err.Error())
+		log.Println("error initiating mongoClient " + err.Error())
 		os.Exit(1)
 	}
 
-	mgoTestLogger, err = newMgoLogger(mgoSession)
+	mgoTestLogger, err = newMgoLogger(mongoClient)
 
 	if err != nil {
 		log.Println("error initiating mgoTestLogger " + err.Error())
@@ -97,7 +97,7 @@ func testMongoGetLogs(t *testing.T) {
 
 	filter := &LogsEntry{}
 	sort := LogsSort{}
-	pager, err := mgoTestLogger.getLogs(0, -1, nil, filter, sort)
+	pager, err := mgoTestLogger.getLogs(0, -1, nil, false, filter, sort, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
@@ -131,7 +131,7 @@ func testMongoDoGetLogs(t *testing.T) {
 
 	filter := &LogsEntry{}
 	sort := LogsSort{}
-	pager, err := mgoTestLogger.getLogs(0, 3, nil, filter, sort)
+	pager, err := mgoTestLogger.getLogs(0, 3, nil, false, filter, sort, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
@@ -141,7 +141,7 @@ func testMongoDoGetLogs(t *testing.T) {
 		t.Fail()
 	}
 
-	pager, err = mgoTestLogger.getLogs(1, 3, nil, filter, sort)
+	pager, err = mgoTestLogger.getLogs(1, 3, nil, false, filter, sort, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
@@ -151,7 +151,7 @@ func testMongoDoGetLogs(t *testing.T) {
 		t.Fail()
 	}
 
-	pager, err = mgoTestLogger.getLogs(1, 1, nil, filter, sort)
+	pager, err = mgoTestLogger.getLogs(1, 1, nil, false, filter, sort, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
@@ -183,7 +183,7 @@ func testMongoDoGetLogsAfter(t *testing.T) {
 
 	filter := &LogsEntry{}
 	sort := LogsSort{}
-	pager, err := mgoTestLogger.getLogs(0, 3, &timeBase, filter, sort)
+	pager, err := mgoTestLogger.getLogs(0, 3, &timeBase, false, filter, sort, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
@@ -193,7 +193,7 @@ func testMongoDoGetLogsAfter(t *testing.T) {
 		t.Fail()
 	}
 
-	pager, err = mgoTestLogger.getLogs(1, 3, &timeBase, filter, sort)
+	pager, err = mgoTestLogger.getLogs(1, 3, &timeBase, false, filter, sort, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())

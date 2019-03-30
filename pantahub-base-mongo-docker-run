@@ -1,0 +1,11 @@
+#!/bin/sh
+
+set -x
+
+mongod --bind_ip_all --port 27017 &
+
+until mongo --eval 'db.createUser({user: "user", pwd: "pass", roles: [{role: "readWrite", db:"testdb-pantabase-serv"}], mechanisms: ["SCRAM-SHA-1"]})' localhost:27017/testdb-pantabase-serv; do
+    sleep 1
+done
+
+tail -f /proc/$(pidof mongod)/fd/1

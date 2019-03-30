@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"gopkg.in/mgo.v2/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type Prn string
@@ -40,10 +40,10 @@ type PrnInfo struct {
 // XXX: make this a nice prn helper tool
 func PrnGetId(prn string) string {
 	idx := strings.Index(prn, "/")
-	return prn[idx+1 : len(prn)]
+	return prn[idx+1:]
 }
 
-func IdGetPrn(id bson.ObjectId, serviceName string) string {
+func IdGetPrn(id primitive.ObjectID, serviceName string) string {
 	return "prn:::" + serviceName + ":/" + id.Hex()
 }
 

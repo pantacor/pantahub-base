@@ -1,5 +1,5 @@
 //
-// Copyright 2017-2018  Pantacor Ltd.
+// Copyright 2017-2019  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,16 +22,17 @@ import (
 	"os"
 	"path"
 	"time"
+	"context"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"gitlab.com/pantacor/pantahub-base/utils"
-	"gopkg.in/mgo.v2"
+	"go.mongodb.org/mongo-driver/mongo"
 	"gopkg.in/mgo.v2/bson"
 )
 
 type HealthzApp struct {
-	Api        *rest.Api
-	mgoSession *mgo.Session
+	Api         *rest.Api
+	mongoClient *mongo.Client
 }
 
 type Response struct {
@@ -54,16 +55,17 @@ func (a *HealthzApp) handle_healthz(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	// check DB
-	collection := a.mgoSession.DB("").C("pantahub_devices")
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
-	var val interface{}
-	err := collection.Find(bson.M{}).One(val)
+	val := map[string]interface{}{}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err := collection.FindOne(ctx, bson.M{}).Decode(&val)
 	if err != nil {
-		log.Println("ERROR: with database query: " + err.Error())
-		rest.Error(w, "Error with Database query", http.StatusInternalServerError)
+		rest.Error(w, "Error with Database query:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	// check storage
@@ -83,10 +85,10 @@ func (a *HealthzApp) handle_healthz(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(response)
 }
 
-func New(session *mgo.Session) *HealthzApp {
+func New(mongoClient *mongo.Client) *HealthzApp {
 
 	app := new(HealthzApp)
-	app.mgoSession = session
+	app.mongoClient = mongoClient
 
 	app.Api = rest.NewApi()
 	// we dont use default stack because we dont want content type enforcement

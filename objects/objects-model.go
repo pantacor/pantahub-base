@@ -1,7 +1,11 @@
 package objects
 
 import (
-	"gopkg.in/mgo.v2"
+	"context"
+	"time"
+
+	"gitlab.com/pantacor/pantahub-base/utils"
+	"go.mongodb.org/mongo-driver/mongo"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -30,42 +34,75 @@ type DiskQuotaUsageResult struct {
 	Total float64 `json:"total"`
 }
 
-func CalcUsageAfterPost(owner string, mgoSession *mgo.Session,
-	objectId bson.ObjectId, newSize int64) (*DiskQuotaUsageResult, error) {
+func CalcUsageAfterPost(owner string, mongoClient *mongo.Client,
+	objectId string, newSize int64) (*DiskQuotaUsageResult, error) {
 
-	oCol := mgoSession.DB("").C("pantahub_objects")
+	oCol := mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 	resp := DiskQuotaUsageResult{}
-	err := oCol.Pipe([]bson.M{{"$match": bson.M{"owner": owner}},
-		{"$group": bson.M{"_id": "$owner", "total": bson.M{"$sum": "$sizeint"}}}}).One(&resp)
-
-	if err != nil {
-		// we bail if we receive any error, but ErrNotFound which happens if user
-		// does not own any objects yet
-		if err != mgo.ErrNotFound {
-			return nil, err
-		}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	pipeline := []bson.M{
+		bson.M{"$match": bson.M{"owner": owner}},
+		bson.M{
+			"$group": bson.M{
+				"_id":   "$owner",
+				"total": bson.M{"$sum": "$sizeint"},
+			},
+		},
 	}
-
-	resp.Total = resp.Total + float64(newSize)
-
-	return &resp, nil
-}
-
-func CalcUsageAfterPut(owner string, mgoSession *mgo.Session,
-	objectId bson.ObjectId, newSize int64) (*DiskQuotaUsageResult, error) {
-
-	oCol := mgoSession.DB("").C("pantahub_objects")
-	resp := DiskQuotaUsageResult{}
-	// match all objects, but leave out the one we replace
-	err := oCol.Pipe([]bson.M{{"$match": bson.M{"owner": owner, "_id": bson.M{"$ne": objectId}}},
-		{"$group": bson.M{"_id": "$owner", "total": bson.M{"$sum": "$sizeint"}}}}).One(&resp)
-
+	cur, err := oCol.Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, err
 	}
+	defer cur.Close(ctx)
+	for cur.Next(ctx) {
+		result := DiskQuotaUsageResult{}
+		err := cur.Decode(&result)
+		if err != nil {
+			return nil, err
+		}
+		result.Total += float64(newSize)
+		resp = result
+		break
+	}
+	return &resp, nil
+}
 
-	resp.Total = resp.Total + float64(newSize)
+func CalcUsageAfterPut(owner string, mongoClient *mongo.Client,
+	objectId string, newSize int64) (*DiskQuotaUsageResult, error) {
 
+	oCol := mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
+	resp := DiskQuotaUsageResult{}
+	// match all objects, but leave out the one we replace
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	pipeline := []bson.M{
+		bson.M{"$match": bson.M{
+			"owner": owner,
+			"_id":   bson.M{"$ne": objectId},
+		}},
+		bson.M{
+			"$group": bson.M{
+				"_id":   "$owner",
+				"total": bson.M{"$sum": "$sizeint"},
+			},
+		},
+	}
+	cur, err := oCol.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+	for cur.Next(ctx) {
+		result := DiskQuotaUsageResult{}
+		err := cur.Decode(&result)
+		if err != nil {
+			return nil, err
+		}
+		result.Total += float64(newSize)
+		resp = result
+		break
+	}
 	return &resp, nil
 }
 

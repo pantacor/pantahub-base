@@ -103,6 +103,7 @@ type PantahubDevice struct {
 	Nick             string    `json:"device-nick"`
 	Revision         int       `json:"revision"`
 	ProgressRevision int       `json:"progress-revision"`
+	RealIP           string    `json:"real-ip"`
 	Timestamp        time.Time `json:"timestamp"`
 	StateSha         string    `json:"state-sha"`
 	Status           string    `json:"status"`

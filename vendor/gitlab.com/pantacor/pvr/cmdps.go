@@ -55,7 +55,7 @@ func CommandPs() cli.Command {
 			table.SetBorder(false)
 			table.SetHeaderLine(false)
 			table.SetColumnSeparator(" ")
-			table.SetHeader([]string{"id", "nick", "rev", "status", "state", "seen", "message"})
+			table.SetHeader([]string{"id", "nick", "rev", "status", "state", "seen", "ip", "message"})
 
 			for _, v := range devices {
 				table.Append([]string{
@@ -65,6 +65,7 @@ func CommandPs() cli.Command {
 					v.Status,
 					v.StateSha[:min(len(v.StateSha), 8)],
 					timeago.FromTime(v.Timestamp),
+					v.RealIP,
 					v.StatusMsg})
 			}
 

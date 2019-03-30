@@ -21,14 +21,27 @@ import (
 	"strings"
 )
 
+func PantahubS3Path() string {
+	if GetEnv(ENV_PANTAHUB_STORAGE_DRIVER) == "s3" {
+		return GetEnv(ENV_PANTAHUB_STORAGE_PATH)
+	}
+
+	basePath := path.Join(GetEnv(ENV_PANTAHUB_S3PATH), GetEnv(ENV_PANTAHUB_STORAGE_PATH))
+
+	if basePath == "" {
+		basePath = "."
+	}
+
+	return basePath
+}
+
 func MakeLocalS3PathForName(name string) (string, error) {
 	if filepath.Separator != '/' && strings.ContainsRune(name, filepath.Separator) ||
 		strings.Contains(name, "\x00") {
 		return "", errors.New("http: invalid character in file path")
 	}
-	dir := GetEnv(ENV_PANTAHUB_S3PATH)
-	if dir == "" {
-		dir = "."
-	}
-	return filepath.Join(dir, filepath.FromSlash(path.Clean("/"+name))), nil
+
+	basePath := PantahubS3Path()
+
+	return filepath.Join(basePath, filepath.FromSlash(path.Clean(name))), nil
 }
