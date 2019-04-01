@@ -673,9 +673,9 @@ func (app *AuthApp) handle_posttoken(writer rest.ResponseWriter, r *rest.Request
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	cancel()
+	defer cancel()
 	_, err = collection.InsertOne(ctx, &tokenStore)
-	if collection == nil || err != nil {
+	if err != nil {
 		rest.Error(writer, "Error storing issued token in DB", http.StatusInternalServerError)
 		return
 	}
