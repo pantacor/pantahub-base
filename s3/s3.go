@@ -8,6 +8,7 @@ import (
 )
 
 type S3 interface {
+	Exists(key string) bool
 	Delete(key string) error
 	Rename(oldKey, newKey string) error
 	UploadURL(key string) (string, error)
@@ -43,6 +44,20 @@ func (s *s3impl) Rename(oldKey, newKey string) error {
 
 	s.Delete(oldKey)
 	return nil
+}
+
+func (s *s3impl) Exists(key string) bool {
+	listInput := &s3.ListObjectsInput{
+		Bucket: aws.String(s.connectionParams.Bucket),
+		Prefix: aws.String(key),
+	}
+
+	out, err := s.session.ListObjects(listInput)
+	if err != nil {
+		return false
+	}
+
+	return len(out.Contents) > 0
 }
 
 func NewS3(params S3ConnectionParameters) S3 {

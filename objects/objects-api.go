@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"time"
 
+	"gitlab.com/pantacor/pantahub-base/storagedriver"
 	"gitlab.com/pantacor/pantahub-base/subscriptions"
 
 	jwtgo "github.com/dgrijalva/jwt-go"
@@ -194,9 +195,8 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 			return
 		}
 
-		_, err = os.Stat(filePath)
-
-		if err == nil {
+		sd := storagedriver.FromEnv()
+		if sd.Exists(filePath) {
 			w.WriteHeader(http.StatusConflict)
 			w.Header().Add("X-PH-Error", "Cannot insert existing object into database")
 			goto conflict
