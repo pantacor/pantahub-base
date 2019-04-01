@@ -77,8 +77,14 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		s3resp, err := http.Get(downloadURL)
 		if err != nil {
-			log.Printf("ERROR: requesting download file, %v", err)
+			log.Printf("ERROR: requesting download file, %v\n", err)
 			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		if s3resp.StatusCode != http.StatusOK {
+			log.Printf("ERROR: unexpected response from s3 server, status code %v\n", s3resp.StatusCode)
+			w.WriteHeader(s3resp.StatusCode)
 			return
 		}
 
