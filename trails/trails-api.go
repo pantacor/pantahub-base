@@ -59,6 +59,7 @@ import (
 	jwtgo "github.com/dgrijalva/jwt-go"
 	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/objects"
+	"gitlab.com/pantacor/pantahub-base/storagedriver"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	pvrapi "gitlab.com/pantacor/pvr/api"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -1210,11 +1211,41 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 	)
 
 	if err != nil {
-		w.WriteHeader(http.StatusConflict)
-		w.Header().Add("X-PH-Error", "Error inserting object into database "+err.Error())
+		filePath, err := utils.MakeLocalS3PathForName(storageId)
+
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Header().Add("X-PH-Error", "Error Finding Path for Name"+err.Error())
+			return
+		}
+
+		sd := storagedriver.FromEnv()
+		if sd.Exists(filePath) {
+			w.WriteHeader(http.StatusConflict)
+			w.Header().Add("X-PH-Error", "Cannot insert existing object into database")
+			goto conflict
+		}
+
+		ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		updatedResult, err := collection.UpdateOne(
+			ctx,
+			bson.M{"_id": newObject.StorageId},
+			bson.M{"$set": newObject},
+		)
+		if updatedResult.MatchedCount == 0 {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Header().Add("X-PH-Error", "Error updating previously failed object in database ")
+			return
+		}
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Header().Add("X-PH-Error", "Error updating previously failed object in database "+err.Error())
+			return
+		}
 		// we return anyway with the already available info about this object
 	}
-
+conflict:
 	issuerUrl := utils.GetApiEndpoint("/trails")
 	newObjectWithAccess := objects.MakeObjAccessible(issuerUrl, newObject.Owner, newObject, storageId)
 	w.WriteJson(newObjectWithAccess)
