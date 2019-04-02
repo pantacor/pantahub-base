@@ -476,8 +476,10 @@ func (app *AuthApp) handle_postauthorizetoken(w rest.ResponseWriter, r *rest.Req
 		return
 	}
 
-	if req.Scopes != "*" {
-		rest.Error(w, "implicit access token requested with invalid scope. During alpha, scopes '*' (all rights) is only valid scope", http.StatusBadRequest)
+	if req.Scopes != "*" &&
+		!strings.HasPrefix(req.Scopes, "prn:pantahub.com:apis:/base/") &&
+		!strings.HasPrefix(req.Scopes, "prn:pantahub.com:apis:/fleet/") {
+		rest.Error(w, "implicit access token requested with invalid scope. During alpha, scopes '*' (all rights) or 'prn:pantahub.com:apis:/base/*' (all rights on base) or 'prn:pantahub.com:apis:/fleet/* (all rights on fleet) are only valid scopes", http.StatusBadRequest)
 		return
 	}
 
