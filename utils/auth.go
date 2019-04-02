@@ -17,6 +17,7 @@ package utils
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
@@ -31,6 +32,7 @@ type AuthInfo struct {
 	Owner      Prn
 	Roles      string
 	Audience   string
+	Scopes     string
 	Nick       string
 	RemoteUser string
 }
@@ -99,7 +101,13 @@ func (s *AuthMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFu
 		scopes, ok := callerClaims["scopes"]
 		if ok {
 			scopesStr := scopes.(string)
-			authInfo.Audience = scopesStr
+			authInfo.Scopes = scopesStr
+
+			if authInfo.Scopes != "*" &&
+				strings.HasPrefix(authInfo.Scopes, "prn:pantahub.com:apis:/base/") {
+				rest.Error(w, "You need to have oauth2 scopes '*' or any 'prn:pantahub.com:apis:/base/*' to access this endpoint, not: "+authInfo.Scopes, http.StatusForbidden)
+				return
+			}
 		}
 		nick, ok := callerClaims["nick"]
 		if ok {
