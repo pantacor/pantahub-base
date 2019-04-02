@@ -365,6 +365,15 @@ type codeResponse struct {
 	RedirectURI string `json:"redirect_uri,omitempty"`
 }
 
+func containsStringWithPrefix(slice []string, prefix string) bool {
+	for _, v := range slice {
+		if strings.HasPrefix(prefix, v) {
+			return true
+		}
+	}
+	return false
+}
+
 func (app *AuthApp) handle_postcode(w rest.ResponseWriter, r *rest.Request) {
 	var err error
 
@@ -407,7 +416,7 @@ func (app *AuthApp) handle_postcode(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestError(w, err, "error access code creation failed to look up service", http.StatusInternalServerError)
 		return
 	}
-	if serviceAccount.Oauth2RedirectURL != "" && !strings.HasPrefix(req.RedirectURI, serviceAccount.Oauth2RedirectURL) {
+	if serviceAccount.Oauth2RedirectURIs != nil && !containsStringWithPrefix(serviceAccount.Oauth2RedirectURIs, req.RedirectURI) {
 		rest.Error(w, "error implicit access token failed; redirect URL does not match registered service", http.StatusBadRequest)
 		return
 	}
@@ -495,7 +504,7 @@ func (app *AuthApp) handle_postauthorizetoken(w rest.ResponseWriter, r *rest.Req
 		return
 	}
 
-	if serviceAccount.Oauth2RedirectURL != "" && !strings.HasPrefix(req.RedirectURI, serviceAccount.Oauth2RedirectURL) {
+	if serviceAccount.Oauth2RedirectURIs != nil && !containsStringWithPrefix(serviceAccount.Oauth2RedirectURIs, req.RedirectURI) {
 		rest.Error(w, "error implicit access token failed; redirect URL does not match registered service", http.StatusBadRequest)
 		return
 	}
