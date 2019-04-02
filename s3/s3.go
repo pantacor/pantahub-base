@@ -47,6 +47,14 @@ func (s *s3impl) Rename(oldKey, newKey string) error {
 }
 
 func (s *s3impl) Exists(key string) bool {
+	if key == "" {
+		return false
+	}
+
+	if string(key[0]) == `/` {
+		key = key[1:]
+	}
+
 	listInput := &s3.ListObjectsInput{
 		Bucket: aws.String(s.connectionParams.Bucket),
 		Prefix: aws.String(key),
