@@ -19,12 +19,12 @@ import (
 	"strconv"
 	"testing"
 
-	"gitlab.com/pantacor/pantahub-gc/db"
 	"gitlab.com/pantacor/pantahub-testharness/helpers"
 )
 
 // TestChangeDeviceSecret : Test Change Device Secret
 func TestChangeDeviceSecret(t *testing.T) {
+	connectToDb(t)
 	setUpChangeDeviceSecret(t)
 	log.Print("Test:Change Device Secret")
 	t.Run("of valid device", testChangeSecretOfValidDevice)
@@ -116,11 +116,9 @@ func testChangeSecretToEmpty(t *testing.T) {
 	}
 }
 func setUpChangeDeviceSecret(t *testing.T) bool {
-	db.Connect()
-	helpers.ClearOldData(t)
+	helpers.ClearOldData(t, MongoDb)
 	return true
 }
 func tearDownChangeDeviceSecret(t *testing.T) bool {
-	helpers.ClearOldData(t)
 	return true
 }

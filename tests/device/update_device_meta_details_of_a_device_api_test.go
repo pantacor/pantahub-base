@@ -19,12 +19,12 @@ import (
 	"strconv"
 	"testing"
 
-	"gitlab.com/pantacor/pantahub-gc/db"
 	"gitlab.com/pantacor/pantahub-testharness/helpers"
 )
 
 // TestUpdateDeviceMetaDetails : Test Update Device Meta Details Of A Device
 func TestUpdateDeviceMetaDetails(t *testing.T) {
+	connectToDb(t)
 	setUpUpdateDeviceMetaDetails(t)
 	log.Print("Test:Update Device Meta Details")
 	t.Run("of valid device", testUpdateDeviceMetaDetailsOfValidDevice)
@@ -129,11 +129,9 @@ func testUpdateDeviceMetaDetailsOfInvalidDevice(t *testing.T) {
 	}
 }
 func setUpUpdateDeviceMetaDetails(t *testing.T) bool {
-	db.Connect()
-	helpers.ClearOldData(t)
+	helpers.ClearOldData(t, MongoDb)
 	return true
 }
 func tearDownUpdateDeviceMetaDetails(t *testing.T) bool {
-	helpers.ClearOldData(t)
 	return true
 }

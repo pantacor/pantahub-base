@@ -19,12 +19,12 @@ import (
 	"strconv"
 	"testing"
 
-	"gitlab.com/pantacor/pantahub-gc/db"
 	"gitlab.com/pantacor/pantahub-testharness/helpers"
 )
 
 // TestUpdateStepProgress : Test Update Step Progress
 func TestUpdateStepProgress(t *testing.T) {
+	connectToDb(t)
 	setUpUpdateStepProgress(t)
 	log.Print("Test:Update Step Progress")
 	t.Run("of a valid step", testUpdateStepProgress)
@@ -102,11 +102,9 @@ func testUpdateStepProgress(t *testing.T) {
 
 }
 func setUpUpdateStepProgress(t *testing.T) bool {
-	db.Connect()
-	helpers.ClearOldData(t)
+	helpers.ClearOldData(t, MongoDb)
 	return true
 }
 func tearDownUpdateStepProgress(t *testing.T) bool {
-	helpers.ClearOldData(t)
 	return true
 }

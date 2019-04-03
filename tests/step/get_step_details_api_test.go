@@ -19,12 +19,12 @@ import (
 	"strconv"
 	"testing"
 
-	"gitlab.com/pantacor/pantahub-gc/db"
 	"gitlab.com/pantacor/pantahub-testharness/helpers"
 )
 
 // TestGetStepDetails : Test Get Step Details
 func TestGetStepDetails(t *testing.T) {
+	connectToDb(t)
 	setUpCreateStep(t)
 	log.Print("Test:Get Step Details")
 	t.Run("of a valid step", testStepDetails)
@@ -90,11 +90,9 @@ func testStepDetails(t *testing.T) {
 
 }
 func setUpStepDetails(t *testing.T) bool {
-	db.Connect()
-	helpers.ClearOldData(t)
+	helpers.ClearOldData(t, MongoDb)
 	return true
 }
 func tearDownStepDetails(t *testing.T) bool {
-	helpers.ClearOldData(t)
 	return true
 }

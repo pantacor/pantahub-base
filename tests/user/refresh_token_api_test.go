@@ -20,12 +20,12 @@ import (
 	"strconv"
 	"testing"
 
-	"gitlab.com/pantacor/pantahub-gc/db"
 	"gitlab.com/pantacor/pantahub-testharness/helpers"
 )
 
 // TestRefreshToken : Test Refresh Token
 func TestRefreshToken(t *testing.T) {
+	connectToDb(t)
 	setUpRefreshToken(t)
 	log.Print("Test:Refresh Token")
 	t.Run("With valid token", testValidToken)
@@ -47,8 +47,8 @@ func testValidToken(t *testing.T) {
 		t.Errorf("Error Registering User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
 		t.Error(res)
 	}
-	account := helpers.GetUser(t, "test@gmail.com")
-	_, res = helpers.VerifyUserAccount(t, account)
+	account := helpers.GetUser(t, "test@gmail.com", MongoDb)
+	_, res = helpers.VerifyUserAccount(t, account.Id.Hex(), account.Challenge)
 	if res.StatusCode() != 200 {
 		t.Errorf("Error Verifying User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
 		t.Error(res)
@@ -105,11 +105,9 @@ func testInvalidToken(t *testing.T) {
 
 }
 func setUpRefreshToken(t *testing.T) bool {
-	db.Connect()
-	helpers.ClearOldData(t)
+	helpers.ClearOldData(t, MongoDb)
 	return true
 }
 func tearDownRefreshToken(t *testing.T) bool {
-	helpers.ClearOldData(t)
 	return true
 }

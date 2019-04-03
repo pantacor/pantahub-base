@@ -19,12 +19,12 @@ import (
 	"strconv"
 	"testing"
 
-	"gitlab.com/pantacor/pantahub-gc/db"
 	"gitlab.com/pantacor/pantahub-testharness/helpers"
 )
 
 // TestListObjects : Test List Objects Of A User
 func TestListObjects(t *testing.T) {
+	connectToDb(t)
 	setUpListObjects(t)
 	log.Print("Test:List Objects")
 	t.Run("of a user", testListObjectsOfUser)
@@ -104,11 +104,9 @@ func testListObjectsOfUser(t *testing.T) {
 
 }
 func setUpListObjects(t *testing.T) bool {
-	db.Connect()
-	helpers.ClearOldData(t)
+	helpers.ClearOldData(t, MongoDb)
 	return true
 }
 func tearDownListObjects(t *testing.T) bool {
-	helpers.ClearOldData(t)
 	return true
 }

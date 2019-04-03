@@ -20,13 +20,13 @@ import (
 	"testing"
 
 	"gitlab.com/pantacor/pantahub-base/accounts"
-	"gitlab.com/pantacor/pantahub-gc/db"
 	"gitlab.com/pantacor/pantahub-testharness/helpers"
-	"gopkg.in/mgo.v2/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // TestVerifyUserAccount : Test Verify User Account
 func TestVerifyUserAccount(t *testing.T) {
+	connectToDb(t)
 	setUpVerifyUserAccount(t)
 	log.Print("Test:Verify User Account")
 	t.Run("With valid account", testValidAccount)
@@ -48,8 +48,8 @@ func testValidAccount(t *testing.T) {
 		t.Errorf("Error Registering User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
 		t.Error(res)
 	}
-	account := helpers.GetUser(t, "test@gmail.com")
-	result, res := helpers.VerifyUserAccount(t, account)
+	account := helpers.GetUser(t, "test@gmail.com", MongoDb)
+	result, res := helpers.VerifyUserAccount(t, account.Id.Hex(), account.Challenge)
 	if res.StatusCode() != 200 {
 		t.Errorf("Expected Response code:200 OK but got:" + strconv.Itoa(res.StatusCode()))
 	}
@@ -71,7 +71,7 @@ func testValidAccount(t *testing.T) {
 	}
 	//Trying to verify again
 	log.Print(" Case 2:Verying account which is already verified")
-	result, res = helpers.VerifyUserAccount(t, account)
+	result, res = helpers.VerifyUserAccount(t, account.Id.Hex(), account.Challenge)
 	if res.StatusCode() != 412 {
 		t.Errorf("Expected Response code:412 Precondition failed, but got:" + strconv.Itoa(res.StatusCode()))
 	}
@@ -98,9 +98,10 @@ func testInvalidAccount(t *testing.T) {
 	account := accounts.Account{}
 	//Setting Invalid Challenge string and object id
 	account.Challenge = "InvalidChallenge"
-	account.Id = bson.ObjectIdHex("5c4da57680123b2d60b28060")
+	ObjectID, _ := primitive.ObjectIDFromHex("5c4da57680123b2d60b28060")
+	account.Id = ObjectID
 
-	result, res := helpers.VerifyUserAccount(t, account)
+	result, res := helpers.VerifyUserAccount(t, account.Id.Hex(), account.Challenge)
 
 	if res.StatusCode() != 403 {
 		t.Errorf("Expected Response code 403:Forbidden failed but got:" + strconv.Itoa(res.StatusCode()))
@@ -121,11 +122,9 @@ func testInvalidAccount(t *testing.T) {
 	}
 }
 func setUpVerifyUserAccount(t *testing.T) bool {
-	db.Connect()
-	helpers.ClearOldData(t)
+	helpers.ClearOldData(t, MongoDb)
 	return true
 }
 func tearDownVerifyUserAccount(t *testing.T) bool {
-	helpers.ClearOldData(t)
 	return true
 }

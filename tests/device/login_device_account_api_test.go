@@ -20,12 +20,12 @@ import (
 	"strconv"
 	"testing"
 
-	"gitlab.com/pantacor/pantahub-gc/db"
 	"gitlab.com/pantacor/pantahub-testharness/helpers"
 )
 
 // TestLoginDeviceAccount : Test Logn Device Accountcd
 func TestLoginDeviceAccount(t *testing.T) {
+	connectToDb(t)
 	setUpLoginDeviceAccount(t)
 	log.Print("Test:Login User Account")
 	t.Run("With valid device account credentials", testLoginValidDeviceAccount)
@@ -47,8 +47,8 @@ func testLoginValidDeviceAccount(t *testing.T) {
 		t.Errorf("Error Register User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
 		t.Error(res)
 	}
-	account := helpers.GetUser(t, "test@gmail.com")
-	_, res = helpers.VerifyUserAccount(t, account)
+	account := helpers.GetUser(t, "test@gmail.com", MongoDb)
+	_, res = helpers.VerifyUserAccount(t, account.Id.Hex(), account.Challenge)
 	if res.StatusCode() != 200 {
 		t.Errorf("Error Verifying User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
 		t.Error(res)
@@ -130,11 +130,9 @@ func testLoginInvalidDeviceAccount(t *testing.T) {
 	}
 }
 func setUpLoginDeviceAccount(t *testing.T) bool {
-	db.Connect()
-	helpers.ClearOldData(t)
+	helpers.ClearOldData(t, MongoDb)
 	return true
 }
 func tearDownLoginDeviceAccount(t *testing.T) bool {
-	helpers.ClearOldData(t)
 	return true
 }
