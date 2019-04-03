@@ -18,11 +18,10 @@ package healthz
 import (
 	"net/http"
 
+	"context"
 	"log"
 	"os"
-	"path"
 	"time"
-	"context"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"gitlab.com/pantacor/pantahub-base/utils"
@@ -66,16 +65,6 @@ func (a *HealthzApp) handle_healthz(w rest.ResponseWriter, r *rest.Request) {
 	err := collection.FindOne(ctx, bson.M{}).Decode(&val)
 	if err != nil {
 		rest.Error(w, "Error with Database query:"+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	// check storage
-	s3Path := utils.GetEnv(utils.ENV_PANTAHUB_S3PATH)
-
-	_, err = os.Stat(path.Join(s3Path, "HEALTHZ.txt"))
-
-	if err != nil {
-		log.Println("ERROR: getting stats of HEALTHZ.txt on local-s3 storage: " + err.Error())
-		rest.Error(w, "Error getting stats of HEALTHZ.txt on local-s3 storage", http.StatusInternalServerError)
 		return
 	}
 
