@@ -560,7 +560,7 @@ func (app *AuthApp) handle_postauthorizetoken(w rest.ResponseWriter, r *rest.Req
 
 	response := tokenResponse{
 		Token:       tokenString,
-		RedirectURI: req.RedirectURI + "?" + params.Encode(),
+		RedirectURI: req.RedirectURI + "#" + params.Encode(),
 		TokenType:   "bearer",
 		Scopes:      req.Scopes,
 	}
