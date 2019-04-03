@@ -19,12 +19,12 @@ import (
 	"strconv"
 	"testing"
 
-	"gitlab.com/pantacor/pantahub-gc/db"
 	"gitlab.com/pantacor/pantahub-testharness/helpers"
 )
 
 // TestMakeDeviceNonPublic : Test Make Device Non Public
 func TestMakeDeviceNonPublic(t *testing.T) {
+	connectToDb(t)
 	setUpMakeDeviceNonPublic(t)
 	log.Print("Test:Make Device Non Public")
 	t.Run("of valid device", testMakeValidDeviceNonPublic)
@@ -98,11 +98,9 @@ func testMakeInvalidDeviceNonPublic(t *testing.T) {
 	}
 }
 func setUpMakeDeviceNonPublic(t *testing.T) bool {
-	db.Connect()
-	helpers.ClearOldData(t)
+	helpers.ClearOldData(t, MongoDb)
 	return true
 }
 func tearDownMakeDeviceNonPublic(t *testing.T) bool {
-	helpers.ClearOldData(t)
 	return true
 }

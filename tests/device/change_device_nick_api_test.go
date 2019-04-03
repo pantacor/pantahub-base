@@ -19,12 +19,24 @@ import (
 	"strconv"
 	"testing"
 
-	"gitlab.com/pantacor/pantahub-gc/db"
+	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-testharness/helpers"
+	"go.mongodb.org/mongo-driver/mongo"
 )
+
+var MongoDb *mongo.Database
+
+func connectToDb(t *testing.T) {
+	MongoClient, err := utils.GetMongoClient()
+	if err != nil {
+		t.Errorf("Error Connecting to Db:" + err.Error())
+	}
+	MongoDb = MongoClient.Database(utils.MongoDb)
+}
 
 // ChangeDeviceNick : Change Device Nick
 func TestChangeDeviceNick(t *testing.T) {
+	connectToDb(t)
 	setUpChangeDeviceNick(t)
 	log.Print("Test:Change Device Nick")
 	t.Run("of valid device", testChangeDeviceNickOfValidDevice)
@@ -109,11 +121,9 @@ func testChangeDeviceNickOfInvalidDevice(t *testing.T) {
 	}
 }
 func setUpChangeDeviceNick(t *testing.T) bool {
-	db.Connect()
-	helpers.ClearOldData(t)
+	helpers.ClearOldData(t, MongoDb)
 	return true
 }
 func tearDownChangeDeviceNick(t *testing.T) bool {
-	helpers.ClearOldData(t)
 	return true
 }

@@ -20,12 +20,24 @@ import (
 	"strconv"
 	"testing"
 
-	"gitlab.com/pantacor/pantahub-gc/db"
+	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-testharness/helpers"
+	"go.mongodb.org/mongo-driver/mongo"
 )
+
+var MongoDb *mongo.Database
+
+func connectToDb(t *testing.T) {
+	MongoClient, err := utils.GetMongoClient()
+	if err != nil {
+		t.Errorf("Error Connecting to Db:" + err.Error())
+	}
+	MongoDb = MongoClient.Database(utils.MongoDb)
+}
 
 // TestLoginUserAccount : Test Logn User Account
 func TestLoginUserAccount(t *testing.T) {
+	connectToDb(t)
 	setUpVerifyUserAccount(t)
 	log.Print("Test:Login User Account")
 	t.Run("With valid account credentials", testLoginValidAccount)
@@ -47,8 +59,8 @@ func testLoginValidAccount(t *testing.T) {
 		t.Errorf("Error Registering User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
 		t.Error(res)
 	}
-	account := helpers.GetUser(t, "test@gmail.com")
-	_, res = helpers.VerifyUserAccount(t, account)
+	account := helpers.GetUser(t, "test@gmail.com", MongoDb)
+	_, res = helpers.VerifyUserAccount(t, account.Id.Hex(), account.Challenge)
 	if res.StatusCode() != 200 {
 		t.Errorf("Error Verifying User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
 		t.Error(res)
@@ -125,11 +137,9 @@ func testLoginInvalidAccount(t *testing.T) {
 	}
 }
 func setUpLoginUserAccount(t *testing.T) bool {
-	db.Connect()
-	helpers.ClearOldData(t)
+	helpers.ClearOldData(t, MongoDb)
 	return true
 }
 func tearDownLoginUserAccount(t *testing.T) bool {
-	helpers.ClearOldData(t)
 	return true
 }

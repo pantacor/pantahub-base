@@ -19,12 +19,12 @@ import (
 	"strconv"
 	"testing"
 
-	"gitlab.com/pantacor/pantahub-gc/db"
 	"gitlab.com/pantacor/pantahub-testharness/helpers"
 )
 
 // Test : Test Claim Ownership Of Device
 func TestClaimOwnershipOfDevice(t *testing.T) {
+	connectToDb(t)
 	setUpClaimOwnershipOfDevice(t)
 	log.Print("Test:Assign User To Device")
 	t.Run("to valid device", testClaimValidDevice)
@@ -46,8 +46,8 @@ func testClaimValidDevice(t *testing.T) {
 		t.Errorf("Error Registering User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
 		t.Error(res)
 	}
-	user := helpers.GetUser(t, "test@gmail.com") //Error handled inside the function
-	_, res = helpers.VerifyUserAccount(t, user)
+	user := helpers.GetUser(t, "test@gmail.com", MongoDb) //Error handled inside the function
+	_, res = helpers.VerifyUserAccount(t, user.Id.Hex(), user.Challenge)
 	if res.StatusCode() != 200 {
 		t.Errorf("Error Verifying User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
 		t.Error(res)
@@ -140,11 +140,9 @@ func testClaimInvalidDevice(t *testing.T) {
 
 }
 func setUpClaimOwnershipOfDevice(t *testing.T) bool {
-	db.Connect()
-	helpers.ClearOldData(t)
+	helpers.ClearOldData(t, MongoDb)
 	return true
 }
 func tearDownClaimOwnershipOfDevice(t *testing.T) bool {
-	helpers.ClearOldData(t)
 	return true
 }

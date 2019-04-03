@@ -19,12 +19,12 @@ import (
 	"strconv"
 	"testing"
 
-	"gitlab.com/pantacor/pantahub-gc/db"
 	"gitlab.com/pantacor/pantahub-testharness/helpers"
 )
 
 // testRegisterUserAccount : Test Register User Account
 func TestRegisterUserAccount(t *testing.T) {
+	connectToDb(t)
 	setUpUserRegistration(t)
 	log.Print("Test:Register User Account account")
 	t.Run("With all required data", testWithData)
@@ -198,11 +198,9 @@ func testNickUniqueness(t *testing.T) {
 	}
 }
 func setUpUserRegistration(t *testing.T) bool {
-	db.Connect()
-	helpers.ClearOldData(t)
+	helpers.ClearOldData(t, MongoDb)
 	return true
 }
 func tearDownUserRegistration(t *testing.T) bool {
-	helpers.ClearOldData(t)
 	return true
 }
