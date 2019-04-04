@@ -406,7 +406,10 @@ func (app *AuthApp) handle_postcode(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	// XXX: allow scopes registered as valid for service once we have scopes middleware
-	if req.Scopes != "*" {
+	if req.Scopes != "*" &&
+		!strings.HasPrefix(req.Scopes, "prn:pantahub.com:apis:/base/") &&
+		!strings.HasPrefix(req.Scopes, "prn:pantahub.com:apis:/fleet/") {
+
 		rest.Error(w, "access code requested with invalid scope. During alpha, scopes '*' (all rights) is only valid scope", http.StatusBadRequest)
 		return
 	}
