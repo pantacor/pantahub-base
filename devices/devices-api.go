@@ -624,8 +624,8 @@ func (a *DevicesApp) handle_getuserdevice(w rest.ResponseWriter, r *rest.Request
 			Decode(&account)
 
 		if err != nil {
-			log.Println("ERROR: error getting account by nick: " + err.Error())
-			rest.Error(w, "Internal Error", http.StatusInternalServerError)
+			log.Println("ERROR: error getting account by nick; will return Forbidden to cover up details from backend: " + err.Error())
+			rest.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
 	}
@@ -646,7 +646,7 @@ func (a *DevicesApp) handle_getuserdevice(w rest.ResponseWriter, r *rest.Request
 
 	if err != nil {
 		log.Println("ERROR: error getting device by nick: " + err.Error())
-		rest.Error(w, "Internal Error", http.StatusNotFound)
+		rest.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
