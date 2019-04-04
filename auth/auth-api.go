@@ -77,8 +77,13 @@ func AccountToPayload(account accounts.Account) map[string]interface{} {
 		result["roles"] = "service"
 		result["type"] = "SERVICE"
 		break
+	case accounts.ACCOUNT_TYPE_CLIENT:
+		result["roles"] = "service"
+		result["type"] = "SERVICE"
+		break
 	default:
-		panic("Must not reach this!")
+		log.Println("ERROR: AccountToPayload with invalid account type: " + account.Type)
+		return nil
 	}
 
 	result["id"] = account.Prn
