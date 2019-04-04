@@ -77,8 +77,13 @@ func AccountToPayload(account accounts.Account) map[string]interface{} {
 		result["roles"] = "service"
 		result["type"] = "SERVICE"
 		break
+	case accounts.ACCOUNT_TYPE_CLIENT:
+		result["roles"] = "service"
+		result["type"] = "SERVICE"
+		break
 	default:
-		panic("Must not reach this!")
+		log.Println("ERROR: AccountToPayload with invalid account type: " + account.Type)
+		return nil
 	}
 
 	result["id"] = account.Prn
@@ -426,6 +431,12 @@ func (app *AuthApp) handle_postcode(w rest.ResponseWriter, r *rest.Request) {
 
 	var mapClaim jwtgo.MapClaims
 	mapClaim = app.accessCodePayload(caller, req.Service, req.Scopes)
+
+	if mapClaim == nil {
+		utils.RestError(w, nil, "error decoding claims from access code", http.StatusBadRequest)
+		return
+	}
+
 	mapClaim["exp"] = time.Now().Add(time.Minute * 5)
 
 	response := codeResponse{}
@@ -837,6 +848,10 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 			payload = AccountToPayload(plm)
 		}
 
+		if payload == nil {
+			return nil
+		}
+
 		if callUser != "" {
 			callPayload := jwtMiddleware.PayloadFunc(callUser)
 			callPayload["id"] = payload["id"].(string) + "==>" + callPayload["id"].(string)
@@ -986,7 +1001,6 @@ func (app *AuthApp) getAccountPayload(idEmailNick string) map[string]interface{}
 
 func (a *AuthApp) accessCodePayload(userIdEmailNick string, serviceIdEmailNick string, scopes string) map[string]interface{} {
 	var (
-		err                   error
 		userAccountPayload    map[string]interface{}
 		serviceAccountPayload map[string]interface{}
 	)
@@ -995,7 +1009,11 @@ func (a *AuthApp) accessCodePayload(userIdEmailNick string, serviceIdEmailNick s
 	userAccountPayload = a.getAccountPayload(userIdEmailNick)
 
 	// error with db or not found -> log and fail
-	if err != nil {
+	if serviceAccountPayload == nil {
+		return nil
+	}
+
+	if userAccountPayload == nil {
 		return nil
 	}
 
