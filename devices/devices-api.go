@@ -276,7 +276,9 @@ func (a *DevicesApp) handle_postdevice(w rest.ResponseWriter, r *rest.Request) {
 
 			// update owner and usermeta
 			newDevice.Owner = autoInfo.Owner
-			newDevice.UserMeta = autoInfo.UserMeta
+			if autoInfo.UserMeta != nil {
+				newDevice.UserMeta = autoInfo.UserMeta
+			}
 		} else {
 			newDevice.Challenge = petname.Generate(3, "-")
 		}
