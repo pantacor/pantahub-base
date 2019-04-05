@@ -128,6 +128,7 @@ var DefaultAccounts = map[string]Account{
 		TimeCreated:  time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
 		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
 		Password:     "service1",
+		Oauth2RedirectURIs: []string{"https://api.fleet.pantahub.com", "https://api.fleet2.pantahub.com", "http://localhost"},
 	},
 	"prn:pantahub.com:auth:/service2": Account{
 		Id:           service2ObjectID,
