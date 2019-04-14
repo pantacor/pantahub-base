@@ -19,12 +19,24 @@ import (
 	"strconv"
 	"testing"
 
-	"gitlab.com/pantacor/pantahub-gc/db"
+	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-testharness/helpers"
+	"go.mongodb.org/mongo-driver/mongo"
 )
+
+var MongoDb *mongo.Database
+
+func connectToDb(t *testing.T) {
+	MongoClient, err := utils.GetMongoClient()
+	if err != nil {
+		t.Errorf("Error Connecting to Db:" + err.Error())
+	}
+	MongoDb = MongoClient.Database(utils.MongoDb)
+}
 
 // TestCreateLog : Test Create Log Of A Device
 func TestCreateLog(t *testing.T) {
+	connectToDb(t)
 	setUpCreateLog(t)
 	log.Print("Test:Create Log Of A Device")
 	t.Run("of a trail", testCreateLog)
@@ -89,11 +101,9 @@ func testCreateLog(t *testing.T) {
 
 }
 func setUpCreateLog(t *testing.T) bool {
-	db.Connect()
-	helpers.ClearOldData(t)
+	helpers.ClearOldData(t, MongoDb)
 	return true
 }
 func tearDownCreateLog(t *testing.T) bool {
-	helpers.ClearOldData(t)
 	return true
 }

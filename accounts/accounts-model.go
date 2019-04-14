@@ -46,8 +46,8 @@ type Account struct {
 	TimeCreated  time.Time `json:"time-created" bson:"time-created"`
 	TimeModified time.Time `json:"time-modified" bson:"time-modified"`
 
-	// Oauth2RedirectURL is limiting the prefix available for redirecting users with oauth code and accesstoken to
-	Oauth2RedirectURL string `json:"redirect_url,omitempty" bson: "redirect_url,omitempty"`
+	// Oauth2RedirectURIs is limiting the prefix available for redirecting users with oauth code and accesstoken to
+	Oauth2RedirectURIs []string `json:"redirect_uris,omitempty" bson: "redirect_uris,omitempty"`
 }
 
 type AccountPublic struct {

@@ -19,13 +19,25 @@ import (
 	"strconv"
 	"testing"
 
-	"gitlab.com/pantacor/pantahub-gc/db"
+	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-gc/models"
 	"gitlab.com/pantacor/pantahub-testharness/helpers"
+	"go.mongodb.org/mongo-driver/mongo"
 )
+
+var MongoDb *mongo.Database
+
+func connectToDb(t *testing.T) {
+	MongoClient, err := utils.GetMongoClient()
+	if err != nil {
+		t.Errorf("Error Connecting to Db:" + err.Error())
+	}
+	MongoDb = MongoClient.Database(utils.MongoDb)
+}
 
 // TestCreateTrail : Test Create Trail
 func TestCreateTrail(t *testing.T) {
+	connectToDb(t)
 	setUpCreateTrail(t)
 	log.Print("Test:Create Trail")
 	t.Run("of a valid device", testCreateTrailOfValidDevice)
@@ -130,11 +142,10 @@ func testCreateTrailOfInvalidDevice(t *testing.T) {
 
 }
 func setUpCreateTrail(t *testing.T) bool {
-	db.Connect()
-	helpers.ClearOldData(t)
+	helpers.ClearOldData(t, MongoDb)
 	return true
 }
 func tearDownCreateTrail(t *testing.T) bool {
-	helpers.ClearOldData(t)
+
 	return true
 }

@@ -19,12 +19,12 @@ import (
 	"strconv"
 	"testing"
 
-	"gitlab.com/pantacor/pantahub-gc/db"
 	"gitlab.com/pantacor/pantahub-testharness/helpers"
 )
 
 // TestDeleteDevice : Test Delete Device
 func TestDeleteDevice(t *testing.T) {
+	connectToDb(t)
 	setUpDeleteDevice(t)
 	log.Print("Test:Delete Device")
 	t.Run("of valid device", testDeleteValidDevice)
@@ -78,14 +78,12 @@ func testDeleteInvalidDevice(t *testing.T) {
 		t.Error(res)
 	}
 	result, res := helpers.RemoveDevice(t, "5c4dcf7d80123b2f2c7e96e2")
-	if res.StatusCode() != 200 {
-		t.Errorf("Expected Response code:200 Forbidden but got:" + strconv.Itoa(res.StatusCode()))
+	if res.StatusCode() != 500 {
+		t.Errorf("Expected Response code:500 Forbidden but got:" + strconv.Itoa(res.StatusCode()))
 	}
+	log.Print(result)
 	expectedResult := map[string]interface{}{
-		"id":    "",
-		"prn":   "",
-		"nick":  "",
-		"owner": "",
+		"Error": "Device not found: mongo: no documents in result",
 	}
 	if helpers.CheckResult(result, expectedResult) {
 		log.Print(" Case 2:Passed")
@@ -99,11 +97,9 @@ func testDeleteInvalidDevice(t *testing.T) {
 	}
 }
 func setUpDeleteDevice(t *testing.T) bool {
-	db.Connect()
-	helpers.ClearOldData(t)
+	helpers.ClearOldData(t, MongoDb)
 	return true
 }
 func tearDownDeleteDevice(t *testing.T) bool {
-	helpers.ClearOldData(t)
 	return true
 }

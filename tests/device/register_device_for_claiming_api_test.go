@@ -20,12 +20,12 @@ import (
 	"testing"
 
 	"gitlab.com/pantacor/pantahub-base/devices"
-	"gitlab.com/pantacor/pantahub-gc/db"
 	"gitlab.com/pantacor/pantahub-testharness/helpers"
 )
 
 // TestRegisterDeviceForClaiming : Register Device Account For Claiming
 func TestRegisterDeviceForClaiming(t *testing.T) {
+	connectToDb(t)
 	setUpRegisterDeviceForClaiming(t)
 
 	log.Print("Test:Register Device For Claiming")
@@ -53,11 +53,9 @@ func TestRegisterDeviceForClaiming(t *testing.T) {
 	tearDownRegisterDeviceForClaiming(t)
 }
 func setUpRegisterDeviceForClaiming(t *testing.T) bool {
-	db.Connect()
-	helpers.ClearOldData(t)
+	helpers.ClearOldData(t, MongoDb)
 	return true
 }
 func tearDownRegisterDeviceForClaiming(t *testing.T) bool {
-	helpers.ClearOldData(t)
 	return true
 }

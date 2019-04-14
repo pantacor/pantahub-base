@@ -19,12 +19,12 @@ import (
 	"strconv"
 	"testing"
 
-	"gitlab.com/pantacor/pantahub-gc/db"
 	"gitlab.com/pantacor/pantahub-testharness/helpers"
 )
 
 // GetAllTrails : Test Get All Trails Of A Device
 func TestGetAllTrails(t *testing.T) {
+	connectToDb(t)
 	setUpGetAllTrails(t)
 	log.Print("Test:Get All Trails")
 	t.Run("of a device", testGetAllTrailsOfDevice)
@@ -94,11 +94,9 @@ func testGetAllTrailsOfDevice(t *testing.T) {
 	}
 }
 func setUpGetAllTrails(t *testing.T) bool {
-	db.Connect()
-	helpers.ClearOldData(t)
+	helpers.ClearOldData(t, MongoDb)
 	return true
 }
 func tearDownGetAllTrails(t *testing.T) bool {
-	helpers.ClearOldData(t)
 	return true
 }

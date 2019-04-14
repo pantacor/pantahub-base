@@ -19,7 +19,6 @@ import (
 	"strconv"
 	"testing"
 
-	"gitlab.com/pantacor/pantahub-gc/db"
 	"gitlab.com/pantacor/pantahub-testharness/helpers"
 )
 
@@ -119,11 +118,9 @@ func testListLogsOfUser(t *testing.T) {
 
 }
 func setUpListLogs(t *testing.T) bool {
-	db.Connect()
-	helpers.ClearOldData(t)
+	helpers.ClearOldData(t, MongoDb)
 	return true
 }
 func tearDownListLogs(t *testing.T) bool {
-	helpers.ClearOldData(t)
 	return true
 }
