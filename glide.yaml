@@ -1,14 +1,16 @@
 package: gitlab.com/pantacor/pantahub-base
 import:
-- package: github.com/fundapps/go-json-rest-middleware-jwt 
+- package: github.com/fundapps/go-json-rest-middleware-jwt
+  repo: https://github.com/pantacor/go-json-rest-middleware-jwt
+  version: fundapps
+  vcs: git
 - package: github.com/alecthomas/units
 - package: github.com/ant0ine/go-json-rest
-  version: ~3.3.2
+  version: cab770813df3db97a11bd04239ac1890c3caf188
   repo: https://github.com/asac/go-json-rest
   vcs: git
   subpackages:
   - rest
-  version: cab770813df3db97a11bd04239ac1890c3caf188
 - package: github.com/asaskevich/govalidator
   version: ~7.0.0
 - package: github.com/aws/aws-sdk-go
@@ -33,3 +35,11 @@ import:
   version: ~1.0.0
 - package: gopkg.in/olivere/elastic.v5
   version: ~5.0.0
+- package: github.com/stretchr/testify
+  version: ^1.3.0
+  subpackages:
+  - assert
+  - suite
+  - mock
+- package: go.mongodb.org/mongo-driver
+  version: ~1.0.0-rc1

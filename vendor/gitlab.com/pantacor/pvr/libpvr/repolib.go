@@ -38,12 +38,9 @@ import (
 	"github.com/asac/json-patch"
 	"github.com/cavaliercoder/grab"
 	"github.com/go-resty/resty"
-
-	"golang.org/x/crypto/ssh/terminal"
-
-	"gopkg.in/cheggaaa/pb.v1"
-
 	pvrapi "gitlab.com/pantacor/pvr/api"
+	"golang.org/x/crypto/ssh/terminal"
+	"gopkg.in/cheggaaa/pb.v1"
 )
 
 type PvrStatus struct {
@@ -198,7 +195,8 @@ func (p *Pvr) addPvrFile(path string) error {
 		return err
 	}
 	relPath := strings.TrimPrefix(path, p.Dir)
-	p.NewFiles[relPath] = shaBal
+	relPathSlash := filepath.ToSlash(relPath)
+	p.NewFiles[relPathSlash] = shaBal
 	return nil
 }
 
@@ -274,13 +272,15 @@ func (p *Pvr) GetWorkingJson() ([]byte, []string, error) {
 		if info.IsDir() {
 			return nil
 		}
+
+		relPathSlash := filepath.ToSlash(relPath)
 		// ignore .pvr and .pv directories
-		if _, ok := p.PristineJsonMap[relPath]; !ok {
-			if _, ok1 := p.NewFiles[relPath]; !ok1 {
-				if strings.HasPrefix(relPath, ".pvr"+string(os.PathSeparator)) {
+		if _, ok := p.PristineJsonMap[relPathSlash]; !ok {
+			if _, ok1 := p.NewFiles[relPathSlash]; !ok1 {
+				if strings.HasPrefix(relPathSlash, ".pvr/") {
 					return nil
 				}
-				if strings.HasPrefix(relPath, ".pv"+string(os.PathSeparator)) {
+				if strings.HasPrefix(relPathSlash, ".pv/") {
 					return nil
 				}
 				untrackedFiles = append(untrackedFiles, relPath)
@@ -300,13 +300,13 @@ func (p *Pvr) GetWorkingJson() ([]byte, []string, error) {
 			if err != nil {
 				return errors.New("JSON Unmarshal (" + strings.TrimPrefix(filePath, p.Dir) + "): " + err.Error())
 			}
-			workingJson[relPath] = jsonFile
+			workingJson[relPathSlash] = jsonFile
 		} else {
 			sha, err := FiletoSha(filePath)
 			if err != nil {
 				return err
 			}
-			workingJson[relPath] = sha
+			workingJson[relPathSlash] = sha
 		}
 
 		return nil
@@ -1260,11 +1260,10 @@ func (p *Pvr) GetRepoLocal(repoPath string, merge bool) error {
 
 	var config *PvrConfig
 
-	configData, err := ioutil.ReadFile(configRepo)
-	if err != nil {
-		return err
-	} else {
-		config = new(PvrConfig)
+	configData, _ := ioutil.ReadFile(configRepo)
+	config = new(PvrConfig)
+	// keep default config if there is no config file yet
+	if configData != nil {
 		err = json.Unmarshal(configData, config)
 		if err != nil {
 			return errors.New("JSON Unmarshal (config.new):" + err.Error())
@@ -1645,8 +1644,9 @@ func (p *Pvr) Reset() error {
 		} else if strings.HasPrefix(k, "#spec") {
 			continue
 		} else {
+			fromSlashK := filepath.FromSlash(k)
 			objectP := filepath.Join(p.Objdir, v.(string))
-			targetP := filepath.Join(p.Dir, k)
+			targetP := filepath.Join(p.Dir, fromSlashK)
 			targetD := path.Dir(targetP)
 			targetDInfo, err := os.Stat(targetD)
 			if err != nil {

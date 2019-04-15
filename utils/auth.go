@@ -17,6 +17,7 @@ package utils
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
@@ -29,6 +30,11 @@ type AuthInfo struct {
 	Caller     Prn
 	CallerType string
 	Owner      Prn
+	Roles      string
+	Audience   string
+	Scopes     string
+	Nick       string
+	RemoteUser string
 }
 
 func GetAuthInfo(r *rest.Request) *AuthInfo {
@@ -42,10 +48,22 @@ func GetAuthInfo(r *rest.Request) *AuthInfo {
 
 func (s *AuthMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFunc {
 	return func(w rest.ResponseWriter, r *rest.Request) {
+		var origCallerClaims, callerClaims jwtgo.MapClaims
 		env := r.Env
 
+		origCallerClaims = r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)
+		callerClaims = origCallerClaims
+
+		if callerClaims["call-as"] != nil {
+			callerClaims = jwtgo.MapClaims(callerClaims["call-as"].(map[string]interface{}))
+			callerClaims["exp"] = origCallerClaims["exp"]
+			callerClaims["orig_iat"] = origCallerClaims["orig_iat"]
+		}
+		r.Env["JWT_PAYLOAD"] = callerClaims
+		r.Env["JWT_ORIG_PAYLOAD"] = origCallerClaims
+
 		authInfo := AuthInfo{}
-		caller, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+		caller, ok := callerClaims["prn"]
 		if !ok {
 			// XXX: find right error
 			rest.Error(w, "You need to be logged in", http.StatusForbidden)
@@ -55,7 +73,7 @@ func (s *AuthMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFu
 		prn := Prn(callerStr)
 		authInfo.Caller = prn
 
-		authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+		authType, ok := callerClaims["type"]
 		if !ok {
 			// XXX: find right error
 			rest.Error(w, "You need to be logged in", http.StatusForbidden)
@@ -64,16 +82,49 @@ func (s *AuthMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFu
 		authTypeStr := authType.(string)
 		authInfo.CallerType = authTypeStr
 
-		owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["owner"]
+		owner, ok := callerClaims["owner"]
 		if ok {
 			ownerStr := owner.(string)
 			prn := Prn(ownerStr)
 			authInfo.Owner = prn
 		}
+		roles, ok := callerClaims["roles"]
+		if ok {
+			rolesStr := roles.(string)
+			authInfo.Roles = rolesStr
+		}
+		aud, ok := callerClaims["aud"]
+		if ok {
+			audStr := aud.(string)
+			authInfo.Audience = audStr
+		}
+		scopes, ok := callerClaims["scopes"]
+		if ok {
+			scopesStr := scopes.(string)
+			authInfo.Scopes = scopesStr
+
+			if authInfo.Scopes != "*" &&
+				strings.HasPrefix(authInfo.Scopes, "prn:pantahub.com:apis:/base/") {
+				rest.Error(w, "You need to have oauth2 scopes '*' or any 'prn:pantahub.com:apis:/base/*' to access this endpoint, not: "+authInfo.Scopes, http.StatusForbidden)
+				return
+			}
+		}
+		nick, ok := callerClaims["nick"]
+		if ok {
+			nickStr := nick.(string)
+			authInfo.Nick = nickStr
+		}
+		origNick, ok := origCallerClaims["nick"]
+		if ok {
+			origNickStr := origNick.(string)
+			authInfo.RemoteUser = origNickStr + "==>" + authInfo.Nick
+		} else {
+			authInfo.RemoteUser = "_unknown_==>" + authInfo.Nick
+		}
 
 		env["PH_AUTH_INFO"] = authInfo
-		r.Env = env
 
+		r.Env = env
 		handler(w, r)
 	}
 }

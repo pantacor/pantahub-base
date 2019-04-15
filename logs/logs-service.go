@@ -38,14 +38,15 @@ import (
 	jwtgo "github.com/dgrijalva/jwt-go"
 	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/utils"
-	"gopkg.in/mgo.v2"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"gopkg.in/mgo.v2/bson"
 )
 
 type logsApp struct {
 	jwt_middleware *jwt.JWTMiddleware
 	Api            *rest.Api
-	mgoSession     *mgo.Session
+	mongoClient    *mongo.Client
 	backend        LogsBackend
 }
 
@@ -60,15 +61,15 @@ type LogsFilter *LogsEntry
 type LogsSort []string
 
 type LogsEntry struct {
-	Id          bson.ObjectId `json:"id,omitempty" bson:"_id,omitempty"`
-	Device      string        `json:"dev,omitempty" bson:"dev"`
-	Owner       string        `json:"own,omitempty" bson:"own"`
-	TimeCreated time.Time     `json:"time-created,omitempty" bson:"time-created"`
-	LogTSec     int64         `json:"tsec,omitempty" bson:"tsec"`
-	LogTNano    int64         `json:"tnano,omitempty" bson:"tnano"`
-	LogSource   string        `json:"src,omitempty" bson:"src"`
-	LogLevel    string        `json:"lvl,omitempty" bson:"lvl"`
-	LogText     string        `json:"msg,omitempty" bson:"msg"`
+	Id          primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+	Device      string             `json:"dev,omitempty" bson:"dev"`
+	Owner       string             `json:"own,omitempty" bson:"own"`
+	TimeCreated time.Time          `json:"time-created,omitempty" bson:"time-created"`
+	LogTSec     int64              `json:"tsec,omitempty" bson:"tsec"`
+	LogTNano    int64              `json:"tnano,omitempty" bson:"tnano"`
+	LogSource   string             `json:"src,omitempty" bson:"src"`
+	LogLevel    string             `json:"lvl,omitempty" bson:"lvl"`
+	LogText     string             `json:"msg,omitempty" bson:"msg"`
 }
 
 type LogsPager struct {
@@ -405,7 +406,11 @@ func (a *logsApp) handle_postlogs(w rest.ResponseWriter, r *rest.Request) {
 	newEntries := []LogsEntry{}
 
 	for _, v := range entries {
-		v.Id = bson.NewObjectId()
+		v.Id, err = primitive.ObjectIDFromHex(bson.NewObjectId().Hex())
+		if err != nil {
+			rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+			return
+		}
 		v.Device = device.(string)
 		v.Owner = owner.(string)
 		v.TimeCreated = time.Now()
@@ -425,13 +430,13 @@ func (a *logsApp) handle_postlogs(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(newEntries)
 }
 
-func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *logsApp {
+func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *logsApp {
 
 	var err error
 
 	app := new(logsApp)
 	app.jwt_middleware = jwtMiddleware
-	app.mgoSession = session
+	app.mongoClient = mongoClient
 
 	app.backend, err = NewElasticLogger()
 
@@ -442,7 +447,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *logsApp {
 		log.Println("INFO: Elastic Logger failed to start: " + err.Error())
 		log.Println("INFO: Elastic Logger not available; trying other options ...")
 
-		app.backend, err = NewMgoLogger(session)
+		app.backend, err = NewMgoLogger(mongoClient)
 		if err == nil {
 			err = app.backend.register()
 		}
@@ -477,12 +482,18 @@ func New(jwtMiddleware *jwt.JWTMiddleware, session *mgo.Session) *logsApp {
 		AccessControlMaxAge:           3600,
 	})
 
-	// no authentication needed for /login
 	app.Api.Use(&rest.IfMiddleware{
 		Condition: func(request *rest.Request) bool {
 			return true
 		},
 		IfTrue: app.jwt_middleware,
+	})
+
+	app.Api.Use(&rest.IfMiddleware{
+		Condition: func(request *rest.Request) bool {
+			return true
+		},
+		IfTrue: &utils.AuthMiddleware{},
 	})
 
 	// XXX: this is all needs to be done so that paths that do not trail with /
