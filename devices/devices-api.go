@@ -1040,7 +1040,12 @@ func (a *DevicesApp) handle_getdevices(w rest.ResponseWriter, r *rest.Request) {
 
 	for k, v := range r.URL.Query() {
 		if query[k] == nil {
-			query[k] = v[0]
+			if strings.HasPrefix(v[0], "!") {
+				v[0] = strings.TrimPrefix(v[0], "!")
+				query[k] = bson.M{"$ne": v[0]}
+			} else {
+				query[k] = v[0]
+			}
 		}
 	}
 
