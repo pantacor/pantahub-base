@@ -248,7 +248,7 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 		urlPrefix += utils.GetEnv(utils.ENV_PANTAHUB_PORT)
 	}
 
-	utils.SendVerification(newAccount.Email, newAccount.Id.Hex(), newAccount.Challenge, urlPrefix)
+	utils.SendVerification(newAccount.Email, newAccount.Nick, newAccount.Id.Hex(), newAccount.Challenge, urlPrefix)
 
 	newAccount.Password = ""
 	newAccount.Challenge = ""
