@@ -211,3 +211,46 @@ X-Powered-By: go-json-rest
 }
 ```
 
+## Steps Meta info
+
+Steps have a general purpose 'meta' field holding a map. This is useful for apps to store info and state
+about steps that they need for their internal processing.
+
+As owner you can PUT meta on any step:
+
+```
+http PUT localhost:12365/trails/5c2cc99990cd51000906c218/steps/10/meta Authorization:" Bearer $TOK" app-meta1=value1 app-meta2:='{"object": "also possible"}'
+HTTP/1.1 200 OK
+Content-Length: 61
+Content-Type: application/json; charset=utf-8
+Date: Wed, 17 Apr 2019 09:09:51 GMT
+X-Powered-By: go-json-rest
+X-Runtime: 0.003029
+
+{
+    "app-meta1": "value1",
+    "app-meta2": {
+        "object": "also possible"
+    }
+}
+```
+
+As owner you can GET meta on any step:
+
+```
+http localhost:12365/trails/5c2cc99990cd51000906c218/steps/10/meta Authorization:" Bearer $TOK"
+HTTP/1.1 200 OK
+Content-Length: 61
+Content-Type: application/json; charset=utf-8
+Date: Wed, 17 Apr 2019 09:10:25 GMT
+X-Powered-By: go-json-rest
+X-Runtime: 0.002949
+
+{
+    "app-meta1": "value1",
+    "app-meta2": {
+        "object": "also possible"
+    }
+}
+```
+
