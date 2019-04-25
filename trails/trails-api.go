@@ -131,6 +131,7 @@ type TrailSummary struct {
 	FleetModel       string    `json:"fleet-model" bson:"fleet_model"`
 	FleetLocation    string    `json:"fleet-location" bson:"fleet_location"`
 	FleetRev         string    `json:"fleet-rev" bson:"fleet_rev"`
+	Owner            string    `json:"-" bson:"owner"`
 }
 
 func handle_auth(w rest.ResponseWriter, r *rest.Request) {
@@ -2043,18 +2044,31 @@ func (a *TrailsApp) handle_gettrailstepsummary(w rest.ResponseWriter, r *rest.Re
 		return
 	}
 
+	query := bson.M{
+		"deviceid": trailId,
+		"garbage":  bson.M{"$ne": true},
+		"$or": []bson.M{
+			{"owner": owner},
+			{"public": true},
+		},
+	}
+
 	summary := TrailSummary{}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	err := summaryCol.FindOne(ctx, bson.M{
-		"deviceid": trailId,
-		"owner":    owner,
-		"garbage":  bson.M{"$ne": true},
-	}).Decode(&summary)
+	err := summaryCol.FindOne(ctx, query).Decode(&summary)
 
 	if err != nil {
 		rest.Error(w, "error finding new trailId", http.StatusForbidden)
 		return
+	}
+
+	if owner != summary.Owner {
+		summary.FleetGroup = ""
+		summary.FleetLocation = ""
+		summary.FleetModel = ""
+		summary.FleetRev = ""
+		summary.RealIP = ""
 	}
 	w.WriteJson(summary)
 }
