@@ -74,6 +74,92 @@ func handle_auth(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(jwtClaims)
 }
 
+func (a *DevicesApp) handle_patchuserdata(w rest.ResponseWriter, r *rest.Request) {
+
+	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
+	if !ok {
+		rest.Error(w, "Missing JWT_PAYLOAD", http.StatusBadRequest)
+		return
+	}
+
+	var owner interface{}
+	owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
+	if !ok {
+		rest.Error(w, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
+		return
+	}
+
+	var authType interface{}
+	authType, ok = jwtPayload.(jwtgo.MapClaims)["type"]
+	if !ok {
+		rest.Error(w, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
+		return
+	}
+
+	if authType != "USER" {
+		rest.Error(w, "User data can only be updated by User", http.StatusBadRequest)
+		return
+	}
+
+	deviceId := r.PathParam("id")
+
+	data := map[string]interface{}{}
+	err := r.DecodeJsonPayload(&data)
+	if err != nil {
+		rest.Error(w, "Error parsing data: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	data = utils.BsonQuoteMap(&data)
+
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
+	if collection == nil {
+		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	deviceObjectID, err := primitive.ObjectIDFromHex(deviceId)
+	if err != nil {
+		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var device Device
+	err = collection.FindOne(ctx,
+		bson.M{
+			"_id":     deviceObjectID,
+			"garbage": bson.M{"$ne": true},
+		}).
+		Decode(&device)
+
+	for k, v := range data {
+		device.UserMeta[k] = v
+	}
+
+	updateResult, err := collection.UpdateOne(
+		ctx,
+		bson.M{
+			"_id":   deviceObjectID,
+			"owner": owner.(string),
+		},
+		bson.M{"$set": bson.M{
+			"user-meta":    device.UserMeta,
+			"timemodified": time.Now(),
+		}},
+	)
+	if updateResult.MatchedCount == 0 {
+		rest.Error(w, "Error updating device user-meta: not found", http.StatusBadRequest)
+		return
+	}
+	if err != nil {
+		rest.Error(w, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.WriteJson(utils.BsonUnquoteMap(&data))
+}
+
 func (a *DevicesApp) handle_putuserdata(w rest.ResponseWriter, r *rest.Request) {
 
 	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
@@ -1325,6 +1411,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *DevicesAp
 		rest.Put("/:id/public", app.handle_putpublic),
 		rest.Delete("/:id/public", app.handle_deletepublic),
 		rest.Put("/:id/user-meta", app.handle_putuserdata),
+		rest.Patch("/:id/user-meta", app.handle_patchuserdata),
 		rest.Put("/:id/device-meta", app.handle_putdevicedata),
 		rest.Patch("/:id/device-meta", app.handle_patchdevicedata),
 		rest.Delete("/:id", app.handle_deletedevice),
