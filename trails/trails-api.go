@@ -101,6 +101,7 @@ type Step struct {
 	StepProgress StepProgress           `json:"progress" bson:"progress"`
 	StepTime     time.Time              `json:"step-time" bson:"step-time"`
 	ProgressTime time.Time              `json:"progress-time" bson:"progress-time"`
+	Meta         map[string]interface{} `json:"meta"` // json blurb
 }
 
 type StepProgress struct {
@@ -130,6 +131,7 @@ type TrailSummary struct {
 	FleetModel       string    `json:"fleet-model" bson:"fleet_model"`
 	FleetLocation    string    `json:"fleet-location" bson:"fleet_location"`
 	FleetRev         string    `json:"fleet-rev" bson:"fleet_rev"`
+	Owner            string    `json:"-" bson:"owner"`
 }
 
 func handle_auth(w rest.ResponseWriter, r *rest.Request) {
@@ -209,6 +211,7 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 	newStep.StepTime = time.Now() // XXX this should be factory time not now
 	newStep.ProgressTime = time.Now()
 	newStep.StepProgress.Status = "DONE"
+	newStep.Meta = map[string]interface{}{}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_trails")
 
@@ -716,6 +719,11 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
+	if newStep.Meta == nil {
+		newStep.Meta = map[string]interface{}{}
+	}
+	newStep.Meta = utils.BsonQuoteMap(&newStep.Meta)
+
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, err = collSteps.InsertOne(
@@ -750,6 +758,7 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	newStep.State = utils.BsonUnquoteMap(&newStep.State)
+	newStep.Meta = utils.BsonUnquoteMap(&newStep.Meta)
 
 	w.WriteJson(newStep)
 }
@@ -855,6 +864,7 @@ func (a *TrailsApp) handle_getsteps(w rest.ResponseWriter, r *rest.Request) {
 			rest.Error(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
 			return
 		}
+		result.Meta = utils.BsonUnquoteMap(&result.Meta)
 		result.State = utils.BsonUnquoteMap(&result.State)
 		steps = append(steps, result)
 	}
@@ -926,9 +936,74 @@ func (a *TrailsApp) handle_getstep(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
+	step.Meta = utils.BsonUnquoteMap(&step.Meta)
 	step.State = utils.BsonUnquoteMap(&step.State)
 
 	w.WriteJson(step)
+}
+
+//
+// ## GET /trails/:id/steps/:rev/meta
+//   get step meta
+//
+//   just the raw data of a step without metainfo...
+//
+func (a *TrailsApp) handle_getstepmeta(w rest.ResponseWriter, r *rest.Request) {
+
+	var err error
+
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	if !ok {
+		// XXX: find right error
+		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		return
+	}
+
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+
+	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
+
+	if coll == nil {
+		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+
+	step := Step{}
+	trailId := r.PathParam("id")
+	rev := r.PathParam("rev")
+
+	isPublic, err := a.isTrailPublic(trailId)
+
+	if err != nil {
+		rest.Error(w, "Error getting trail public", http.StatusInternalServerError)
+		return
+	}
+
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	if isPublic {
+		err = coll.FindOne(ctx, bson.M{
+			"_id":     trailId + "-" + rev,
+			"garbage": bson.M{"$ne": true},
+		}).Decode(&step)
+	} else if authType == "DEVICE" {
+		err = coll.FindOne(ctx, bson.M{
+			"_id":     trailId + "-" + rev,
+			"device":  owner,
+			"garbage": bson.M{"$ne": true},
+		}).Decode(&step)
+	} else if authType == "USER" {
+		err = coll.FindOne(ctx, bson.M{
+			"_id":     trailId + "-" + rev,
+			"owner":   owner,
+			"garbage": bson.M{"$ne": true},
+		}).Decode(&step)
+	}
+
+	if step.Meta == nil {
+		step.Meta = map[string]interface{}{}
+	}
+
+	w.WriteJson(utils.BsonUnquoteMap(&step.Meta))
 }
 
 //
@@ -1752,6 +1827,88 @@ func (a *TrailsApp) handle_putstepstate(w rest.ResponseWriter, r *rest.Request) 
 }
 
 //
+// ## PUT /trails/:id/steps/:rev/meta
+//   put step meta
+//
+//   just the raw data of a step without metainfo like pvr put ...
+//
+func (a *TrailsApp) handle_putstepmeta(w rest.ResponseWriter, r *rest.Request) {
+
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	if !ok {
+		// XXX: find right error
+		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		return
+	}
+
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+
+	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
+	if coll == nil {
+		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+
+	step := Step{}
+	trailId := r.PathParam("id")
+	rev := r.PathParam("rev")
+
+	if authType != "USER" {
+		rest.Error(w, "Need to be logged in as USER to put step meta", http.StatusForbidden)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err := coll.FindOne(ctx, bson.M{
+		"_id":     trailId + "-" + rev,
+		"garbage": bson.M{"$ne": true},
+	}).Decode(&step)
+
+	if err != nil {
+		rest.Error(w, "Error with accessing data: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if step.Owner != owner {
+		rest.Error(w, "No write access to step meta", http.StatusForbidden)
+	}
+
+	metaMap := map[string]interface{}{}
+	err = r.DecodeJsonPayload(&metaMap)
+	if err != nil {
+		rest.Error(w, "Error with request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	step.Meta = utils.BsonQuoteMap(&metaMap)
+
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	updateResult, err := coll.UpdateOne(
+		ctx,
+		bson.M{
+			"_id":     trailId + "-" + rev,
+			"owner":   owner,
+			"garbage": bson.M{"$ne": true},
+		},
+		bson.M{"$set": step},
+	)
+	if updateResult.MatchedCount == 0 {
+		rest.Error(w, "Error updating step meta: not found", http.StatusBadRequest)
+		return
+	}
+
+	if err != nil {
+		rest.Error(w, "Error updating step meta: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	step.Meta = utils.BsonUnquoteMap(&step.Meta)
+	w.WriteJson(step.Meta)
+}
+
+//
 // ## PUT /trails/:id/steps/:rev/progress
 //   Post Step Progress information for a step.
 //
@@ -1887,18 +2044,31 @@ func (a *TrailsApp) handle_gettrailstepsummary(w rest.ResponseWriter, r *rest.Re
 		return
 	}
 
+	query := bson.M{
+		"deviceid": trailId,
+		"garbage":  bson.M{"$ne": true},
+		"$or": []bson.M{
+			{"owner": owner},
+			{"public": true},
+		},
+	}
+
 	summary := TrailSummary{}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	err := summaryCol.FindOne(ctx, bson.M{
-		"deviceid": trailId,
-		"owner":    owner,
-		"garbage":  bson.M{"$ne": true},
-	}).Decode(&summary)
+	err := summaryCol.FindOne(ctx, query).Decode(&summary)
 
 	if err != nil {
 		rest.Error(w, "error finding new trailId", http.StatusForbidden)
 		return
+	}
+
+	if owner != summary.Owner {
+		summary.FleetGroup = ""
+		summary.FleetLocation = ""
+		summary.FleetModel = ""
+		summary.FleetRev = ""
+		summary.RealIP = ""
 	}
 	w.WriteJson(summary)
 }
@@ -1947,6 +2117,7 @@ func (a *TrailsApp) handle_gettrailsummary(w rest.ResponseWriter, r *rest.Reques
 
 	// always filter by owner...
 	m["owner"] = owner
+	m["garbage"] = bson.M{"$ne": true}
 
 	summaries := make([]TrailSummary, 0)
 
@@ -1961,10 +2132,7 @@ func (a *TrailsApp) handle_gettrailsummary(w rest.ResponseWriter, r *rest.Reques
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	cur, err := summaryCol.Find(ctx, bson.M{
-		"owner":   owner,
-		"garbage": bson.M{"$ne": true},
-	}, findOptions)
+	cur, err := summaryCol.Find(ctx, m, findOptions)
 	if err != nil {
 		rest.Error(w, "Error on fetching summaries:"+err.Error(), http.StatusForbidden)
 		return
@@ -2140,11 +2308,13 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *TrailsApp
 		rest.Get("/:id/steps", app.handle_getsteps),
 		rest.Get("/:id/steps/:rev", app.handle_getstep),
 		rest.Get("/:id/steps/:rev/.pvrremote", app.handle_getsteppvrinfo),
+		rest.Get("/:id/steps/:rev/meta", app.handle_getstepmeta),
 		rest.Get("/:id/steps/:rev/state", app.handle_getstepstate),
 		rest.Get("/:id/steps/:rev/objects", app.handle_getstepsobjects),
 		rest.Post("/:id/steps/:rev/objects", app.handle_poststepsobject),
 		rest.Get("/:id/steps/:rev/objects/:obj", app.handle_getstepsobject),
 		rest.Get("/:id/steps/:rev/objects/:obj/blob", app.handle_getstepsobjectfile),
+		rest.Put("/:id/steps/:rev/meta", app.handle_putstepmeta),
 		rest.Put("/:id/steps/:rev/state", app.handle_putstepstate),
 		rest.Put("/:id/steps/:rev/progress", app.handle_putstepprogress),
 		rest.Get("/:id/summary", app.handle_gettrailstepsummary),
