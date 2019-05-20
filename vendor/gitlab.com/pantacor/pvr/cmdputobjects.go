@@ -19,7 +19,6 @@ import (
 	"os"
 
 	"github.com/urfave/cli"
-	"gitlab.com/pantacor/pvr/libpvr"
 )
 
 func CommandPutObjects() cli.Command {
@@ -38,15 +37,9 @@ func CommandPutObjects() cli.Command {
 				return cli.NewExitError("Push requires exactly 1 argument. See --help.", 2)
 			}
 
-			session, err := libpvr.NewSession(c.App)
-
+			pvr, err := NewPvr(c.App, wd)
 			if err != nil {
-				return cli.NewExitError(err, 4)
-			}
-
-			pvr, err := libpvr.NewPvr(session, wd)
-			if err != nil {
-				return cli.NewExitError(err, 2)
+				return cli.NewExitError(err, 3)
 			}
 
 			err = pvr.PutObjects(c.Args()[0], c.Bool("force"))

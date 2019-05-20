@@ -21,7 +21,6 @@ import (
 	"path"
 
 	"github.com/urfave/cli"
-	"gitlab.com/pantacor/pvr/libpvr"
 )
 
 func CommandClone() cli.Command {
@@ -57,15 +56,9 @@ func CommandClone() cli.Command {
 				return cli.NewExitError(err, 4)
 			}
 
-			session, err := libpvr.NewSession(c.App)
-
+			pvr, err := NewPvrInit(c.App, base)
 			if err != nil {
-				return cli.NewExitError(err, 4)
-			}
-
-			pvr, err := libpvr.NewPvr(session, base)
-			if err != nil {
-				return cli.NewExitError(err, 2)
+				return cli.NewExitError(err, 5)
 			}
 
 			err = pvr.Init(c.String("objects"))
