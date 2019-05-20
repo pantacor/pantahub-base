@@ -19,7 +19,6 @@ import (
 	"os"
 
 	"github.com/urfave/cli"
-	"gitlab.com/pantacor/pvr/libpvr"
 )
 
 func CommandInit() cli.Command {
@@ -35,17 +34,11 @@ func CommandInit() cli.Command {
 				return cli.NewExitError(err, 1)
 			}
 
-			session, err := libpvr.NewSession(c.App)
+			pvr, err := NewPvrInit(c.App, wd)
 
-			if err != nil {
-				return cli.NewExitError(err, 4)
-			}
-
-			pvr, err := libpvr.NewPvr(session, wd)
 			if err != nil {
 				return cli.NewExitError(err, 2)
 			}
-
 			// empty template as starting point; XXX; add Flag to pass custom json
 			err = pvr.Init(c.String("objects"))
 

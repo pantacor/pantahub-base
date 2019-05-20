@@ -20,7 +20,6 @@ import (
 	"os"
 
 	"github.com/urfave/cli"
-	"gitlab.com/pantacor/pvr/libpvr"
 )
 
 func CommandJson() cli.Command {
@@ -36,23 +35,17 @@ func CommandJson() cli.Command {
 				return cli.NewExitError(err, 1)
 			}
 
-			session, err := libpvr.NewSession(c.App)
-
-			if err != nil {
-				return cli.NewExitError(err, 4)
-			}
-
-			pvr, err := libpvr.NewPvr(session, wd)
+			pvr, err := NewPvr(c.App, wd)
 			if err != nil {
 				return cli.NewExitError(err, 2)
 			}
 
-			result, _, err := pvr.GetWorkingJson()
+			result, err := pvr.GetWorkingJson()
 			if err != nil {
 				return cli.NewExitError(err, 3)
 			}
 
-			resultF, err := libpvr.FormatJson(result)
+			resultF, err := FormatJson(result)
 			if err != nil {
 				cli.NewExitError(err, 4)
 			}

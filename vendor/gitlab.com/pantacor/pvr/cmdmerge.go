@@ -20,7 +20,6 @@ import (
 	"os"
 
 	"github.com/urfave/cli"
-	"gitlab.com/pantacor/pvr/libpvr"
 )
 
 func CommandMerge() cli.Command {
@@ -36,13 +35,7 @@ func CommandMerge() cli.Command {
 				return cli.NewExitError(err, 1)
 			}
 
-			session, err := libpvr.NewSession(c.App)
-
-			if err != nil {
-				return cli.NewExitError(err, 4)
-			}
-
-			pvr, err := libpvr.NewPvr(session, wd)
+			pvr, err := NewPvr(c.App, wd)
 			if err != nil {
 				return cli.NewExitError(err, 2)
 			}
