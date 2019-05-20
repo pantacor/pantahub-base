@@ -1,5 +1,5 @@
 //
-// Copyright 2017, 2018  Pantacor Ltd.
+// Copyright 2017  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,8 +16,9 @@
 package main
 
 import (
-	"crypto/tls"
 	"os"
+
+	"crypto/tls"
 
 	"github.com/go-resty/resty"
 	"github.com/urfave/cli"
@@ -28,55 +29,36 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "pvr"
 	app.Usage = "PantaVisor Repo"
-	app.Version = VERSION
+	app.Version = "0.0.1"
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
-			Name:   "access-token, a",
-			Usage:  "Use `ACCESS_TOKEN` for authorization with core services",
-			EnvVar: "PVR_ACCESSTOKEN",
+			Name:  "auth, a",
+			Usage: "Use `ACCESS_TOKEN` for authorization with core services",
 		},
 		cli.StringFlag{
-			Name:   "baseurl, b",
-			Usage:  "Use `BASEURL` for resolving prn URIs to core service endpoints",
-			EnvVar: "PVR_BASEURL",
-			Value:  "https://api.pantahub.com",
-		},
-		cli.StringFlag{
-			Name:   "repo-baseurl, r",
-			Usage:  "Use `REPO_BASEURL` for resolving PVR repositories like docker through user/name syntax.",
-			EnvVar: "PVR_REPO_BASEURL",
-			Value:  "https://pvr.pantahub.com",
-		},
-		cli.BoolFlag{
-			Name:   "debug, d",
-			Usage:  "enable debugging output for rest calls",
-			EnvVar: "PVR_DEBUG",
-		},
-		cli.BoolFlag{
-			Name:   "insecure, i",
-			Usage:  "skip tls verify",
-			EnvVar: "PVR_INSECURE",
+			Name:  "baseurl, b",
+			Usage: "Use `BASEURL` for resolving prn URIs to core service endpoints",
 		},
 	}
 
 	app.Before = func(c *cli.Context) error {
-		resty.SetTLSClientConfig(&tls.Config{InsecureSkipVerify: c.GlobalBool("insecure")})
-		resty.SetDebug(c.GlobalBool("debug"))
-
-		c.App.Metadata["PVR_AUTH"] = c.GlobalString("auth")
-
+		c.App.Metadata["PANTAHUB_BASE"] = "https://pantahub.appspot.com/api"
+		if os.Getenv("PANTAHUB_BASE") != "" {
+			c.App.Metadata["PANTAHUB_BASE"] = os.Getenv("PANTAHUB_BASE")
+		}
 		if c.GlobalString("baseurl") != "" {
-			c.App.Metadata["PVR_BASEURL"] = c.GlobalString("baseurl")
-		} else {
-			c.App.Metadata["PVR_BASEURL"] = "https://api.pantahub.com"
+			c.App.Metadata["PANTAHUB_BASE"] = c.GlobalString("baseurl")
 		}
-
-		if c.GlobalString("repo-baseurl") != "" {
-			c.App.Metadata["PVR_REPO_BASEURL"] = c.GlobalString("repo-baseurl")
-		} else {
-			c.App.Metadata["PVR_REPO_BASEURL"] = "https://pvr.pantahub.com"
+		c.App.Metadata["PANTAHUB_AUTH"] = ""
+		if os.Getenv("PANTAHUB_AUTH") != "" {
+			c.App.Metadata["PANTAHUB_AUTH"] = os.Getenv("PANTAHUB_AUTH")
 		}
+		if c.GlobalString("auth") != "" {
+			c.App.Metadata["PANTAHUB_AUTH"] = c.GlobalString("auth")
+		}
+		// XXX: make a --no-verify flag instead of thisr
+		resty.SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true})
 
 		return nil
 	}
@@ -99,9 +81,6 @@ func main() {
 		CommandExport(),
 		CommandImport(),
 		CommandRegister(),
-		CommandScan(),
-		CommandPs(),
-		CommandLogs(),
 	}
 	app.Run(os.Args)
 }

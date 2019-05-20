@@ -1,13 +1,10 @@
-PVR operates on two types of entities:
+# The PiVo Repo
 
-Sumodules:
- * PVR Repository
- * PVR Pantahub
- * PVR Devel
+> "*When you are in scalable REST world, there is not much else than JSON with binary blobs being published through dumb CDNs.
+> 
+> With PVR, consuming and sharing file trees in json format becomes a joy for REST environments.*"
 
-# PVR Repository
-
-## Features
+# Features
 
  * simple repository in json format with object store
  * checkout and commit any working directory to repository
@@ -16,11 +13,7 @@ Sumodules:
  * all repo operations are atomic and can be recovered
  * object store can be local or in cloud/CDN
 
-## Requirement
-
- * a server backend implementing state CRUD primitives like offered by pantahub "trails"
-
-## Install
+# Install
 
 1. From gitlab:
   ```
@@ -28,7 +21,7 @@ $ go get gitlab.com/pantacor/pvr
 $ go build -o ~/bin/pvr gitlab.com/pantacor/pvr
 ```
 
-## Get Started
+# Get Started
 
 pvr is about transforming a directory structure that contains files as well as json files into
 a single managable, diffable and mergeable json file that unambiguously defines directory state.
@@ -37,7 +30,7 @@ To leverage the features of json diff/merge etc. all json files found in a direc
 get inlined while all other objects will get a sha reference entry with the files themselves
 getting stored in a flat objects directory.
 
-## Basics
+# Basics
 
 To start a pvr from scratch you use the pvr init command which sets you up.
 
@@ -60,7 +53,7 @@ While working on changes to your local checkout, you can use `status` and `diff`
 to observe your current changes:
 
 ```
-example2$ pvr status
+example2$ ../pvr status
 A newfile.txt
 D deleted.txt
 C some.json
@@ -73,7 +66,7 @@ This means that `newfile.txt` is new, working.txt and some.json changed and
 You can introspect the changes through the `diff` command:
 
 ```
-example2$ pvr diff
+example2$ ../pvr diff
 {
 	"deleted.txt": null,
 	"newfile.txt": "dc460da4ad72c482231e28e688e01f2778a88ce31a08826899d54ef7183998b5",
@@ -88,7 +81,7 @@ Being happy with what you see, you can checkpoint your working state using the
 `commit` command:
 
 ```
-example2$ pvr commit
+example2$ ../pvr commit
 Committing some.json
 Committing working.txt
 Adding newfile.txt
@@ -115,13 +108,13 @@ You can also push your repository to a pvr compliant REST backend. In this
 case to a device trails (replace device id with your device)
 
 ```
-example2: pvr post https://api.pantahub.com/trails/<DEVICEID>
+example2: pvr push https://api.pantahub.com/trails/<DEVICEID>
 ```
 
 You can later clone that very repo to use it as a starting point or get 
 its content to update another repo.
 
-## Internals
+# Internals
 
 The pvr repository has the following structure in v1:
 
@@ -153,9 +146,9 @@ cat json
 }
 ```
 
-## Commands
+# Commands
 
-### pvr init
+## pvr init
 ```
 $ pvr init
 $ cat .pvr/json 
@@ -167,7 +160,7 @@ $ cat .pvr/json
 
 You would now continue editing this directory as it pleases you. and you can refer to any file you put here in your configs just using the absolute path (e.g. /systemc.json).
 
-### pvr add [file1 file2 ...]
+## pvr add [file1 file2 ...]
 
 `prv add` will put a file that exists in working directory under management of pvr. This means that the file will be honored on future `pvr diff` and `pvr commit` operations.
 
@@ -181,7 +174,7 @@ $ pvr add lxc-platform.json pxc-platform.conf
 
 These files will then be part of the next commit.
 
-### pvr diff
+## pvr diff
 You can look at your current changes to working directory using the diff command to get RFCXXXX json patch format:
 
 ```
@@ -192,7 +185,7 @@ $ pvr diff
 }
 ```
 
-### pvr commit
+## pvr commit
 Committing your pvr will update the .pvr directory so it can be pushed to pantahub.
 
 ```
@@ -204,7 +197,7 @@ Commit Done
 
 You can then continue editing and see your changes compared to the committed baseline using `pvr diff` again.
 
-### pvr put <destination>
+## pvr put <destination>
 
 Put local:
 ```
@@ -216,7 +209,7 @@ $ find /some/local/repopath
 /some/local/repopath/objects/yyyyyyyyyyyyyyyyyyyyyy
 ```
 
-### pvr post <remote-device-ep>
+# pvr post <remote-device-ep>
 
 Post local pvr as a new revision to your device endpoint:
 ```
@@ -224,7 +217,7 @@ $ pvr post https://api.pantahub.com/trails/<YOURDEVICE>
 ...
 ```
 
-### pvr clone <LOCATION>
+## pvr clone <LOCATION>
 
 you can clone a remote device state as follows:
 
@@ -237,34 +230,6 @@ Alternatively you can get a specific revision:
 ```
 $ pvr clone https://api.pantahub.com/trails/<YOURDEVICE>/steps/<REV>
 ...
-```
-
-# PVR Device Commands
-
-PVR Devices commands provide convenience for developers and individuals
-that operate their very own pantavisor enabled solutions.
-
-These commands are designed for developers that want to interface with devices
-in their own local network, but not does not replace a fleet management
-solution.
-
-## pvr scan
-
-Scan for pantavisor enabled devices on local network.
-
-Info about how to interface and claim devices that dont have an owner yet
-are printed on console.
-
-```
-> .\pvr.exe scan
-Scanning ...
-        ID: 5b0aa4363c6f7200095b2566 (owned)
-        Host: linux.local.
-        IPv4: [192.168.178.97]
-        IPv6: [2a02:2028:713:3001:602:a2ff:feb3:d4e8]
-        Port: 22
-        Pantahub WWW: https://www.pantahub.com/u/_/devices/5b0aa4363c6f7200095b2566
-        PVR Clone: https://api.pantahub.com:443/trails/5b0aa4363c6f7200095b2566
 ```
 
 # References
@@ -310,24 +275,3 @@ Scanning ...
 	}
 }
 ```
-
-# PVR Pantahub Commands
-
-Since version 006 PVR also provides convenience commands for interacting with pantahub
-regardless beyond publishing pvr repositories to pantahub trails.
-
-## pvr ps
-
-```pvr ps``` gets a list of devices like below:
-
-```
-$ pvr ps
-     ID               NICK             REV   STATUS   STATE          SEEN            MESSAGE
-  5a21cefc   tops_urchin                20   NEW      xxxx    7 months ago         message....
-  5af32b42   verified_cicada             5   NEW      xxxx    5 months ago         message....
-  5af4ca2c   classic_crappie             0   DONE     xxxx    5 months ago         message....
-  5b07f476   resolved_mule               0   DONE     xxxx    4 months ago         message....
-  5b07ff81   right_vervet                0   DONE     xxxx    4 months ago         message....
-  5b08464f   helped_aphid                3   NEW      xxxx    about 23 hours ago   message....
-```
-

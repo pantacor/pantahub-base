@@ -107,6 +107,10 @@ func (mw *JWTMiddleware) middlewareImpl(writer rest.ResponseWriter, request *res
 		return
 	}
 
+	mClaims := token.Claims.(jwt.MapClaims)
+
+	request.Env["REMOTE_USER"] = mClaims["id"]
+
 	handler(writer, request)
 }
 
