@@ -52,11 +52,9 @@ type ObjectsApp struct {
 	awsRegion   string
 }
 
-var pantahubS3Path string
 var pantahubHttpsUrl string
 
 func init() {
-	pantahubS3Path = utils.GetEnv(utils.ENV_PANTAHUB_S3PATH)
 	pantahubHost := utils.GetEnv(utils.ENV_PANTAHUB_HOST)
 	pantahubPort := utils.GetEnv(utils.ENV_PANTAHUB_PORT)
 	pantahubScheme := utils.GetEnv(utils.ENV_PANTAHUB_SCHEME)
@@ -66,10 +64,6 @@ func init() {
 	if pantahubPort != "" {
 		pantahubHttpsUrl += ":" + pantahubPort
 	}
-}
-
-func PantahubS3Path() string {
-	return pantahubS3Path
 }
 
 func PantahubS3DevUrl() string {

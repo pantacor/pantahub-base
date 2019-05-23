@@ -24,7 +24,7 @@ To do define the admin password as env also with:
 
 
 ```
-	PANTAHUB_DEMOACCOUUNTS_PASSWORD_admin=YOURPASSWORDHERE
+	PANTAHUB_DEMOACCOUNTS_PASSWORD_admin=YOURPASSWORDHERE
 ```
 
 # Set Subscription (as Admin user)
