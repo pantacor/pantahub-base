@@ -55,14 +55,11 @@ func GetMongoClient() (*mongo.Client, error) {
 		mongoConnect += port
 	}
 
-	mongoConnect += "/"
+	mongoConnect += "/?"
 
-	if MongoDb != "" {
-		mongoConnect += MongoDb
+	if mongoRs != "" {
+		mongoConnect += "replicaSet=" + mongoRs
 	}
-
-	mongoConnect += "?authMechanism=SCRAM-SHA-1"
-
 	clientOptions = clientOptions.ApplyURI(mongoConnect)
 	if mongoRs != "" {
 		clientOptions = clientOptions.SetReplicaSet(mongoRs)
@@ -104,13 +101,7 @@ func GetMongoClientTest() (*mongo.Client, error) {
 		mongoConnect += port
 	}
 
-	mongoConnect += "/"
-
-	if MongoDb != "" {
-		mongoConnect += MongoDb
-	}
-
-	mongoConnect += "?authMechanism=SCRAM-SHA-1"
+	mongoConnect += "/?"
 
 	clientOptions = clientOptions.ApplyURI(mongoConnect)
 	if mongoRs != "" {
