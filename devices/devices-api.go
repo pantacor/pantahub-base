@@ -1397,26 +1397,26 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *DevicesAp
 	// /auth_status endpoints
 	api_router, _ := rest.MakeRouter(
 		// token api
-		rest.Post("/tokens", app.handle_posttokens),
-		rest.Delete("/tokens/:id", app.handle_disabletokens),
-		rest.Get("/tokens", app.handle_gettokens),
+		rest.Post("/tokens", utils.ScopeFilter([]string{"all", "devices", "devices.readonly"}, app.handle_posttokens)),
+		rest.Delete("/tokens/:id", utils.ScopeFilter([]string{"all", "devices", "devices.change"}, app.handle_disabletokens)),
+		rest.Get("/tokens", utils.ScopeFilter([]string{"all", "devices", "devices.readonly"}, app.handle_gettokens)),
 
 		// default api
-		rest.Get("/auth_status", handle_auth),
-		rest.Get("/", app.handle_getdevices),
-		rest.Post("/", app.handle_postdevice),
-		rest.Get("/:id", app.handle_getdevice),
-		rest.Put("/:id", app.handle_putdevice),
-		rest.Patch("/:id", app.handle_patchdevice),
-		rest.Put("/:id/public", app.handle_putpublic),
-		rest.Delete("/:id/public", app.handle_deletepublic),
-		rest.Put("/:id/user-meta", app.handle_putuserdata),
-		rest.Patch("/:id/user-meta", app.handle_patchuserdata),
-		rest.Put("/:id/device-meta", app.handle_putdevicedata),
-		rest.Patch("/:id/device-meta", app.handle_patchdevicedata),
-		rest.Delete("/:id", app.handle_deletedevice),
+		rest.Get("/auth_status", utils.ScopeFilter([]string{"all", "devices", "devices.readonly"}, handle_auth)),
+		rest.Get("/", utils.ScopeFilter([]string{"all", "devices", "devices.readonly"}, app.handle_getdevices)),
+		rest.Post("/", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_postdevice)),
+		rest.Get("/:id", utils.ScopeFilter([]string{"all", "devices", "devices.readonly"}, app.handle_getdevice)),
+		rest.Put("/:id", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_putdevice)),
+		rest.Patch("/:id", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_patchdevice)),
+		rest.Put("/:id/public", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_putpublic)),
+		rest.Delete("/:id/public", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_deletepublic)),
+		rest.Put("/:id/user-meta", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_putuserdata)),
+		rest.Patch("/:id/user-meta", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_patchuserdata)),
+		rest.Put("/:id/device-meta", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_putdevicedata)),
+		rest.Patch("/:id/device-meta", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_patchdevicedata)),
+		rest.Delete("/:id", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_deletedevice)),
 		// lookup by nick-path (np)
-		rest.Get("/np/:usernick/:devicenick", app.handle_getuserdevice),
+		rest.Get("/np/:usernick/:devicenick", utils.ScopeFilter([]string{"all", "devices", "devices.readonly"}, app.handle_getuserdevice)),
 	)
 	app.Api.SetApp(api_router)
 

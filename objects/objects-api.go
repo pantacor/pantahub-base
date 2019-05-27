@@ -723,13 +723,13 @@ func New(jwtMiddleware *jwt.JWTMiddleware, subService subscriptions.Subscription
 
 	// /auth_status endpoints
 	api_router, _ := rest.MakeRouter(
-		rest.Get("/auth_status", handle_auth),
-		rest.Get("/", app.handle_getobjects),
-		rest.Post("/", app.handle_postobject),
-		rest.Get("/:id", app.handle_getobject),
-		rest.Get("/:id/blob", app.handle_getobjectfile),
-		rest.Put("/:id", app.handle_putobject),
-		rest.Delete("/:id", app.handle_deleteobject),
+		rest.Get("/auth_status", utils.ScopeFilter([]string{"all", "devices", "objects", "objects.readonly"}, handle_auth)),
+		rest.Get("/", utils.ScopeFilter([]string{"all", "devices", "objects", "objects.readonly"}, app.handle_getobjects)),
+		rest.Post("/", utils.ScopeFilter([]string{"all", "devices", "objects", "objects.write"}, app.handle_postobject)),
+		rest.Get("/:id", utils.ScopeFilter([]string{"all", "devices", "objects", "objects.readonly"}, app.handle_getobject)),
+		rest.Get("/:id/blob", utils.ScopeFilter([]string{"all", "devices", "objects", "objects.readonly"}, app.handle_getobjectfile)),
+		rest.Put("/:id", utils.ScopeFilter([]string{"all", "devices", "objects", "objects.write"}, app.handle_putobject)),
+		rest.Delete("/:id", utils.ScopeFilter([]string{"all", "devices", "objects", "objects.write"}, app.handle_deleteobject)),
 	)
 	app.Api.SetApp(api_router)
 
