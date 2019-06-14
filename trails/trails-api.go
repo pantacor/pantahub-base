@@ -732,7 +732,6 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, "Error calculating Sha "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	newStep.State = utils.BsonQuoteMap(&newStep.State)
 
 	objectList, err := ProcessObjectsInState(newStep.Owner, newStep.State, a)
 	if err != nil {
@@ -740,6 +739,7 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 	newStep.UsedObjects = objectList
+	newStep.State = utils.BsonQuoteMap(&newStep.State)
 	if newStep.Meta == nil {
 		newStep.Meta = map[string]interface{}{}
 	}
