@@ -83,6 +83,7 @@ type Trail struct {
 	LastInSync   time.Time              `json:"last-insync" bson:"last-insync"`
 	LastTouched  time.Time              `json:"last-touched" bson:"last-touched"`
 	FactoryState map[string]interface{} `json:"factory-state" bson:"factory-state"`
+	UsedObjects  []string               `bson:"used_objects" json:"used_objects"`
 }
 
 // step wanted can be added by the device owner or delegate.
@@ -102,6 +103,7 @@ type Step struct {
 	StepTime     time.Time              `json:"step-time" bson:"step-time"`
 	ProgressTime time.Time              `json:"progress-time" bson:"progress-time"`
 	Meta         map[string]interface{} `json:"meta"` // json blurb
+	UsedObjects  []string               `bson:"used_objects" json:"used_objects"`
 }
 
 type StepProgress struct {
@@ -192,6 +194,12 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 	newTrail.Device = device.(string)
 	newTrail.LastInSync = time.Time{}
 	newTrail.LastTouched = newTrail.LastInSync
+	objectList, err := ProcessObjectsInState(newTrail.Owner, initialState, a)
+	if err != nil {
+		rest.Error(w, "Error processing trail objects in factory-state:"+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	newTrail.UsedObjects = objectList
 	newTrail.FactoryState = utils.BsonQuoteMap(&initialState)
 
 	newStep := Step{}
@@ -204,7 +212,6 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 	newStep.StateSha = stateSha
-	newStep.State = utils.BsonQuoteMap(&initialState)
 	newStep.Owner = newTrail.Owner
 	newStep.Device = newTrail.Device
 	newStep.CommitMsg = "Factory State (rev 0)"
@@ -219,6 +226,14 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
+	objectList, err = ProcessObjectsInState(newStep.Owner, initialState, a)
+	if err != nil {
+		rest.Error(w, "Error processing step objects in state"+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	newStep.UsedObjects = objectList
+	newStep.State = utils.BsonQuoteMap(&initialState)
+
 	// XXX: prototype: for production we need to prevent posting twice!!
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -712,13 +727,19 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 
 	// IMPORTANT: statesha has to be before state as that will be escaped
 	newStep.StateSha, err = utils.StateSha(&newStep.State)
-	newStep.State = utils.BsonQuoteMap(&newStep.State)
 
 	if err != nil {
 		rest.Error(w, "Error calculating Sha "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+	newStep.State = utils.BsonQuoteMap(&newStep.State)
 
+	objectList, err := ProcessObjectsInState(newStep.Owner, newStep.State, a)
+	if err != nil {
+		rest.Error(w, "Error processing step objects in state:"+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	newStep.UsedObjects = objectList
 	if newStep.Meta == nil {
 		newStep.Meta = map[string]interface{}{}
 	}
@@ -1795,11 +1816,19 @@ func (a *TrailsApp) handle_putstepstate(w rest.ResponseWriter, r *rest.Request) 
 	}
 
 	step.StateSha, err = utils.StateSha(&stateMap)
-	step.State = utils.BsonQuoteMap(&stateMap)
+
 	step.StepTime = time.Now()
 	step.ProgressTime = time.Unix(0, 0)
-
 	step.Id = trailId + "-" + rev
+
+	objectList, err := ProcessObjectsInState(step.Owner, stateMap, a)
+	if err != nil {
+		rest.Error(w, "Error processing step objects in state:"+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	step.UsedObjects = objectList
+	step.State = utils.BsonQuoteMap(&stateMap)
+
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	updateResult, err := coll.UpdateOne(
@@ -2149,6 +2178,172 @@ func (a *TrailsApp) handle_gettrailsummary(w rest.ResponseWriter, r *rest.Reques
 	}
 
 	w.WriteJson(summaries)
+}
+
+// ProcessObjectsInState :
+/*
+1.Get Object List from the State field
+2.UnMark All Objects As Garbages if they are marked as garbage
+*/
+func ProcessObjectsInState(
+	owner string,
+	state map[string]interface{},
+	a *TrailsApp,
+) (
+	objects []string,
+	err error,
+) {
+	objectList, err := GetStateObjects(owner, state, a)
+	if err != nil {
+		return objectList, err
+	}
+	err = RestoreObjects(objectList, a)
+	if err != nil {
+		return objectList, err
+	}
+	return objectList, nil
+}
+
+// GetStateObjects : Get State Objects
+func GetStateObjects(
+	owner string,
+	state map[string]interface{},
+	a *TrailsApp,
+) (
+	[]string,
+	error,
+) {
+	objectList := []string{}
+	objMap := map[string]bool{}
+	if len(state) == 0 {
+		return objectList, nil
+	}
+
+	spec, ok := state["#spec"]
+	if !ok {
+		return objectList, errors.New("state_object: Invalid state:#spec is missing")
+	}
+
+	specValue, ok := spec.(string)
+	if !ok {
+		return objectList, errors.New("state_object: Invalid state:Value of #spec should be string")
+	}
+
+	if specValue != "pantavisor-multi-platform@1" &&
+		specValue != "pantavisor-service-system@1" {
+		return objectList, errors.New("state_object: Invalid state:Value of #spec should not be " + specValue)
+	}
+
+	for key, v := range state {
+		if strings.HasSuffix(key, ".json") ||
+			key == "#spec" {
+			continue
+		}
+		sha, found := v.(string)
+		if !found {
+			return objectList, errors.New("state_object:Object is not a string[sha:" + sha + "]")
+		}
+		shaBytes, err := utils.DecodeSha256HexString(sha)
+		if err != nil {
+			return objectList, errors.New("state_object: Object sha that could not be decoded from hex:" + err.Error() + " [sha:" + sha + "]")
+		}
+		// lets use proper storage shas to reflect that fact that each
+		// owner has its own copy of the object instance on DB side
+		storageSha := objects.MakeStorageId(owner, shaBytes)
+		result, _ := IsObjectValid(storageSha, a)
+		if !result {
+			return objectList, errors.New("state_object: Object sha is not found in the db[storage-id(_id):" + storageSha + "]")
+		}
+		if _, ok := objMap[storageSha]; !ok {
+			objectList = append(objectList, storageSha)
+		}
+	}
+	return objectList, nil
+}
+
+// RestoreObjects : Takes the list of objects and unmarks them garbage.
+func RestoreObjects(
+	objectList []string,
+	a *TrailsApp,
+) error {
+
+	for _, storageSha := range objectList {
+
+		result, err := IsObjectGarbage(storageSha, a)
+		if err != nil {
+			return errors.New("Error checking garbage object:" + err.Error() + "[sha:" + storageSha + "]")
+		}
+		if result {
+			err := UnMarkObjectAsGarbage(storageSha, a)
+			if err != nil {
+				return errors.New("Error unmarking object as garbage:" + err.Error() + "[sha:" + storageSha + "]")
+			}
+		}
+	}
+	return nil
+}
+
+// IsObjectValid : to check if an object is valid or not
+func IsObjectValid(ObjectID string, a *TrailsApp) (
+	result bool,
+	errs error,
+) {
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	objectCount, err := collection.CountDocuments(ctx,
+		bson.M{
+			"_id": ObjectID,
+		},
+	)
+	if err != nil {
+		return false, errors.New("Error Finding Object:" + err.Error())
+	}
+	return (objectCount == 1), nil
+}
+
+// IsObjectGarbage : to check if an object is garbage or not
+func IsObjectGarbage(ObjectID string, a *TrailsApp) (
+	bool,
+	error,
+) {
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	objectCount, err := collection.CountDocuments(ctx,
+		bson.M{
+			"_id":     ObjectID,
+			"garbage": true,
+		},
+	)
+	if err != nil {
+		return false, errors.New("Error Finding Object:" + err.Error())
+	}
+	return (objectCount == 1), nil
+}
+
+// UnMarkObjectAsGarbage : to unmark object as garbage
+func UnMarkObjectAsGarbage(ObjectID string, a *TrailsApp) error {
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	updateResult, err := collection.UpdateOne(
+		ctx,
+		bson.M{
+			"_id": ObjectID,
+		},
+		bson.M{"$set": bson.M{
+			"garbage": false,
+		}},
+	)
+	if updateResult.MatchedCount == 0 {
+		return errors.New("unmark_object_as_garbage:Error updating object: not found")
+	}
+	if err != nil {
+		return errors.New("unmark_object_as_garbage:Error updating object:" + err.Error())
+	}
+	return nil
 }
 
 // XXX:
