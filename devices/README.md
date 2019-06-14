@@ -176,7 +176,7 @@ X-Powered-By: go-json-rest
 
 ```
 
-# Fill in User Metadata
+## Fill in User Metadata
 
 To fill in user metadata you need to be logged in as user like
 for all operations above:
@@ -222,7 +222,7 @@ X-Powered-By: go-json-rest
 }
 ```
 
-# Fill in Device Metadata
+## Fill in Device Metadata
 
 To fill in user metadata you need to be logged in as the device:
 
@@ -249,7 +249,7 @@ X-Powered-By: go-json-rest
 
 ```
 
-# Share your device with the world; mark it as public
+## Share your device with the world; mark it as public
 
 To mark device as public you can either update the public field
 using a full PUT on the device you you can use the convenience
@@ -270,7 +270,7 @@ X-Powered-By: go-json-rest
 }
 ```
 
-# Unshare your devices; unmark them public
+## Unshare your devices; unmark them public
 
 If you change your mind simply use the DELETE method on the public endpoint:
 
@@ -288,7 +288,8 @@ X-Powered-By: go-json-rest
 ...
 }
 ```
-# Change device nick
+
+## Change device nick
 
 To change device nick, use the PATCH method on the device resource, e.g.
 
@@ -331,7 +332,7 @@ X-Runtime: 0.001955
 }
 ```
 
-# Auto Assign Devices to Owners
+## Auto Assign Devices to Owners
 
 Pantahub base offers a built in basic factory story in the sense that we offer the ability to auto assing devices to a specific owner.
 
@@ -384,7 +385,7 @@ X-Runtime: 0.000635
 ```
 **Remember the ```token```* you won't be able to retrieve it another time.
 
-## Auto Assign Devices on Registration
+### Auto Assign Devices on Registration
 
 Now on device side you have to send the Pantahub-Devices-Auto-Token-V1: http header when registering yourself. This will make pantahub to automatically associated you with the owner of the token. Example:
 
@@ -425,7 +426,7 @@ X-Runtime: 0.000788
 ```
 
 
-## List tokens registered
+### List tokens registered
 
 If you want to see which tokens are already registered by your user, you can do so through a simple get at collection level:
 
@@ -501,7 +502,7 @@ X-Runtime: 0.000664
 ```
 
 
-## Disable Tokens
+### Disable Tokens
 
 In case you want to ensure no further devices will be auto assinged you can disable your token in pantahub. Existing devices will continue to be authenticated though.
 
