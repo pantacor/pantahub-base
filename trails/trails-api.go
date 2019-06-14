@@ -114,16 +114,16 @@ type StepProgress struct {
 }
 
 type TrailSummary struct {
-	DeviceId         string    `json:"deviceid"`
-	Device           string    `json:"device"`
+	DeviceId         string    `json:"deviceid" bson:"deviceid"`
+	Device           string    `json:"device" bson:"device"`
 	DeviceNick       string    `json:"device-nick" bson:"device_nick"`
-	Rev              int       `json:"revision"`
+	Rev              int       `json:"revision" bson:"revision"`
 	ProgressRev      int       `json:"progress-revision" bson:"progress_revision"`
-	Progress         int       `json:"progress"` // progress number. steps or 1-100
-	IsPublic         bool      `json:"public"`
+	Progress         int       `json:"progress" bson:"progress"` // progress number. steps or 1-100
+	IsPublic         bool      `json:"public" bson:"public"`
 	StateSha         string    `json:"state-sha" bson:"state_sha256"`
 	StatusMsg        string    `json:"status-msg" bson:"status_msg"` // message of progress status
-	Status           string    `json:"status"`                       // status code
+	Status           string    `json:"status" bson:"status"`         // status code
 	Timestamp        time.Time `json:"timestamp" bson:"timestamp"`   // greater of last seen and last modified
 	StepTime         time.Time `json:"step-time" bson:"step_time"`
 	ProgressTime     time.Time `json:"progress-time" bson:"progress_time"`
