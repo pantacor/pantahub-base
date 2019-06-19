@@ -9,7 +9,11 @@ import (
 )
 
 func RestError(w rest.ResponseWriter, err error, message string, status_code int) {
+	errStr := "<nil>"
+	if err != nil {
+		errStr = err.Error()
+	}
 	errId := primitive.NewObjectID()
-	log.Println("ERROR: " + message + " -- " + err.Error() + " -- statuscode: " + fmt.Sprintf("%d", status_code) + " -- sid: " + errId.Hex())
+	log.Println("ERROR: " + message + " -- " + errStr + " -- statuscode: " + fmt.Sprintf("%d", status_code) + " -- sid: " + errId.Hex())
 	rest.Error(w, message+" (sid: "+errId.Hex()+")", status_code)
 }
