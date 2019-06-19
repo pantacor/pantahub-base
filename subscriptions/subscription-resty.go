@@ -137,7 +137,7 @@ func (s *SubscriptionsApp) put(w rest.ResponseWriter, r *rest.Request) {
 
 	sub, err := s.service.LoadBySubject(req.Subject)
 
-	if err != nil {
+	if err != nil && err != mongo.ErrNoDocuments {
 		// XXX: right now not implemented
 		errID := bson.NewObjectId()
 		log.Printf("ERROR (%s): error using database in 'post subscriptions' by user %s: %s'\n",
