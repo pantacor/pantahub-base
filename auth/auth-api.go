@@ -66,7 +66,7 @@ func AccountToPayload(account accounts.Account) map[string]interface{} {
 		result["type"] = "USER"
 		break
 	case accounts.ACCOUNT_TYPE_USER:
-		result["roles"] = "admin"
+		result["roles"] = "user"
 		result["type"] = "USER"
 		break
 	case accounts.ACCOUNT_TYPE_DEVICE:
