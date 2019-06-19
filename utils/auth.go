@@ -32,7 +32,7 @@ type AuthInfo struct {
 	Owner      Prn
 	Roles      string
 	Audience   string
-	Scopes     string
+	Scopes     []string
 	Nick       string
 	RemoteUser string
 }
@@ -101,13 +101,7 @@ func (s *AuthMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFu
 		scopes, ok := callerClaims["scopes"]
 		if ok {
 			scopesStr := scopes.(string)
-			authInfo.Scopes = scopesStr
-
-			if authInfo.Scopes != "*" &&
-				strings.HasPrefix(authInfo.Scopes, "prn:pantahub.com:apis:/base/") {
-				rest.Error(w, "You need to have oauth2 scopes '*' or any 'prn:pantahub.com:apis:/base/*' to access this endpoint, not: "+authInfo.Scopes, http.StatusForbidden)
-				return
-			}
+			authInfo.Scopes = strings.Fields(scopesStr)
 		}
 		nick, ok := callerClaims["nick"]
 		if ok {
@@ -127,4 +121,47 @@ func (s *AuthMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFu
 		r.Env = env
 		handler(w, r)
 	}
+}
+
+//ScopeFilter :  Scope Filter for end points
+func ScopeFilter(filterScopes []string, handler rest.HandlerFunc) rest.HandlerFunc {
+
+	filterScopes = parseScopes(filterScopes)
+
+	return func(w rest.ResponseWriter, r *rest.Request) {
+		authInfo := GetAuthInfo(r)
+		if authInfo != nil && len(filterScopes) > 0 {
+			if !matchScope(filterScopes, authInfo.Scopes) {
+				phAuth := GetEnv(ENV_PANTAHUB_AUTH)
+				w.Header().Set("WWW-Authenticate", `Bearer Realm="pantahub services",
+								ph-aeps="`+phAuth+`",
+								scope="`+strings.Join(filterScopes, " ")+`",
+								error="insufficient_scope",
+								error_description="The request requires higher privileges than provided by the
+				     access token"
+								`)
+				rest.Error(w, "InSufficient Scopes", http.StatusForbidden)
+				return
+			}
+		}
+		handler(w, r)
+	}
+}
+
+func matchScope(filterScopes []string, requestScopes []string) bool {
+
+	for _, fs := range filterScopes {
+		for _, rs := range requestScopes {
+			if fs == rs {
+				return true
+			}
+		}
+	}
+	return false
+}
+func parseScopes(scopes []string) []string {
+	for k, scope := range scopes {
+		scopes[k] = "prn:pantahub.com:apis:/base/" + scope
+	}
+	return scopes
 }

@@ -89,6 +89,7 @@ func AccountToPayload(account accounts.Account) map[string]interface{} {
 	result["id"] = account.Prn
 	result["nick"] = account.Nick
 	result["prn"] = account.Prn
+	result["scopes"] = "prn:pantahub.com:apis:/base/all"
 
 	return result
 }
@@ -1105,11 +1106,12 @@ func (a *AuthApp) devicePayload(deviceId string) map[string]interface{} {
 	}
 
 	val := map[string]interface{}{
-		"id":    device.Prn,
-		"roles": "device",
-		"type":  "DEVICE",
-		"prn":   device.Prn,
-		"owner": device.Owner,
+		"id":     device.Prn,
+		"roles":  "device",
+		"type":   "DEVICE",
+		"prn":    device.Prn,
+		"owner":  device.Owner,
+		"scopes": "prn:pantahub.com:apis:/base/all",
 	}
 
 	return val

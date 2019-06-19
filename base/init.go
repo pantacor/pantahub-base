@@ -16,9 +16,9 @@
 package base
 
 import (
+	"log"
 	"net/http"
 	"time"
-	"log"
 
 	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
 	"github.com/rs/cors"
@@ -123,7 +123,7 @@ func DoInit() {
 		fservermux = NewS3FileServer()
 	default:
 		log.Println("INFO: using 'local' driver to serve object blobs/files")
-		fservermux = &LocalFileServer{fileServer: http.FileServer(http.Dir(objects.PantahubS3Path())), directory: objects.PantahubS3Path()}
+		fservermux = &LocalFileServer{fileServer: http.FileServer(http.Dir(utils.PantahubS3Path())), directory: utils.PantahubS3Path()}
 	}
 
 	// default cors - allow GET and POST from all origins
