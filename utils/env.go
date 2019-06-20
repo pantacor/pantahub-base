@@ -223,7 +223,7 @@ var defaultEnvs = map[string]string{
 	ENV_PANTAHUB_PRODUCTNAME:                    "pantahub-personal",
 	ENV_PANTAHUB_DEMOACCOUNTS_PASSWORD_service1: "O9i8HlpSc",
 	ENV_PANTAHUB_JWT_AUTH_SECRET:                "YOU MUST CHANGE THIS",
-	ENV_PANTAHUB_AUTH_SECRET:                		 "YOU MUST CHANGE THIS",
+	ENV_PANTAHUB_AUTH_SECRET:                    "YOU MUST CHANGE THIS",
 	ENV_PANTAHUB_JWT_OBJECT_SECRET:              "YOU MUST CHANGE THIS",
 
 	ENV_PANTAHUB_HOST:       "localhost",
