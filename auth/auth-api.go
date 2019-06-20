@@ -205,7 +205,9 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	newAccount.Password, err := utils.HashPassword(newAccount.Password)
+	newAccount.PasswordHash, err := utils.HashPassword(newAccount.Password, utils.CryptoMethods.BCrypt)
+	newAccount.PasswordScrypt, err := utils.HashPassword(newAccount.Password, utils.CryptoMethods.SCrypt)
+	newAccount.Password = ""
 	if err != nil {
 		utils.RestError(w, err, err.Error(), http.StatusInternalServerError)
 		return 
@@ -652,7 +654,8 @@ func (app *AuthApp) handle_password_reset(writer rest.ResponseWriter, r *rest.Re
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	password, err := utils.HashPassword(data.Password)
+	passwordHash, err := utils.HashPassword(data.Password, utils.CryptoMethods.BCrypt)
+	passwordScrypt, err := utils.HashPassword(data.Password, utils.CryptoMethods.SCrypt)
 	if err != nil {
 		utils.RestError(writer, err, err.Error(), http.StatusInternalServerError)
 		return 
@@ -660,7 +663,8 @@ func (app *AuthApp) handle_password_reset(writer rest.ResponseWriter, r *rest.Re
 
 	update := bson.M{
 		"$set": bson.M{
-			"password": password,
+			"password_hash": passwordHash,
+			"password_scrypt": passwordScrypt,
 		},
 	}
 	filter := bson.M{
@@ -1141,7 +1145,7 @@ func (a *AuthApp) accountAuth(idEmailNick string, secret string) bool {
 	}
 
 	// account has same password as the secret provided to func call -> success
-	if utils.CheckPasswordHash(secret, account.Password) {
+	if utils.CheckPasswordHash(secret, account.PasswordHash, utils.CryptoMethods.BCrypt) {
 		return true
 	}
 

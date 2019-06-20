@@ -41,6 +41,8 @@ type Account struct {
 	Prn   string      `json:"prn" bson:"prn"`
 
 	Password  string `json:"password,omitempty" bson:"password"`
+	PasswordHash string `json:"password,omitempty" bson:"password_hash"`
+	PasswordScrypt string `json:"password,omitempty" bson:"password_script"`
 	Challenge string `json:"challenge,omitempty" bson:"challenge"`
 
 	TimeCreated  time.Time `json:"time-created" bson:"time-created"`
