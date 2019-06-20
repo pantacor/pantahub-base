@@ -1,20 +1,28 @@
-version: "2"
+version: "3"
 
 services:
   base:
     build:
       context: .
       dockerfile: Dockerfile.development
-    volumes:
-      - ${PWD}:/go/src/gitlab.com/pantacor/pantahub-base
-    env_file: ./.env.local
-    ports:
-      - 12365:12365
-    depends_on:
+    links:
       - mongo
       - fluentd
-      - kafka
       - elasticsearch
+    volumes:
+      - ${PWD}:/go/src/gitlab.com/pantacor/pantahub-base
+    ports:
+      - 12365:12365
+    links:
+      - localstack
+      - mongo
+    env_file: ./env.default
+
+  mongo:
+    image: mongo
+    volumes:
+      - ./pantahub-base-mongo-docker-run:/docker-entrypoint
+    command: /docker-entrypoint
 
   fluentd:
     image: fluent/fluentd
@@ -35,30 +43,11 @@ services:
         hard: -1
     restart: always
 
-  mongo:
-    image: mongo
-    volumes:
-      - ./mongo-entrypoint.sh:/docker-entrypoint
-    command: /docker-entrypoint
-
-  zookeeper:
-    container_name: zookeeper
-    image: confluentinc/cp-zookeeper:5.2.1
+  localstack:
+    image: localstack/localstack:0.9.0
     environment:
-      - ZOOKEEPER_CLIENT_PORT=32181
-      - ZOOKEEPER_TICK_TIME=2000
-      - ZOOKEEPER_SYNC_LIMIT=2
-
-  kafka:
-    container_name: kafka
-    image: confluentinc/cp-kafka:5.0.1
-    volumes:
-      - ./kafka-entrypoint.sh:/docker-entrypoint
-    command: /docker-entrypoint
-    links:
-      - zookeeper
-    environment:
-      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:32181
-      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092
-      - KAFKA_BROKER_ID=2
-      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - SERVICES=s3:5000
+      - DEFAULT_REGION=us-east-1
+      - HOSTNAME=localstack-s3
+    ports:
+      - "5000:5000"
