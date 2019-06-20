@@ -76,7 +76,7 @@ func bcryptCheckPasswordHash(password, hash string) bool {
 }
 
 func scryptHashPassword(password string) (string, error) {
-	bytes, err := scrypt.Key([]byte(password), utils.GetEnv(utils.ENV_PANTAHUB_JWT_AUTH_SECRET), 32768, 8, 1, 32)
+	bytes, err := scrypt.Key([]byte(password), utils.GetEnv(utils.ENV_PANTAHUB_AUTH_SECRET), 32768, 8, 1, 32)
 	return string(bytes), err
 }
 
