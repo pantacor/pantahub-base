@@ -97,11 +97,21 @@ func AccountToPayload(account accounts.Account) map[string]interface{} {
 type AccountType string
 
 const (
-	ACCOUNT_TYPE_ADMIN   = AccountType("ADMIN")
-	ACCOUNT_TYPE_DEVICE  = AccountType("DEVICE")
-	ACCOUNT_TYPE_ORG     = AccountType("ORG")
-	ACCOUNT_TYPE_SERVICE = AccountType("SERVICE")
-	ACCOUNT_TYPE_USER    = AccountType("USER")
+	ACCOUNT_TYPE_ADMIN          = AccountType("ADMIN")
+	ACCOUNT_TYPE_DEVICE         = AccountType("DEVICE")
+	ACCOUNT_TYPE_ORG            = AccountType("ORG")
+	ACCOUNT_TYPE_SERVICE        = AccountType("SERVICE")
+	ACCOUNT_TYPE_USER           = AccountType("USER")
+	tokenIsNeedItErr            = "Exchange token is need it"
+	passwordIsNeedItErr         = "New password is need it"
+	tokenInvalidOrExpiredErr    = "Invalid or expired token"
+	emailRequiredForPasswordErr = "Use email is required in order to send recovey email"
+	dbConnectionErr							= "Error with Database connectivity"
+	emailNotFoundErr 						= "Email don't exist"
+	tokenCreationErr 						= "Error creating token"
+	sendEmailErr 								= "Error sending email"
+	restorePasswordTTL          = 15
+	restorePasswordTTLUnit      = time.Minute
 )
 
 func handle_auth(w rest.ResponseWriter, r *rest.Request) {
@@ -189,10 +199,16 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, "Accounts must have a nick set", http.StatusPreconditionFailed)
 		return
 	}
-	log.Print(newAccount)
+
 	if !newAccount.Id.IsZero() {
 		rest.Error(w, "Accounts cannot have id before creation", http.StatusPreconditionFailed)
 		return
+	}
+
+	newAccount.Password, err := utils.HashPassword(newAccount.Password)
+	if err != nil {
+		utils.RestError(w, err, err.Error(), http.StatusInternalServerError)
+		return 
 	}
 
 	mgoid := primitive.NewObjectID()
@@ -201,12 +217,15 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
+
 	newAccount.Id = ObjectID
 	newAccount.Prn = "prn:::accounts:/" + newAccount.Id.Hex()
 	newAccount.Challenge = utils.GenerateChallenge()
 	newAccount.TimeCreated = time.Now()
 	newAccount.Type = accounts.ACCOUNT_TYPE_USER // XXX: need org approach too
 	newAccount.TimeModified = newAccount.TimeCreated
+
+	log.Print(newAccount)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -583,17 +602,83 @@ func (app *AuthApp) handle_postauthorizetoken(w rest.ResponseWriter, r *rest.Req
 	w.WriteJson(response)
 }
 
-// this requests to swap access code with accesstoken
-type tokenRequest struct {
-	Code    string `json:"access-code"`
-	Comment string `json:"comment"`
+type passwordReset struct {
+	Token string `json:"token"`
+	Password string `json:"password"`
 }
-type tokenStore struct {
-	ID      primitive.ObjectID     `json:"id", bson:"_id"`
-	Client  string                 `json:"client"`
-	Owner   string                 `json:"owner"`
-	Comment string                 `json:"comment"`
-	Claims  map[string]interface{} `json:"jwt-claims"`
+
+type resetPasswordClaims struct {
+	Email string `json:"email"`
+	jwtgo.StandardClaims
+}
+
+// handle_password_reset gets the recovery token and validate it in order to overwrite the user password
+func (app *AuthApp) handle_password_reset(writer rest.ResponseWriter, r *rest.Request) {
+	data := passwordReset{}
+
+	r.DecodeJsonPayload(&data)
+
+	if data.Token == "" {
+		utils.RestError(writer, nil, tokenIsNeedItErr, http.StatusBadRequest)
+		return
+	}
+
+	if data.Password == "" {
+		utils.RestError(writer, nil, passwordIsNeedItErr, http.StatusBadRequest)
+		return
+	}
+
+	token, err := jwtgo.ParseWithClaims(data.Token, &resetPasswordClaims{}, func(token *jwtgo.Token) (interface{}, error) {
+		return app.jwt_middleware.Key, nil	
+	})
+	if err != nil {
+		utils.RestError(writer, err, tokenInvalidOrExpiredErr, http.StatusInternalServerError)
+		return
+	}
+
+	claims := token.Claims.(*resetPasswordClaims)
+	err = claims.Valid()
+	if err != nil {
+		utils.RestError(writer, err, tokenInvalidOrExpiredErr, http.StatusInternalServerError)
+		return
+	}
+
+	collection := app.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
+	if collection == nil {
+		utils.RestError(writer, nil, dbConnectionErr, http.StatusInternalServerError)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	password, err := utils.HashPassword(data.Password)
+	if err != nil {
+		utils.RestError(writer, err, err.Error(), http.StatusInternalServerError)
+		return 
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"password": password,
+		},
+	}
+	filter := bson.M{
+		"email": claims.Email,
+		"garbage": bson.M{"$ne": true},
+	}
+
+	updateOptions := options.Update()
+	_, err = collection.UpdateOne(
+		ctx,
+		filter,
+		update,
+		updateOptions,
+	)
+	if err != nil {
+		utils.RestError(writer, err, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 type tokenResponse struct {
@@ -602,6 +687,78 @@ type tokenResponse struct {
 	State       string `json:"state"`
 	TokenType   string `json:"token_type"`
 	Scopes      string `json:"scopes"`
+}
+
+type passwordResetRequest struct {
+	Email string `json:"email"`
+}
+
+// handle_password_recovery send email with token to user in order to reset password to given user
+func (app *AuthApp) handle_password_recovery(writer rest.ResponseWriter, r *rest.Request) {
+	data := passwordResetRequest{}
+
+	r.DecodeJsonPayload(&data)
+
+	if data.Email == "" {
+		utils.RestError(writer, nil, emailRequiredForPasswordErr, http.StatusPreconditionFailed)
+		return
+	}
+
+	collection := app.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
+	if collection == nil {
+		utils.RestError(writer, nil, dbConnectionErr, http.StatusInternalServerError)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	account := accounts.AccountPublic{}
+	filter := bson.M{
+		"email": data.Email,
+		"garbage": bson.M{"$ne": true},
+	}
+
+	err := collection.FindOne(ctx, filter).Decode(&account)
+	if err != nil {
+		utils.RestError(writer, nil, emailNotFoundErr, http.StatusNotFound)
+		return
+	}
+	
+	claims := resetPasswordClaims{
+    account.Email,
+    jwtgo.StandardClaims{
+			ExpiresAt: time.Now().UTC().Add(restorePasswordTTL * restorePasswordTTLUnit).Unix(),
+    },
+	}
+
+	token := jwtgo.NewWithClaims(jwtgo.GetSigningMethod(app.jwt_middleware.SigningAlgorithm), claims)
+
+	tokenString, err := token.SignedString(app.jwt_middleware.Key)
+	if err != nil {
+		utils.RestError(writer, err, tokenCreationErr, http.StatusInternalServerError)
+		return
+	}
+
+	err = utils.SendResetPasswordEmail(account.Email, account.Nick, tokenString)
+	if err != nil {
+		utils.RestError(writer, err, sendEmailErr, http.StatusInternalServerError)
+		return
+	}
+}
+
+// this requests to swap access code with accesstoken
+type tokenRequest struct {
+	Code    string `json:"access-code"`
+	Comment string `json:"comment"`
+}
+
+type tokenStore struct {
+	ID      primitive.ObjectID     `json:"id", bson:"_id"`
+	Client  string                 `json:"client"`
+	Owner   string                 `json:"owner"`
+	Comment string                 `json:"comment"`
+	Claims  map[string]interface{} `json:"jwt-claims"`
 }
 
 // handle_posttoken can be used by services to swap an accessCode to a long living accessToken.
@@ -807,19 +964,21 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 			loginUser = userId
 		}
 
-		testUserId := loginUser
+		testUserID := loginUser
 		if !strings.HasPrefix(loginUser, "prn:") {
-			testUserId = "prn:pantahub.com:auth:/" + loginUser
+			testUserID = "prn:pantahub.com:auth:/" + loginUser
 		}
-		if plm, ok := accounts.DefaultAccounts[testUserId]; !ok {
+
+		plm, ok := accounts.DefaultAccounts[testUserID]
+		if !ok {
 			if strings.HasPrefix(loginUser, "prn:::devices:") {
 				return app.deviceAuth(loginUser, password)
-			} else {
-				return app.accountAuth(loginUser, password)
 			}
-		} else {
-			return plm.Password == password
+			
+			return app.accountAuth(loginUser, password)
 		}
+		
+		return plm.Password == password
 	}
 
 	jwtMiddleware.PayloadFunc = func(userId string) map[string]interface{} {
@@ -835,11 +994,11 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 			loginUser = userId
 		}
 
-		testUserId := loginUser
+		testUserID := loginUser
 		if !strings.HasPrefix(loginUser, "prn:") {
-			testUserId = "prn:pantahub.com:auth:/" + loginUser
+			testUserID = "prn:pantahub.com:auth:/" + loginUser
 		}
-		if plm, ok := accounts.DefaultAccounts[testUserId]; !ok {
+		if plm, ok := accounts.DefaultAccounts[testUserID]; !ok {
 			if strings.HasPrefix(userId, "prn:::devices:") {
 				payload = app.devicePayload(loginUser)
 			} else {
@@ -884,7 +1043,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 		Condition: func(request *rest.Request) bool {
 			return request.URL.Path != "/login" &&
 				!(request.URL.Path == "/accounts" && request.Method == "POST") &&
-				!(request.URL.Path == "/verify" && request.Method == "GET")
+				!(request.URL.Path == "/verify" && request.Method == "GET") &&
+				!(request.URL.Path == "/password_recovery" && request.Method == "POST") &&
+				!(request.URL.Path == "/password" && request.Method == "POST")
 		},
 		IfTrue: app.jwt_middleware,
 	})
@@ -894,7 +1055,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 		Condition: func(request *rest.Request) bool {
 			return request.URL.Path != "/login" &&
 				!(request.URL.Path == "/accounts" && request.Method == "POST") &&
-				!(request.URL.Path == "/verify" && request.Method == "GET")
+				!(request.URL.Path == "/verify" && request.Method == "GET") &&
+				!(request.URL.Path == "/password_recovery" && request.Method == "POST") &&
+				!(request.URL.Path == "/password" && request.Method == "POST")
 		},
 		IfTrue: &utils.AuthMiddleware{},
 	})
@@ -911,6 +1074,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 		rest.Get("/accounts", app.handle_getaccounts),
 		rest.Post("/accounts", app.handle_postaccount),
 		rest.Get("/verify", app.handle_verify),
+		rest.Post("/password_recovery", app.handle_password_recovery),
+		rest.Post("/password", app.handle_password_reset),
 	)
 	app.Api.SetApp(api_router)
 
@@ -976,7 +1141,7 @@ func (a *AuthApp) accountAuth(idEmailNick string, secret string) bool {
 	}
 
 	// account has same password as the secret provided to func call -> success
-	if secret == account.Password {
+	if utils.CheckPasswordHash(secret, account.Password) {
 		return true
 	}
 

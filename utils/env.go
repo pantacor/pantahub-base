@@ -276,7 +276,7 @@ var defaultEnvs = map[string]string{
 	ENV_SMTP_PORT: "25",
 	ENV_SMTP_USER: "XXX",
 	ENV_SMTP_PASS: "XXX",
-	ENV_REG_EMAIL: "admin@pantacor.com",
+	ENV_REG_EMAIL: "sergio.marin@pantacor.com",
 
 	// pantahub internal envs
 	ENV_PANTAHUB_AUTH: "http://localhost:12365/auth",
