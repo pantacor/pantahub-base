@@ -15,6 +15,7 @@ package utils
 
 import (
 	"errors"
+	"encoding/hex"
 
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/crypto/scrypt"
@@ -80,10 +81,10 @@ func bcryptCheckPasswordHash(password, hash string) bool {
 
 func scryptHashPassword(password string) (string, error) {
 	bytes, err := scrypt.Key([]byte(password), []byte(GetEnv(ENV_PANTAHUB_AUTH_SECRET)), 32768, 8, 1, 32)
-	return string(bytes), err
+	return hex.EncodeToString(bytes), err
 }
 
 func scryptCheckPasswordHash(password, hash string) bool {
 	passwordHash, err := scryptHashPassword(password)
-	return err == nil && string(passwordHash) == hash
+	return err == nil && passwordHash == hash
 }
