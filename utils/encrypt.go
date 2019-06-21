@@ -24,22 +24,25 @@ import (
 type Method string
 
 const (
-	 // BCrypt method
-	BCrypt Method = "bcrypt"
-	 // SCrypt method
-	SCrypt Method = "scrypt"
+	// BCryptMethod method
+	BCryptMethod Method = "bcrypt"
+	// SCryptMethod method
+	SCryptMethod Method = "scrypt"
 )
 
 type crytoMethods struct {
 	BCrypt Method
-	Scrypt Method
+	SCrypt Method
 }
 
-CryptoMethods = &crytoMethods{
-	BCrypt: BCrypt,
-	Scrypt: Scrypt,
-}
-errMethodNotFound := errors.New("The only encrypt method supported are bcrypt and scrypt")
+// CryptoMethods kind a enum for cryptography methods supported
+var (
+	CryptoMethods = &crytoMethods{
+		BCrypt: BCryptMethod,
+		SCrypt: SCryptMethod,
+	}
+	errMethodNotFound = errors.New("The only encrypt method supported are bcrypt and scrypt")
+)
 
 // HashPassword create a hashed version of a string
 func HashPassword (password string, method Method) (string, error){
@@ -54,14 +57,14 @@ func HashPassword (password string, method Method) (string, error){
 }
 
 // CheckPasswordHash validate password agains a given hash
-func CheckPasswordHash (password string, method Method) (string, error){
+func CheckPasswordHash (password, hash string, method Method) bool {
 	switch method {
-	case BCrypt:
-		return bcryptCheckPasswordHash(password)
-	case SCrypt:
-		return scryptCheckPasswordHash(password)
+	case CryptoMethods.BCrypt:
+		return bcryptCheckPasswordHash(password, hash)
+	case CryptoMethods.SCrypt:
+		return scryptCheckPasswordHash(password, hash)
 	default:
-		return "", errMethodNotFound
+		return false
 	}
 }
 
@@ -76,11 +79,11 @@ func bcryptCheckPasswordHash(password, hash string) bool {
 }
 
 func scryptHashPassword(password string) (string, error) {
-	bytes, err := scrypt.Key([]byte(password), utils.GetEnv(utils.ENV_PANTAHUB_AUTH_SECRET), 32768, 8, 1, 32)
+	bytes, err := scrypt.Key([]byte(password), []byte(GetEnv(ENV_PANTAHUB_AUTH_SECRET)), 32768, 8, 1, 32)
 	return string(bytes), err
 }
 
 func scryptCheckPasswordHash(password, hash string) bool {
-	passwordHash, err := ScryptHashPassword(password)
+	passwordHash, err := scryptHashPassword(password)
 	return err == nil && string(passwordHash) == hash
 }
