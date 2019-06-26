@@ -6,3 +6,4 @@ docker.env
 debug
 pantahub-base.exe
 s3-storage/
+tmp
