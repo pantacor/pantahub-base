@@ -1,4 +1,4 @@
-FROM golang:alpine as builder
+FROM golang:alpine3.9 as builder
 
 WORKDIR /go/src/gitlab.com/pantacor/pantahub-base
 COPY . .
