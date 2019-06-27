@@ -18,6 +18,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -531,7 +532,7 @@ func (app *AuthApp) handle_postauthorizetoken(w rest.ResponseWriter, r *rest.Req
 	tokenClaims["aud"] = req.Service
 	tokenClaims["scopes"] = req.Scopes
 	tokenClaims["prn"] = caller
-	tokenClaims["exp"] = time.Now().Add(time.Minute * 60)
+	tokenClaims["exp"] = time.Now().Add(app.jwt_middleware.Timeout)
 	tokenString, err := token.SignedString(app.jwt_middleware.Key)
 
 	if err != nil {
@@ -569,7 +570,7 @@ func (app *AuthApp) handle_postauthorizetoken(w rest.ResponseWriter, r *rest.Req
 	params := url.Values{}
 	params.Add("token_type", "bearer")
 	params.Add("access_token", tokenString)
-	params.Add("expires_in", "3600")
+	params.Add("expires_in", fmt.Sprintf("%d", app.jwt_middleware.Timeout/time.Second))
 	params.Add("scope", req.Scopes)
 	params.Add("state", req.State)
 
