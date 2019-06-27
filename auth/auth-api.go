@@ -137,7 +137,7 @@ func (a *AuthApp) handle_getaccounts(w rest.ResponseWriter, r *rest.Request) {
 	defer cancel()
 
 	// NO ADMIN: FILTER
-	if asAdminMode == "" {
+	if true && asAdminMode == "" {
 		cur, err = collection.Find(ctx, bson.M{
 			"$or": bson.A{
 				bson.M{"prn": authInfo.Caller},
