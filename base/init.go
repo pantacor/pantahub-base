@@ -16,9 +16,10 @@
 package base
 
 import (
-	"net/http"
-	"time"
 	"log"
+	"net/http"
+	"strconv"
+	"time"
 
 	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
 	"github.com/rs/cors"
@@ -46,11 +47,23 @@ func DoInit() {
 		adminUsers, subscriptions.SubscriptionProperties)
 
 	{
+		timeoutStr := utils.GetEnv(utils.ENV_PANTAHUB_JWT_TIMEOUT_MINUTES)
+		timeout, err := strconv.Atoi(timeoutStr)
+		if err != nil {
+			panic(err)
+		}
+
+		maxRefreshStr := utils.GetEnv(utils.ENV_PANTAHUB_JWT_MAX_REFRESH_MINUTES)
+		maxRefresh, err := strconv.Atoi(maxRefreshStr)
+		if err != nil {
+			panic(err)
+		}
+
 		app := auth.New(&jwt.JWTMiddleware{
 			Key:        []byte(jwtSecret),
 			Realm:      "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
-			Timeout:    time.Minute * 60,
-			MaxRefresh: time.Hour * 24,
+			Timeout:    time.Minute * time.Duration(timeout),
+			MaxRefresh: time.Hour * time.Duration(maxRefresh),
 		}, mongoClient)
 		http.Handle("/auth/", http.StripPrefix("/auth", app.Api.MakeHandler()))
 	}
@@ -123,7 +136,7 @@ func DoInit() {
 		fservermux = NewS3FileServer()
 	default:
 		log.Println("INFO: using 'local' driver to serve object blobs/files")
-		fservermux = &LocalFileServer{fileServer: http.FileServer(http.Dir(objects.PantahubS3Path())), directory: objects.PantahubS3Path()}
+		fservermux = &LocalFileServer{fileServer: http.FileServer(http.Dir(utils.PantahubS3Path())), directory: utils.PantahubS3Path()}
 	}
 
 	// default cors - allow GET and POST from all origins

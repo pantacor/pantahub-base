@@ -30,6 +30,14 @@ const (
 	// default: "THIS MUST BE CHANGED"
 	ENV_PANTAHUB_JWT_OBJECT_SECRET = "PANTAHUB_JWT_OBJECT_SECRET"
 
+	// Pantahub JWT Token Timeout in Minutes
+	// default: 60
+	ENV_PANTAHUB_JWT_TIMEOUT_MINUTES = "PANTAHUB_JWT_TIMEOUT_MINUTES"
+
+	// Pantahub JWT Max Refresh timeout in Minutes
+	// default: 24 * 60
+	ENV_PANTAHUB_JWT_MAX_REFRESH_MINUTES = "PANTAHUB_JWT_MAX_REFRESH_MINUTES"
+
 	// Host you want clients to reach this server under
 	// default: localhost
 	ENV_PANTAHUB_HOST = "PANTAHUB_HOST"
@@ -213,13 +221,18 @@ const (
 
 	// Pantahub GC garbage expiry time to remove it
 	ENV_PANTAHUB_GC_GARBAGE_EXPIRY = "PANTAHUB_GC_GARBAGE_EXPIRY"
+
+	// Pantahub Demo Account:service1 password
+	ENV_PANTAHUB_DEMOACCOUNTS_PASSWORD_service1 = "PANTAHUB_DEMOACCOUNTS_PASSWORD_service1"
 )
 
 var defaultEnvs = map[string]string{
-	ENV_PANTAHUB_PRODUCTNAME: "pantahub-personal",
-
-	ENV_PANTAHUB_JWT_AUTH_SECRET:   "YOU MUST CHANGE THIS",
-	ENV_PANTAHUB_JWT_OBJECT_SECRET: "YOU MUST CHANGE THIS",
+	ENV_PANTAHUB_PRODUCTNAME:                    "pantahub-personal",
+	ENV_PANTAHUB_DEMOACCOUNTS_PASSWORD_service1: "O9i8HlpSc",
+	ENV_PANTAHUB_JWT_AUTH_SECRET:                "YOU MUST CHANGE THIS",
+	ENV_PANTAHUB_JWT_OBJECT_SECRET:              "YOU MUST CHANGE THIS",
+	ENV_PANTAHUB_JWT_TIMEOUT_MINUTES:            "60",
+	ENV_PANTAHUB_JWT_MAX_REFRESH_MINUTES:        "1440",
 
 	ENV_PANTAHUB_HOST:       "localhost",
 	ENV_PANTAHUB_HOST_WWW:   "localhost",

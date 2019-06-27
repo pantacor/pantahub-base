@@ -18,6 +18,7 @@ package accounts
 import (
 	"time"
 
+	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -120,14 +121,14 @@ var DefaultAccounts = map[string]Account{
 		Password:     "device2",
 	},
 	"prn:pantahub.com:auth:/service1": Account{
-		Id:           service1ObjectID,
-		Type:         ACCOUNT_TYPE_SERVICE,
-		Prn:          "prn:pantahub.com:auth:/service1",
-		Nick:         "service1",
-		Email:        "no-reply-service1@accounts.pantahub.com",
-		TimeCreated:  time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
-		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
-		Password:     "service1",
+		Id:                 service1ObjectID,
+		Type:               ACCOUNT_TYPE_SERVICE,
+		Prn:                "prn:pantahub.com:auth:/service1",
+		Nick:               "service1",
+		Email:              "no-reply-service1@accounts.pantahub.com",
+		TimeCreated:        time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
+		TimeModified:       time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
+		Password:           utils.GetEnv("PANTAHUB_DEMOACCOUNTS_PASSWORD_service1"),
 		Oauth2RedirectURIs: []string{"https://api.fleet.pantahub.com", "https://api.fleet2.pantahub.com", "http://localhost"},
 	},
 	"prn:pantahub.com:auth:/service2": Account{
