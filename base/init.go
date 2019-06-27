@@ -18,6 +18,7 @@ package base
 import (
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
@@ -46,11 +47,23 @@ func DoInit() {
 		adminUsers, subscriptions.SubscriptionProperties)
 
 	{
+		timeoutStr := utils.GetEnv(utils.ENV_PANTAHUB_JWT_TIMEOUT_MINUTES)
+		timeout, err := strconv.Atoi(timeoutStr)
+		if err != nil {
+			panic(err)
+		}
+
+		maxRefreshStr := utils.GetEnv(utils.ENV_PANTAHUB_JWT_MAX_REFRESH_MINUTES)
+		maxRefresh, err := strconv.Atoi(maxRefreshStr)
+		if err != nil {
+			panic(err)
+		}
+
 		app := auth.New(&jwt.JWTMiddleware{
 			Key:        []byte(jwtSecret),
 			Realm:      "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
-			Timeout:    time.Minute * 60,
-			MaxRefresh: time.Hour * 24,
+			Timeout:    time.Minute * time.Duration(timeout),
+			MaxRefresh: time.Hour * time.Duration(maxRefresh),
 		}, mongoClient)
 		http.Handle("/auth/", http.StripPrefix("/auth", app.Api.MakeHandler()))
 	}
