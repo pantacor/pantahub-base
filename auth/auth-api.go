@@ -98,11 +98,21 @@ func AccountToPayload(account accounts.Account) map[string]interface{} {
 type AccountType string
 
 const (
-	ACCOUNT_TYPE_ADMIN   = AccountType("ADMIN")
-	ACCOUNT_TYPE_DEVICE  = AccountType("DEVICE")
-	ACCOUNT_TYPE_ORG     = AccountType("ORG")
-	ACCOUNT_TYPE_SERVICE = AccountType("SERVICE")
-	ACCOUNT_TYPE_USER    = AccountType("USER")
+	ACCOUNT_TYPE_ADMIN          = AccountType("ADMIN")
+	ACCOUNT_TYPE_DEVICE         = AccountType("DEVICE")
+	ACCOUNT_TYPE_ORG            = AccountType("ORG")
+	ACCOUNT_TYPE_SERVICE        = AccountType("SERVICE")
+	ACCOUNT_TYPE_USER           = AccountType("USER")
+	exchangeTokenRequiredErr    = "Exchange token is needed"
+	passwordIsNeededErr         = "New password is needed"
+	tokenInvalidOrExpiredErr    = "Invalid or expired token"
+	emailRequiredForPasswordErr = "Email is required"
+	dbConnectionErr             = "Error with Database connectivity"
+	emailNotFoundErr            = "Email don't exist"
+	tokenCreationErr            = "Error creating token"
+	sendEmailErr                = "Error sending email"
+	restorePasswordTTL          = 15
+	restorePasswordTTLUnit      = time.Minute
 )
 
 func handle_auth(w rest.ResponseWriter, r *rest.Request) {
@@ -190,11 +200,21 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, "Accounts must have a nick set", http.StatusPreconditionFailed)
 		return
 	}
-	log.Print(newAccount)
+
 	if !newAccount.Id.IsZero() {
 		rest.Error(w, "Accounts cannot have id before creation", http.StatusPreconditionFailed)
 		return
 	}
+
+	passwordBcrypt, err := utils.HashPassword(newAccount.Password, utils.CryptoMethods.BCrypt)
+	passwordScrypt, err := utils.HashPassword(newAccount.Password, utils.CryptoMethods.SCrypt)
+	if err != nil {
+		utils.RestError(w, err, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	newAccount.Password = ""
+	newAccount.PasswordBcrypt = passwordBcrypt
+	newAccount.PasswordScrypt = passwordScrypt
 
 	mgoid := primitive.NewObjectID()
 	ObjectID, err := primitive.ObjectIDFromHex(mgoid.Hex())
@@ -202,6 +222,7 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
+
 	newAccount.Id = ObjectID
 	newAccount.Prn = "prn:::accounts:/" + newAccount.Id.Hex()
 	newAccount.Challenge = utils.GenerateChallenge()
@@ -589,6 +610,7 @@ type tokenRequest struct {
 	Code    string `json:"access-code"`
 	Comment string `json:"comment"`
 }
+
 type tokenStore struct {
 	ID      primitive.ObjectID     `json:"id", bson:"_id"`
 	Client  string                 `json:"client"`
@@ -808,19 +830,21 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 			loginUser = userId
 		}
 
-		testUserId := loginUser
+		testUserID := loginUser
 		if !strings.HasPrefix(loginUser, "prn:") {
-			testUserId = "prn:pantahub.com:auth:/" + loginUser
+			testUserID = "prn:pantahub.com:auth:/" + loginUser
 		}
-		if plm, ok := accounts.DefaultAccounts[testUserId]; !ok {
+
+		plm, ok := accounts.DefaultAccounts[testUserID]
+		if !ok {
 			if strings.HasPrefix(loginUser, "prn:::devices:") {
 				return app.deviceAuth(loginUser, password)
-			} else {
-				return app.accountAuth(loginUser, password)
 			}
-		} else {
-			return plm.Password == password
+
+			return app.accountAuth(loginUser, password)
 		}
+
+		return plm.Password == password
 	}
 
 	jwtMiddleware.PayloadFunc = func(userId string) map[string]interface{} {
@@ -836,11 +860,11 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 			loginUser = userId
 		}
 
-		testUserId := loginUser
+		testUserID := loginUser
 		if !strings.HasPrefix(loginUser, "prn:") {
-			testUserId = "prn:pantahub.com:auth:/" + loginUser
+			testUserID = "prn:pantahub.com:auth:/" + loginUser
 		}
-		if plm, ok := accounts.DefaultAccounts[testUserId]; !ok {
+		if plm, ok := accounts.DefaultAccounts[testUserID]; !ok {
 			if strings.HasPrefix(userId, "prn:::devices:") {
 				payload = app.devicePayload(loginUser)
 			} else {
@@ -977,7 +1001,10 @@ func (a *AuthApp) accountAuth(idEmailNick string, secret string) bool {
 	}
 
 	// account has same password as the secret provided to func call -> success
-	if secret == account.Password {
+	if utils.CheckPasswordHash(secret, account.PasswordBcrypt, utils.CryptoMethods.BCrypt) {
+		return true
+	}
+	if account.Password != "" && secret == account.Password {
 		return true
 	}
 
