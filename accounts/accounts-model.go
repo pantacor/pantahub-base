@@ -40,8 +40,10 @@ type Account struct {
 	Nick  string      `json:"nick" bson:"nick"`
 	Prn   string      `json:"prn" bson:"prn"`
 
-	Password  string `json:"password,omitempty" bson:"password"`
-	Challenge string `json:"challenge,omitempty" bson:"challenge"`
+	Password       string `json:"password,omitempty" bson:"password"`
+	PasswordBcrypt string `json:"password_bcrypt,omitempty" bson:"password_bcrypt"`
+	PasswordScrypt string `json:"password_script,omitempty" bson:"password_script"`
+	Challenge      string `json:"challenge,omitempty" bson:"challenge"`
 
 	TimeCreated  time.Time `json:"time-created" bson:"time-created"`
 	TimeModified time.Time `json:"time-modified" bson:"time-modified"`
