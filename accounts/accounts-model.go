@@ -42,7 +42,7 @@ type Account struct {
 
 	Password       string `json:"password,omitempty" bson:"password"`
 	PasswordBcrypt string `json:"password_bcrypt,omitempty" bson:"password_bcrypt"`
-	PasswordScrypt string `json:"password_script,omitempty" bson:"password_script"`
+	PasswordScrypt string `json:"password_scrypt,omitempty" bson:"password_scrypt"`
 	Challenge      string `json:"challenge,omitempty" bson:"challenge"`
 
 	TimeCreated  time.Time `json:"time-created" bson:"time-created"`
