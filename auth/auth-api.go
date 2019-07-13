@@ -1,4 +1,3 @@
-//
 // Copyright 2016-2018  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,6 +24,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"strconv"
 
 	"github.com/mongodb/mongo-go-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -111,7 +111,6 @@ const (
 	emailNotFoundErr            = "Email don't exist"
 	tokenCreationErr            = "Error creating token"
 	sendEmailErr                = "Error sending email"
-	restorePasswordTTL          = 15
 	restorePasswordTTLUnit      = time.Minute
 )
 
@@ -605,6 +604,182 @@ func (app *AuthApp) handle_postauthorizetoken(w rest.ResponseWriter, r *rest.Req
 	w.WriteJson(response)
 }
 
+type passwordReset struct {
+	Token    string `json:"token"`
+	Password string `json:"password"`
+}
+
+type resetPasswordClaims struct {
+	Email        string    `json:"email"`
+	TimeModified time.Time `json:"time-modified"`
+	jwtgo.StandardClaims
+}
+
+// handle_password_reset gets the recovery token and validate it in order to overwrite the user password
+func (app *AuthApp) handle_password_reset(writer rest.ResponseWriter, r *rest.Request) {
+	data := passwordReset{}
+
+	r.DecodeJsonPayload(&data)
+
+	if data.Token == "" {
+		utils.RestError(writer, nil, exchangeTokenRequiredErr, http.StatusBadRequest)
+		return
+	}
+
+	if data.Password == "" {
+		utils.RestError(writer, nil, passwordIsNeededErr, http.StatusBadRequest)
+		return
+	}
+
+	token, err := jwtgo.ParseWithClaims(data.Token, &resetPasswordClaims{}, func(token *jwtgo.Token) (interface{}, error) {
+		return app.jwt_middleware.Key, nil
+	})
+	if err != nil {
+		utils.RestError(writer, err, tokenInvalidOrExpiredErr, http.StatusInternalServerError)
+		return
+	}
+
+	claims := token.Claims.(*resetPasswordClaims)
+	err = claims.Valid()
+	if err != nil {
+		utils.RestError(writer, err, tokenInvalidOrExpiredErr, http.StatusInternalServerError)
+		return
+	}
+
+	collection := app.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
+	if collection == nil {
+		utils.RestError(writer, nil, dbConnectionErr, http.StatusInternalServerError)
+		return
+	}
+
+	filter := bson.M{
+		"email":   claims.Email,
+		"garbage": bson.M{"$ne": true},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	account := accounts.AccountPublic{}
+	err = collection.FindOne(ctx, filter).Decode(&account)
+	if err != nil {
+		utils.RestError(writer, nil, emailNotFoundErr, http.StatusNotFound)
+		return
+	}
+
+	if !account.TimeModified.Equal(claims.TimeModified) {
+		utils.RestError(writer, nil, tokenInvalidOrExpiredErr, http.StatusBadRequest)
+		return
+	}
+
+	passwordBcrypt, err := utils.HashPassword(data.Password, utils.CryptoMethods.BCrypt)
+	passwordScrypt, err := utils.HashPassword(data.Password, utils.CryptoMethods.SCrypt)
+	if err != nil {
+		utils.RestError(writer, err, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"password":        "",
+			"password_bcrypt": passwordBcrypt,
+			"password_scrypt": passwordScrypt,
+			"time-modified":   time.Now(),
+		},
+	}
+
+	updateOptions := options.Update()
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err = collection.UpdateOne(
+		ctx,
+		filter,
+		update,
+		updateOptions,
+	)
+	if err != nil {
+		utils.RestError(writer, err, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	writer.WriteJson(true)
+}
+
+type tokenResponse struct {
+	Token       string `json:"token"`
+	RedirectURI string `json:"redirect_uri"`
+	State       string `json:"state"`
+	TokenType   string `json:"token_type"`
+	Scopes      string `json:"scopes"`
+}
+
+type passwordResetRequest struct {
+	Email string `json:"email"`
+}
+
+// handle_password_recovery send email with token to user in order to reset password to given user
+func (app *AuthApp) handle_password_recovery(writer rest.ResponseWriter, r *rest.Request) {
+	data := passwordResetRequest{}
+
+	r.DecodeJsonPayload(&data)
+
+	if data.Email == "" {
+		utils.RestError(writer, nil, emailRequiredForPasswordErr, http.StatusPreconditionFailed)
+		return
+	}
+
+	collection := app.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
+	if collection == nil {
+		utils.RestError(writer, nil, dbConnectionErr, http.StatusInternalServerError)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	account := accounts.AccountPublic{}
+	filter := bson.M{
+		"email":   data.Email,
+		"garbage": bson.M{"$ne": true},
+	}
+
+	err := collection.FindOne(ctx, filter).Decode(&account)
+	if err != nil {
+		utils.RestError(writer, nil, emailNotFoundErr, http.StatusNotFound)
+		return
+	}
+
+	restorePasswordTTL, err := strconv.Atoi(utils.GetEnv(utils.ENV_PANTAHUB_RECOVER_JWT_TIMEOUT_MINUTES))
+	if err != nil {
+		utils.RestError(writer, err, err.Error(), http.StatusInternalServerError)
+	}
+
+	claims := resetPasswordClaims{
+		account.Email,
+		account.TimeModified,
+		jwtgo.StandardClaims{
+			ExpiresAt: time.Now().UTC().Add(time.Duration(restorePasswordTTL) * restorePasswordTTLUnit).Unix(),
+		},
+	}
+
+	token := jwtgo.NewWithClaims(jwtgo.GetSigningMethod(app.jwt_middleware.SigningAlgorithm), claims)
+
+	tokenString, err := token.SignedString(app.jwt_middleware.Key)
+	if err != nil {
+		utils.RestError(writer, err, tokenCreationErr, http.StatusInternalServerError)
+		return
+	}
+
+	err = utils.SendResetPasswordEmail(account.Email, account.Nick, tokenString)
+	if err != nil {
+		utils.RestError(writer, err, sendEmailErr, http.StatusInternalServerError)
+		return
+	}
+
+	writer.WriteJson(true)
+}
+
 // this requests to swap access code with accesstoken
 type tokenRequest struct {
 	Code    string `json:"access-code"`
@@ -617,14 +792,6 @@ type tokenStore struct {
 	Owner   string                 `json:"owner"`
 	Comment string                 `json:"comment"`
 	Claims  map[string]interface{} `json:"jwt-claims"`
-}
-
-type tokenResponse struct {
-	Token       string `json:"token"`
-	RedirectURI string `json:"redirect_uri"`
-	State       string `json:"state"`
-	TokenType   string `json:"token_type"`
-	Scopes      string `json:"scopes"`
 }
 
 // handle_posttoken can be used by services to swap an accessCode to a long living accessToken.
@@ -909,7 +1076,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 		Condition: func(request *rest.Request) bool {
 			return request.URL.Path != "/login" &&
 				!(request.URL.Path == "/accounts" && request.Method == "POST") &&
-				!(request.URL.Path == "/verify" && request.Method == "GET")
+				!(request.URL.Path == "/verify" && request.Method == "GET") &&
+				!(request.URL.Path == "/recover" && request.Method == "POST") &&
+				!(request.URL.Path == "/password" && request.Method == "POST")
 		},
 		IfTrue: app.jwt_middleware,
 	})
@@ -919,7 +1088,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 		Condition: func(request *rest.Request) bool {
 			return request.URL.Path != "/login" &&
 				!(request.URL.Path == "/accounts" && request.Method == "POST") &&
-				!(request.URL.Path == "/verify" && request.Method == "GET")
+				!(request.URL.Path == "/verify" && request.Method == "GET") &&
+				!(request.URL.Path == "/recover" && request.Method == "POST") &&
+				!(request.URL.Path == "/password" && request.Method == "POST")
 		},
 		IfTrue: &utils.AuthMiddleware{},
 	})
@@ -936,6 +1107,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 		rest.Get("/accounts", app.handle_getaccounts),
 		rest.Post("/accounts", app.handle_postaccount),
 		rest.Get("/verify", app.handle_verify),
+		rest.Post("/recover", app.handle_password_recovery),
+		rest.Post("/password", app.handle_password_reset),
 	)
 	app.Api.SetApp(api_router)
 
