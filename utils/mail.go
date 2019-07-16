@@ -90,7 +90,7 @@ func SendResetPasswordEmail(email, nick, token string) error {
 
 	message := mg.NewMessage(
 		regEmail,
-		"Pantahub, forgot your password",
+		"Request to reset your password",
 		bodyPlain.String(),
 		email,
 	)
