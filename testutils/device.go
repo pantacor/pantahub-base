@@ -7,7 +7,7 @@ import (
 
 	"gitlab.com/pantacor/pantahub-base/devices"
 
-	"github.com/go-resty/resty"
+	"gopkg.in/resty.v1"
 )
 
 // returns deviceId of new test device
