@@ -145,7 +145,7 @@ func handle_auth(w rest.ResponseWriter, r *rest.Request) {
 // service instance
 func prnGetId(prn string) string {
 	idx := strings.Index(prn, "/")
-	return prn[idx+1 : len(prn)]
+	return prn[idx+1:]
 }
 
 // ## POST /trails/

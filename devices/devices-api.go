@@ -29,7 +29,6 @@ import (
 	jwtgo "github.com/dgrijalva/jwt-go"
 	petname "github.com/dustinkirkland/golang-petname"
 	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
-	"github.com/go-resty/resty"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/gcapi"
 	"gitlab.com/pantacor/pantahub-base/utils"
@@ -38,6 +37,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/x/bsonx"
 	"gopkg.in/mgo.v2/bson"
+	"gopkg.in/resty.v1"
 )
 
 const PantahubDevicesAutoTokenV1 = "Pantahub-Devices-Auto-Token-V1"

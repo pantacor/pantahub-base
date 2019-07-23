@@ -9,11 +9,11 @@ import (
 	"time"
 
 	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
-	"github.com/go-resty/resty"
 	"gitlab.com/pantacor/pantahub-base/auth"
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/testutils"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gopkg.in/resty.v1"
 )
 
 var (

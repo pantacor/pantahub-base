@@ -1,6 +1,8 @@
 FROM golang:alpine
 
-RUN apk add --no-cache \
+ENV GO111MODULE=on
+
+RUN apk add -U --no-cache \
     git \
     curl \
     openssl \
@@ -11,10 +13,8 @@ RUN wget https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSI
     && tar -C /usr/local/bin -xzvf dockerize-alpine-linux-amd64-$DOCKERIZE_VERSION.tar.gz \
     && rm dockerize-alpine-linux-amd64-$DOCKERIZE_VERSION.tar.gz
 
-RUN curl https://glide.sh/get | sh
+RUN go get github.com/cosmtrek/air
 
 WORKDIR /go/src/gitlab.com/pantacor/pantahub-base
-
-RUN GO111MODULE=on go get github.com/cosmtrek/air
 
 CMD ["dockerize", "-wait", "tcp://mongo:27017", "-wait", "tcp://fluentd:24224", "-wait", "tcp://elasticsearch:9200", "-timeout", "180s", "air", "-d"]
