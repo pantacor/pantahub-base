@@ -70,6 +70,8 @@ github.com/pantacor/go-json-rest-middleware-jwt v0.0.0-20190329230644-1f6c0e03d2
 github.com/pantacor/go-json-rest-middleware-jwt v0.0.0-20190329230644-1f6c0e03d26e/go.mod h1:6SjpVuaow7hHYHD5UD1G+F3AqnNRGIwQvUQMbQd03zI=
 github.com/pantacor/go-json-rest-middleware-jwt v0.0.0-20190329232506-b7815ffda0af h1:NFgfAuSHUeR0Gd7E7YfR/KbmGyAH7f1uK+XpAOEvQKc=
 github.com/pantacor/go-json-rest-middleware-jwt v0.0.0-20190329232506-b7815ffda0af/go.mod h1:6SjpVuaow7hHYHD5UD1G+F3AqnNRGIwQvUQMbQd03zI=
+github.com/pantacor/go-json-rest-middleware-jwt v0.0.0-20190329235955-213479ac018c h1:E6rdONVf2t1kjzcBQKyANfzOueVP8RikT17prOpr424=
+github.com/pantacor/go-json-rest-middleware-jwt v0.0.0-20190329235955-213479ac018c/go.mod h1:6SjpVuaow7hHYHD5UD1G+F3AqnNRGIwQvUQMbQd03zI=
 github.com/philhofer/fwd v1.0.0 h1:UbZqGr5Y38ApvM/V/jEljVxwocdweyH+vmYvRPBnbqQ=
 github.com/philhofer/fwd v1.0.0/go.mod h1:gk3iGcWd9+svBvR0sR+KPcfE+RNWozjowpeBVG3ZVNU=
 github.com/pkg/errors v0.8.0 h1:WdK/asTD0HN+q6hsWO3/vpuAkAr+tw6aNJNDFFf0+qw=
