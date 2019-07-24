@@ -61,13 +61,23 @@ import (
 	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/storagedriver"
 	"gitlab.com/pantacor/pantahub-base/utils"
-	pvrapi "gitlab.com/pantacor/pvr/api"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/x/bsonx"
 	"gopkg.in/mgo.v2/bson"
 )
+
+
+type PvrRemote struct {
+        RemoteSpec         string   `json:"pvr-spec"`         // the pvr remote protocol spec available
+        JsonGetUrl         string   `json:"json-get-url"`     // where to pvr post stuff
+        JsonKey            string   `json:"json-key"`         // what key is to use in post json [default: json]
+        ObjectsEndpointUrl string   `json:"objects-endpoint"` // where to store/retrieve objects
+        PostUrl            string   `json:"post-url"`         // where to post/announce new revisions
+        PostFields         []string `json:"post-fields"`      // what fields require input
+        PostFieldsOpt      []string `json:"post-fields-opt"`  // what optional fields are available [default: <empty>]
+}
 
 type TrailsApp struct {
 	jwt_middleware *jwt.JWTMiddleware
@@ -480,7 +490,7 @@ func (a *TrailsApp) handle_gettrailpvrinfo(w rest.ResponseWriter, r *rest.Reques
 	postFields := []string{"commit-msg"}
 	postFieldsOpt := []string{"rev"}
 
-	remoteInfo := pvrapi.PvrRemote{
+	remoteInfo := PvrRemote{
 		RemoteSpec:         "pvr-pantahub-1",
 		JsonGetUrl:         jsonGet,
 		ObjectsEndpointUrl: oe,
@@ -567,7 +577,7 @@ func (a *TrailsApp) handle_getsteppvrinfo(w rest.ResponseWriter, r *rest.Request
 	postFields := []string{"msg"}
 	postFieldsOpt := []string{}
 
-	remoteInfo := pvrapi.PvrRemote{
+	remoteInfo := PvrRemote{
 		RemoteSpec:         "pvr-pantahub-1",
 		JsonGetUrl:         jsonUrl,
 		ObjectsEndpointUrl: oe,
