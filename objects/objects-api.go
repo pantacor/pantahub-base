@@ -31,7 +31,7 @@ import (
 	"gitlab.com/pantacor/pantahub-base/subscriptions"
 
 	jwtgo "github.com/dgrijalva/jwt-go"
-	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
+	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/x/bsonx"

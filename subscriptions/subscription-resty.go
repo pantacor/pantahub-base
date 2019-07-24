@@ -14,7 +14,7 @@ import (
 	"strconv"
 
 	"github.com/ant0ine/go-json-rest/rest"
-	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
+	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gopkg.in/mgo.v2/bson"

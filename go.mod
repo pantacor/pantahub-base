@@ -4,8 +4,6 @@ go 1.12
 
 replace github.com/go-resty/resty => gopkg.in/resty.v1 v1.11.0
 
-replace github.com/fundapps/go-json-rest-middleware-jwt => github.com/pantacor/go-json-rest-middleware-jwt v0.0.0-20190329232506-b7815ffda0af
-
 replace github.com/ant0ine/go-json-rest => github.com/asac/go-json-rest v3.3.3-0.20181121222456-cab770813df3+incompatible
 
 require (
@@ -23,7 +21,6 @@ require (
 	github.com/facebookgo/subset v0.0.0-20150612182917-8dac2c3c4870 // indirect
 	github.com/fatih/structs v1.1.0
 	github.com/fluent/fluent-logger-golang v1.4.0
-	github.com/fundapps/go-json-rest-middleware-jwt v0.0.0-00010101000000-000000000000
 	github.com/gibson042/canonicaljson-go v1.0.3
 	github.com/go-resty/resty v0.0.0-00010101000000-000000000000 // indirect
 	github.com/go-stack/stack v1.8.0 // indirect
@@ -36,7 +33,7 @@ require (
 	github.com/mongodb/mongo-go-driver v1.0.4
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/onsi/gomega v1.5.0 // indirect
-	github.com/pantacor/go-json-rest-middleware-jwt v0.0.0-20190329230644-1f6c0e03d26e
+	github.com/pantacor/go-json-rest-middleware-jwt v0.0.0-20190329235955-213479ac018c
 	github.com/philhofer/fwd v1.0.0 // indirect
 	github.com/rs/cors v1.6.0
 	github.com/stretchr/testify v1.3.0
