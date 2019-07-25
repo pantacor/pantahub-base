@@ -632,7 +632,7 @@ func (app *AuthApp) handle_password_reset(writer rest.ResponseWriter, r *rest.Re
 	}
 
 	token, err := jwtgo.ParseWithClaims(data.Token, &resetPasswordClaims{}, func(token *jwtgo.Token) (interface{}, error) {
-		return app.jwt_middleware.Key, nil
+		return app.jwt_middleware.Pub, nil
 	})
 	if err != nil {
 		utils.RestError(writer, err, tokenInvalidOrExpiredErr, http.StatusInternalServerError)
@@ -812,8 +812,7 @@ func (app *AuthApp) handle_posttoken(writer rest.ResponseWriter, r *rest.Request
 	log.Println("Requesting code " + tokenRequest.Code)
 	// we parse the accessCode to see if we can swap it out.
 	tok, err := jwtgo.Parse(tokenRequest.Code, func(token *jwtgo.Token) (interface{}, error) {
-		jwtSecret := utils.GetEnv(utils.ENV_PANTAHUB_JWT_AUTH_SECRET)
-		return []byte(jwtSecret), nil
+		return app.jwt_middleware.Pub, nil
 	})
 
 	if err != nil {

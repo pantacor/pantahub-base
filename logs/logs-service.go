@@ -234,8 +234,6 @@ func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if result.NextCursor != "" {
-		jwtSecret := []byte(utils.GetEnv(utils.ENV_PANTAHUB_JWT_AUTH_SECRET))
-
 		claims := LogsCursorClaim{
 			NextCursor: result.NextCursor,
 			StandardClaims: jwtgo.StandardClaims{
@@ -244,8 +242,8 @@ func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 				Audience:  own.(string),
 			},
 		}
-		token := jwtgo.NewWithClaims(jwtgo.SigningMethodHS256, claims)
-		ss, err := token.SignedString(jwtSecret)
+		token := jwtgo.NewWithClaims(jwtgo.GetSigningMethod(a.jwt_middleware.SigningAlgorithm), claims)
+		ss, err := token.SignedString(a.jwt_middleware.Key)
 		if err != nil {
 			rest.Error(w, "ERROR: signing scrollid token: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -294,7 +292,7 @@ func (a *logsApp) handle_getlogscursor(w rest.ResponseWriter, r *rest.Request) {
 
 	}
 	token, err := jwtgo.ParseWithClaims(nextCursorJWT, &LogsCursorClaim{}, func(token *jwtgo.Token) (interface{}, error) {
-		return []byte(utils.GetEnv(utils.ENV_PANTAHUB_JWT_AUTH_SECRET)), nil
+		return a.jwt_middleware.Pub, nil
 	})
 
 	if err != nil {
@@ -319,8 +317,6 @@ func (a *logsApp) handle_getlogscursor(w rest.ResponseWriter, r *rest.Request) {
 		}
 
 		if result.NextCursor != "" {
-			jwtSecret := []byte(utils.GetEnv(utils.ENV_PANTAHUB_JWT_AUTH_SECRET))
-
 			claims := LogsCursorClaim{
 				NextCursor: result.NextCursor,
 				StandardClaims: jwtgo.StandardClaims{
@@ -329,8 +325,8 @@ func (a *logsApp) handle_getlogscursor(w rest.ResponseWriter, r *rest.Request) {
 					Audience:  own.(string),
 				},
 			}
-			token := jwtgo.NewWithClaims(jwtgo.SigningMethodHS256, claims)
-			ss, err := token.SignedString(jwtSecret)
+			token := jwtgo.NewWithClaims(jwtgo.GetSigningMethod(a.jwt_middleware.SigningAlgorithm), claims)
+			ss, err := token.SignedString(a.jwt_middleware.Key)
 			if err != nil {
 				rest.Error(w, "ERROR: signing scrollid token: "+err.Error(), http.StatusInternalServerError)
 				return
