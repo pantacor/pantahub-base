@@ -350,7 +350,8 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 	defer cancel()
 	pipeline := []bson.M{
 		bson.M{"$match": bson.M{
-			"owner": owner.(string),
+			"owner":   owner.(string),
+			"garbage": bson.M{"$ne": true},
 		}},
 		bson.M{
 			"$group": bson.M{
