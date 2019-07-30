@@ -42,7 +42,12 @@ func CalcUsageAfterPost(owner string, mongoClient *mongo.Client,
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	pipeline := []bson.M{
-		bson.M{"$match": bson.M{"owner": owner}},
+		bson.M{
+			"$match": bson.M{
+				"owner":   owner,
+				"garbage": bson.M{"$ne": true},
+			},
+		},
 		bson.M{
 			"$group": bson.M{
 				"_id":   "$owner",
@@ -77,10 +82,13 @@ func CalcUsageAfterPut(owner string, mongoClient *mongo.Client,
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	pipeline := []bson.M{
-		bson.M{"$match": bson.M{
-			"owner": owner,
-			"_id":   bson.M{"$ne": objectId},
-		}},
+		bson.M{
+			"$match": bson.M{
+				"owner":   owner,
+				"garbage": bson.M{"$ne": true},
+				"_id":     bson.M{"$ne": objectId},
+			},
+		},
 		bson.M{
 			"$group": bson.M{
 				"_id":   "$owner",
