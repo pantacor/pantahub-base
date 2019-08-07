@@ -27,6 +27,7 @@ build-branch:
   except:
   - develop
   - master
+  - tags
 
 build-devel:
   stage: build
@@ -57,13 +58,26 @@ build-master:
   script:
     - docker pull $CONTAINER_IMAGE:$CI_BUILD_REF_SLUG || true
     - docker build -f Dockerfile --build-arg NS=api --cache-from $CONTAINER_IMAGE:$CI_BUILD_REF_SLUG --tag $CONTAINER_IMAGE:$CI_BUILD_REF_SLUG-$CI_BUILD_REF --tag $CONTAINER_IMAGE:$CI_BUILD_REF_SLUG .
-    - test -n "$CI_BUILD_TAG" && docker tag $CONTAINER_IMAGE:$CI_BUILD_REF_SLUG-$CI_BUILD_REF $CONTAINER_IMAGE:$CI_BUILD_TAG || true
     - docker push $CONTAINER_IMAGE:$CI_BUILD_REF_SLUG-$CI_BUILD_REF
     - docker push $CONTAINER_IMAGE:$CI_BUILD_REF_SLUG
     - test -n "$CI_BUILD_TAG" && docker push $CONTAINER_IMAGE:$CI_BUILD_TAG || true
   only:
   - master
 
+build-tags:
+  stage: build
+  before_script:
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
+    - docker run --rm --privileged multiarch/qemu-user-static:register || true
+  script:
+    - docker pull $CONTAINER_IMAGE:$CI_BUILD_REF_SLUG || true
+    - docker build -f Dockerfile --build-arg NS=api --cache-from $CONTAINER_IMAGE:$CI_BUILD_REF_SLUG --tag $CONTAINER_IMAGE:$CI_BUILD_REF_SLUG-$CI_BUILD_REF --tag $CONTAINER_IMAGE:$CI_BUILD_REF_SLUG .
+    - docker tag $CONTAINER_IMAGE:$CI_BUILD_REF_SLUG-$CI_BUILD_REF $CONTAINER_IMAGE:$CI_BUILD_TAG
+    - docker push $CONTAINER_IMAGE:$CI_BUILD_REF_SLUG-$CI_BUILD_REF
+    - docker push $CONTAINER_IMAGE:$CI_BUILD_REF_SLUG
+    - docker push $CONTAINER_IMAGE:$CI_BUILD_TAG
+  only:
+    - tags
 
 deploy-devel:
   stage: deploy
@@ -89,5 +103,5 @@ deploy-prod:
     - echo -n $KUBE_CONFIG_PROD | base64 -d > $HOME/.kube/config
     - kubectl -n api set image deploy/pantahub-base pantahub-base=$CONTAINER_IMAGE:$CI_BUILD_REF_SLUG-$CI_BUILD_REF
   only:
-    - master
+    - tags
 
