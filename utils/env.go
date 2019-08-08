@@ -25,6 +25,10 @@ const (
 	// Pantahub JWT Secret. THIS MUST BE SET TO SOMETHING SECRET!!
 	// default: "THIS MUST BE CHANGED"
 	ENV_PANTAHUB_JWT_AUTH_SECRET = "PANTAHUB_JWT_SECRET"
+	ENV_PANTAHUB_SCRYPT_SECRET   = "PANTAHUB_SCRYPT_SECRET"
+
+	// Pantahub JWT Public Key. Public RSA key in base64 encoded PEM format
+	ENV_PANTAHUB_JWT_AUTH_PUB = "PANTAHUB_JWT_PUB"
 
 	// Pantahub JWT Secret. THIS MUST BE SET TO SOMETHING SECRET!!
 	// default: "THIS MUST BE CHANGED"
@@ -33,6 +37,10 @@ const (
 	// Pantahub JWT Token Timeout in Minutes
 	// default: 60
 	ENV_PANTAHUB_JWT_TIMEOUT_MINUTES = "PANTAHUB_JWT_TIMEOUT_MINUTES"
+
+	// Pantahub JWT Token for password recovery Timeout in Minutes
+	// default: 60
+	ENV_PANTAHUB_RECOVER_JWT_TIMEOUT_MINUTES = "PANTAHUB_RECOVER_JWT_TIMEOUT_MINUTES"
 
 	// Pantahub JWT Max Refresh timeout in Minutes
 	// default: 24 * 60
@@ -230,8 +238,11 @@ var defaultEnvs = map[string]string{
 	ENV_PANTAHUB_PRODUCTNAME:                    "pantahub-personal",
 	ENV_PANTAHUB_DEMOACCOUNTS_PASSWORD_service1: "O9i8HlpSc",
 	ENV_PANTAHUB_JWT_AUTH_SECRET:                "YOU MUST CHANGE THIS",
+	ENV_PANTAHUB_JWT_AUTH_PUB:                   "YOU MUST CHANGE THIS",
+	ENV_PANTAHUB_SCRYPT_SECRET:                  "YOU MUST CHANGE THIS",
 	ENV_PANTAHUB_JWT_OBJECT_SECRET:              "YOU MUST CHANGE THIS",
 	ENV_PANTAHUB_JWT_TIMEOUT_MINUTES:            "60",
+	ENV_PANTAHUB_RECOVER_JWT_TIMEOUT_MINUTES:    "60",
 	ENV_PANTAHUB_JWT_MAX_REFRESH_MINUTES:        "1440",
 
 	ENV_PANTAHUB_HOST:       "localhost",
@@ -286,7 +297,7 @@ var defaultEnvs = map[string]string{
 	ENV_SMTP_PORT: "25",
 	ENV_SMTP_USER: "XXX",
 	ENV_SMTP_PASS: "XXX",
-	ENV_REG_EMAIL: "admin@pantacor.com",
+	ENV_REG_EMAIL: "Pantahub.com <team@pantacor.com>",
 
 	// pantahub internal envs
 	ENV_PANTAHUB_AUTH: "http://localhost:12365/auth",

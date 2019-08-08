@@ -1,4 +1,3 @@
-//
 // Copyright 2016-2018  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,17 +22,18 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
-	"github.com/mongodb/mongo-go-driver/bson"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/x/bsonx"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
-	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
+	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/utils"
@@ -98,11 +98,20 @@ func AccountToPayload(account accounts.Account) map[string]interface{} {
 type AccountType string
 
 const (
-	ACCOUNT_TYPE_ADMIN   = AccountType("ADMIN")
-	ACCOUNT_TYPE_DEVICE  = AccountType("DEVICE")
-	ACCOUNT_TYPE_ORG     = AccountType("ORG")
-	ACCOUNT_TYPE_SERVICE = AccountType("SERVICE")
-	ACCOUNT_TYPE_USER    = AccountType("USER")
+	ACCOUNT_TYPE_ADMIN          = AccountType("ADMIN")
+	ACCOUNT_TYPE_DEVICE         = AccountType("DEVICE")
+	ACCOUNT_TYPE_ORG            = AccountType("ORG")
+	ACCOUNT_TYPE_SERVICE        = AccountType("SERVICE")
+	ACCOUNT_TYPE_USER           = AccountType("USER")
+	exchangeTokenRequiredErr    = "Exchange token is needed"
+	passwordIsNeededErr         = "New password is needed"
+	tokenInvalidOrExpiredErr    = "Invalid or expired token"
+	emailRequiredForPasswordErr = "Email is required"
+	dbConnectionErr             = "Error with Database connectivity"
+	emailNotFoundErr            = "Email don't exist"
+	tokenCreationErr            = "Error creating token"
+	sendEmailErr                = "Error sending email"
+	restorePasswordTTLUnit      = time.Minute
 )
 
 func handle_auth(w rest.ResponseWriter, r *rest.Request) {
@@ -190,11 +199,21 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, "Accounts must have a nick set", http.StatusPreconditionFailed)
 		return
 	}
-	log.Print(newAccount)
+
 	if !newAccount.Id.IsZero() {
 		rest.Error(w, "Accounts cannot have id before creation", http.StatusPreconditionFailed)
 		return
 	}
+
+	passwordBcrypt, err := utils.HashPassword(newAccount.Password, utils.CryptoMethods.BCrypt)
+	passwordScrypt, err := utils.HashPassword(newAccount.Password, utils.CryptoMethods.SCrypt)
+	if err != nil {
+		utils.RestError(w, err, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	newAccount.Password = ""
+	newAccount.PasswordBcrypt = passwordBcrypt
+	newAccount.PasswordScrypt = passwordScrypt
 
 	mgoid := primitive.NewObjectID()
 	ObjectID, err := primitive.ObjectIDFromHex(mgoid.Hex())
@@ -202,6 +221,7 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
+
 	newAccount.Id = ObjectID
 	newAccount.Prn = "prn:::accounts:/" + newAccount.Id.Hex()
 	newAccount.Challenge = utils.GenerateChallenge()
@@ -584,17 +604,106 @@ func (app *AuthApp) handle_postauthorizetoken(w rest.ResponseWriter, r *rest.Req
 	w.WriteJson(response)
 }
 
-// this requests to swap access code with accesstoken
-type tokenRequest struct {
-	Code    string `json:"access-code"`
-	Comment string `json:"comment"`
+type passwordReset struct {
+	Token    string `json:"token"`
+	Password string `json:"password"`
 }
-type tokenStore struct {
-	ID      primitive.ObjectID     `json:"id", bson:"_id"`
-	Client  string                 `json:"client"`
-	Owner   string                 `json:"owner"`
-	Comment string                 `json:"comment"`
-	Claims  map[string]interface{} `json:"jwt-claims"`
+
+type resetPasswordClaims struct {
+	Email        string    `json:"email"`
+	TimeModified time.Time `json:"time-modified"`
+	jwtgo.StandardClaims
+}
+
+// handle_password_reset gets the recovery token and validate it in order to overwrite the user password
+func (app *AuthApp) handle_password_reset(writer rest.ResponseWriter, r *rest.Request) {
+	data := passwordReset{}
+
+	r.DecodeJsonPayload(&data)
+
+	if data.Token == "" {
+		utils.RestError(writer, nil, exchangeTokenRequiredErr, http.StatusBadRequest)
+		return
+	}
+
+	if data.Password == "" {
+		utils.RestError(writer, nil, passwordIsNeededErr, http.StatusBadRequest)
+		return
+	}
+
+	token, err := jwtgo.ParseWithClaims(data.Token, &resetPasswordClaims{}, func(token *jwtgo.Token) (interface{}, error) {
+		return app.jwt_middleware.Pub, nil
+	})
+	if err != nil {
+		utils.RestError(writer, err, tokenInvalidOrExpiredErr, http.StatusInternalServerError)
+		return
+	}
+
+	claims := token.Claims.(*resetPasswordClaims)
+	err = claims.Valid()
+	if err != nil {
+		utils.RestError(writer, err, tokenInvalidOrExpiredErr, http.StatusInternalServerError)
+		return
+	}
+
+	collection := app.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
+	if collection == nil {
+		utils.RestError(writer, nil, dbConnectionErr, http.StatusInternalServerError)
+		return
+	}
+
+	filter := bson.M{
+		"email":   claims.Email,
+		"garbage": bson.M{"$ne": true},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	account := accounts.AccountPublic{}
+	err = collection.FindOne(ctx, filter).Decode(&account)
+	if err != nil {
+		utils.RestError(writer, nil, emailNotFoundErr, http.StatusNotFound)
+		return
+	}
+
+	if !account.TimeModified.Equal(claims.TimeModified) {
+		utils.RestError(writer, nil, tokenInvalidOrExpiredErr, http.StatusBadRequest)
+		return
+	}
+
+	passwordBcrypt, err := utils.HashPassword(data.Password, utils.CryptoMethods.BCrypt)
+	passwordScrypt, err := utils.HashPassword(data.Password, utils.CryptoMethods.SCrypt)
+	if err != nil {
+		utils.RestError(writer, err, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"password":        "",
+			"password_bcrypt": passwordBcrypt,
+			"password_scrypt": passwordScrypt,
+			"time-modified":   time.Now(),
+		},
+	}
+
+	updateOptions := options.Update()
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err = collection.UpdateOne(
+		ctx,
+		filter,
+		update,
+		updateOptions,
+	)
+	if err != nil {
+		utils.RestError(writer, err, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	writer.WriteJson(true)
 }
 
 type tokenResponse struct {
@@ -603,6 +712,86 @@ type tokenResponse struct {
 	State       string `json:"state"`
 	TokenType   string `json:"token_type"`
 	Scopes      string `json:"scopes"`
+}
+
+type passwordResetRequest struct {
+	Email string `json:"email"`
+}
+
+// handle_password_recovery send email with token to user in order to reset password to given user
+func (app *AuthApp) handle_password_recovery(writer rest.ResponseWriter, r *rest.Request) {
+	data := passwordResetRequest{}
+
+	r.DecodeJsonPayload(&data)
+
+	if data.Email == "" {
+		utils.RestError(writer, nil, emailRequiredForPasswordErr, http.StatusPreconditionFailed)
+		return
+	}
+
+	collection := app.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
+	if collection == nil {
+		utils.RestError(writer, nil, dbConnectionErr, http.StatusInternalServerError)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	account := accounts.AccountPublic{}
+	filter := bson.M{
+		"email":   data.Email,
+		"garbage": bson.M{"$ne": true},
+	}
+
+	err := collection.FindOne(ctx, filter).Decode(&account)
+	if err != nil {
+		utils.RestError(writer, nil, emailNotFoundErr, http.StatusNotFound)
+		return
+	}
+
+	restorePasswordTTL, err := strconv.Atoi(utils.GetEnv(utils.ENV_PANTAHUB_RECOVER_JWT_TIMEOUT_MINUTES))
+	if err != nil {
+		utils.RestError(writer, err, err.Error(), http.StatusInternalServerError)
+	}
+
+	claims := resetPasswordClaims{
+		account.Email,
+		account.TimeModified,
+		jwtgo.StandardClaims{
+			ExpiresAt: time.Now().UTC().Add(time.Duration(restorePasswordTTL) * restorePasswordTTLUnit).Unix(),
+		},
+	}
+
+	token := jwtgo.NewWithClaims(jwtgo.GetSigningMethod(app.jwt_middleware.SigningAlgorithm), claims)
+
+	tokenString, err := token.SignedString(app.jwt_middleware.Key)
+	if err != nil {
+		utils.RestError(writer, err, tokenCreationErr, http.StatusInternalServerError)
+		return
+	}
+
+	err = utils.SendResetPasswordEmail(account.Email, account.Nick, tokenString)
+	if err != nil {
+		utils.RestError(writer, err, sendEmailErr, http.StatusInternalServerError)
+		return
+	}
+
+	writer.WriteJson(true)
+}
+
+// this requests to swap access code with accesstoken
+type tokenRequest struct {
+	Code    string `json:"access-code"`
+	Comment string `json:"comment"`
+}
+
+type tokenStore struct {
+	ID      primitive.ObjectID     `json:"id", bson:"_id"`
+	Client  string                 `json:"client"`
+	Owner   string                 `json:"owner"`
+	Comment string                 `json:"comment"`
+	Claims  map[string]interface{} `json:"jwt-claims"`
 }
 
 // handle_posttoken can be used by services to swap an accessCode to a long living accessToken.
@@ -623,8 +812,7 @@ func (app *AuthApp) handle_posttoken(writer rest.ResponseWriter, r *rest.Request
 	log.Println("Requesting code " + tokenRequest.Code)
 	// we parse the accessCode to see if we can swap it out.
 	tok, err := jwtgo.Parse(tokenRequest.Code, func(token *jwtgo.Token) (interface{}, error) {
-		jwtSecret := utils.GetEnv(utils.ENV_PANTAHUB_JWT_AUTH_SECRET)
-		return []byte(jwtSecret), nil
+		return app.jwt_middleware.Pub, nil
 	})
 
 	if err != nil {
@@ -808,19 +996,21 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 			loginUser = userId
 		}
 
-		testUserId := loginUser
+		testUserID := loginUser
 		if !strings.HasPrefix(loginUser, "prn:") {
-			testUserId = "prn:pantahub.com:auth:/" + loginUser
+			testUserID = "prn:pantahub.com:auth:/" + loginUser
 		}
-		if plm, ok := accounts.DefaultAccounts[testUserId]; !ok {
+
+		plm, ok := accounts.DefaultAccounts[testUserID]
+		if !ok {
 			if strings.HasPrefix(loginUser, "prn:::devices:") {
 				return app.deviceAuth(loginUser, password)
-			} else {
-				return app.accountAuth(loginUser, password)
 			}
-		} else {
-			return plm.Password == password
+
+			return app.accountAuth(loginUser, password)
 		}
+
+		return plm.Password == password
 	}
 
 	jwtMiddleware.PayloadFunc = func(userId string) map[string]interface{} {
@@ -836,11 +1026,11 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 			loginUser = userId
 		}
 
-		testUserId := loginUser
+		testUserID := loginUser
 		if !strings.HasPrefix(loginUser, "prn:") {
-			testUserId = "prn:pantahub.com:auth:/" + loginUser
+			testUserID = "prn:pantahub.com:auth:/" + loginUser
 		}
-		if plm, ok := accounts.DefaultAccounts[testUserId]; !ok {
+		if plm, ok := accounts.DefaultAccounts[testUserID]; !ok {
 			if strings.HasPrefix(userId, "prn:::devices:") {
 				payload = app.devicePayload(loginUser)
 			} else {
@@ -885,7 +1075,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 		Condition: func(request *rest.Request) bool {
 			return request.URL.Path != "/login" &&
 				!(request.URL.Path == "/accounts" && request.Method == "POST") &&
-				!(request.URL.Path == "/verify" && request.Method == "GET")
+				!(request.URL.Path == "/verify" && request.Method == "GET") &&
+				!(request.URL.Path == "/recover" && request.Method == "POST") &&
+				!(request.URL.Path == "/password" && request.Method == "POST")
 		},
 		IfTrue: app.jwt_middleware,
 	})
@@ -895,7 +1087,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 		Condition: func(request *rest.Request) bool {
 			return request.URL.Path != "/login" &&
 				!(request.URL.Path == "/accounts" && request.Method == "POST") &&
-				!(request.URL.Path == "/verify" && request.Method == "GET")
+				!(request.URL.Path == "/verify" && request.Method == "GET") &&
+				!(request.URL.Path == "/recover" && request.Method == "POST") &&
+				!(request.URL.Path == "/password" && request.Method == "POST")
 		},
 		IfTrue: &utils.AuthMiddleware{},
 	})
@@ -912,6 +1106,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 		rest.Get("/accounts", app.handle_getaccounts),
 		rest.Post("/accounts", app.handle_postaccount),
 		rest.Get("/verify", app.handle_verify),
+		rest.Post("/recover", app.handle_password_recovery),
+		rest.Post("/password", app.handle_password_reset),
 	)
 	app.Api.SetApp(api_router)
 
@@ -977,7 +1173,10 @@ func (a *AuthApp) accountAuth(idEmailNick string, secret string) bool {
 	}
 
 	// account has same password as the secret provided to func call -> success
-	if secret == account.Password {
+	if utils.CheckPasswordHash(secret, account.PasswordBcrypt, utils.CryptoMethods.BCrypt) {
+		return true
+	}
+	if account.Password != "" && secret == account.Password {
 		return true
 	}
 

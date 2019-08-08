@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/go-resty/resty"
+	"gopkg.in/resty.v1"
 )
 
 func DoLogin(t *testing.T, serverUrl *url.URL, username string, password string) string {

@@ -24,7 +24,7 @@ import (
 	"time"
 
 	jwtgo "github.com/dgrijalva/jwt-go"
-	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
+	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
@@ -350,7 +350,8 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 	defer cancel()
 	pipeline := []bson.M{
 		bson.M{"$match": bson.M{
-			"owner": owner.(string),
+			"owner":   owner.(string),
+			"garbage": bson.M{"$ne": true},
 		}},
 		bson.M{
 			"$group": bson.M{

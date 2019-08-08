@@ -33,10 +33,10 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/go-resty/resty"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gopkg.in/mgo.v2/bson"
 	elastic "gopkg.in/olivere/elastic.v5"
+	"gopkg.in/resty.v1"
 )
 
 var (

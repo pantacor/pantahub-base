@@ -32,7 +32,7 @@ import (
 	"time"
 
 	jwtgo "github.com/dgrijalva/jwt-go"
-	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
+	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"

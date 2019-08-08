@@ -16,12 +16,15 @@
 package base
 
 import (
+	"encoding/base64"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
 	"time"
 
-	jwt "github.com/fundapps/go-json-rest-middleware-jwt"
+	jwtgo "github.com/dgrijalva/jwt-go"
+	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
 	"github.com/rs/cors"
 	"gitlab.com/pantacor/pantahub-base/auth"
 	"gitlab.com/pantacor/pantahub-base/dash"
@@ -38,7 +41,25 @@ import (
 func DoInit() {
 
 	phAuth := utils.GetEnv(utils.ENV_PANTAHUB_AUTH)
-	jwtSecret := utils.GetEnv(utils.ENV_PANTAHUB_JWT_AUTH_SECRET)
+	jwtSecretBase64 := utils.GetEnv(utils.ENV_PANTAHUB_JWT_AUTH_SECRET)
+	jwtSecretPem, err := base64.StdEncoding.DecodeString(jwtSecretBase64)
+	if err != nil {
+		panic(fmt.Errorf("No valid JWT secret (PANTAHUB_JWT_AUTH_SECRET) in base64 format: %s", err.Error()))
+	}
+	jwtSecret, err := jwtgo.ParseRSAPrivateKeyFromPEM(jwtSecretPem)
+	if err != nil {
+		panic(fmt.Errorf("No valid JWT secret (PANTAHUB_JWT_AUTH_SECRET); must be rsa private key in PEM format: %s", err.Error()))
+	}
+
+	jwtPubBase64 := utils.GetEnv(utils.ENV_PANTAHUB_JWT_AUTH_PUB)
+	jwtPubPem, err := base64.StdEncoding.DecodeString(jwtPubBase64)
+	if err != nil {
+		panic(fmt.Errorf("No valid JWT PUB KEY (PANTAHUB_JWT_AUTH_PUB) in base64 format: %s", err.Error()))
+	}
+	jwtPub, err := jwtgo.ParseRSAPublicKeyFromPEM(jwtPubPem)
+	if err != nil {
+		panic(fmt.Errorf("No valid JWT pub key (PANTAHUB_JWT_AUTH_PUB); must be rsa private key in PEM format: %s", err.Error()))
+	}
 
 	mongoClient, _ := utils.GetMongoClient()
 
@@ -60,50 +81,60 @@ func DoInit() {
 		}
 
 		app := auth.New(&jwt.JWTMiddleware{
-			Key:        []byte(jwtSecret),
-			Realm:      "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
-			Timeout:    time.Minute * time.Duration(timeout),
-			MaxRefresh: time.Hour * time.Duration(maxRefresh),
+			Key:              jwtSecret,
+			Pub:              jwtPub,
+			Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
+			Timeout:          time.Minute * time.Duration(timeout),
+			MaxRefresh:       time.Minute * time.Duration(maxRefresh),
+			SigningAlgorithm: "RS256",
+			LogFunc: func(text string) {
+				log.Println("/auth: " + text)
+			},
 		}, mongoClient)
 		http.Handle("/auth/", http.StripPrefix("/auth", app.Api.MakeHandler()))
 	}
 	{
 		app := objects.New(&jwt.JWTMiddleware{
-			Key:           []byte(jwtSecret),
-			Realm:         "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
-			Authenticator: falseAuthenticator,
+			Pub:              jwtPub,
+			Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
+			Authenticator:    falseAuthenticator,
+			SigningAlgorithm: "RS256",
 		}, subService, mongoClient)
 		http.Handle("/objects/", http.StripPrefix("/objects", app.Api.MakeHandler()))
 	}
 	{
 		app := devices.New(&jwt.JWTMiddleware{
-			Key:           []byte(jwtSecret),
-			Realm:         "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
-			Authenticator: falseAuthenticator,
+			Pub:              jwtPub,
+			Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
+			Authenticator:    falseAuthenticator,
+			SigningAlgorithm: "RS256",
 		}, mongoClient)
 		http.Handle("/devices/", http.StripPrefix("/devices", app.Api.MakeHandler()))
 	}
 	{
 		app := trails.New(&jwt.JWTMiddleware{
-			Key:           []byte(jwtSecret),
-			Realm:         "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
-			Authenticator: falseAuthenticator,
+			Pub:              jwtPub,
+			Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
+			Authenticator:    falseAuthenticator,
+			SigningAlgorithm: "RS256",
 		}, mongoClient)
 		http.Handle("/trails/", http.StripPrefix("/trails", app.Api.MakeHandler()))
 	}
 	{
 		app := plog.New(&jwt.JWTMiddleware{
-			Key:           []byte(jwtSecret),
-			Realm:         "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
-			Authenticator: falseAuthenticator,
+			Pub:              jwtPub,
+			Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
+			Authenticator:    falseAuthenticator,
+			SigningAlgorithm: "RS256",
 		}, mongoClient)
 		http.Handle("/plog/", http.StripPrefix("/plog", app.Api.MakeHandler()))
 	}
 	{
 		app := logs.New(&jwt.JWTMiddleware{
-			Key:           []byte(jwtSecret),
-			Realm:         "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
-			Authenticator: falseAuthenticator,
+			Pub:              jwtPub,
+			Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
+			Authenticator:    falseAuthenticator,
+			SigningAlgorithm: "RS256",
 		}, mongoClient)
 		http.Handle("/logs/", http.StripPrefix("/logs", app.Api.MakeHandler()))
 	}
@@ -114,17 +145,19 @@ func DoInit() {
 	}
 	{
 		app := dash.New(&jwt.JWTMiddleware{
-			Key:           []byte(jwtSecret),
-			Realm:         "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
-			Authenticator: falseAuthenticator,
+			Pub:              jwtPub,
+			Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
+			Authenticator:    falseAuthenticator,
+			SigningAlgorithm: "RS256",
 		}, subService, mongoClient)
 		http.Handle("/dash/", http.StripPrefix("/dash", app.Api.MakeHandler()))
 	}
 	{
 		app := subscriptions.NewResty(&jwt.JWTMiddleware{
-			Key:           []byte(jwtSecret),
-			Realm:         "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
-			Authenticator: falseAuthenticator,
+			Pub:              jwtPub,
+			Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
+			Authenticator:    falseAuthenticator,
+			SigningAlgorithm: "RS256",
 		}, subService, mongoClient)
 		http.Handle("/subscriptions/", http.StripPrefix("/subscriptions", app.MakeHandler()))
 	}
