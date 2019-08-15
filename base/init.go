@@ -131,6 +131,7 @@ func DoInit() {
 	}
 	{
 		app := logs.New(&jwt.JWTMiddleware{
+			Key:              jwtSecret,
 			Pub:              jwtPub,
 			Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
 			Authenticator:    falseAuthenticator,
