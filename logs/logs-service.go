@@ -276,6 +276,7 @@ func (a *logsApp) handle_getlogscursor(w rest.ResponseWriter, r *rest.Request) {
 	err = r.DecodeJsonPayload(&jsonBody)
 	if err != nil {
 		rest.Error(w, "Error decoding json request body: "+err.Error(), http.StatusBadRequest)
+		return
 	}
 
 	var nextCursorJWT string
@@ -291,6 +292,7 @@ func (a *logsApp) handle_getlogscursor(w rest.ResponseWriter, r *rest.Request) {
 		nextCursorJWT = r.FormValue("next-cursor")
 
 	}
+
 	token, err := jwtgo.ParseWithClaims(nextCursorJWT, &LogsCursorClaim{}, func(token *jwtgo.Token) (interface{}, error) {
 		return a.jwt_middleware.Pub, nil
 	})
