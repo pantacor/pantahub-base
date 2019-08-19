@@ -367,7 +367,6 @@ func (s *elasticLogger) postLogs(e []LogsEntry) error {
 
 	timeRecv := time.Now()
 	index := fmt.Sprintf(s.elasticIndexPrefix+"-%.4d%.2d%.2d", timeRecv.Year(), timeRecv.Month(), timeRecv.Day())
-	log.Print("Index:" + index)
 	buildURLStr := "_bulk"
 
 	if s.syncWrites {
