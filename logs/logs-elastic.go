@@ -31,6 +31,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"strings"
 	"time"
 
 	"gitlab.com/pantacor/pantahub-base/utils"
@@ -177,7 +178,28 @@ func (s *elasticLogger) getLogs(start int64, page int64, beforeOrAfter *time.Tim
 		q = q.Must(elastic.NewTermQuery("own", query.Owner))
 	}
 	if query.Device != "" {
-		q = q.Must(elastic.NewTermQuery("dev", query.Device))
+		devices := strings.Split(query.Device, ",")
+		devicesInterface := []interface{}{}
+		for _, device := range devices {
+			devicesInterface = append(devicesInterface, device)
+		}
+		q = q.Must(elastic.NewTermsQuery("dev", devicesInterface...))
+	}
+	if query.LogSource != "" {
+		sources := strings.Split(query.LogSource, ",")
+		sourcesInterface := []interface{}{}
+		for _, source := range sources {
+			sourcesInterface = append(sourcesInterface, source)
+		}
+		q = q.Must(elastic.NewTermsQuery("src", sourcesInterface...))
+	}
+	if query.LogLevel != "" {
+		levels := strings.Split(query.LogLevel, ",")
+		levelsInterface := []interface{}{}
+		for _, level := range levels {
+			levelsInterface = append(levelsInterface, level)
+		}
+		q = q.Must(elastic.NewTermsQuery("lvl", levelsInterface...))
 	}
 	if beforeOrAfter != nil {
 		if after {
@@ -336,6 +358,7 @@ func (s *elasticLogger) getLogsByCursor(nextCursor string) (*LogsPager, error) {
 }
 
 func (s *elasticLogger) postLogs(e []LogsEntry) error {
+	log.Print("Inside postLogs(Elastic Search)")
 	if !s.works {
 		return errors.New("logger not initialized/works")
 	}
@@ -344,7 +367,7 @@ func (s *elasticLogger) postLogs(e []LogsEntry) error {
 
 	timeRecv := time.Now()
 	index := fmt.Sprintf(s.elasticIndexPrefix+"-%.4d%.2d%.2d", timeRecv.Year(), timeRecv.Month(), timeRecv.Day())
-
+	log.Print("Index:" + index)
 	buildURLStr := "_bulk"
 
 	if s.syncWrites {
