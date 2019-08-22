@@ -178,28 +178,28 @@ func (s *elasticLogger) getLogs(start int64, page int64, beforeOrAfter *time.Tim
 		q = q.Must(elastic.NewTermQuery("own", query.Owner))
 	}
 	if query.Device != "" {
-		devices := strings.Split(query.Device, ",")
-		devicesInterface := []interface{}{}
-		for _, device := range devices {
-			devicesInterface = append(devicesInterface, device)
+		components := strings.Split(query.Device, ",")
+		devices := []interface{}{}
+		for _, device := range components {
+			devices = append(devices, device)
 		}
-		q = q.Must(elastic.NewTermsQuery("dev", devicesInterface...))
+		q = q.Must(elastic.NewTermsQuery("dev", devices...))
 	}
 	if query.LogSource != "" {
-		sources := strings.Split(query.LogSource, ",")
-		sourcesInterface := []interface{}{}
-		for _, source := range sources {
-			sourcesInterface = append(sourcesInterface, source)
+		components := strings.Split(query.LogSource, ",")
+		sources := []interface{}{}
+		for _, source := range components {
+			sources = append(sources, source)
 		}
-		q = q.Must(elastic.NewTermsQuery("src", sourcesInterface...))
+		q = q.Must(elastic.NewTermsQuery("src", sources...))
 	}
 	if query.LogLevel != "" {
-		levels := strings.Split(query.LogLevel, ",")
-		levelsInterface := []interface{}{}
-		for _, level := range levels {
-			levelsInterface = append(levelsInterface, level)
+		components := strings.Split(query.LogLevel, ",")
+		levels := []interface{}{}
+		for _, level := range components {
+			levels = append(levels, level)
 		}
-		q = q.Must(elastic.NewTermsQuery("lvl", levelsInterface...))
+		q = q.Must(elastic.NewTermsQuery("lvl", levels...))
 	}
 	if beforeOrAfter != nil {
 		if after {
