@@ -358,7 +358,6 @@ func (s *elasticLogger) getLogsByCursor(nextCursor string) (*LogsPager, error) {
 }
 
 func (s *elasticLogger) postLogs(e []LogsEntry) error {
-	log.Print("Inside postLogs(Elastic Search)")
 	if !s.works {
 		return errors.New("logger not initialized/works")
 	}
