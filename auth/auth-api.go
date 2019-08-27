@@ -119,6 +119,30 @@ func handle_auth(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(jwtClaims)
 }
 
+type encryptedAccountToken struct {
+	Token       string `json:"token"`
+	RedirectURI string `json:"redirect-uri"`
+}
+
+func handle_get_encrypted_account(accountData *accountCreationPayload) (*encryptedAccountToken, error) {
+	encryptedAccountData, err := utils.CreateJWE(accountData)
+	if err != nil {
+		return nil, err
+	}
+
+	urlPrefix := utils.GetEnv(utils.ENV_PANTAHUB_SCHEME) + "://"
+	urlPrefix += utils.GetEnv(utils.ENV_PANTAHUB_HOST_WWW)
+	urlPrefix += utils.GetEnv(utils.ENV_PANTAHUB_SIGNUP_PATH)
+	urlPrefix += "#account=" + encryptedAccountData
+
+	response := &encryptedAccountToken{
+		Token:       encryptedAccountData,
+		RedirectURI: urlPrefix,
+	}
+
+	return response, nil
+}
+
 func (a *AuthApp) handle_getaccounts(w rest.ResponseWriter, r *rest.Request) {
 	var err error
 	var cur *mongo.Cursor
@@ -180,28 +204,86 @@ func (a *AuthApp) handle_getaccounts(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(&resultSet)
 }
 
+type accountCreationPayload struct {
+	accounts.Account
+	Captcha          string `json:"captcha"`
+	EncryptedAccount string `json:"encrypted-account"`
+}
+
 func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
-	newAccount := accounts.Account{}
+	newAccount := accountCreationPayload{}
 
 	r.DecodeJsonPayload(&newAccount)
 
+	// if encrypted account data exist decryted and continue with validation
+	if newAccount.EncryptedAccount != "" {
+		err := utils.ParseJWE(newAccount.EncryptedAccount, &newAccount.Account)
+		if err != nil {
+			utils.RestError(w, err, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
 	if newAccount.Email == "" {
-		rest.Error(w, "Accounts must have an email address", http.StatusPreconditionFailed)
+		utils.RestError(w, nil, "Accounts must have an email address", http.StatusPreconditionFailed)
 		return
 	}
 
 	if newAccount.Password == "" {
-		rest.Error(w, "Accounts must have a password set", http.StatusPreconditionFailed)
+		utils.RestError(w, nil, "Accounts must have a password set", http.StatusPreconditionFailed)
 		return
 	}
 
 	if newAccount.Nick == "" {
-		rest.Error(w, "Accounts must have a nick set", http.StatusPreconditionFailed)
+		utils.RestError(w, nil, "Accounts must have a nick set", http.StatusPreconditionFailed)
 		return
 	}
 
 	if !newAccount.Id.IsZero() {
-		rest.Error(w, "Accounts cannot have id before creation", http.StatusPreconditionFailed)
+		utils.RestError(w, nil, "Accounts cannot have id before creation", http.StatusPreconditionFailed)
+		return
+	}
+
+	// Validate if user already exist
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
+
+	if collection == nil {
+		utils.RestError(w, nil, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+
+	usersCount, _ := collection.CountDocuments(ctx,
+		bson.M{
+			"$or": []bson.M{
+				{"email": newAccount.Email},
+				{"nick": newAccount.Nick},
+			},
+		},
+	)
+	if usersCount > 0 {
+		utils.RestError(w, nil, "Email or Nick already in use", http.StatusPreconditionFailed)
+		return
+	}
+
+	// if account creation doesn't have captcha encrypt data and send a redirect link to finish the process
+	if newAccount.Captcha == "" {
+		response, err := handle_get_encrypted_account(&newAccount)
+		if err != nil {
+			utils.RestError(w, err, err.Error(), http.StatusInternalServerError)
+		}
+		w.WriteJson(response)
+		return
+	}
+
+	validCaptcha, err := utils.VerifyReCaptchaToken(newAccount.Captcha)
+	if err != nil {
+		utils.RestError(w, err, err.Error(), http.StatusPreconditionFailed)
+		return
+	}
+	if !validCaptcha {
+		utils.RestError(w, nil, "Invalid captcha", http.StatusPreconditionFailed)
 		return
 	}
 
@@ -218,7 +300,7 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 	mgoid := primitive.NewObjectID()
 	ObjectID, err := primitive.ObjectIDFromHex(mgoid.Hex())
 	if err != nil {
-		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		utils.RestError(w, err, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -229,38 +311,18 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 	newAccount.Type = accounts.ACCOUNT_TYPE_USER // XXX: need org approach too
 	newAccount.TimeModified = newAccount.TimeCreated
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
-
-	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
-	}
-
-	usersCount, _ := collection.CountDocuments(ctx,
-		bson.M{
-			"$or": []bson.M{
-				{"email": newAccount.Email},
-				{"nick": newAccount.Nick},
-			},
-		},
-	)
-	if usersCount > 0 {
-		rest.Error(w, "Email or Nick already in use", http.StatusPreconditionFailed)
-		return
-	}
-
 	updateOptions := options.Update()
 	updateOptions.SetUpsert(true)
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	_, err = collection.UpdateOne(
 		ctx,
 		bson.M{"_id": newAccount.Id},
-		bson.M{"$set": newAccount},
+		bson.M{"$set": newAccount.Account},
 		updateOptions,
 	)
 	if err != nil {
-		rest.Error(w, "Internal Error: "+err.Error(), http.StatusInternalServerError)
+		utils.RestError(w, err, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
