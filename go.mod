@@ -4,12 +4,13 @@ go 1.12
 
 replace github.com/go-resty/resty => gopkg.in/resty.v1 v1.11.0
 
-replace github.com/ant0ine/go-json-rest => github.com/asac/go-json-rest v3.3.3-0.20181121222456-cab770813df3+incompatible
+replace github.com/ant0ine/go-json-rest => github.com/asac/go-json-rest v3.3.3-0.20191004094541-40429adaafcb+incompatible
 
 require (
 	github.com/ChannelMeter/iso8601duration v0.0.0-20150204201828-8da3af7a2a61 // indirect
 	github.com/alecthomas/units v0.0.0-20190717042225-c3de453c63f4
 	github.com/ant0ine/go-json-rest v3.3.2+incompatible
+	github.com/asac/go-json-rest v3.3.2+incompatible
 	github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a
 	github.com/aws/aws-sdk-go v1.21.1
 	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
@@ -23,9 +24,7 @@ require (
 	github.com/fluent/fluent-logger-golang v1.4.0
 	github.com/gibson042/canonicaljson-go v1.0.3
 	github.com/go-resty/resty v0.0.0-00010101000000-000000000000 // indirect
-	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/golang/snappy v0.0.1 // indirect
-	github.com/google/go-cmp v0.3.0 // indirect
 	github.com/gorilla/mux v1.7.3 // indirect
 	github.com/jaswdr/faker v1.0.2
 	github.com/kr/pretty v0.1.0 // indirect
@@ -35,6 +34,7 @@ require (
 	github.com/onsi/gomega v1.5.0 // indirect
 	github.com/pantacor/go-json-rest-middleware-jwt v0.0.0-20190329235955-213479ac018c
 	github.com/philhofer/fwd v1.0.0 // indirect
+	github.com/prometheus/client_golang v1.1.0
 	github.com/rs/cors v1.6.0
 	github.com/stretchr/testify v1.3.0
 	github.com/tidwall/pretty v1.0.0 // indirect
@@ -43,7 +43,6 @@ require (
 	github.com/xdg/stringprep v1.0.0 // indirect
 	gitlab.com/pantacor/pantahub-gc v0.0.0-20190719115544-466a41727898
 	gitlab.com/pantacor/pantahub-testharness v0.0.0-20190311155708-e39aa76a7650
-	gitlab.com/pantacor/pvr v0.0.0-20190722130419-325b73c63259
 	go.mongodb.org/mongo-driver v1.0.4
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
 	golang.org/x/sync v0.0.0-20190423024810-112230192c58 // indirect
