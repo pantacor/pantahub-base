@@ -1,6 +1,6 @@
-image: docker
+language: ruby
+dist: bionic
 services:
-    - docker:dind
-build:
-  script:
-    - docker build --no-cache --rm .
+  - docker
+script:
+  - docker build --no-cache .
