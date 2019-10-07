@@ -1,19 +1,6 @@
-language: go
-sudo: required
+language: ruby
 dist: xenial
-go:
-  - "1.11"
-  - "1.12"
-  - "1.13"
-  - tip
-os:
-  - linux
-  - osx
-  - windows
-matrix:
-  allow_failures:
-    - go: tip
-  fast_finish: true
+services:
+  - docker
 script:
-  - go test -v -cover
-  - docker build .
+  - docker build --no-cache .
