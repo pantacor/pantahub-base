@@ -269,7 +269,8 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	// if account creation doesn't have captcha encrypt data and send a redirect link to finish the process
-	if newAccount.Captcha == "" {
+	useCaptcha := utils.GetEnv(utils.ENV_PANTAHUB_USE_CAPTCHA) == "true"
+	if newAccount.Captcha == "" && useCaptcha {
 		response, err := handle_get_encrypted_account(&newAccount)
 		if err != nil {
 			utils.RestError(w, err, err.Error(), http.StatusInternalServerError)
@@ -278,14 +279,16 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	validCaptcha, err := utils.VerifyReCaptchaToken(newAccount.Captcha)
-	if err != nil {
-		utils.RestError(w, err, err.Error(), http.StatusPreconditionFailed)
-		return
-	}
-	if !validCaptcha {
-		utils.RestError(w, nil, "Invalid captcha", http.StatusPreconditionFailed)
-		return
+	if useCaptcha {
+		validCaptcha, err := utils.VerifyReCaptchaToken(newAccount.Captcha)
+		if err != nil {
+			utils.RestError(w, err, err.Error(), http.StatusPreconditionFailed)
+			return
+		}
+		if !validCaptcha {
+			utils.RestError(w, nil, "Invalid captcha", http.StatusPreconditionFailed)
+			return
+		}
 	}
 
 	passwordBcrypt, err := utils.HashPassword(newAccount.Password, utils.CryptoMethods.BCrypt)

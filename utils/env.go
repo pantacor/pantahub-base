@@ -40,6 +40,9 @@ const (
 	// default: "This must be changed"
 	ENV_GOOGLE_CAPTCHA_SECRET = "GOOGLE_CAPTCHA_SECRET"
 
+	// Pantahub Use Captcha. Set if captcha will be used by the API.
+	ENV_PANTAHUB_USE_CAPTCHA = "PANTAHUB_USE_CAPTCHA"
+
 	// Pantahub JWT Secret. THIS MUST BE SET TO SOMETHING SECRET!!
 	// default: "THIS MUST BE CHANGED"
 	ENV_PANTAHUB_JWT_OBJECT_SECRET = "PANTAHUB_JWT_OBJECT_SECRET"
@@ -250,6 +253,7 @@ var defaultEnvs = map[string]string{
 	ENV_PANTAHUB_PRODUCTNAME:                    "pantahub-personal",
 	ENV_PANTAHUB_DEMOACCOUNTS_PASSWORD_service1: "O9i8HlpSc",
 	ENV_GOOGLE_CAPTCHA_SECRET:                   "YOU MUST CHANGE THIS",
+	ENV_PANTAHUB_USE_CAPTCHA:                    "true",
 	ENV_PANTAHUB_JWT_AUTH_SECRET:                "YOU MUST CHANGE THIS",
 	ENV_PANTAHUB_JWT_AUTH_PUB:                   "YOU MUST CHANGE THIS",
 	ENV_PANTAHUB_JWE_SECRET:                     "YOU MUST CHANGE THIS",
