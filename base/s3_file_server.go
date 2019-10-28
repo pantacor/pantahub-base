@@ -21,10 +21,12 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"path"
 	"path/filepath"
+	"time"
 
 	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/s3"
@@ -125,7 +127,21 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s3resp, err := http.DefaultClient.Do(s3req)
+	transport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   60 * time.Minute,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   30 * time.Second,
+		ExpectContinueTimeout: 15 * time.Second,
+	}
+	httpClient := &http.Client{Transport: transport}
+
+	s3resp, err := httpClient.Do(s3req)
 	if err != nil {
 		defer s.s3.Delete(tempName)
 		log.Printf("ERROR: failed to upload to %s\n", preSignedURL)
