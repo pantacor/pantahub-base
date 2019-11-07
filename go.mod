@@ -26,11 +26,14 @@ require (
 	github.com/fluent/fluent-logger-golang v1.4.0
 	github.com/gibson042/canonicaljson-go v1.0.3
 	github.com/go-resty/resty v0.0.0-00010101000000-000000000000 // indirect
+	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/golang/snappy v0.0.1 // indirect
 	github.com/gorilla/mux v1.7.3 // indirect
 	github.com/jaswdr/faker v1.0.2
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/miolini/datacounter v0.0.0-20171104152933-fd4e42a1d5e0 // indirect
+	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
+	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/mongodb/mongo-go-driver v1.0.4
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/onsi/gomega v1.5.0 // indirect

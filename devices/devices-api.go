@@ -1130,6 +1130,9 @@ func (a *DevicesApp) handle_getdevices(w rest.ResponseWriter, r *rest.Request) {
 			if strings.HasPrefix(v[0], "!") {
 				v[0] = strings.TrimPrefix(v[0], "!")
 				query[k] = bson.M{"$ne": v[0]}
+			} else if strings.HasPrefix(v[0], "^") {
+				v[0] = strings.TrimPrefix(v[0], "^")
+				query[k] = bson.M{"$regex": "^" + v[0], "$options": "i"}
 			} else {
 				query[k] = v[0]
 			}
