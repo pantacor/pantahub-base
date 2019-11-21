@@ -22,6 +22,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -42,6 +43,9 @@ import (
 )
 
 const PantahubDevicesAutoTokenV1 = "Pantahub-Devices-Auto-Token-V1"
+
+//DeviceNickRule : Device nick rule used to create/update a device nick
+const DeviceNickRule = "^[a-zA-Z0-9_-`+``%`]+$"
 
 func init() {
 	// seed this for petname as dustin dropped our patch upstream... moo
@@ -379,6 +383,16 @@ func (a *DevicesApp) handle_postdevice(w rest.ResponseWriter, r *rest.Request) {
 		newDevice.Nick = petname.Generate(3, "_")
 	}
 
+	isValidNick, err := regexp.MatchString(DeviceNickRule, newDevice.Nick)
+	if err != nil {
+		rest.Error(w, "Error Validating Device nick "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if !isValidNick {
+		rest.Error(w, "Invalid Device Nick (Only allowed characters:[A-Za-z0-9-_+%])", http.StatusBadRequest)
+		return
+	}
+
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -524,6 +538,16 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 			rest.Error(w, "No Access to Device", http.StatusForbidden)
 			return
 		}
+	}
+
+	isValidNick, err := regexp.MatchString(DeviceNickRule, newDevice.Nick)
+	if err != nil {
+		rest.Error(w, "Error Validating Device nick "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if !isValidNick {
+		rest.Error(w, "Invalid Device Nick(Only allowed characters:[A-Za-z0-9-_+%])", http.StatusBadRequest)
+		return
 	}
 
 	newDevice.TimeModified = time.Now()
@@ -829,6 +853,15 @@ func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) 
 	if patch.Nick != "" {
 		newDevice.Nick = patch.Nick
 		patched = true
+	}
+	isValidNick, err := regexp.MatchString(DeviceNickRule, newDevice.Nick)
+	if err != nil {
+		rest.Error(w, "Error Validating Device nick "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if !isValidNick {
+		rest.Error(w, "Invalid Device Nick(Only allowed characters:[A-Za-z0-9-_+%])", http.StatusBadRequest)
+		return
 	}
 
 	if patched {
