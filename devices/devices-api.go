@@ -549,7 +549,11 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 
 	var device Device
 
-	mgoid := bson.ObjectIdHex(r.PathParam("id"))
+	mgoid, err := primitive.ObjectIDFromHex(r.PathParam("id"))
+	if err != nil {
+		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	authId, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
@@ -1192,7 +1196,14 @@ func (a *DevicesApp) handle_deletedevice(w rest.ResponseWriter, r *rest.Request)
 		"garbage": bson.M{"$ne": true},
 	}).Decode(&device)
 	if err != nil {
-		rest.Error(w, "Device not found: "+err.Error(), http.StatusInternalServerError)
+		if err != mongo.ErrNoDocuments {
+			log.Println("Error deleting device: " + err.Error())
+			rest.Error(w, "Device not found", http.StatusInternalServerError)
+			return
+		}
+
+		device.Id = deviceObjectID
+		w.WriteJson(device)
 		return
 	}
 
