@@ -210,21 +210,14 @@ func (s *mgoLogger) getLogs(start int64, page int64, beforeOrAfter *time.Time,
 	if query.Owner != "" {
 		findFilter["own"] = query.Owner
 	}
-
 	if query.LogLevel != "" {
-		findFilter["lvl"] = bson.M{
-			"$in": strings.Split(query.LogLevel, ","),
-		}
+		findFilter["lvl"] = query.LogLevel
 	}
 	if query.Device != "" {
-		findFilter["dev"] = bson.M{
-			"$in": strings.Split(query.Device, ","),
-		}
+		findFilter["dev"] = query.Device
 	}
 	if query.LogSource != "" {
-		findFilter["src"] = bson.M{
-			"$in": strings.Split(query.LogSource, ","),
-		}
+		findFilter["src"] = query.LogSource
 	}
 
 	if beforeOrAfter != nil {

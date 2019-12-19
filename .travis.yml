@@ -1,6 +1,0 @@
-language: ruby
-dist: bionic
-services:
-  - docker
-script:
-  - docker build --no-cache .

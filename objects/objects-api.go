@@ -27,7 +27,6 @@ import (
 	"strconv"
 	"time"
 
-	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/storagedriver"
 	"gitlab.com/pantacor/pantahub-base/subscriptions"
 
@@ -695,9 +694,6 @@ func New(jwtMiddleware *jwt.JWTMiddleware, subService subscriptions.Subscription
 	app.Api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
 		"/objects:", log.Lshortfile)})
 	app.Api.Use(&utils.AccessLogFluentMiddleware{Prefix: "objects"})
-	app.Api.Use(&rest.StatusMiddleware{})
-	app.Api.Use(&rest.TimerMiddleware{})
-	app.Api.Use(&metrics.MetricsMiddleware{})
 
 	app.Api.Use(rest.DefaultCommonStack...)
 	app.Api.Use(&rest.CorsMiddleware{
