@@ -58,6 +58,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
+	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/storagedriver"
 	"gitlab.com/pantacor/pantahub-base/utils"
@@ -2469,6 +2470,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *TrailsApp
 	app.Api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
 		"/trails:", log.Lshortfile)})
 	app.Api.Use(&utils.AccessLogFluentMiddleware{Prefix: "trails"})
+	app.Api.Use(&rest.StatusMiddleware{})
+	app.Api.Use(&rest.TimerMiddleware{})
+	app.Api.Use(&metrics.MetricsMiddleware{})
 
 	app.Api.Use(rest.DefaultCommonStack...)
 	app.Api.Use(&rest.CorsMiddleware{

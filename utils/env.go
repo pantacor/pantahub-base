@@ -30,6 +30,19 @@ const (
 	// Pantahub JWT Public Key. Public RSA key in base64 encoded PEM format
 	ENV_PANTAHUB_JWT_AUTH_PUB = "PANTAHUB_JWT_PUB"
 
+	// Pantahub JWE Secret. THIS MUST BE SET TO SOMETHING SECRET!!
+	ENV_PANTAHUB_JWE_SECRET = "PANTAHUB_JWE_SECRET"
+
+	// Pantahub JWE Public Key. Public RSA key in base64 encoded PEM format
+	ENV_PANTAHUB_JWE_PUB = "PANTAHUB_JWE_PUB"
+
+	// Google Captcha service secret key
+	// default: "This must be changed"
+	ENV_GOOGLE_CAPTCHA_SECRET = "GOOGLE_CAPTCHA_SECRET"
+
+	// Pantahub Use Captcha. Set if captcha will be used by the API.
+	ENV_PANTAHUB_USE_CAPTCHA = "PANTAHUB_USE_CAPTCHA"
+
 	// Pantahub JWT Secret. THIS MUST BE SET TO SOMETHING SECRET!!
 	// default: "THIS MUST BE CHANGED"
 	ENV_PANTAHUB_JWT_OBJECT_SECRET = "PANTAHUB_JWT_OBJECT_SECRET"
@@ -104,6 +117,8 @@ const (
 	// or need more privileged access tokens.
 	// default: $PANTAHUB_SCHEME://$PANTAHUB_HOST:$PANTAHUB_PORT/auth
 	ENV_PANTAHUB_AUTH = "PH_AUTH"
+
+	ENV_PANTAHUB_SIGNUP_PATH = "PANTAHUB_SIGNUP_PATH"
 
 	// port to listen to on for http on internal interfaces
 	// default: 12365
@@ -237,8 +252,12 @@ const (
 var defaultEnvs = map[string]string{
 	ENV_PANTAHUB_PRODUCTNAME:                    "pantahub-personal",
 	ENV_PANTAHUB_DEMOACCOUNTS_PASSWORD_service1: "O9i8HlpSc",
+	ENV_GOOGLE_CAPTCHA_SECRET:                   "YOU MUST CHANGE THIS",
+	ENV_PANTAHUB_USE_CAPTCHA:                    "true",
 	ENV_PANTAHUB_JWT_AUTH_SECRET:                "YOU MUST CHANGE THIS",
 	ENV_PANTAHUB_JWT_AUTH_PUB:                   "YOU MUST CHANGE THIS",
+	ENV_PANTAHUB_JWE_SECRET:                     "YOU MUST CHANGE THIS",
+	ENV_PANTAHUB_JWE_PUB:                        "YOU MUST CHANGE THIS",
 	ENV_PANTAHUB_SCRYPT_SECRET:                  "YOU MUST CHANGE THIS",
 	ENV_PANTAHUB_JWT_OBJECT_SECRET:              "YOU MUST CHANGE THIS",
 	ENV_PANTAHUB_JWT_TIMEOUT_MINUTES:            "60",
@@ -301,6 +320,9 @@ var defaultEnvs = map[string]string{
 
 	// pantahub internal envs
 	ENV_PANTAHUB_AUTH: "http://localhost:12365/auth",
+
+	// pantahub www signup path
+	ENV_PANTAHUB_SIGNUP_PATH: "/signup",
 
 	// storage driver used to store objects
 	ENV_PANTAHUB_STORAGE_DRIVER: "local",
