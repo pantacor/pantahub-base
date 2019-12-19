@@ -13,30 +13,27 @@ Start your server:
 
 ## Register a user
 
-To register simply POST your details to the accounts endpoint. If nick and email are not taken
-it will send a registration confirm email out. In case of development server where SMTP is not working
-the regisgtration URL will be dumped to console for you to pick up.
+The registration process is a two steps flow when you are using the CLI or the API, in that case in order to  
+register:
 
+1.- simply POST your details to the accounts endpoint. If nick and email are not taken 
+it will response with a token and redirect-uri to continue the second step
+
+2.- Open the browser with the redirect-uri resolve the captcha challenge and finish the process. If there is any error the system will send a registration confirm email out.
 
 ```
-http POST http://localhost:12365/auth/accounts email="asac@pantacor.com" nick="asac" password="XXXXXX"
-HTTP/1.1 200 OK
-Connection: keep-alive
-Content-Length: 303
-Content-Type: application/json; charset=utf-8
-Date: Wed, 29 Mar 2017 21:06:32 GMT
-Server: nginx/1.10.0 (Ubuntu)
-X-Powered-By: go-json-rest
+curl --request POST \
+  --url http://localhost:12365/auth/accounts \
+  --header 'content-type: application/json' \
+  --data '{
+	"email": "sergio.marin@pantacor.com",
+	"nick": "sergiomarin",
+	"password": "1234567890"
+}'
 
 {
-    "email": "asac@pantacor.com",
-    "id": "58dc21d76e2bc30224f160b0",
-    "nick": "asac",
-    "password": "XXXXXX",
-    "password-new": "",
-    "prn": "prn:::accounts:/58dc21d76e2bc30224f160b0", 
-    "time-created": "2017-03-29T16:06:31.345913416-05:00", 
-    "time-modified": "2017-03-29T16:06:31.345913416-05:00"
+    token: "eyJhbGciOiJSU0EtT0FFUCIsImVuYyI6IkExMjhHQ00iLCJ0eXAiOiJKV1QifQ.ExjbJW5nNxOKftqAZ0RAqMfE5Q20bzm2fcICJM-r0fqRqn3mbBadVuZrk5NqYJrCH2YfBU4Jt1yhDBjlZwM1HM4QU7Xau6IeX8h4n8kyYDd819Ra9uisYfnq2lT2mAnS-08RaFDmjh3B2o--JZDydIEAa7hXDlo7sXuIPXayj3oQVLhhpLkaTII5XYy1U47_7hPHGTf5MbXbK79yYzPS1EqtWDjLpxIiViY0oMZUgZLP_IZ81rAD_0zdTrKeh_mBUefN0d2fpcWtyH3zSGX_o6-N5-MASFc9LgVfQDBymv_9XkG_MAggv3pmfFQXeRunJZdIXJujAgFh9rEg67voOA.Eb8SnMx_c0ImvlVb.O8yTX9gqbx4a5oTGgHEMEmOBWw_aibkQs6fjgazs6OZH9u1lRXil3MSzJ4D0NlAtS-jH_Rz_hQ6gt-m-SuM_JYH-2T_-KJ67n1VugApaATIADWX-7r_d-oYkM50qcvC7U3tmiWLQ3WHveSi-1JpPPG6Ukuuw9G7itbLMpoi2AzHpMtrZPyjIv5A6JdCIFPlLax8N2krHA2lRqv24596Vv4zy_w1Y9nb3RDLX4F81F33t0VA-dE-i-Bay2RH2KH9dfm9CmlvxWpk8NwzKCgoHBHuzm7dhEVAlfNU.ucIQP10FLHcgsSNflIrO9Q",
+    "redirect-uri": "http://localhost:3000/signup#account=eyJhbGciOiJSU0EtT0FFUCIsImVuYyI6IkExMjhHQ00iLCJ0eXAiOiJKV1QifQ.ExjbJW5nNxOKftqAZ0RAqMfE5Q20bzm2fcICJM-r0fqRqn3mbBadVuZrk5NqYJrCH2YfBU4Jt1yhDBjlZwM1HM4QU7Xau6IeX8h4n8kyYDd819Ra9uisYfnq2lT2mAnS-08RaFDmjh3B2o--JZDydIEAa7hXDlo7sXuIPXayj3oQVLhhpLkaTII5XYy1U47_7hPHGTf5MbXbK79yYzPS1EqtWDjLpxIiViY0oMZUgZLP_IZ81rAD_0zdTrKeh_mBUefN0d2fpcWtyH3zSGX_o6-N5-MASFc9LgVfQDBymv_9XkG_MAggv3pmfFQXeRunJZdIXJujAgFh9rEg67voOA.Eb8SnMx_c0ImvlVb.O8yTX9gqbx4a5oTGgHEMEmOBWw_aibkQs6fjgazs6OZH9u1lRXil3MSzJ4D0NlAtS-jH_Rz_hQ6gt-m-SuM_JYH-2T_-KJ67n1VugApaATIADWX-7r_d-oYkM50qcvC7U3tmiWLQ3WHveSi-1JpPPG6Ukuuw9G7itbLMpoi2AzHpMtrZPyjIv5A6JdCIFPlLax8N2krHA2lRqv24596Vv4zy_w1Y9nb3RDLX4F81F33t0VA-dE-i-Bay2RH2KH9dfm9CmlvxWpk8NwzKCgoHBHuzm7dhEVAlfNU.ucIQP10FLHcgsSNflIrO9Q"
 }
 ```
 

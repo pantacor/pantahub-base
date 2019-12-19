@@ -31,6 +31,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"strings"
 	"time"
 
 	"gitlab.com/pantacor/pantahub-base/utils"
@@ -177,7 +178,28 @@ func (s *elasticLogger) getLogs(start int64, page int64, beforeOrAfter *time.Tim
 		q = q.Must(elastic.NewTermQuery("own", query.Owner))
 	}
 	if query.Device != "" {
-		q = q.Must(elastic.NewTermQuery("dev", query.Device))
+		components := strings.Split(query.Device, ",")
+		devices := []interface{}{}
+		for _, device := range components {
+			devices = append(devices, device)
+		}
+		q = q.Must(elastic.NewTermsQuery("dev", devices...))
+	}
+	if query.LogSource != "" {
+		components := strings.Split(query.LogSource, ",")
+		sources := []interface{}{}
+		for _, source := range components {
+			sources = append(sources, source)
+		}
+		q = q.Must(elastic.NewTermsQuery("src", sources...))
+	}
+	if query.LogLevel != "" {
+		components := strings.Split(query.LogLevel, ",")
+		levels := []interface{}{}
+		for _, level := range components {
+			levels = append(levels, level)
+		}
+		q = q.Must(elastic.NewTermsQuery("lvl", levels...))
 	}
 	if beforeOrAfter != nil {
 		if after {
@@ -344,7 +366,6 @@ func (s *elasticLogger) postLogs(e []LogsEntry) error {
 
 	timeRecv := time.Now()
 	index := fmt.Sprintf(s.elasticIndexPrefix+"-%.4d%.2d%.2d", timeRecv.Year(), timeRecv.Month(), timeRecv.Day())
-
 	buildURLStr := "_bulk"
 
 	if s.syncWrites {
