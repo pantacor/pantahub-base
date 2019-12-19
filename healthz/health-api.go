@@ -17,7 +17,6 @@ package healthz
 
 import (
 	"net/http"
-	"sync"
 
 	"context"
 	"log"
@@ -28,12 +27,6 @@ import (
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gopkg.in/mgo.v2/bson"
-)
-
-var (
-	m                sync.Mutex
-	lastResponse     Response
-	lastResponseTime time.Time
 )
 
 type HealthzApp struct {
@@ -48,13 +41,6 @@ type Response struct {
 }
 
 func (a *HealthzApp) handle_healthz(w rest.ResponseWriter, r *rest.Request) {
-	m.Lock()
-	defer m.Unlock()
-
-	if time.Now().Before(lastResponseTime.Add(30 * time.Second)) {
-		w.WriteJson(lastResponse)
-		return
-	}
 
 	response := Response{}
 
@@ -84,9 +70,6 @@ func (a *HealthzApp) handle_healthz(w rest.ResponseWriter, r *rest.Request) {
 
 	end := time.Now()
 	response.Duration = end.Sub(response.Start)
-
-	lastResponse = response
-	lastResponseTime = time.Now()
 
 	w.WriteJson(response)
 }

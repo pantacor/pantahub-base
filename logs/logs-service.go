@@ -24,15 +24,12 @@ package logs
 
 //
 import (
-	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -40,7 +37,6 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
-	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -174,11 +170,6 @@ func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 
 	sourceParam := r.FormValue("src")
 	deviceParam := r.FormValue("dev")
-	deviceParam, err = a.ParseDeviceString(deviceParam)
-	if err != nil {
-		rest.Error(w, "Error Parsing Device nicks:"+err.Error(), http.StatusBadRequest)
-		return
-	}
 	levelParam := r.FormValue("lvl")
 
 	filter := &LogsEntry{
@@ -261,55 +252,6 @@ func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	w.WriteJson(result)
-}
-
-// ParseDeviceString : Parse Device Nicks & Device Id's from a string and replace them with device Prn
-func (a *logsApp) ParseDeviceString(devicesString string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
-	if collection == nil {
-		return "", errors.New("Error with Database connectivity")
-	}
-	devicePrns := []string{}
-
-	components := strings.Split(devicesString, ",")
-	deviceObject := devices.Device{}
-	for _, device := range components {
-		hasPrefix, _ := regexp.MatchString("^prn:(.*):devices:/(.+)$", device)
-		if hasPrefix {
-			devicePrns = append(devicePrns, device)
-			continue
-		}
-		deviceNick := ""
-		deviceObjectID, err := primitive.ObjectIDFromHex(device)
-		if err != nil {
-			deviceNick = device
-		}
-		if deviceNick != "" {
-			err = collection.FindOne(ctx,
-				bson.M{
-					"nick":    deviceNick,
-					"garbage": bson.M{"$ne": true},
-				}).
-				Decode(&deviceObject)
-		} else {
-			err = collection.FindOne(ctx,
-				bson.M{
-					"_id":     deviceObjectID,
-					"garbage": bson.M{"$ne": true},
-				}).
-				Decode(&deviceObject)
-		}
-		if err != nil {
-			fmt.Print("Error finding device:" + device + ",err:" + err.Error())
-			continue
-		}
-		if deviceObject.Nick != "" {
-			devicePrns = append(devicePrns, deviceObject.Prn)
-		}
-	}
-	return strings.Join(devicePrns, ","), nil
 }
 
 func (a *logsApp) handle_getlogscursor(w rest.ResponseWriter, r *rest.Request) {
