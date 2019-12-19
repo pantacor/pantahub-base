@@ -131,17 +131,6 @@ func (mw *AccessLogFluentMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.Han
 	}
 
 	return func(w rest.ResponseWriter, r *rest.Request) {
-		bodySize, err := strconv.ParseFloat(r.Header.Get("Content-Length"), 64)
-		if err != nil {
-			rest.Error(w, "Error when parsing Content-Length header", http.StatusBadRequest)
-			return
-		}
-
-		if int(bodySize) > MAX_READ_BODY_SIZE {
-			rest.Error(w, "Body is too large", http.StatusRequestEntityTooLarge)
-			return
-		}
-
 		requestBody := []byte{}
 		responseBody := []byte{}
 
@@ -191,7 +180,7 @@ func (mw *AccessLogFluentMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.Han
 
 		m := structs.Map(logRec)
 
-		err = mw.Logger.Post(mw.Tag, m)
+		err := mw.Logger.Post(mw.Tag, m)
 		if err != nil {
 			log.Println("WARNING: error posting logs to fluentd: " + err.Error())
 		}
