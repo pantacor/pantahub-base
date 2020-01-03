@@ -16,7 +16,9 @@ services:
     links:
       - localstack
       - mongo
-    env_file: ./env.default
+    env_file:
+      - ./env.default 
+      - ./.env.local
 
   mongo:
     image: mongo
@@ -48,6 +50,6 @@ services:
     environment:
       - SERVICES=s3:5000
       - DEFAULT_REGION=us-east-1
-      - HOSTNAME=localstack-s3
+      - HOSTNAME=localstack
     ports:
       - "5000:5000"

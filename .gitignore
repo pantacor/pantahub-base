@@ -9,3 +9,4 @@ s3-storage/
 tmp
 data
 vendor/
+.env.*
