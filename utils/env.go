@@ -247,6 +247,9 @@ const (
 
 	// Pantahub Demo Account:service1 password
 	ENV_PANTAHUB_DEMOACCOUNTS_PASSWORD_service1 = "PANTAHUB_DEMOACCOUNTS_PASSWORD_service1"
+
+	// enable log requests,responses parameters and bodies
+	ENV_PANTAHUB_LOG_BODY = "PANTAHUB_LOG_BODY"
 )
 
 var defaultEnvs = map[string]string{
@@ -374,6 +377,9 @@ var defaultEnvs = map[string]string{
 	Format:ISO_8601: https://en.wikipedia.org/wiki/ISO_8601?oldformat=true#Durations
 	*/
 	ENV_PANTAHUB_GC_GARBAGE_EXPIRY: "P2D", // => 2 Days
+
+	// log requests,responses parameters and bodies
+	ENV_PANTAHUB_LOG_BODY: "false",
 }
 
 func GetEnv(key string) string {
