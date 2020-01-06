@@ -137,7 +137,7 @@ func (mw *AccessLogFluentMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.Han
 		ct := r.Header.Get("Content-Type")
 
 		// only read body if the content is json to avoid read binary or uploaded files
-		if ct == "application/json" {
+		if ct == "application/json" && GetEnv(ENV_PANTAHUB_LOG_BODY) == "true" {
 			responseWrapper := NewResponseWriterWrapper(w)
 
 			// read blocks of 64k
@@ -270,13 +270,9 @@ func (mw *AccessLogFluentMiddleware) makeAccessLogFluentRecord(w rest.ResponseWr
 		StatusCode:     statusCode,
 		Timestamp:      timestamp.Unix(),
 		UserAgent:      r.UserAgent(),
-		RequestBody:    mw.recordableBody(requestBody),
-		ResponseBody:   mw.recordableBody(responseBody),
+		RequestBody:    string(requestBody),
+		ResponseBody:   string(responseBody),
 	}
-}
-
-func (r *AccessLogFluentMiddleware) recordableBody(v []byte) string {
-	return string(v)
 }
 
 func (r *AccessLogFluentRecord) asJson() []byte {
