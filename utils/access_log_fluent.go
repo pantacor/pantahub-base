@@ -196,21 +196,18 @@ type JsonLog struct {
 // AccessLogFluentRecord is the data structure used by AccessLogFluentMiddleware to create the JSON
 // records. (Public for documentation only, no public method uses it)
 type AccessLogFluentRecord struct {
-	Endpoint       string
-	Hostname       string
-	HttpMethod     string
-	Namespace      string
-	RemoteUser     string
-	RequestHeaders map[string]interface{}
-	RequestBody    string
-	RequestParams  map[string]interface{}
-	RequestURI     string
-	ResponseBody   string
-	ResponseSize   uint64
-	ResponseTime   int64
-	StatusCode     int
-	Timestamp      int64
-	UserAgent      string
+	Timestamp    int64
+	StatusCode   int
+	ResponseTime int64
+	HttpMethod   string
+	RequestURI   string
+	RemoteUser   string
+	UserAgent    string
+	Hostname     string
+	Namespace    string
+	Endpoint     string
+	ResponseSize uint64
+	ReqHeaders   map[string]interface{}
 }
 
 func (mw *AccessLogFluentMiddleware) makeAccessLogFluentRecord(w rest.ResponseWriter, responseBody []byte, r *rest.Request, requestBody []byte) *AccessLogFluentRecord {
@@ -251,27 +248,28 @@ func (mw *AccessLogFluentMiddleware) makeAccessLogFluentRecord(w rest.ResponseWr
 		reqMap[k] = v
 	}
 
-	reqParams := map[string]interface{}{}
-	for k, v := range r.URL.Query() {
-		reqParams[k] = v
-	}
+	/*
+		reqParams := map[string]interface{}{}
+		for k, v := range r.URL.Query() {
+			reqParams[k] = v
+		}*/
 
 	return &AccessLogFluentRecord{
-		Endpoint:       mw.Prefix,
-		Hostname:       mw.Hostname,
-		HttpMethod:     r.Method,
-		Namespace:      mw.Namespace,
-		RemoteUser:     remoteUser,
-		RequestHeaders: reqMap,
-		RequestParams:  reqParams,
-		RequestURI:     r.URL.RequestURI(),
-		ResponseSize:   w.Count(),
-		ResponseTime:   responseTime.Nanoseconds(),
-		StatusCode:     statusCode,
-		Timestamp:      timestamp.Unix(),
-		UserAgent:      r.UserAgent(),
-		RequestBody:    string(requestBody),
-		ResponseBody:   string(responseBody),
+		Endpoint:   mw.Prefix,
+		Hostname:   mw.Hostname,
+		HttpMethod: r.Method,
+		Namespace:  mw.Namespace,
+		RemoteUser: remoteUser,
+		//RequestHeaders: reqMap,
+		//RequestParams:  reqParams,
+		RequestURI:   r.URL.RequestURI(),
+		ResponseSize: w.Count(),
+		ResponseTime: responseTime.Nanoseconds(),
+		StatusCode:   statusCode,
+		Timestamp:    timestamp.Unix(),
+		UserAgent:    r.UserAgent(),
+		//RequestBody:    string(requestBody),
+		//ResponseBody:   string(responseBody),
 	}
 }
 
