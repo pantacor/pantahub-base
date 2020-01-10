@@ -1376,6 +1376,7 @@ func (a *AuthApp) devicePayload(deviceId string) map[string]interface{} {
 
 	val := map[string]interface{}{
 		"id":     device.Prn,
+		"nick":   device.Nick,
 		"roles":  "device",
 		"type":   "DEVICE",
 		"prn":    device.Prn,
