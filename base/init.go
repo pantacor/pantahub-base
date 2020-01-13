@@ -35,6 +35,7 @@ import (
 	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/plog"
 	"gitlab.com/pantacor/pantahub-base/subscriptions"
+	"gitlab.com/pantacor/pantahub-base/apps"
 	"gitlab.com/pantacor/pantahub-base/trails"
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
@@ -171,6 +172,15 @@ func DoInit() {
 			SigningAlgorithm: "RS256",
 		}, mongoClient)
 		http.Handle("/metrics/", http.StripPrefix("/metrics", app.Api.MakeHandler()))
+	}
+	{
+		app := apps.New(&jwt.JWTMiddleware{
+			Pub:              jwtPub,
+			Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
+			Authenticator:    falseAuthenticator,
+			SigningAlgorithm: "RS256",
+		}, mongoClient)
+		http.Handle("/apps/", http.StripPrefix("/apps", app.API.MakeHandler()))
 	}
 
 	var fservermux FileUploadServer

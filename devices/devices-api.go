@@ -1475,29 +1475,45 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *DevicesAp
 		IfTrue: &utils.AuthMiddleware{},
 	})
 
+	writeDevicesScopes := []utils.Scope{
+		utils.Scopes.API,
+		utils.Scopes.Devices,
+		utils.Scopes.WriteDevices,
+	}
+	readDevicesScopes := []utils.Scope{
+		utils.Scopes.API,
+		utils.Scopes.Devices,
+		utils.Scopes.ReadDevices,
+	}
+	updateDevicesScopes := []utils.Scope{
+		utils.Scopes.API,
+		utils.Scopes.Devices,
+		utils.Scopes.UpdateDevices,
+	}
+
 	// /auth_status endpoints
 	api_router, _ := rest.MakeRouter(
 		// token api
-		rest.Post("/tokens", utils.ScopeFilter([]string{"all", "devices", "devices.readonly"}, app.handle_posttokens)),
-		rest.Delete("/tokens/:id", utils.ScopeFilter([]string{"all", "devices", "devices.change"}, app.handle_disabletokens)),
-		rest.Get("/tokens", utils.ScopeFilter([]string{"all", "devices", "devices.readonly"}, app.handle_gettokens)),
+		rest.Post("/tokens", utils.ScopeFilter(readDevicesScopes, app.handle_posttokens)),
+		rest.Delete("/tokens/:id", utils.ScopeFilter(updateDevicesScopes, app.handle_disabletokens)),
+		rest.Get("/tokens", utils.ScopeFilter(readDevicesScopes, app.handle_gettokens)),
 
 		// default api
-		rest.Get("/auth_status", utils.ScopeFilter([]string{"all", "devices", "devices.readonly"}, handle_auth)),
-		rest.Get("/", utils.ScopeFilter([]string{"all", "devices", "devices.readonly"}, app.handle_getdevices)),
-		rest.Post("/", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_postdevice)),
-		rest.Get("/:id", utils.ScopeFilter([]string{"all", "devices", "devices.readonly"}, app.handle_getdevice)),
-		rest.Put("/:id", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_putdevice)),
-		rest.Patch("/:id", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_patchdevice)),
-		rest.Put("/:id/public", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_putpublic)),
-		rest.Delete("/:id/public", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_deletepublic)),
-		rest.Put("/:id/user-meta", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_putuserdata)),
-		rest.Patch("/:id/user-meta", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_patchuserdata)),
-		rest.Put("/:id/device-meta", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_putdevicedata)),
-		rest.Patch("/:id/device-meta", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_patchdevicedata)),
-		rest.Delete("/:id", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_deletedevice)),
+		rest.Get("/auth_status", utils.ScopeFilter(readDevicesScopes, handle_auth)),
+		rest.Get("/", utils.ScopeFilter(readDevicesScopes, app.handle_getdevices)),
+		rest.Post("/", utils.ScopeFilter(writeDevicesScopes, app.handle_postdevice)),
+		rest.Get("/:id", utils.ScopeFilter(readDevicesScopes, app.handle_getdevice)),
+		rest.Put("/:id", utils.ScopeFilter(writeDevicesScopes, app.handle_putdevice)),
+		rest.Patch("/:id", utils.ScopeFilter(writeDevicesScopes, app.handle_patchdevice)),
+		rest.Put("/:id/public", utils.ScopeFilter(writeDevicesScopes, app.handle_putpublic)),
+		rest.Delete("/:id/public", utils.ScopeFilter(writeDevicesScopes, app.handle_deletepublic)),
+		rest.Put("/:id/user-meta", utils.ScopeFilter(writeDevicesScopes, app.handle_putuserdata)),
+		rest.Patch("/:id/user-meta", utils.ScopeFilter(writeDevicesScopes, app.handle_patchuserdata)),
+		rest.Put("/:id/device-meta", utils.ScopeFilter(writeDevicesScopes, app.handle_putdevicedata)),
+		rest.Patch("/:id/device-meta", utils.ScopeFilter(writeDevicesScopes, app.handle_patchdevicedata)),
+		rest.Delete("/:id", utils.ScopeFilter(writeDevicesScopes, app.handle_deletedevice)),
 		// lookup by nick-path (np)
-		rest.Get("/np/:usernick/:devicenick", utils.ScopeFilter([]string{"all", "devices", "devices.readonly"}, app.handle_getuserdevice)),
+		rest.Get("/np/:usernick/:devicenick", utils.ScopeFilter(readDevicesScopes, app.handle_getuserdevice)),
 	)
 	app.Api.SetApp(api_router)
 

@@ -1,0 +1,190 @@
+// Copyright 2020  Pantacor Ltd.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+//
+
+// Package apps package to manage extensions of the oauth protocol
+package apps
+
+import (
+	"errors"
+	"net/http"
+	"time"
+
+	"github.com/ant0ine/go-json-rest/rest"
+	jwtgo "github.com/dgrijalva/jwt-go"
+	petname "github.com/dustinkirkland/golang-petname"
+	"gitlab.com/pantacor/pantahub-base/utils"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"gopkg.in/mgo.v2/bson"
+)
+
+type createAppPayload struct {
+	Type          string        `json:"type"`
+	Nick          string        `json:"nick"`
+	RedirectURIs  []string      `json:"redirect_uris,omitempty"`
+	Scopes        []utils.Scope `json:"scopes,omitempty"`
+	ExposedScopes []utils.Scope `json:"exposed_scopes,omitempty" bson:"exposed_scopes,omitempty"`
+}
+
+// handleCreateApp create a new oauth client
+func (app *App) handleCreateApp(w rest.ResponseWriter, r *rest.Request) {
+	newApp := &TPApp{}
+	payload := &createAppPayload{}
+	r.DecodeJsonPayload(payload)
+
+	var owner interface{}
+	var ownerNick interface{}
+	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
+	if ok {
+		owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
+		ownerNick, ok = jwtPayload.(jwtgo.MapClaims)["nick"]
+	} else {
+		rest.Error(w, "Owner can't be defined", http.StatusInternalServerError)
+		return
+	}
+
+	err := validatePayload(payload)
+	if err != nil {
+		rest.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	mgoid := bson.NewObjectId()
+	ObjectID, err := primitive.ObjectIDFromHex(mgoid.Hex())
+	if err != nil {
+		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	apptype, err := parseType(payload.Type)
+	if err != nil {
+		rest.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if payload.Nick == "" {
+		payload.Nick = petname.Generate(2, "_")
+	}
+
+	scopes, err := parseScopes(payload.Scopes, payload.Nick)
+	if err != nil {
+		rest.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if apptype == AppTypeConfidential {
+		newApp.Secret, err = utils.GenerateSecret(30)
+		if err != nil {
+			rest.Error(w, "Error generating secret", http.StatusInternalServerError)
+			return
+		}
+		newApp.ExposedScopes, err = parseScopes(payload.ExposedScopes, payload.Nick)
+		if err != nil {
+			rest.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
+	newApp.ID = ObjectID
+	newApp.Type = apptype
+	newApp.Scopes = scopes
+	newApp.Prn = utils.BuildScopePrn(payload.Nick)
+	newApp.Nick = payload.Nick
+	newApp.RedirectURIs = payload.RedirectURIs
+	newApp.Owner = owner.(string)
+	newApp.OwnerNick = ownerNick.(string)
+	newApp.TimeCreated = time.Now()
+	newApp.TimeModified = newApp.TimeCreated
+	newApp.DeletedAt = nil
+
+	_, err = CreateOrUpdateApp(newApp, app.mongoClient.Database(utils.MongoDb))
+	if err != nil {
+		rest.Error(w, "Error creating third party application "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteJson(newApp)
+}
+
+func parseType(typeofApp string) (string, error) {
+	switch typeofApp {
+	case AppTypePublic:
+		return AppTypePublic, nil
+	case AppTypeConfidential:
+		return AppTypeConfidential, nil
+	default:
+		return "", errors.New("Invalid app type")
+	}
+}
+
+func parseScopes(scopes []utils.Scope, serviceID string) ([]utils.Scope, error) {
+	newScopes := []utils.Scope{}
+	servicePrn := utils.BuildScopePrn(serviceID)
+	for _, scope := range scopes {
+		if !isEmpty(scope) {
+			phScope := matchPantahubScope(scope)
+			if phScope != nil {
+				phScope.Required = scope.Required
+				newScopes = append(newScopes, *phScope)
+				continue
+			}
+			if (scope.Service == "" || scope.Service == servicePrn) && phScope == nil {
+				newScopes = append(newScopes, utils.Scope{
+					ID:          scope.ID,
+					Service:     servicePrn,
+					Description: scope.Description,
+					Required:    scope.Required,
+				})
+				continue
+			}
+			newScopes = append(newScopes, scope)
+		}
+	}
+
+	if len(newScopes) == 0 {
+		return newScopes, errors.New("Scopes are invalid")
+	}
+
+	return newScopes, nil
+}
+
+func matchPantahubScope(scope utils.Scope) *utils.Scope {
+	phScope := utils.PhScopesMap[scope.ID]
+	if isEmpty(phScope) {
+		return nil
+	}
+	if phScope.Service != scope.Service {
+		return nil
+	}
+
+	return &phScope
+}
+
+func isEmpty(scope utils.Scope) bool {
+	return scope.ID == ""
+}
+
+func validatePayload(app *createAppPayload) error {
+	if app.Type == "" {
+		return errors.New("App type must be defined")
+	}
+	if len(app.Scopes) == 0 {
+		return errors.New("A new app need to have at least one scope")
+	}
+	if len(app.RedirectURIs) == 0 {
+		return errors.New("A new app need to have at least one redirect URI")
+	}
+
+	return nil
+}

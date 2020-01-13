@@ -72,7 +72,10 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *MetricsAp
 	// /auth_status endpoints
 	api_router, _ := rest.MakeRouter(
 		// default api
-		rest.Get("/", utils.ScopeFilter([]string{"all", "metrics", "metrics.readonly"}, app.handle_getmetrics)),
+		rest.Get("/", utils.ScopeFilter(
+			[]utils.Scope{utils.Scopes.API, utils.Scopes.Metrics, utils.Scopes.ReadMetrics},
+			app.handle_getmetrics),
+		),
 	)
 	app.Api.SetApp(api_router)
 

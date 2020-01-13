@@ -4,12 +4,13 @@ ENV GO111MODULE=on
 
 RUN apk add -U --no-cache \
     git \
-    curl
+    curl \
+    build-base
 
 WORKDIR /app/
 COPY . .
-RUN go mod download \
-    && go install -v .
+RUN go get -d -v ./... \
+    && go install -v ./...
 
 FROM alpine
 

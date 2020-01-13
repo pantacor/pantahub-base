@@ -57,9 +57,8 @@ func setUp(t *testing.T) {
 	}
 
 	jwtMWR = &jwt.JWTMiddleware{
-		Key:           []byte("secret key"),
-		Realm:         "pantahub services",
-		Authenticator: falseAuthenticator,
+		Key:   []byte("secret key"),
+		Realm: "pantahub services",
 	}
 
 	recorder = httptest.NewRecorder()
