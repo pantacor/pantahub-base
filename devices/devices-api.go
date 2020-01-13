@@ -18,10 +18,12 @@ package devices
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"math/rand"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -31,6 +33,7 @@ import (
 	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/gcapi"
+	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -41,6 +44,9 @@ import (
 )
 
 const PantahubDevicesAutoTokenV1 = "Pantahub-Devices-Auto-Token-V1"
+
+//DeviceNickRule : Device nick rule used to create/update a device nick
+const DeviceNickRule = "^[a-zA-Z0-9_-`+``%`]+$"
 
 func init() {
 	// seed this for petname as dustin dropped our patch upstream... moo
@@ -100,11 +106,13 @@ func (a *DevicesApp) handle_patchuserdata(w rest.ResponseWriter, r *rest.Request
 		rest.Error(w, "User data can only be updated by User", http.StatusBadRequest)
 		return
 	}
-
-	deviceId := r.PathParam("id")
-
+	deviceID, err := a.ParseDeviceIDOrNick(r.PathParam("id"))
+	if err != nil {
+		rest.Error(w, "Error Parsing Device ID or Nick:"+err.Error(), http.StatusBadRequest)
+		return
+	}
 	data := map[string]interface{}{}
-	err := r.DecodeJsonPayload(&data)
+	err = r.DecodeJsonPayload(&data)
 	if err != nil {
 		rest.Error(w, "Error parsing data: "+err.Error(), http.StatusBadRequest)
 		return
@@ -119,16 +127,10 @@ func (a *DevicesApp) handle_patchuserdata(w rest.ResponseWriter, r *rest.Request
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	deviceObjectID, err := primitive.ObjectIDFromHex(deviceId)
-	if err != nil {
-		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	var device Device
 	err = collection.FindOne(ctx,
 		bson.M{
-			"_id":     deviceObjectID,
+			"_id":     deviceID,
 			"garbage": bson.M{"$ne": true},
 		}).
 		Decode(&device)
@@ -140,7 +142,7 @@ func (a *DevicesApp) handle_patchuserdata(w rest.ResponseWriter, r *rest.Request
 	updateResult, err := collection.UpdateOne(
 		ctx,
 		bson.M{
-			"_id":   deviceObjectID,
+			"_id":   deviceID,
 			"owner": owner.(string),
 		},
 		bson.M{"$set": bson.M{
@@ -378,6 +380,16 @@ func (a *DevicesApp) handle_postdevice(w rest.ResponseWriter, r *rest.Request) {
 		newDevice.Nick = petname.Generate(3, "_")
 	}
 
+	isValidNick, err := regexp.MatchString(DeviceNickRule, newDevice.Nick)
+	if err != nil {
+		rest.Error(w, "Error Validating Device nick "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if !isValidNick {
+		rest.Error(w, "Invalid Device Nick (Only allowed characters:[A-Za-z0-9-_+%])", http.StatusBadRequest)
+		return
+	}
+
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
 		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -525,6 +537,16 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 		}
 	}
 
+	isValidNick, err := regexp.MatchString(DeviceNickRule, newDevice.Nick)
+	if err != nil {
+		rest.Error(w, "Error Validating Device nick "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if !isValidNick {
+		rest.Error(w, "Invalid Device Nick(Only allowed characters:[A-Za-z0-9-_+%])", http.StatusBadRequest)
+		return
+	}
+
 	newDevice.TimeModified = time.Now()
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -544,11 +566,22 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(newDevice)
 }
 
+//ParseDeviceIDOrNick : Parse DeviceID Or Nick from the given string and return device objectID
+func (a *DevicesApp) ParseDeviceIDOrNick(param string) (*primitive.ObjectID, error) {
+	mgoid, err := primitive.ObjectIDFromHex(param)
+	if err != nil {
+		return a.LookupDeviceNick(param)
+	}
+	return &mgoid, nil
+}
 func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 
 	var device Device
-
-	mgoid := bson.ObjectIdHex(r.PathParam("id"))
+	mgoid, err := a.ParseDeviceIDOrNick(r.PathParam("id"))
+	if err != nil {
+		rest.Error(w, "Error Parsing Device ID or Nick:"+err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	authId, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
@@ -589,14 +622,9 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	deviceObjectID, err := primitive.ObjectIDFromHex(mgoid.Hex())
-	if err != nil {
-		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
-		return
-	}
 	err = collection.FindOne(ctx,
 		bson.M{
-			"_id":     deviceObjectID,
+			"_id":     mgoid,
 			"garbage": bson.M{"$ne": true},
 		}).
 		Decode(&device)
@@ -829,6 +857,15 @@ func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) 
 		newDevice.Nick = patch.Nick
 		patched = true
 	}
+	isValidNick, err := regexp.MatchString(DeviceNickRule, newDevice.Nick)
+	if err != nil {
+		rest.Error(w, "Error Validating Device nick "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if !isValidNick {
+		rest.Error(w, "Invalid Device Nick(Only allowed characters:[A-Za-z0-9-_+%])", http.StatusBadRequest)
+		return
+	}
 
 	if patched {
 		newDevice.TimeModified = time.Now()
@@ -886,16 +923,15 @@ func (a *DevicesApp) handle_patchdevicedata(w rest.ResponseWriter, r *rest.Reque
 		return
 	}
 
-	deviceId := r.PathParam("id")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	deviceObjectID, err := primitive.ObjectIDFromHex(deviceId)
+	deviceID, err := a.ParseDeviceIDOrNick(r.PathParam("id"))
 	if err != nil {
-		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		rest.Error(w, "Error Parsing Device ID or Nick:"+err.Error(), http.StatusBadRequest)
 		return
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	err = collection.FindOne(ctx, bson.M{
-		"_id":     deviceObjectID,
+		"_id":     deviceID,
 		"garbage": bson.M{"$ne": true},
 	}).Decode(&device)
 	if err != nil {
@@ -920,7 +956,7 @@ func (a *DevicesApp) handle_patchdevicedata(w rest.ResponseWriter, r *rest.Reque
 	updateResult, err := collection.UpdateOne(
 		ctx,
 		bson.M{
-			"_id": deviceObjectID,
+			"_id": deviceID,
 			"prn": owner.(string),
 		},
 		bson.M{"$set": bson.M{
@@ -1129,6 +1165,9 @@ func (a *DevicesApp) handle_getdevices(w rest.ResponseWriter, r *rest.Request) {
 			if strings.HasPrefix(v[0], "!") {
 				v[0] = strings.TrimPrefix(v[0], "!")
 				query[k] = bson.M{"$ne": v[0]}
+			} else if strings.HasPrefix(v[0], "^") {
+				v[0] = strings.TrimPrefix(v[0], "^")
+				query[k] = bson.M{"$regex": "^" + v[0], "$options": "i"}
 			} else {
 				query[k] = v[0]
 			}
@@ -1188,7 +1227,14 @@ func (a *DevicesApp) handle_deletedevice(w rest.ResponseWriter, r *rest.Request)
 		"garbage": bson.M{"$ne": true},
 	}).Decode(&device)
 	if err != nil {
-		rest.Error(w, "Device not found: "+err.Error(), http.StatusInternalServerError)
+		if err != mongo.ErrNoDocuments {
+			log.Println("Error deleting device: " + err.Error())
+			rest.Error(w, "Device not found", http.StatusInternalServerError)
+			return
+		}
+
+		device.Id = deviceObjectID
+		w.WriteJson(device)
 		return
 	}
 
@@ -1226,6 +1272,38 @@ func MarkDeviceAsGarbage(
 	return response, res
 }
 
+// LookupDeviceNick : Lookup Device Nicks and return device id
+func (a *DevicesApp) LookupDeviceNick(deviceID string) (*primitive.ObjectID, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
+	if collection == nil {
+		return nil, errors.New("Error with Database connectivity")
+	}
+	count, err := collection.CountDocuments(ctx,
+		bson.M{
+			"nick":    deviceID,
+			"garbage": bson.M{"$ne": true},
+		})
+	if err != nil {
+		return nil, errors.New("Error finding device:" + deviceID + ",err:" + err.Error())
+	}
+	if count > 0 {
+		deviceObject := Device{}
+		err = collection.FindOne(ctx,
+			bson.M{
+				"nick":    deviceID,
+				"garbage": bson.M{"$ne": true},
+			}).
+			Decode(&deviceObject)
+		if err != nil {
+			return nil, errors.New("Error finding device:" + deviceID + ",err:" + err.Error())
+		}
+		return &deviceObject.Id, nil
+
+	}
+	return nil, errors.New("Device not found")
+}
 func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *DevicesApp {
 
 	app := new(DevicesApp)
@@ -1351,6 +1429,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *DevicesAp
 	app.Api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
 		"/devices:", log.Lshortfile)})
 	app.Api.Use(&utils.AccessLogFluentMiddleware{Prefix: "devices"})
+	app.Api.Use(&rest.StatusMiddleware{})
+	app.Api.Use(&rest.TimerMiddleware{})
+	app.Api.Use(&metrics.MetricsMiddleware{})
 
 	app.Api.Use(rest.DefaultCommonStack...)
 	app.Api.Use(&rest.CorsMiddleware{
@@ -1394,29 +1475,45 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *DevicesAp
 		IfTrue: &utils.AuthMiddleware{},
 	})
 
+	writeDevicesScopes := []utils.Scope{
+		utils.Scopes.API,
+		utils.Scopes.Devices,
+		utils.Scopes.WriteDevices,
+	}
+	readDevicesScopes := []utils.Scope{
+		utils.Scopes.API,
+		utils.Scopes.Devices,
+		utils.Scopes.ReadDevices,
+	}
+	updateDevicesScopes := []utils.Scope{
+		utils.Scopes.API,
+		utils.Scopes.Devices,
+		utils.Scopes.UpdateDevices,
+	}
+
 	// /auth_status endpoints
 	api_router, _ := rest.MakeRouter(
 		// token api
-		rest.Post("/tokens", utils.ScopeFilter([]string{"all", "devices", "devices.readonly"}, app.handle_posttokens)),
-		rest.Delete("/tokens/:id", utils.ScopeFilter([]string{"all", "devices", "devices.change"}, app.handle_disabletokens)),
-		rest.Get("/tokens", utils.ScopeFilter([]string{"all", "devices", "devices.readonly"}, app.handle_gettokens)),
+		rest.Post("/tokens", utils.ScopeFilter(readDevicesScopes, app.handle_posttokens)),
+		rest.Delete("/tokens/:id", utils.ScopeFilter(updateDevicesScopes, app.handle_disabletokens)),
+		rest.Get("/tokens", utils.ScopeFilter(readDevicesScopes, app.handle_gettokens)),
 
 		// default api
-		rest.Get("/auth_status", utils.ScopeFilter([]string{"all", "devices", "devices.readonly"}, handle_auth)),
-		rest.Get("/", utils.ScopeFilter([]string{"all", "devices", "devices.readonly"}, app.handle_getdevices)),
-		rest.Post("/", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_postdevice)),
-		rest.Get("/:id", utils.ScopeFilter([]string{"all", "devices", "devices.readonly"}, app.handle_getdevice)),
-		rest.Put("/:id", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_putdevice)),
-		rest.Patch("/:id", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_patchdevice)),
-		rest.Put("/:id/public", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_putpublic)),
-		rest.Delete("/:id/public", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_deletepublic)),
-		rest.Put("/:id/user-meta", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_putuserdata)),
-		rest.Patch("/:id/user-meta", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_patchuserdata)),
-		rest.Put("/:id/device-meta", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_putdevicedata)),
-		rest.Patch("/:id/device-meta", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_patchdevicedata)),
-		rest.Delete("/:id", utils.ScopeFilter([]string{"all", "devices", "devices.write"}, app.handle_deletedevice)),
+		rest.Get("/auth_status", utils.ScopeFilter(readDevicesScopes, handle_auth)),
+		rest.Get("/", utils.ScopeFilter(readDevicesScopes, app.handle_getdevices)),
+		rest.Post("/", utils.ScopeFilter(writeDevicesScopes, app.handle_postdevice)),
+		rest.Get("/:id", utils.ScopeFilter(readDevicesScopes, app.handle_getdevice)),
+		rest.Put("/:id", utils.ScopeFilter(writeDevicesScopes, app.handle_putdevice)),
+		rest.Patch("/:id", utils.ScopeFilter(writeDevicesScopes, app.handle_patchdevice)),
+		rest.Put("/:id/public", utils.ScopeFilter(writeDevicesScopes, app.handle_putpublic)),
+		rest.Delete("/:id/public", utils.ScopeFilter(writeDevicesScopes, app.handle_deletepublic)),
+		rest.Put("/:id/user-meta", utils.ScopeFilter(writeDevicesScopes, app.handle_putuserdata)),
+		rest.Patch("/:id/user-meta", utils.ScopeFilter(writeDevicesScopes, app.handle_patchuserdata)),
+		rest.Put("/:id/device-meta", utils.ScopeFilter(writeDevicesScopes, app.handle_putdevicedata)),
+		rest.Patch("/:id/device-meta", utils.ScopeFilter(writeDevicesScopes, app.handle_patchdevicedata)),
+		rest.Delete("/:id", utils.ScopeFilter(writeDevicesScopes, app.handle_deletedevice)),
 		// lookup by nick-path (np)
-		rest.Get("/np/:usernick/:devicenick", utils.ScopeFilter([]string{"all", "devices", "devices.readonly"}, app.handle_getuserdevice)),
+		rest.Get("/np/:usernick/:devicenick", utils.ScopeFilter(readDevicesScopes, app.handle_getuserdevice)),
 	)
 	app.Api.SetApp(api_router)
 

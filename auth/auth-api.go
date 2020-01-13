@@ -17,10 +17,8 @@ package auth
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -35,7 +33,9 @@ import (
 	jwtgo "github.com/dgrijalva/jwt-go"
 	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/accounts"
+	"gitlab.com/pantacor/pantahub-base/apps"
 	"gitlab.com/pantacor/pantahub-base/devices"
+	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -119,6 +119,30 @@ func handle_auth(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(jwtClaims)
 }
 
+type encryptedAccountToken struct {
+	Token       string `json:"token"`
+	RedirectURI string `json:"redirect-uri"`
+}
+
+func handle_get_encrypted_account(accountData *accountCreationPayload) (*encryptedAccountToken, error) {
+	encryptedAccountData, err := utils.CreateJWE(accountData)
+	if err != nil {
+		return nil, err
+	}
+
+	urlPrefix := utils.GetEnv(utils.ENV_PANTAHUB_SCHEME) + "://"
+	urlPrefix += utils.GetEnv(utils.ENV_PANTAHUB_HOST_WWW)
+	urlPrefix += utils.GetEnv(utils.ENV_PANTAHUB_SIGNUP_PATH)
+	urlPrefix += "#account=" + encryptedAccountData
+
+	response := &encryptedAccountToken{
+		Token:       encryptedAccountData,
+		RedirectURI: urlPrefix,
+	}
+
+	return response, nil
+}
+
 func (a *AuthApp) handle_getaccounts(w rest.ResponseWriter, r *rest.Request) {
 	var err error
 	var cur *mongo.Cursor
@@ -180,29 +204,90 @@ func (a *AuthApp) handle_getaccounts(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(&resultSet)
 }
 
+type accountCreationPayload struct {
+	accounts.Account
+	Captcha          string `json:"captcha"`
+	EncryptedAccount string `json:"encrypted-account"`
+}
+
 func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
-	newAccount := accounts.Account{}
+	newAccount := accountCreationPayload{}
 
 	r.DecodeJsonPayload(&newAccount)
 
+	// if encrypted account data exist decryted and continue with validation
+	if newAccount.EncryptedAccount != "" {
+		err := utils.ParseJWE(newAccount.EncryptedAccount, &newAccount.Account)
+		if err != nil {
+			utils.RestError(w, err, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
 	if newAccount.Email == "" {
-		rest.Error(w, "Accounts must have an email address", http.StatusPreconditionFailed)
+		utils.RestError(w, nil, "Accounts must have an email address", http.StatusPreconditionFailed)
 		return
 	}
 
 	if newAccount.Password == "" {
-		rest.Error(w, "Accounts must have a password set", http.StatusPreconditionFailed)
+		utils.RestError(w, nil, "Accounts must have a password set", http.StatusPreconditionFailed)
 		return
 	}
 
 	if newAccount.Nick == "" {
-		rest.Error(w, "Accounts must have a nick set", http.StatusPreconditionFailed)
+		utils.RestError(w, nil, "Accounts must have a nick set", http.StatusPreconditionFailed)
 		return
 	}
 
 	if !newAccount.Id.IsZero() {
-		rest.Error(w, "Accounts cannot have id before creation", http.StatusPreconditionFailed)
+		utils.RestError(w, nil, "Accounts cannot have id before creation", http.StatusPreconditionFailed)
 		return
+	}
+
+	// Validate if user already exist
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
+
+	if collection == nil {
+		utils.RestError(w, nil, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+
+	usersCount, _ := collection.CountDocuments(ctx,
+		bson.M{
+			"$or": []bson.M{
+				{"email": newAccount.Email},
+				{"nick": newAccount.Nick},
+			},
+		},
+	)
+	if usersCount > 0 {
+		utils.RestError(w, nil, "Email or Nick already in use", http.StatusPreconditionFailed)
+		return
+	}
+
+	// if account creation doesn't have captcha encrypt data and send a redirect link to finish the process
+	useCaptcha := utils.GetEnv(utils.ENV_PANTAHUB_USE_CAPTCHA) == "true"
+	if newAccount.Captcha == "" && useCaptcha {
+		response, err := handle_get_encrypted_account(&newAccount)
+		if err != nil {
+			utils.RestError(w, err, err.Error(), http.StatusInternalServerError)
+		}
+		w.WriteJson(response)
+		return
+	}
+
+	if useCaptcha {
+		validCaptcha, err := utils.VerifyReCaptchaToken(newAccount.Captcha)
+		if err != nil {
+			utils.RestError(w, err, err.Error(), http.StatusPreconditionFailed)
+			return
+		}
+		if !validCaptcha {
+			utils.RestError(w, nil, "Invalid captcha", http.StatusPreconditionFailed)
+			return
+		}
 	}
 
 	passwordBcrypt, err := utils.HashPassword(newAccount.Password, utils.CryptoMethods.BCrypt)
@@ -218,7 +303,7 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 	mgoid := primitive.NewObjectID()
 	ObjectID, err := primitive.ObjectIDFromHex(mgoid.Hex())
 	if err != nil {
-		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		utils.RestError(w, err, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -229,38 +314,18 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 	newAccount.Type = accounts.ACCOUNT_TYPE_USER // XXX: need org approach too
 	newAccount.TimeModified = newAccount.TimeCreated
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
-
-	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
-	}
-
-	usersCount, _ := collection.CountDocuments(ctx,
-		bson.M{
-			"$or": []bson.M{
-				{"email": newAccount.Email},
-				{"nick": newAccount.Nick},
-			},
-		},
-	)
-	if usersCount > 0 {
-		rest.Error(w, "Email or Nick already in use", http.StatusPreconditionFailed)
-		return
-	}
-
 	updateOptions := options.Update()
 	updateOptions.SetUpsert(true)
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	_, err = collection.UpdateOne(
 		ctx,
 		bson.M{"_id": newAccount.Id},
-		bson.M{"$set": newAccount},
+		bson.M{"$set": newAccount.Account},
 		updateOptions,
 	)
 	if err != nil {
-		rest.Error(w, "Internal Error: "+err.Error(), http.StatusInternalServerError)
+		utils.RestError(w, err, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -376,232 +441,6 @@ func (a *AuthApp) handle_verify(w rest.ResponseWriter, r *rest.Request) {
 	newAccount.Password = ""
 	newAccount.Challenge = ""
 	w.WriteJson(newAccount)
-}
-
-type codeRequest struct {
-	Service     string `json:"service"`
-	Scopes      string `json:"scopes"`
-	State       string `json:"state"`
-	RedirectURI string `json:"redirect_uri"`
-}
-
-type codeResponse struct {
-	Code        string `json:"code"`
-	Scopes      string `json:"scopes,omitempty"`
-	State       string `json:"state,omitempty"`
-	RedirectURI string `json:"redirect_uri,omitempty"`
-}
-
-func containsStringWithPrefix(slice []string, prefix string) bool {
-	for _, v := range slice {
-		if strings.HasPrefix(prefix, v) {
-			return true
-		}
-	}
-	return false
-}
-
-func (app *AuthApp) handle_postcode(w rest.ResponseWriter, r *rest.Request) {
-	var err error
-
-	// this is the claim of the service authenticating itself
-	caller := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"].(string)
-	callerType := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"].(string)
-
-	if caller == "" {
-		rest.Error(w, "must be authenticated as user", http.StatusUnauthorized)
-		return
-	}
-
-	if callerType != "USER" {
-		rest.Error(w, "only USER's can request access codes", http.StatusForbidden)
-		return
-	}
-
-	req := codeRequest{}
-	err = r.DecodeJsonPayload(&req)
-
-	if err != nil {
-		rest.Error(w, "error decoding code request", http.StatusBadRequest)
-		log.Println("WARNING: access code request received with wrong request body: " + err.Error())
-		return
-	}
-
-	if req.Service == "" {
-		rest.Error(w, "access code requested with invalid service", http.StatusBadRequest)
-		return
-	}
-
-	// XXX: allow scopes registered as valid for service once we have scopes middleware
-	if req.Scopes != "*" &&
-		!strings.HasPrefix(req.Scopes, "prn:pantahub.com:apis:/base/") &&
-		!strings.HasPrefix(req.Scopes, "prn:pantahub.com:apis:/fleet/") {
-
-		rest.Error(w, "access code requested with invalid scope. During alpha, scopes '*' (all rights) is only valid scope", http.StatusBadRequest)
-		return
-	}
-
-	serviceAccount, err := app.getAccount(req.Service)
-	if err != nil && err != mongo.ErrNoDocuments {
-		utils.RestError(w, err, "error access code creation failed to look up service", http.StatusInternalServerError)
-		return
-	}
-	if serviceAccount.Oauth2RedirectURIs != nil && !containsStringWithPrefix(serviceAccount.Oauth2RedirectURIs, req.RedirectURI) {
-		rest.Error(w, "error implicit access token failed; redirect URL does not match registered service", http.StatusBadRequest)
-		return
-	}
-
-	var mapClaim jwtgo.MapClaims
-	mapClaim = app.accessCodePayload(caller, req.Service, req.Scopes)
-
-	if mapClaim == nil {
-		utils.RestError(w, nil, "error decoding claims from access code", http.StatusBadRequest)
-		return
-	}
-
-	mapClaim["exp"] = time.Now().Add(time.Minute * 5)
-
-	response := codeResponse{}
-
-	code := jwtgo.New(jwtgo.GetSigningMethod(app.jwt_middleware.SigningAlgorithm))
-	code.Claims = mapClaim
-
-	response.Code, err = code.SignedString(app.jwt_middleware.Key)
-	response.Scopes = req.Scopes
-
-	params := url.Values{}
-	params.Add("code", response.Code)
-	params.Add("state", req.State)
-	response.RedirectURI = req.RedirectURI + "?" + params.Encode()
-	w.WriteJson(response)
-}
-
-type implicitTokenRequest struct {
-	codeRequest
-	RedirectURI string `json:"redirect_uri"`
-}
-
-func (app *AuthApp) handle_postauthorizetoken(w rest.ResponseWriter, r *rest.Request) {
-	var err error
-
-	// this is the claim of the service authenticating itself
-	caller := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"].(string)
-	callerType := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"].(string)
-
-	if caller == "" {
-		rest.Error(w, "must be authenticated as user", http.StatusUnauthorized)
-		return
-	}
-
-	if callerType != "USER" {
-		rest.Error(w, "only USER's can request implicit access tokens", http.StatusForbidden)
-		return
-	}
-
-	req := implicitTokenRequest{}
-	err = r.DecodeJsonPayload(&req)
-
-	if err != nil {
-		rest.Error(w, "error decoding token request", http.StatusBadRequest)
-		log.Println("WARNING: implicit access token request received with wrong request body: " + err.Error())
-		return
-	}
-
-	if req.Service == "" {
-		rest.Error(w, "implicit  access token requested with invalid service", http.StatusBadRequest)
-		return
-	}
-
-	if req.Scopes != "*" &&
-		!strings.HasPrefix(req.Scopes, "prn:pantahub.com:apis:/base/") &&
-		!strings.HasPrefix(req.Scopes, "prn:pantahub.com:apis:/fleet/") {
-		rest.Error(w, "implicit access token requested with invalid scope. During alpha, scopes '*' (all rights) or 'prn:pantahub.com:apis:/base/*' (all rights on base) or 'prn:pantahub.com:apis:/fleet/* (all rights on fleet) are only valid scopes", http.StatusBadRequest)
-		return
-	}
-
-	token := jwtgo.New(jwtgo.GetSigningMethod(app.jwt_middleware.SigningAlgorithm))
-	tokenClaims := token.Claims.(jwtgo.MapClaims)
-
-	// lets get the standard payload for a user and modify it so its a service accesstoken
-	if app.jwt_middleware.PayloadFunc != nil {
-		for key, value := range app.jwt_middleware.PayloadFunc(caller) {
-			tokenClaims[key] = value
-		}
-	}
-
-	serviceAccount, err := app.getAccount(req.Service)
-
-	if err != nil && err != mongo.ErrNoDocuments {
-		log.Println("error implicit access token creation failed to look up service: " + err.Error())
-		rest.Error(w, "error  implicit access token creation failed to look up service", http.StatusInternalServerError)
-		return
-	}
-
-	if err == mongo.ErrNoDocuments {
-		rest.Error(w, "error access token failed, due to unknown service id", http.StatusBadRequest)
-		return
-	}
-
-	if serviceAccount.Oauth2RedirectURIs != nil && !containsStringWithPrefix(serviceAccount.Oauth2RedirectURIs, req.RedirectURI) {
-		rest.Error(w, "error implicit access token failed; redirect URL does not match registered service", http.StatusBadRequest)
-		return
-	}
-
-	tokenClaims["token_id"] = primitive.NewObjectID()
-	tokenClaims["id"] = caller
-	tokenClaims["aud"] = req.Service
-	tokenClaims["scopes"] = req.Scopes
-	tokenClaims["prn"] = caller
-	tokenClaims["exp"] = time.Now().Add(app.jwt_middleware.Timeout)
-	tokenString, err := token.SignedString(app.jwt_middleware.Key)
-
-	if err != nil {
-		log.Println("WARNING: error signing implicit access token for service / user / scopes(" + req.Service + " / " + caller + " / " + req.Scopes + ")")
-		rest.Error(w, "error signing implicit access token for service / user / scopes("+req.Service+" / "+caller+" / "+req.Scopes+")", http.StatusUnauthorized)
-		return
-	}
-
-	tokenStore := tokenStore{
-		ID:      tokenClaims["token_id"].(primitive.ObjectID),
-		Client:  req.Service,
-		Owner:   caller,
-		Comment: "",
-		Claims:  tokenClaims,
-	}
-
-	collection := app.mongoClient.Database(utils.MongoDb).Collection("pantahub_oauth_accesstokens")
-
-	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
-	}
-	// XXX: prototype: for production we need to prevent posting twice!!
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	_, err = collection.InsertOne(
-		ctx,
-		tokenStore,
-	)
-	if err != nil {
-		rest.Error(w, "Error inserting oauth token into database "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	params := url.Values{}
-	params.Add("token_type", "bearer")
-	params.Add("access_token", tokenString)
-	params.Add("expires_in", fmt.Sprintf("%d", app.jwt_middleware.Timeout/time.Second))
-	params.Add("scope", req.Scopes)
-	params.Add("state", req.State)
-
-	response := tokenResponse{
-		Token:       tokenString,
-		RedirectURI: req.RedirectURI + "#" + params.Encode(),
-		TokenType:   "bearer",
-		Scopes:      req.Scopes,
-	}
-
-	w.WriteJson(response)
 }
 
 type passwordReset struct {
@@ -1001,6 +840,14 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 			testUserID = "prn:pantahub.com:auth:/" + loginUser
 		}
 
+		if strings.HasPrefix(loginUser, utils.BaseServiceID) {
+			tpApp, err := apps.LoginAsApp(loginUser, password, app.mongoClient.Database(utils.MongoDb))
+			if err != nil || tpApp == nil {
+				return false
+			}
+			return true
+		}
+
 		plm, ok := accounts.DefaultAccounts[testUserID]
 		if !ok {
 			if strings.HasPrefix(loginUser, "prn:::devices:") {
@@ -1041,7 +888,11 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 		}
 
 		if payload == nil {
-			return nil
+			payload, err = apps.GetAppPayload(userId, app.mongoClient.Database(utils.MongoDb))
+			if err != nil {
+				return nil
+			}
+			return payload
 		}
 
 		if callUser != "" {
@@ -1057,6 +908,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 	app.Api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
 		"/auth:", log.Lshortfile)})
 	app.Api.Use(&utils.AccessLogFluentMiddleware{Prefix: "auth"})
+	app.Api.Use(&rest.StatusMiddleware{})
+	app.Api.Use(&rest.TimerMiddleware{})
+	app.Api.Use(&metrics.MetricsMiddleware{})
 	app.Api.Use(rest.DefaultDevStack...)
 	app.Api.Use(&rest.CorsMiddleware{
 		RejectNonCorsRequests: false,
@@ -1099,8 +953,6 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 		rest.Get("/", app.handle_getprofile),
 		rest.Post("/login", app.jwt_middleware.LoginHandler),
 		rest.Post("/token", app.handle_posttoken),
-		rest.Post("/authorize", app.handle_postauthorizetoken),
-		rest.Post("/code", app.handle_postcode),
 		rest.Get("/auth_status", handle_auth),
 		rest.Get("/login", app.jwt_middleware.RefreshHandler),
 		rest.Get("/accounts", app.handle_getaccounts),
@@ -1108,6 +960,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
 		rest.Get("/verify", app.handle_verify),
 		rest.Post("/recover", app.handle_password_recovery),
 		rest.Post("/password", app.handle_password_reset),
+		rest.Post("/authorize", app.handlePostAuthorizeToken),
+		rest.Post("/code", app.handlePostCode),
 	)
 	app.Api.SetApp(api_router)
 
@@ -1184,30 +1038,41 @@ func (a *AuthApp) accountAuth(idEmailNick string, secret string) bool {
 	return false
 }
 
-func (app *AuthApp) getAccountPayload(idEmailNick string) map[string]interface{} {
+func (a *AuthApp) getAccountPayload(idEmailNick string) map[string]interface{} {
 	var plm accounts.Account
 	var ok, ok2 bool
-	if plm, ok = accounts.DefaultAccounts[idEmailNick]; !ok {
-		fullprn := "prn:pantahub.com:auth:/" + idEmailNick
-		if plm, ok2 = accounts.DefaultAccounts[fullprn]; !ok && !ok2 {
-			if strings.HasPrefix(idEmailNick, "prn:::devices:") {
-				return app.devicePayload(idEmailNick)
-			} else {
-				return app.accountPayload(idEmailNick)
-			}
-		}
+
+	plm, ok = accounts.DefaultAccounts[idEmailNick]
+	if ok {
+		return AccountToPayload(plm)
 	}
+
+	fullprn := "prn:pantahub.com:auth:/" + idEmailNick
+	plm, ok2 = accounts.DefaultAccounts[fullprn]
+	if ok2 {
+		return AccountToPayload(plm)
+	}
+
+	if strings.HasPrefix(idEmailNick, "prn:::devices:") {
+		return a.devicePayload(idEmailNick)
+	}
+
+	acc := a.accountPayload(idEmailNick)
+	if acc != nil && acc["prn"] != nil {
+		return acc
+	}
+
 	return AccountToPayload(plm)
 }
 
-func (a *AuthApp) accessCodePayload(userIdEmailNick string, serviceIdEmailNick string, scopes string) map[string]interface{} {
+func (a *AuthApp) accessCodePayload(userIDEmailNick string, serviceIDEmailNick string, scopes string) map[string]interface{} {
 	var (
 		userAccountPayload    map[string]interface{}
 		serviceAccountPayload map[string]interface{}
 	)
 
-	serviceAccountPayload = a.getAccountPayload(serviceIdEmailNick)
-	userAccountPayload = a.getAccountPayload(userIdEmailNick)
+	serviceAccountPayload = a.getAccountPayload(serviceIDEmailNick)
+	userAccountPayload = a.getAccountPayload(userIDEmailNick)
 
 	// error with db or not found -> log and fail
 	if serviceAccountPayload == nil {
@@ -1230,7 +1095,6 @@ func (a *AuthApp) accessCodePayload(userIdEmailNick string, serviceIdEmailNick s
 }
 
 func (a *AuthApp) accountPayload(idEmailNick string) map[string]interface{} {
-
 	var (
 		err     error
 		account accounts.Account
@@ -1245,9 +1109,7 @@ func (a *AuthApp) accountPayload(idEmailNick string) map[string]interface{} {
 		return nil
 	}
 
-	val := AccountToPayload(account)
-
-	return val
+	return AccountToPayload(account)
 }
 
 func (a *AuthApp) deviceAuth(deviceId string, secret string) bool {
@@ -1307,6 +1169,7 @@ func (a *AuthApp) devicePayload(deviceId string) map[string]interface{} {
 
 	val := map[string]interface{}{
 		"id":     device.Prn,
+		"nick":   device.Nick,
 		"roles":  "device",
 		"type":   "DEVICE",
 		"prn":    device.Prn,

@@ -4,8 +4,17 @@ set -x
 
 mongod --bind_ip_all --port 27017 &
 
+sleep 5
+
 until mongo --eval 'db.createUser({user: "user", pwd: "pass", roles: [{role: "readWrite", db:"testdb-pantabase-serv"}], mechanisms: ["SCRAM-SHA-1"]})' localhost:27017/testdb-pantabase-serv; do
-    sleep 1
+
+  echo "checking mongo"
+  if mongo --eval 'db.getUsers()' mongodb://user:pass@localhost:27017/testdb-pantabase-serv; then
+    echo "get users"
+    break
+  fi
+  echo "checking mongo done"
+  sleep 1
 done
 
 tail -f /proc/$(pidof mongod)/fd/1

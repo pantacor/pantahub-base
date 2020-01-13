@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"time"
 
+	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/storagedriver"
 	"gitlab.com/pantacor/pantahub-base/subscriptions"
 
@@ -694,6 +695,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, subService subscriptions.Subscription
 	app.Api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
 		"/objects:", log.Lshortfile)})
 	app.Api.Use(&utils.AccessLogFluentMiddleware{Prefix: "objects"})
+	app.Api.Use(&rest.StatusMiddleware{})
+	app.Api.Use(&rest.TimerMiddleware{})
+	app.Api.Use(&metrics.MetricsMiddleware{})
 
 	app.Api.Use(rest.DefaultCommonStack...)
 	app.Api.Use(&rest.CorsMiddleware{
@@ -721,15 +725,28 @@ func New(jwtMiddleware *jwt.JWTMiddleware, subService subscriptions.Subscription
 		IfTrue: &utils.AuthMiddleware{},
 	})
 
+	readObjectsScopes := []utils.Scope{
+		utils.Scopes.API,
+		utils.Scopes.Devices,
+		utils.Scopes.Objects,
+		utils.Scopes.ReadObjects,
+	}
+	writeObjectScopes := []utils.Scope{
+		utils.Scopes.API,
+		utils.Scopes.Devices,
+		utils.Scopes.Objects,
+		utils.Scopes.WriteObjects,
+	}
+
 	// /auth_status endpoints
 	api_router, _ := rest.MakeRouter(
-		rest.Get("/auth_status", utils.ScopeFilter([]string{"all", "devices", "objects", "objects.readonly"}, handle_auth)),
-		rest.Get("/", utils.ScopeFilter([]string{"all", "devices", "objects", "objects.readonly"}, app.handle_getobjects)),
-		rest.Post("/", utils.ScopeFilter([]string{"all", "devices", "objects", "objects.write"}, app.handle_postobject)),
-		rest.Get("/:id", utils.ScopeFilter([]string{"all", "devices", "objects", "objects.readonly"}, app.handle_getobject)),
-		rest.Get("/:id/blob", utils.ScopeFilter([]string{"all", "devices", "objects", "objects.readonly"}, app.handle_getobjectfile)),
-		rest.Put("/:id", utils.ScopeFilter([]string{"all", "devices", "objects", "objects.write"}, app.handle_putobject)),
-		rest.Delete("/:id", utils.ScopeFilter([]string{"all", "devices", "objects", "objects.write"}, app.handle_deleteobject)),
+		rest.Get("/auth_status", utils.ScopeFilter(readObjectsScopes, handle_auth)),
+		rest.Get("/", utils.ScopeFilter(readObjectsScopes, app.handle_getobjects)),
+		rest.Post("/", utils.ScopeFilter(writeObjectScopes, app.handle_postobject)),
+		rest.Get("/:id", utils.ScopeFilter(readObjectsScopes, app.handle_getobject)),
+		rest.Get("/:id/blob", utils.ScopeFilter(readObjectsScopes, app.handle_getobjectfile)),
+		rest.Put("/:id", utils.ScopeFilter(writeObjectScopes, app.handle_putobject)),
+		rest.Delete("/:id", utils.ScopeFilter(writeObjectScopes, app.handle_deleteobject)),
 	)
 	app.Api.SetApp(api_router)
 
