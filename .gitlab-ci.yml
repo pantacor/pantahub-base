@@ -34,8 +34,6 @@ build-devel:
   before_script:
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
     - docker run --rm --privileged multiarch/qemu-user-static:register || true
-    - docker run --rm -v $PWD:/src -w /src golang sh -c "go mod download && go mod vendor"
-    - tar -cvzf "vendor.tar.gz" ./vendor/
   script:
     - docker pull $CONTAINER_IMAGE:$CI_BUILD_REF_SLUG || true
     - docker build -f Dockerfile --build-arg NS=api2 --cache-from $CONTAINER_IMAGE:$CI_BUILD_REF_SLUG --tag $CONTAINER_IMAGE:$CI_BUILD_REF_SLUG-$CI_BUILD_REF --tag $CONTAINER_IMAGE:$CI_BUILD_REF_SLUG .
