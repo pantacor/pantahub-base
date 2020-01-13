@@ -21,6 +21,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+// AccountType Type of account
 type AccountType string
 
 const (
@@ -32,6 +33,7 @@ const (
 	ACCOUNT_TYPE_USER    = AccountType("USER")
 )
 
+// Account account information all the structure
 type Account struct {
 	Id primitive.ObjectID `json:"-" bson:"_id"`
 
@@ -49,9 +51,10 @@ type Account struct {
 	TimeModified time.Time `json:"time-modified" bson:"time-modified"`
 
 	// Oauth2RedirectURIs is limiting the prefix available for redirecting users with oauth code and accesstoken to
-	Oauth2RedirectURIs []string `json:"redirect_uris,omitempty" bson: "redirect_uris,omitempty"`
+	Oauth2RedirectURIs []string `json:"redirect_uris,omitempty" bson:"redirect_uris,omitempty"`
 }
 
+// AccountPublic Public information for one account
 type AccountPublic struct {
 	Id primitive.ObjectID `json:"-" bson:"_id"`
 

@@ -26,6 +26,7 @@ import (
 
 func main() {
 
+	utils.InitScopes()
 	base.DoInit()
 
 	portInt := utils.GetEnv(utils.ENV_PANTAHUB_PORT_INT)

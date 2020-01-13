@@ -2505,27 +2505,38 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *TrailsApp
 	// XXX: this is all needs to be done so that paths that do not trail with /
 	//      get a MOVED PERMANTENTLY error with the redir path with / like the main
 	//      API routers (bad rest.MakeRouter I suspect)
+
+	readTrailsScopes := []utils.Scope{
+		utils.Scopes.API,
+		utils.Scopes.Trails,
+		utils.Scopes.ReadTrails,
+	}
+	writeTrailsScopes := []utils.Scope{
+		utils.Scopes.API,
+		utils.Scopes.Trails,
+		utils.Scopes.WriteTrails,
+	}
 	api_router, _ := rest.MakeRouter(
-		rest.Get("/auth_status", utils.ScopeFilter([]string{"all", "trails", "trails.readonly"}, handle_auth)),
-		rest.Get("/", utils.ScopeFilter([]string{"all", "trails", "trails.readonly"}, app.handle_gettrails)),
-		rest.Post("/", utils.ScopeFilter([]string{"all", "trails", "trails.write"}, app.handle_posttrail)),
-		rest.Get("/summary", utils.ScopeFilter([]string{"all", "trails", "trails.readonly"}, app.handle_gettrailsummary)),
-		rest.Get("/:id", utils.ScopeFilter([]string{"all", "trails", "trails.readonly"}, app.handle_gettrail)),
-		rest.Get("/:id/.pvrremote", utils.ScopeFilter([]string{"all", "trails", "trails.readonly"}, app.handle_gettrailpvrinfo)),
-		rest.Post("/:id/steps", utils.ScopeFilter([]string{"all", "trails", "trails.write"}, app.handle_poststep)),
-		rest.Get("/:id/steps", utils.ScopeFilter([]string{"all", "trails", "trails.readonly"}, app.handle_getsteps)),
-		rest.Get("/:id/steps/:rev", utils.ScopeFilter([]string{"all", "trails", "trails.readonly"}, app.handle_getstep)),
-		rest.Get("/:id/steps/:rev/.pvrremote", utils.ScopeFilter([]string{"all", "trails", "trails.readonly"}, app.handle_getsteppvrinfo)),
-		rest.Get("/:id/steps/:rev/meta", utils.ScopeFilter([]string{"all", "trails", "trails.readonly"}, app.handle_getstepmeta)),
-		rest.Get("/:id/steps/:rev/state", utils.ScopeFilter([]string{"all", "trails", "trails.readonly"}, app.handle_getstepstate)),
-		rest.Get("/:id/steps/:rev/objects", utils.ScopeFilter([]string{"all", "trails", "trails.readonly"}, app.handle_getstepsobjects)),
-		rest.Post("/:id/steps/:rev/objects", utils.ScopeFilter([]string{"all", "trails", "trails.write"}, app.handle_poststepsobject)),
-		rest.Get("/:id/steps/:rev/objects/:obj", utils.ScopeFilter([]string{"all", "trails", "trails.readonly"}, app.handle_getstepsobject)),
-		rest.Get("/:id/steps/:rev/objects/:obj/blob", utils.ScopeFilter([]string{"all", "trails", "trails.readonly"}, app.handle_getstepsobjectfile)),
-		rest.Put("/:id/steps/:rev/meta", utils.ScopeFilter([]string{"all", "trails", "trails.write"}, app.handle_putstepmeta)),
-		rest.Put("/:id/steps/:rev/state", utils.ScopeFilter([]string{"all", "trails", "trails.write"}, app.handle_putstepstate)),
-		rest.Put("/:id/steps/:rev/progress", utils.ScopeFilter([]string{"all", "trails", "trails.write"}, app.handle_putstepprogress)),
-		rest.Get("/:id/summary", utils.ScopeFilter([]string{"all", "trails", "trails.readonly"}, app.handle_gettrailstepsummary)),
+		rest.Get("/auth_status", utils.ScopeFilter(readTrailsScopes, handle_auth)),
+		rest.Get("/", utils.ScopeFilter(readTrailsScopes, app.handle_gettrails)),
+		rest.Post("/", utils.ScopeFilter(writeTrailsScopes, app.handle_posttrail)),
+		rest.Get("/summary", utils.ScopeFilter(readTrailsScopes, app.handle_gettrailsummary)),
+		rest.Get("/:id", utils.ScopeFilter(readTrailsScopes, app.handle_gettrail)),
+		rest.Get("/:id/.pvrremote", utils.ScopeFilter(readTrailsScopes, app.handle_gettrailpvrinfo)),
+		rest.Post("/:id/steps", utils.ScopeFilter(writeTrailsScopes, app.handle_poststep)),
+		rest.Get("/:id/steps", utils.ScopeFilter(readTrailsScopes, app.handle_getsteps)),
+		rest.Get("/:id/steps/:rev", utils.ScopeFilter(readTrailsScopes, app.handle_getstep)),
+		rest.Get("/:id/steps/:rev/.pvrremote", utils.ScopeFilter(readTrailsScopes, app.handle_getsteppvrinfo)),
+		rest.Get("/:id/steps/:rev/meta", utils.ScopeFilter(readTrailsScopes, app.handle_getstepmeta)),
+		rest.Get("/:id/steps/:rev/state", utils.ScopeFilter(readTrailsScopes, app.handle_getstepstate)),
+		rest.Get("/:id/steps/:rev/objects", utils.ScopeFilter(readTrailsScopes, app.handle_getstepsobjects)),
+		rest.Post("/:id/steps/:rev/objects", utils.ScopeFilter(writeTrailsScopes, app.handle_poststepsobject)),
+		rest.Get("/:id/steps/:rev/objects/:obj", utils.ScopeFilter(readTrailsScopes, app.handle_getstepsobject)),
+		rest.Get("/:id/steps/:rev/objects/:obj/blob", utils.ScopeFilter(readTrailsScopes, app.handle_getstepsobjectfile)),
+		rest.Put("/:id/steps/:rev/meta", utils.ScopeFilter(writeTrailsScopes, app.handle_putstepmeta)),
+		rest.Put("/:id/steps/:rev/state", utils.ScopeFilter(writeTrailsScopes, app.handle_putstepstate)),
+		rest.Put("/:id/steps/:rev/progress", utils.ScopeFilter(writeTrailsScopes, app.handle_putstepprogress)),
+		rest.Get("/:id/summary", utils.ScopeFilter(readTrailsScopes, app.handle_gettrailstepsummary)),
 	)
 	app.Api.SetApp(api_router)
 
