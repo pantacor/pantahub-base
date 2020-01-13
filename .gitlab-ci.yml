@@ -43,10 +43,6 @@ build-devel:
     - test -n "$CI_BUILD_TAG" && docker push $CONTAINER_IMAGE:$CI_BUILD_TAG || true
   only:
   - develop
-  artifacts:
-    paths:
-    - vendor.tar.gz
-    expire_in: 1 week
 
 build-master:
   stage: build
