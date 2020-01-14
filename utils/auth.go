@@ -66,7 +66,7 @@ func (s *AuthMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFu
 		caller, ok := callerClaims["prn"]
 		if !ok {
 			// XXX: find right error
-			rest.Error(w, "You need to be logged in", http.StatusForbidden)
+			RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
 			return
 		}
 		callerStr := caller.(string)
@@ -76,7 +76,7 @@ func (s *AuthMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFu
 		authType, ok := callerClaims["type"]
 		if !ok {
 			// XXX: find right error
-			rest.Error(w, "You need to be logged in", http.StatusForbidden)
+			RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
 			return
 		}
 		authTypeStr := authType.(string)

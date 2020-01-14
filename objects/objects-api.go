@@ -96,7 +96,7 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 	caller, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 	callerStr, ok := caller.(string)
@@ -108,7 +108,7 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 		owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["owner"]
 		if !ok {
 			// XXX: find right error
-			rest.Error(w, "You need to be logged in as a USER or DEVICE", http.StatusForbidden)
+			utils.RestErrorWrapper(w, "You need to be logged in as a USER or DEVICE", http.StatusForbidden)
 			return
 		}
 		ownerStr = owner.(string)
@@ -116,7 +116,7 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "Invalid Access Token", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Invalid Access Token", http.StatusForbidden)
 		return
 	}
 
@@ -125,7 +125,7 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 
 	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -134,14 +134,14 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 	var err error
 
 	if newObject.Sha == "" {
-		rest.Error(w, "Post New Object must set a sha", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Post New Object must set a sha", http.StatusBadRequest)
 		return
 	}
 
 	sha, err = utils.DecodeSha256HexString(newObject.Sha)
 
 	if err != nil {
-		rest.Error(w, "Post New Object sha must be a valid sha256", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Post New Object sha must be a valid sha256", http.StatusBadRequest)
 		return
 	}
 
@@ -155,7 +155,7 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 
 	if err != nil {
 		log.Printf("ERROR: CalcUsageAfterPost failed: %s\n", err.Error())
-		rest.Error(w, "Error posting object", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error posting object", http.StatusInternalServerError)
 		return
 	}
 
@@ -163,14 +163,14 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 
 	if err != nil {
 		log.Println("Error to calc diskquota: " + err.Error())
-		rest.Error(w, "Error to calc quota", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error to calc quota", http.StatusInternalServerError)
 		return
 	}
 
 	if result.Total > quota {
 
 		log.Println("Quota exceeded in post object.")
-		rest.Error(w, "Quota exceeded; delete some objects or request a quota bump from team@pantahub.com",
+		utils.RestErrorWrapper(w, "Quota exceeded; delete some objects or request a quota bump from team@pantahub.com",
 			http.StatusPreconditionFailed)
 	}
 
@@ -230,21 +230,21 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in as a USER", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in as a USER", http.StatusForbidden)
 		return
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 
 	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
 	ownerStr, ok := owner.(string)
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "Invalid Access", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Invalid Access", http.StatusForbidden)
 		return
 	}
 	putId := r.PathParam("id")
@@ -252,7 +252,7 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 	sha, err := utils.DecodeSha256HexString(putId)
 
 	if err != nil {
-		rest.Error(w, "Post New Object sha must be a valid sha256", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Post New Object sha must be a valid sha256", http.StatusBadRequest)
 		return
 	}
 
@@ -265,12 +265,12 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 	}).Decode(&newObject)
 
 	if err != nil {
-		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
 	}
 
 	if newObject.Owner != owner {
-		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
 	}
 
@@ -285,7 +285,7 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 
 	if err != nil {
 		log.Println("Error to calc diskquota: " + err.Error())
-		rest.Error(w, "Error posting object", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error posting object", http.StatusInternalServerError)
 		return
 	}
 
@@ -293,12 +293,12 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 
 	if err != nil {
 		log.Println("Error get diskquota setting: " + err.Error())
-		rest.Error(w, "Error to calc quota", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error to calc quota", http.StatusInternalServerError)
 		return
 	}
 
 	if result.Total > quota {
-		rest.Error(w, "Quota exceeded; delete some objects or request a quota bump from team@pantahub.com",
+		utils.RestErrorWrapper(w, "Quota exceeded; delete some objects or request a quota bump from team@pantahub.com",
 			http.StatusPreconditionFailed)
 	}
 
@@ -313,7 +313,7 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 		updateOptions,
 	)
 	if err != nil {
-		rest.Error(w, "Error updating device public state", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Error updating device public state", http.StatusForbidden)
 		return
 	}
 
@@ -409,7 +409,7 @@ func (a *ObjectsApp) handle_getobject(w rest.ResponseWriter, r *rest.Request) {
 		owner, ok = r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 		// XXX: find right error
 		if !ok {
-			rest.Error(w, "You need to be logged in as USER or DEVICE with owner", http.StatusForbidden)
+			utils.RestErrorWrapper(w, "You need to be logged in as USER or DEVICE with owner", http.StatusForbidden)
 			return
 		}
 	}
@@ -417,7 +417,7 @@ func (a *ObjectsApp) handle_getobject(w rest.ResponseWriter, r *rest.Request) {
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 
 	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -425,7 +425,7 @@ func (a *ObjectsApp) handle_getobject(w rest.ResponseWriter, r *rest.Request) {
 
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "Invalid Access", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Invalid Access", http.StatusForbidden)
 		return
 	}
 
@@ -433,7 +433,7 @@ func (a *ObjectsApp) handle_getobject(w rest.ResponseWriter, r *rest.Request) {
 	sha, err := utils.DecodeSha256HexString(objId)
 
 	if err != nil {
-		rest.Error(w, "Get New Object :id must be a valid sha256", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Get New Object :id must be a valid sha256", http.StatusBadRequest)
 		return
 	}
 
@@ -448,14 +448,14 @@ func (a *ObjectsApp) handle_getobject(w rest.ResponseWriter, r *rest.Request) {
 	}).Decode(&filesObj)
 
 	if err != nil {
-		rest.Error(w, "No Access", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
 		return
 	}
 
 	// XXX: fixme; needs delegation of authorization for device accessing its resources
 	// could be subscriptions, but also something else
 	if filesObj.Owner != owner {
-		rest.Error(w, "No Access", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
 		return
 	}
 
@@ -473,7 +473,7 @@ func (a *ObjectsApp) handle_getobjectfile(w rest.ResponseWriter, r *rest.Request
 		owner, ok = r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 		// XXX: find right error
 		if !ok {
-			rest.Error(w, "You need to be logged in as USER or DEVICE with owner", http.StatusForbidden)
+			utils.RestErrorWrapper(w, "You need to be logged in as USER or DEVICE with owner", http.StatusForbidden)
 			return
 		}
 	}
@@ -481,7 +481,7 @@ func (a *ObjectsApp) handle_getobjectfile(w rest.ResponseWriter, r *rest.Request
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 
 	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -489,7 +489,7 @@ func (a *ObjectsApp) handle_getobjectfile(w rest.ResponseWriter, r *rest.Request
 
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "Invalid Access", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Invalid Access", http.StatusForbidden)
 		return
 	}
 
@@ -497,7 +497,7 @@ func (a *ObjectsApp) handle_getobjectfile(w rest.ResponseWriter, r *rest.Request
 	sha, err := utils.DecodeSha256HexString(objId)
 
 	if err != nil {
-		rest.Error(w, "Post New Object sha must be a valid sha256", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Post New Object sha must be a valid sha256", http.StatusBadRequest)
 		return
 	}
 	storageId := MakeStorageId(ownerStr, sha)
@@ -511,14 +511,14 @@ func (a *ObjectsApp) handle_getobjectfile(w rest.ResponseWriter, r *rest.Request
 	}).Decode(&filesObj)
 
 	if err != nil {
-		rest.Error(w, "No Access", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
 		return
 	}
 
 	// XXX: fixme; needs delegation of authorization for device accessing its resources
 	// could be subscriptions, but also something else
 	if filesObj.Owner != owner {
-		rest.Error(w, "No Access", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
 		return
 	}
 
@@ -536,14 +536,14 @@ func (a *ObjectsApp) handle_getobjects(w rest.ResponseWriter, r *rest.Request) {
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in as a USER", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in as a USER", http.StatusForbidden)
 		return
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 
 	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -553,7 +553,7 @@ func (a *ObjectsApp) handle_getobjects(w rest.ResponseWriter, r *rest.Request) {
 	if filter != "" {
 		err := json.Unmarshal([]byte(filter), &m)
 		if err != nil {
-			rest.Error(w, "Error parsing filter json "+err.Error(), http.StatusInternalServerError)
+			utils.RestErrorWrapper(w, "Error parsing filter json "+err.Error(), http.StatusInternalServerError)
 		}
 	}
 	m["owner"] = owner
@@ -569,7 +569,7 @@ func (a *ObjectsApp) handle_getobjects(w rest.ResponseWriter, r *rest.Request) {
 		"garbage": bson.M{"$ne": true},
 	}, findOptions)
 	if err != nil {
-		rest.Error(w, "Error on fetching objects:"+err.Error(), http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Error on fetching objects:"+err.Error(), http.StatusForbidden)
 		return
 	}
 	defer cur.Close(ctx)
@@ -577,7 +577,7 @@ func (a *ObjectsApp) handle_getobjects(w rest.ResponseWriter, r *rest.Request) {
 		result := Object{}
 		err := cur.Decode(&result)
 		if err != nil {
-			rest.Error(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
+			utils.RestErrorWrapper(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
 			return
 		}
 		newObjects = append(newObjects, result)
@@ -591,14 +591,14 @@ func (a *ObjectsApp) handle_deleteobject(w rest.ResponseWriter, r *rest.Request)
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in as a USER", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in as a USER", http.StatusForbidden)
 		return
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 
 	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -606,7 +606,7 @@ func (a *ObjectsApp) handle_deleteobject(w rest.ResponseWriter, r *rest.Request)
 
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "Invalid Access", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Invalid Access", http.StatusForbidden)
 		return
 	}
 
@@ -614,7 +614,7 @@ func (a *ObjectsApp) handle_deleteobject(w rest.ResponseWriter, r *rest.Request)
 	sha, err := utils.DecodeSha256HexString(delId)
 
 	if err != nil {
-		rest.Error(w, "Post New Object sha must be a valid sha256", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Post New Object sha must be a valid sha256", http.StatusBadRequest)
 		return
 	}
 	storageId := MakeStorageId(ownerStr, sha)
@@ -627,7 +627,7 @@ func (a *ObjectsApp) handle_deleteobject(w rest.ResponseWriter, r *rest.Request)
 		"garbage": bson.M{"$ne": true},
 	}).Decode(&newObject)
 	if err != nil {
-		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
 	}
 
@@ -639,11 +639,11 @@ func (a *ObjectsApp) handle_deleteobject(w rest.ResponseWriter, r *rest.Request)
 			"garbage": bson.M{"$ne": true},
 		})
 		if err != nil {
-			rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
+			utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
 			return
 		}
 		if deleteResult.DeletedCount == 0 {
-			rest.Error(w, "Object not deleted", http.StatusForbidden)
+			utils.RestErrorWrapper(w, "Object not deleted", http.StatusForbidden)
 			return
 		}
 	}

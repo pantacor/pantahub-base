@@ -21,13 +21,53 @@ import (
 	"net/http"
 
 	"gitlab.com/pantacor/pantahub-base/base"
+	"gitlab.com/pantacor/pantahub-base/docs"
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
 
+// @title Pantahub API reference
+// @version 1.0
+// @description This is the pantahub API documentation to use our API.
+
+// @license.name Apache 2.0
+// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
+
+// @securityDefinitions.basic BasicAuth
+// @tokenUrl /auth/login
+
+// @securityDefinitions.apikey ApiKeyAuth
+// @in header
+// @name Authorization
+
+// @securitydefinitions.oauth2.application OAuth2Application
+// @tokenUrl /auth/token
+// @scope.write Grants write access
+// @scope.admin Grants read and write access to administrative information
+
+// @securitydefinitions.oauth2.implicit OAuth2Implicit
+// @authorizationUrl /auth/authorize
+// @scope.write Grants write access
+// @scope.admin Grants read and write access to administrative information
+
+// @securitydefinitions.oauth2.password OAuth2Password
+// @tokenUrl /auth/token
+// @scope.read Grants read access
+// @scope.write Grants write access
+// @scope.admin Grants read and write access to administrative information
+
+// @securitydefinitions.oauth2.accessCode OAuth2AccessCode
+// @tokenUrl /auth/token
+// @authorizationUrl /auth/authorize
+
+// @BasePath /
 func main() {
 
 	utils.InitScopes()
 	base.DoInit()
+
+	docs.SwaggerInfo.BasePath = "/"
+	docs.SwaggerInfo.Schemes = []string{utils.GetEnv(utils.ENV_PANTAHUB_SCHEME)}
+	docs.SwaggerInfo.Host = utils.GetEnv(utils.ENV_PANTAHUB_HOST)
 
 	portInt := utils.GetEnv(utils.ENV_PANTAHUB_PORT_INT)
 	portIntTls := utils.GetEnv(utils.ENV_PANTAHUB_PORT_INT_TLS)

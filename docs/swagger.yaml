@@ -1,0 +1,617 @@
+basePath: /
+definitions:
+  accounts.Account:
+    properties:
+      challenge:
+        type: string
+      email:
+        type: string
+      nick:
+        type: string
+      password:
+        type: string
+      password_bcrypt:
+        type: string
+      password_scrypt:
+        type: string
+      prn:
+        type: string
+      redirect_uris:
+        description: Oauth2RedirectURIs is limiting the prefix available for redirecting
+          users with oauth code and accesstoken to
+        items:
+          type: string
+        type: array
+      time-created:
+        type: string
+      time-modified:
+        type: string
+      type:
+        type: string
+    type: object
+  apps.CreateAppPayload:
+    properties:
+      exposed_scopes:
+        items:
+          $ref: '#/definitions/utils.Scope'
+        type: array
+      nick:
+        type: string
+      redirect_uris:
+        items:
+          type: string
+        type: array
+      scopes:
+        items:
+          $ref: '#/definitions/utils.Scope'
+        type: array
+      type:
+        type: string
+    type: object
+  apps.TPApp:
+    properties:
+      deleted-at:
+        type: string
+      exposed_scopes:
+        items:
+          $ref: '#/definitions/utils.Scope'
+        type: array
+      exposedScopesLength:
+        type: integer
+      id:
+        type: string
+      nick:
+        type: string
+      owner:
+        type: string
+      owner-nick:
+        type: string
+      prn:
+        type: string
+      redirect_uris:
+        items:
+          type: string
+        type: array
+      scopes:
+        items:
+          $ref: '#/definitions/utils.Scope'
+        type: array
+      secret:
+        type: string
+      time-created:
+        type: string
+      time-modified:
+        type: string
+      type:
+        type: string
+    type: object
+  auth.accountCreationPayload:
+    properties:
+      captcha:
+        type: string
+      challenge:
+        type: string
+      email:
+        type: string
+      encrypted-account:
+        type: string
+      nick:
+        type: string
+      password:
+        type: string
+      password_bcrypt:
+        type: string
+      password_scrypt:
+        type: string
+      prn:
+        type: string
+      redirect_uris:
+        description: Oauth2RedirectURIs is limiting the prefix available for redirecting
+          users with oauth code and accesstoken to
+        items:
+          type: string
+        type: array
+      time-created:
+        type: string
+      time-modified:
+        type: string
+      type:
+        type: string
+    type: object
+  auth.passwordReset:
+    properties:
+      password:
+        type: string
+      token:
+        type: string
+    type: object
+  auth.passwordResetRequest:
+    properties:
+      email:
+        type: string
+    type: object
+  utils.RError:
+    properties:
+      code:
+        type: integer
+      error:
+        type: string
+    type: object
+  utils.Scope:
+    properties:
+      description:
+        type: string
+      id:
+        type: string
+      required:
+        type: boolean
+      service:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: This is the pantahub API documentation to use our API.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  title: Pantahub API reference
+  version: "1.0"
+paths:
+  /apps:
+    get:
+      consumes:
+      - application/json
+      description: Get all applications owned by a user
+      parameters:
+      - description: App ID|Nick|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/apps.TPApp'
+            type: array
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: App not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get all applications owned by a user
+  /apps/:
+    post:
+      consumes:
+      - application/json
+      description: This define a new application to be used as OAuth client
+      parameters:
+      - description: Create app body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/apps.CreateAppPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/apps.TPApp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new third party application
+  /apps/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: delete an oauth client
+      parameters:
+      - description: App ID|Nick|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/apps.TPApp'
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: App not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: delete an oauth client
+    get:
+      consumes:
+      - application/json
+      description: Get an oauth application
+      parameters:
+      - description: App ID|Nick|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/apps.TPApp'
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: App not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get an oauth application
+    put:
+      consumes:
+      - application/json
+      description: Update a third party application
+      parameters:
+      - description: App ID|Nick|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update app body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/apps.CreateAppPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/apps.TPApp'
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: App not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Update a third party application
+  /apps/scopes:
+    get:
+      consumes:
+      - application/json
+      description: Get scopes for OAuth applications
+      parameters:
+      - description: ID|Nick|PRN
+        in: query
+        name: serviceID
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/utils.Scope'
+            type: array
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: App not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      summary: Get scopes for OAuth applications
+  /auth:
+    get:
+      consumes:
+      - application/json
+      description: Get user profile
+      parameters:
+      - description: ID|Nick|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/accounts.Account'
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Account not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get user profile
+  /auth/accounts:
+    get:
+      consumes:
+      - application/json
+      description: Get list of accounts
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/accounts.Account'
+            type: array
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "403":
+          description: user has no admin role
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Account not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get list of accounts
+    post:
+      consumes:
+      - application/json
+      description: Create a new account
+      parameters:
+      - description: Account Payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.accountCreationPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/accounts.Account'
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Account not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "412":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      summary: Create a new account
+  /auth/auth_status:
+    get:
+      consumes:
+      - application/json
+      description: Get JWT claims from Authorization header
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/accounts.Account'
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Account not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get JWT claims from Authorization header
+  /auth/password:
+    post:
+      consumes:
+      - application/json
+      description: send email with token to user in order to reset password to given
+        user
+      parameters:
+      - description: New password payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.passwordReset'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/accounts.Account'
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Account not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      summary: send email with token to user in order to reset password to given user
+  /auth/recover:
+    post:
+      consumes:
+      - application/json
+      description: send email with token to user in order to reset password to given
+        user
+      parameters:
+      - description: Account recovery payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.passwordResetRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/accounts.Account'
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Account not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      summary: send email with token to user in order to reset password to given user
+  /auth/verify:
+    get:
+      consumes:
+      - application/json
+      description: Verify account payload
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/accounts.Account'
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Account not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      summary: Verify account payload
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+  BasicAuth:
+    type: basic
+  OAuth2AccessCode:
+    authorizationUrl: /auth/authorize
+    flow: accessCode
+    tokenUrl: /auth/token
+    type: oauth2
+  OAuth2Application:
+    flow: application
+    scopes:
+      admin: ' Grants read and write access to administrative information'
+      write: ' Grants write access'
+    tokenUrl: /auth/token
+    type: oauth2
+  OAuth2Implicit:
+    authorizationUrl: /auth/authorize
+    flow: implicit
+    scopes:
+      admin: ' Grants read and write access to administrative information'
+      write: ' Grants write access'
+    type: oauth2
+  OAuth2Password:
+    flow: password
+    scopes:
+      admin: ' Grants read and write access to administrative information'
+      read: ' Grants read access'
+      write: ' Grants write access'
+    tokenUrl: /auth/token
+    type: oauth2
+swagger: "2.0"

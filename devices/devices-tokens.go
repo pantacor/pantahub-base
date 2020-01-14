@@ -54,26 +54,26 @@ func (a *DevicesApp) handle_posttokens(w rest.ResponseWriter, r *rest.Request) {
 
 	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
 	if !ok {
-		rest.Error(w, "Missing JWT_PAYLOAD", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD", http.StatusBadRequest)
 		return
 	}
 
 	var caller interface{}
 	caller, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
 	if !ok {
-		rest.Error(w, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
 		return
 	}
 
 	var authType interface{}
 	authType, ok = jwtPayload.(jwtgo.MapClaims)["type"]
 	if !ok {
-		rest.Error(w, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
 		return
 	}
 
 	if authType != "USER" {
-		rest.Error(w, "Can only be updated by Device: handle_posttoken", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Can only be updated by Device: handle_posttoken", http.StatusBadRequest)
 		return
 
 	}
@@ -83,7 +83,7 @@ func (a *DevicesApp) handle_posttokens(w rest.ResponseWriter, r *rest.Request) {
 	err := r.DecodeJsonPayload(&req)
 
 	if err != nil && err != rest.ErrJsonPayloadEmpty {
-		rest.Error(w, "error decoding request: "+err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "error decoding request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -100,7 +100,7 @@ func (a *DevicesApp) handle_posttokens(w rest.ResponseWriter, r *rest.Request) {
 
 	_, err = rand.Read(key)
 	if err != nil {
-		rest.Error(w, "error generating random token: "+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "error generating random token: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -120,7 +120,7 @@ func (a *DevicesApp) handle_posttokens(w rest.ResponseWriter, r *rest.Request) {
 	_, err = collection.InsertOne(ctx, &req)
 
 	if err != nil {
-		rest.Error(w, "error inserting device token into database: "+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "error inserting device token into database: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -135,26 +135,26 @@ func (a *DevicesApp) handle_disabletokens(w rest.ResponseWriter, r *rest.Request
 
 	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
 	if !ok {
-		rest.Error(w, "Missing JWT_PAYLOAD", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD", http.StatusBadRequest)
 		return
 	}
 
 	var caller interface{}
 	caller, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
 	if !ok {
-		rest.Error(w, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
 		return
 	}
 
 	var authType interface{}
 	authType, ok = jwtPayload.(jwtgo.MapClaims)["type"]
 	if !ok {
-		rest.Error(w, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
 		return
 	}
 
 	if authType != "USER" {
-		rest.Error(w, "Can only be updated by Device: handle_posttoken", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Can only be updated by Device: handle_posttoken", http.StatusBadRequest)
 		return
 	}
 
@@ -178,7 +178,7 @@ func (a *DevicesApp) handle_disabletokens(w rest.ResponseWriter, r *rest.Request
 	)
 
 	if err != nil {
-		rest.Error(w, "error inserting device token into database: "+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "error inserting device token into database: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -189,26 +189,26 @@ func (a *DevicesApp) handle_gettokens(w rest.ResponseWriter, r *rest.Request) {
 
 	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
 	if !ok {
-		rest.Error(w, "Missing JWT_PAYLOAD", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD", http.StatusBadRequest)
 		return
 	}
 
 	var caller interface{}
 	caller, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
 	if !ok {
-		rest.Error(w, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
 		return
 	}
 
 	var authType interface{}
 	authType, ok = jwtPayload.(jwtgo.MapClaims)["type"]
 	if !ok {
-		rest.Error(w, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
 		return
 	}
 
 	if authType != "USER" {
-		rest.Error(w, "Can only be updated by Device: handle_posttoken", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Can only be updated by Device: handle_posttoken", http.StatusBadRequest)
 		return
 	}
 
@@ -222,7 +222,7 @@ func (a *DevicesApp) handle_gettokens(w rest.ResponseWriter, r *rest.Request) {
 	}, findOptions)
 
 	if err != nil {
-		rest.Error(w, "error getting device tokens for user:"+err.Error(), http.StatusForbidden)
+		utils.RestErrorWrapper(w, "error getting device tokens for user:"+err.Error(), http.StatusForbidden)
 		return
 	}
 
@@ -231,7 +231,7 @@ func (a *DevicesApp) handle_gettokens(w rest.ResponseWriter, r *rest.Request) {
 		result := PantahubDevicesJoinToken{}
 		err := cur.Decode(&result)
 		if err != nil {
-			rest.Error(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
+			utils.RestErrorWrapper(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
 			return
 		}
 		// lets not reveal details about token when collection gets queried

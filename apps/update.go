@@ -25,15 +25,27 @@ import (
 )
 
 // handleUpdateApp update a oauth client
+// @Summary Update a third party application
+// @Description Update a third party application
+// @Accept  json
+// @Produce  json
+// @Security ApiKeyAuth
+// @Param id path string true "App ID|Nick|PRN"
+// @Param body body CreateAppPayload true "Update app body"
+// @Success 200 {object} TPApp
+// @Failure 400 {object} utils.RError "Invalid payload"
+// @Failure 404 {object} utils.RError "App not found"
+// @Failure 500 {object} utils.RError "Error processing request"
+// @Router /apps/{id} [put]
 func (app *App) handleUpdateApp(w rest.ResponseWriter, r *rest.Request) {
 	id := r.PathParam("id")
 
-	payload := &createAppPayload{}
+	payload := &CreateAppPayload{}
 	r.DecodeJsonPayload(payload)
 
 	err := validatePayload(payload)
 	if err != nil {
-		rest.Error(w, err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -42,25 +54,25 @@ func (app *App) handleUpdateApp(w rest.ResponseWriter, r *rest.Request) {
 	if ok {
 		owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"].(string)
 	} else {
-		rest.Error(w, "Owner can't be defined", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Owner can't be defined", http.StatusInternalServerError)
 		return
 	}
 
 	database := app.mongoClient.Database(utils.MongoDb)
 	tpApp, httpCode, err := SearchApp(owner, id, database)
 	if err != nil {
-		rest.Error(w, err.Error(), httpCode)
+		utils.RestErrorWrapper(w, err.Error(), httpCode)
 		return
 	}
 
 	if tpApp == nil {
-		rest.Error(w, "App not found", http.StatusNotFound)
+		utils.RestErrorWrapper(w, "App not found", http.StatusNotFound)
 		return
 	}
 
 	apptype, err := parseType(payload.Type)
 	if err != nil {
-		rest.Error(w, err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -71,7 +83,7 @@ func (app *App) handleUpdateApp(w rest.ResponseWriter, r *rest.Request) {
 
 	scopes, err := parseScopes(payload.Scopes, tpApp.Nick)
 	if err != nil {
-		rest.Error(w, err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -82,7 +94,7 @@ func (app *App) handleUpdateApp(w rest.ResponseWriter, r *rest.Request) {
 	if apptype == AppTypeConfidential && tpApp.Secret == "" {
 		tpApp.Secret, err = utils.GenerateSecret(30)
 		if err != nil {
-			rest.Error(w, err.Error(), http.StatusInternalServerError)
+			utils.RestErrorWrapper(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	}
@@ -90,7 +102,7 @@ func (app *App) handleUpdateApp(w rest.ResponseWriter, r *rest.Request) {
 	if apptype == AppTypeConfidential && len(payload.ExposedScopes) > 0 {
 		tpApp.ExposedScopes, err = parseScopes(payload.ExposedScopes, payload.Nick)
 		if err != nil {
-			rest.Error(w, err.Error(), http.StatusBadRequest)
+			utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 	}
@@ -101,7 +113,7 @@ func (app *App) handleUpdateApp(w rest.ResponseWriter, r *rest.Request) {
 
 	_, err = CreateOrUpdateApp(tpApp, database)
 	if err != nil {
-		rest.Error(w, "Error creating third party application "+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error creating third party application "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 

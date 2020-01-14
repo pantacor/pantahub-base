@@ -4,19 +4,16 @@ services:
   base:
     build:
       context: .
-      dockerfile: Dockerfile.development
+      dockerfile: Dockerfile
     links:
       - mongo
       - fluentd
       - elasticsearch
       - localstack
-    volumes:
-      - ${PWD}:/go/src/gitlab.com/pantacor/pantahub-base
     ports:
       - 12365:12365
-    env_file:
-      - ./env.default 
-      - ./.env.local
+    volumes:
+      - ${PWD}/.env.local:/opt/ph/bin/env.default
 
   mongo:
     image: mongo

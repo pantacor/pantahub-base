@@ -241,19 +241,19 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 
 	summaryCol := a.mongoClient.Database("pantabase_devicesummary").Collection("device_summary_short_new_v2")
 	if summaryCol == nil {
-		rest.Error(w, "Error with Database connectivity (summaryCol)", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity (summaryCol)", http.StatusInternalServerError)
 		return
 	}
 
 	dCol := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if dCol == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
 	oCol := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 	if oCol == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -271,7 +271,7 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 		"garbage": bson.M{"$ne": true},
 	}, findOptions)
 	if err != nil {
-		rest.Error(w, "Error on fetching devices:"+err.Error(), http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Error on fetching devices:"+err.Error(), http.StatusForbidden)
 		return
 	}
 	defer cur.Close(ctx)
@@ -279,13 +279,13 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 		result := trails.TrailSummary{}
 		err := cur.Decode(&result)
 		if err != nil {
-			rest.Error(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
+			utils.RestErrorWrapper(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
 			return
 		}
 		mostRecentDeviceTrails = append(mostRecentDeviceTrails, result)
 	}
 	if err != nil {
-		rest.Error(w, "Error finding devices for summary "+err.Error(),
+		utils.RestErrorWrapper(w, "Error finding devices for summary "+err.Error(),
 			http.StatusInternalServerError)
 		return
 	}
@@ -315,7 +315,7 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 	plan := sub.GetPlan()
 	prnInfo, err := plan.GetInfo()
 	if err != nil {
-		rest.Error(w, "Error parsing plan "+err.Error(),
+		utils.RestErrorWrapper(w, "Error parsing plan "+err.Error(),
 			http.StatusInternalServerError)
 		return
 	}
@@ -335,7 +335,7 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 		},
 	)
 	if err != nil {
-		rest.Error(w, "Error finding devices for summary "+err.Error(),
+		utils.RestErrorWrapper(w, "Error finding devices for summary "+err.Error(),
 			http.StatusInternalServerError)
 		return
 	}
@@ -362,12 +362,12 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 	}
 	//pipelineData, err := bson.Marshal(pipeline)
 	if err != nil {
-		rest.Error(w, "ERROR Marshalling pipeline: "+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "ERROR Marshalling pipeline: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	cur, err = oCol.Aggregate(ctx, pipeline)
 	if err != nil {
-		rest.Error(w, "ERROR Aggregate pipeline data: "+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "ERROR Aggregate pipeline data: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	defer cur.Close(ctx)
@@ -375,7 +375,7 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 		result := DiskQuotaUsageResult{}
 		err := cur.Decode(&result)
 		if err != nil {
-			rest.Error(w, "ERROR Decoding Document: "+err.Error(), http.StatusInternalServerError)
+			utils.RestErrorWrapper(w, "ERROR Decoding Document: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		resp = result
@@ -386,14 +386,14 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 		quotaObjects := summary.Sub.QuotaStats[QUOTA_OBJECTS]
 		uM, err := units.ParseStrictBytes("1" + quotaObjects.Unit)
 		if err != nil {
-			rest.Error(w, "ERROR Quota Unit: "+err.Error(), http.StatusInternalServerError)
+			utils.RestErrorWrapper(w, "ERROR Quota Unit: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		fRound := float64(int64(float64(resp.Total)/float64(uM)*100)) / 100
 		quotaObjects.Actual = fRound
 		summary.Sub.QuotaStats[QUOTA_OBJECTS] = quotaObjects
 	} else if err != nil {
-		rest.Error(w, "Error finding quota usage of disk: "+err.Error(),
+		utils.RestErrorWrapper(w, "Error finding quota usage of disk: "+err.Error(),
 			http.StatusInternalServerError)
 		return
 	}

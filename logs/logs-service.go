@@ -134,14 +134,14 @@ func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	if authType != "USER" {
-		rest.Error(w, "Need to be logged in as USER to get logs", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Need to be logged in as USER to get logs", http.StatusForbidden)
 		return
 	}
 
 	own, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
@@ -157,7 +157,7 @@ func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 		startParamInt = int64(p)
 	}
 	if err != nil {
-		rest.Error(w, "Bad 'start' parameter", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Bad 'start' parameter", http.StatusBadRequest)
 		return
 	}
 
@@ -168,7 +168,7 @@ func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 		pageParamInt = int64(p)
 	}
 	if err != nil {
-		rest.Error(w, "Bad 'page' parameter", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Bad 'page' parameter", http.StatusBadRequest)
 		return
 	}
 
@@ -176,7 +176,7 @@ func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 	deviceParam := r.FormValue("dev")
 	deviceParam, err = a.ParseDeviceString(deviceParam)
 	if err != nil {
-		rest.Error(w, "Error Parsing Device nicks:"+err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error Parsing Device nicks:"+err.Error(), http.StatusBadRequest)
 		return
 	}
 	levelParam := r.FormValue("lvl")
@@ -219,7 +219,7 @@ func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 	if beforeParam != "" {
 		t, err := time.Parse(time.RFC3339, beforeParam)
 		if err != nil {
-			rest.Error(w, "ERROR: parsing 'before' date "+err.Error(), http.StatusBadRequest)
+			utils.RestErrorWrapper(w, "ERROR: parsing 'before' date "+err.Error(), http.StatusBadRequest)
 			return
 		}
 		beforeOrAfter = &t
@@ -227,7 +227,7 @@ func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 	} else if afterParam != "" {
 		t, err := time.Parse(time.RFC3339, afterParam)
 		if err != nil {
-			rest.Error(w, "ERROR: parsing 'before' date "+err.Error(), http.StatusBadRequest)
+			utils.RestErrorWrapper(w, "ERROR: parsing 'before' date "+err.Error(), http.StatusBadRequest)
 			return
 		}
 		beforeOrAfter = &t
@@ -238,7 +238,7 @@ func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 	result, err = a.backend.getLogs(startParamInt, pageParamInt, beforeOrAfter, after, filter, logsSort, cursor)
 
 	if err != nil {
-		rest.Error(w, "ERROR: getting logs failed "+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "ERROR: getting logs failed "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -254,7 +254,7 @@ func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 		token := jwtgo.NewWithClaims(jwtgo.GetSigningMethod(a.jwt_middleware.SigningAlgorithm), claims)
 		ss, err := token.SignedString(a.jwt_middleware.Key)
 		if err != nil {
-			rest.Error(w, "ERROR: signing scrollid token: "+err.Error(), http.StatusInternalServerError)
+			utils.RestErrorWrapper(w, "ERROR: signing scrollid token: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		result.NextCursor = ss
@@ -319,21 +319,21 @@ func (a *logsApp) handle_getlogscursor(w rest.ResponseWriter, r *rest.Request) {
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	if authType != "USER" {
-		rest.Error(w, "Need to be logged in as USER to get logs", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Need to be logged in as USER to get logs", http.StatusForbidden)
 		return
 	}
 
 	own, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
 	jsonBody := map[string]interface{}{}
 	err = r.DecodeJsonPayload(&jsonBody)
 	if err != nil {
-		rest.Error(w, "Error decoding json request body: "+err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error decoding json request body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -356,7 +356,7 @@ func (a *logsApp) handle_getlogscursor(w rest.ResponseWriter, r *rest.Request) {
 	})
 
 	if err != nil {
-		rest.Error(w, "Error decoding JWT token for next-cursor: "+err.Error(), http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Error decoding JWT token for next-cursor: "+err.Error(), http.StatusForbidden)
 		return
 	}
 
@@ -365,14 +365,14 @@ func (a *logsApp) handle_getlogscursor(w rest.ResponseWriter, r *rest.Request) {
 
 		caller := claims.StandardClaims.Audience
 		if caller != own {
-			rest.Error(w, "Calling user does not match owner of cursor-next", http.StatusForbidden)
+			utils.RestErrorWrapper(w, "Calling user does not match owner of cursor-next", http.StatusForbidden)
 			return
 		}
 		nextCursor := claims.NextCursor
 		result, err = a.backend.getLogsByCursor(nextCursor)
 
 		if err != nil {
-			rest.Error(w, "ERROR: getting logs failed "+err.Error(), http.StatusInternalServerError)
+			utils.RestErrorWrapper(w, "ERROR: getting logs failed "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
@@ -388,7 +388,7 @@ func (a *logsApp) handle_getlogscursor(w rest.ResponseWriter, r *rest.Request) {
 			token := jwtgo.NewWithClaims(jwtgo.GetSigningMethod(a.jwt_middleware.SigningAlgorithm), claims)
 			ss, err := token.SignedString(a.jwt_middleware.Key)
 			if err != nil {
-				rest.Error(w, "ERROR: signing scrollid token: "+err.Error(), http.StatusInternalServerError)
+				utils.RestErrorWrapper(w, "ERROR: signing scrollid token: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
 			result.NextCursor = ss
@@ -398,7 +398,7 @@ func (a *logsApp) handle_getlogscursor(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	rest.Error(w, "Unexpected Code", http.StatusInternalServerError)
+	utils.RestErrorWrapper(w, "Unexpected Code", http.StatusInternalServerError)
 	return
 }
 
@@ -428,34 +428,34 @@ func (a *logsApp) handle_postlogs(w rest.ResponseWriter, r *rest.Request) {
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	if authType != "DEVICE" {
-		rest.Error(w, "Need to be logged in as DEVICE to post logs", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Need to be logged in as DEVICE to post logs", http.StatusForbidden)
 		return
 	}
 
 	device, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["owner"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in as device with owner", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in as device with owner", http.StatusForbidden)
 		return
 	}
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		rest.Error(w, "Error reading logs body", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error reading logs body", http.StatusBadRequest)
 		return
 	}
 
 	entries, err := unmarshalBody(body)
 
 	if err != nil {
-		rest.Error(w, "Error parsing logs body: "+err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error parsing logs body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -464,7 +464,7 @@ func (a *logsApp) handle_postlogs(w rest.ResponseWriter, r *rest.Request) {
 	for _, v := range entries {
 		v.Id, err = primitive.ObjectIDFromHex(bson.NewObjectId().Hex())
 		if err != nil {
-			rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+			utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		v.Device = device.(string)
@@ -478,7 +478,7 @@ func (a *logsApp) handle_postlogs(w rest.ResponseWriter, r *rest.Request) {
 
 	err = a.backend.postLogs(newEntries)
 	if err != nil {
-		rest.Error(w, "Error posting logs "+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error posting logs "+err.Error(), http.StatusInternalServerError)
 		log.Println("ERROR: Error posting logs " + err.Error())
 		return
 	}

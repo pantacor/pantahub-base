@@ -22,7 +22,7 @@ func (mw *URLCleanMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.HandlerFun
 		r.URL, err = url.Parse(r.URL.String())
 
 		if err != nil {
-			rest.Error(w, "Error cleaning trailing / from path", http.StatusInternalServerError)
+			RestErrorWrapper(w, "Error cleaning trailing / from path", http.StatusInternalServerError)
 		}
 
 		// call the handler

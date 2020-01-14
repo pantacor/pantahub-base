@@ -25,17 +25,28 @@ import (
 type AccountType string
 
 const (
-	ACCOUNT_TYPE_ADMIN   = AccountType("ADMIN")
-	ACCOUNT_TYPE_DEVICE  = AccountType("DEVICE")
-	ACCOUNT_TYPE_ORG     = AccountType("ORG")
-	ACCOUNT_TYPE_SERVICE = AccountType("SERVICE")
-	ACCOUNT_TYPE_CLIENT  = AccountType("CLIENT")
-	ACCOUNT_TYPE_USER    = AccountType("USER")
+	// AccountTypeAdmin define account type ADMIN
+	AccountTypeAdmin = AccountType("ADMIN")
+
+	// AccountTypeDevice define account type DEVICE
+	AccountTypeDevice = AccountType("DEVICE")
+
+	// AccountTypeOrg define account type ORG
+	AccountTypeOrg = AccountType("ORG")
+
+	// AccountTypeService define account type SERVICE
+	AccountTypeService = AccountType("SERVICE")
+
+	// AccountTypeUser define account type USER
+	AccountTypeUser = AccountType("USER")
+
+	// AccountTypeClient define account type CLIENT
+	AccountTypeClient = AccountType("CLIENT")
 )
 
 // Account account information all the structure
 type Account struct {
-	Id primitive.ObjectID `json:"-" bson:"_id"`
+	ID primitive.ObjectID `json:"-" bson:"_id"`
 
 	Type  AccountType `json:"type" bson:"type"`
 	Email string      `json:"email" bson:"email"`

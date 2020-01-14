@@ -74,21 +74,21 @@ func (a *PlogApp) handle_getplogposts(w rest.ResponseWriter, r *rest.Request) {
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
 	collPlogPosts := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_plogposts")
 
 	if collPlogPosts == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	if authType != "USER" {
-		rest.Error(w, "Need to be logged in as USER to get trail summary", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Need to be logged in as USER to get trail summary", http.StatusForbidden)
 		return
 	}
 
@@ -101,7 +101,7 @@ func (a *PlogApp) handle_getplogposts(w rest.ResponseWriter, r *rest.Request) {
 		"owner": owner,
 	}, findOptions)
 	if err != nil {
-		rest.Error(w, "Error on fetching plogposts:"+err.Error(), http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Error on fetching plogposts:"+err.Error(), http.StatusForbidden)
 		return
 	}
 	defer cur.Close(ctx)
@@ -109,7 +109,7 @@ func (a *PlogApp) handle_getplogposts(w rest.ResponseWriter, r *rest.Request) {
 		result := PlogPost{}
 		err := cur.Decode(&result)
 		if err != nil {
-			rest.Error(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
+			utils.RestErrorWrapper(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
 			return
 		}
 		plogPosts = append(plogPosts, result)
