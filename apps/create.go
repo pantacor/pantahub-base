@@ -89,6 +89,9 @@ func (app *App) handleCreateApp(w rest.ResponseWriter, r *rest.Request) {
 			rest.Error(w, "Error generating secret", http.StatusInternalServerError)
 			return
 		}
+	}
+
+	if apptype == AppTypeConfidential && len(payload.ExposedScopes) > 0 {
 		newApp.ExposedScopes, err = parseScopes(payload.ExposedScopes, payload.Nick)
 		if err != nil {
 			rest.Error(w, err.Error(), http.StatusBadRequest)
