@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"gopkg.in/mgo.v2"
 
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -120,4 +121,53 @@ func GetMongoClientTest() (*mongo.Client, error) {
 	client, err := mongo.Connect(ctx, clientOptions)
 
 	return client, err
+}
+
+// GetMongoSession is the legacy util to access database through old mgo driver
+func GetMongoSession() (*mgo.Session, error) {
+	// XXX: make mongo host configurable through env
+	mongoDb := GetEnv(ENV_MONGO_DB)
+	mongoHost := GetEnv(ENV_MONGO_HOST)
+	mongoPort := GetEnv(ENV_MONGO_PORT)
+	mongoUser := GetEnv(ENV_MONGO_USER)
+	mongoPass := GetEnv(ENV_MONGO_PASS)
+	mongoRs := GetEnv(ENV_MONGO_RS)
+
+	mongoCreds := ""
+	if mongoUser != "" {
+		mongoCreds = mongoUser + ":" + mongoPass + "@"
+	}
+
+	mongoConnect := "mongodb://" + mongoCreds + mongoHost + ":" + mongoPort + "/" + mongoDb
+
+	if mongoRs != "" {
+		mongoConnect = mongoConnect + "?replicaSet=" + mongoRs
+	}
+	log.Println("Will connect to mongo PROD db with: " + mongoConnect)
+
+	return mgo.Dial(mongoConnect)
+}
+
+func GetMongoSessionTest() (*mgo.Session, error) {
+	// XXX: make mongo host configurable through env
+	mongoDb := "testdb-" + GetEnv(ENV_MONGO_DB)
+	mongoHost := GetEnv(ENV_MONGO_HOST)
+	mongoPort := GetEnv(ENV_MONGO_PORT)
+	mongoUser := GetEnv(ENV_MONGO_USER)
+	mongoPass := GetEnv(ENV_MONGO_PASS)
+	mongoRs := GetEnv(ENV_MONGO_RS)
+
+	mongoCreds := ""
+	if mongoUser != "" {
+		mongoCreds = mongoUser + ":" + mongoPass + "@"
+	}
+
+	mongoConnect := "mongodb://" + mongoCreds + mongoHost + ":" + mongoPort + "/" + mongoDb
+
+	if mongoRs != "" {
+		mongoConnect = mongoConnect + "?replicaSet=" + mongoRs
+	}
+	log.Println("Will connect to mongo TEST db with: " + mongoConnect)
+
+	return mgo.Dial(mongoConnect)
 }
