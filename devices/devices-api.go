@@ -46,7 +46,7 @@ import (
 const PantahubDevicesAutoTokenV1 = "Pantahub-Devices-Auto-Token-V1"
 
 //DeviceNickRule : Device nick rule used to create/update a device nick
-const DeviceNickRule = "^[a-zA-Z0-9_-`+``%`]+$"
+const DeviceNickRule = `(?m)^[a-zA-Z0-9_\-+%]+$`
 
 func init() {
 	// seed this for petname as dustin dropped our patch upstream... moo
