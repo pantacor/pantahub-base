@@ -63,14 +63,14 @@ func (a *HealthzApp) handle_healthz(w rest.ResponseWriter, r *rest.Request) {
 	user := r.Env["REMOTE_USER"].(string)
 
 	if user == "" {
-		rest.Error(w, "Not authorized", http.StatusUnauthorized)
+		utils.RestErrorWrapper(w, "Not authorized", http.StatusUnauthorized)
 		return
 	}
 
 	// check DB
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 	val := map[string]interface{}{}
@@ -78,7 +78,7 @@ func (a *HealthzApp) handle_healthz(w rest.ResponseWriter, r *rest.Request) {
 	defer cancel()
 	err := collection.FindOne(ctx, bson.M{}).Decode(&val)
 	if err != nil {
-		rest.Error(w, "Error with Database query:"+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database query:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 

@@ -84,44 +84,44 @@ func (a *DevicesApp) handle_patchuserdata(w rest.ResponseWriter, r *rest.Request
 
 	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
 	if !ok {
-		rest.Error(w, "Missing JWT_PAYLOAD", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD", http.StatusBadRequest)
 		return
 	}
 
 	var owner interface{}
 	owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
 	if !ok {
-		rest.Error(w, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
 		return
 	}
 
 	var authType interface{}
 	authType, ok = jwtPayload.(jwtgo.MapClaims)["type"]
 	if !ok {
-		rest.Error(w, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
 		return
 	}
 
 	if authType != "USER" {
-		rest.Error(w, "User data can only be updated by User", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "User data can only be updated by User", http.StatusBadRequest)
 		return
 	}
 	deviceID, err := a.ParseDeviceIDOrNick(r.PathParam("id"))
 	if err != nil {
-		rest.Error(w, "Error Parsing Device ID or Nick:"+err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error Parsing Device ID or Nick:"+err.Error(), http.StatusBadRequest)
 		return
 	}
 	data := map[string]interface{}{}
 	err = r.DecodeJsonPayload(&data)
 	if err != nil {
-		rest.Error(w, "Error parsing data: "+err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error parsing data: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	data = utils.BsonQuoteMap(&data)
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -151,11 +151,11 @@ func (a *DevicesApp) handle_patchuserdata(w rest.ResponseWriter, r *rest.Request
 		}},
 	)
 	if updateResult.MatchedCount == 0 {
-		rest.Error(w, "Error updating device user-meta: not found", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error updating device user-meta: not found", http.StatusBadRequest)
 		return
 	}
 	if err != nil {
-		rest.Error(w, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -166,26 +166,26 @@ func (a *DevicesApp) handle_putuserdata(w rest.ResponseWriter, r *rest.Request) 
 
 	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
 	if !ok {
-		rest.Error(w, "Missing JWT_PAYLOAD", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD", http.StatusBadRequest)
 		return
 	}
 
 	var owner interface{}
 	owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
 	if !ok {
-		rest.Error(w, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
 		return
 	}
 
 	var authType interface{}
 	authType, ok = jwtPayload.(jwtgo.MapClaims)["type"]
 	if !ok {
-		rest.Error(w, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
 		return
 	}
 
 	if authType != "USER" {
-		rest.Error(w, "User data can only be updated by User", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "User data can only be updated by User", http.StatusBadRequest)
 		return
 	}
 
@@ -194,21 +194,21 @@ func (a *DevicesApp) handle_putuserdata(w rest.ResponseWriter, r *rest.Request) 
 	data := map[string]interface{}{}
 	err := r.DecodeJsonPayload(&data)
 	if err != nil {
-		rest.Error(w, "Error parsing data: "+err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error parsing data: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	data = utils.BsonQuoteMap(&data)
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	deviceObjectID, err := primitive.ObjectIDFromHex(deviceId)
 	if err != nil {
-		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	updateResult, err := collection.UpdateOne(
@@ -223,11 +223,11 @@ func (a *DevicesApp) handle_putuserdata(w rest.ResponseWriter, r *rest.Request) 
 		}},
 	)
 	if updateResult.MatchedCount == 0 {
-		rest.Error(w, "Error updating device user-meta: not found", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error updating device user-meta: not found", http.StatusBadRequest)
 		return
 	}
 	if err != nil {
-		rest.Error(w, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -238,47 +238,47 @@ func (a *DevicesApp) handle_putdevicedata(w rest.ResponseWriter, r *rest.Request
 
 	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
 	if !ok {
-		rest.Error(w, "Missing JWT_PAYLOAD", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD", http.StatusBadRequest)
 		return
 	}
 
 	var owner interface{}
 	owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
 	if !ok {
-		rest.Error(w, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
 		return
 	}
 
 	var authType interface{}
 	authType, ok = jwtPayload.(jwtgo.MapClaims)["type"]
 	if !ok {
-		rest.Error(w, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
 		return
 	}
 
 	if authType != "DEVICE" {
-		rest.Error(w, "Device data can only be updated by Device", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Device data can only be updated by Device", http.StatusBadRequest)
 		return
 	}
 
 	deviceId := r.PathParam("id")
 	deviceObjectID, err := primitive.ObjectIDFromHex(deviceId)
 	if err != nil {
-		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	data := map[string]interface{}{}
 	err = r.DecodeJsonPayload(&data)
 	if err != nil {
-		rest.Error(w, "Error parsing data: "+err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error parsing data: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	data = utils.BsonQuoteMap(&data)
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -296,11 +296,11 @@ func (a *DevicesApp) handle_putdevicedata(w rest.ResponseWriter, r *rest.Request
 		}},
 	)
 	if updateResult.MatchedCount == 0 {
-		rest.Error(w, "Error updating device user-meta: not found", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error updating device user-meta: not found", http.StatusBadRequest)
 		return
 	}
 	if err != nil {
-		rest.Error(w, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -316,7 +316,7 @@ func (a *DevicesApp) handle_postdevice(w rest.ResponseWriter, r *rest.Request) {
 	mgoid := bson.NewObjectId()
 	ObjectID, err := primitive.ObjectIDFromHex(mgoid.Hex())
 	if err != nil {
-		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	newDevice.Id = ObjectID
@@ -327,7 +327,7 @@ func (a *DevicesApp) handle_postdevice(w rest.ResponseWriter, r *rest.Request) {
 		var err error
 		newDevice.Secret, err = utils.GenerateSecret(15)
 		if err != nil {
-			rest.Error(w, "Error generating secret", http.StatusInternalServerError)
+			utils.RestErrorWrapper(w, "Error generating secret", http.StatusInternalServerError)
 			return
 		}
 	}
@@ -358,7 +358,7 @@ func (a *DevicesApp) handle_postdevice(w rest.ResponseWriter, r *rest.Request) {
 
 			autoInfo, err := a.getBase64AutoTokenInfo(autoAuthToken)
 			if err != nil {
-				rest.Error(w, "Error using AutoAuthToken "+err.Error(), http.StatusBadRequest)
+				utils.RestErrorWrapper(w, "Error using AutoAuthToken "+err.Error(), http.StatusBadRequest)
 				return
 			}
 
@@ -382,17 +382,17 @@ func (a *DevicesApp) handle_postdevice(w rest.ResponseWriter, r *rest.Request) {
 
 	isValidNick, err := regexp.MatchString(DeviceNickRule, newDevice.Nick)
 	if err != nil {
-		rest.Error(w, "Error Validating Device nick "+err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error Validating Device nick "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	if !isValidNick {
-		rest.Error(w, "Invalid Device Nick (Only allowed characters:[A-Za-z0-9-_+%])", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Invalid Device Nick (Only allowed characters:[A-Za-z0-9-_+%])", http.StatusBadRequest)
 		return
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -409,7 +409,7 @@ func (a *DevicesApp) handle_postdevice(w rest.ResponseWriter, r *rest.Request) {
 
 	if err != nil {
 		log.Print(newDevice)
-		rest.Error(w, "Error creating device "+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error creating device "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -425,7 +425,7 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 	authId, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in.", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in.", http.StatusForbidden)
 		return
 	}
 
@@ -433,7 +433,7 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in with a known authentication type.", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in with a known authentication type.", http.StatusForbidden)
 		return
 	}
 
@@ -449,14 +449,14 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
 	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	deviceObjectID, err := primitive.ObjectIDFromHex(putId)
 	if err != nil {
-		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	err = collection.FindOne(ctx,
@@ -464,7 +464,7 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 		Decode(&newDevice)
 
 	if err != nil {
-		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
 	}
 
@@ -478,44 +478,44 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 	deviceMeta := utils.BsonUnquoteMap(&newDevice.DeviceMeta)
 
 	if callerIsDevice && newDevice.Prn != authId {
-		rest.Error(w, "Not Device Accessible Resource Id", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Not Device Accessible Resource Id", http.StatusForbidden)
 		return
 	}
 
 	if callerIsUser && newDevice.Owner != "" && newDevice.Owner != authId {
-		rest.Error(w, "Not User Accessible Resource Id", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Not User Accessible Resource Id", http.StatusForbidden)
 		return
 	}
 
 	r.DecodeJsonPayload(&newDevice)
 
 	if newDevice.Id.Hex() != putId {
-		rest.Error(w, "Cannot change device Id in PUT", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Cannot change device Id in PUT", http.StatusForbidden)
 		return
 	}
 
 	if newDevice.Prn != prn {
-		rest.Error(w, "Cannot change device prn in PUT", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Cannot change device prn in PUT", http.StatusForbidden)
 		return
 	}
 
 	if newDevice.Owner != owner {
-		rest.Error(w, "Cannot change device owner in PUT", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Cannot change device owner in PUT", http.StatusForbidden)
 		return
 	}
 
 	if newDevice.TimeCreated != timeCreated {
-		rest.Error(w, "Cannot change device timeCreated in PUT", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Cannot change device timeCreated in PUT", http.StatusForbidden)
 		return
 	}
 
 	if newDevice.Secret == "" {
-		rest.Error(w, "Empty Secret not allowed for devices in PUT", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Empty Secret not allowed for devices in PUT", http.StatusForbidden)
 		return
 	}
 
 	if callerIsDevice && newDevice.IsPublic != isPublic {
-		rest.Error(w, "Device cannot change its own 'public' state", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Device cannot change its own 'public' state", http.StatusForbidden)
 		return
 	}
 
@@ -532,18 +532,18 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 			newDevice.Owner = authId.(string)
 			newDevice.Challenge = ""
 		} else {
-			rest.Error(w, "No Access to Device", http.StatusForbidden)
+			utils.RestErrorWrapper(w, "No Access to Device", http.StatusForbidden)
 			return
 		}
 	}
 
 	isValidNick, err := regexp.MatchString(DeviceNickRule, newDevice.Nick)
 	if err != nil {
-		rest.Error(w, "Error Validating Device nick "+err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error Validating Device nick "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	if !isValidNick {
-		rest.Error(w, "Invalid Device Nick(Only allowed characters:[A-Za-z0-9-_+%])", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Invalid Device Nick(Only allowed characters:[A-Za-z0-9-_+%])", http.StatusBadRequest)
 		return
 	}
 
@@ -579,14 +579,14 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 	var device Device
 	mgoid, err := a.ParseDeviceIDOrNick(r.PathParam("id"))
 	if err != nil {
-		rest.Error(w, "Error Parsing Device ID or Nick:"+err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error Parsing Device ID or Nick:"+err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	authId, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in.", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in.", http.StatusForbidden)
 		return
 	}
 
@@ -594,7 +594,7 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in with a known authentication type.", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in with a known authentication type.", http.StatusForbidden)
 		return
 	}
 
@@ -610,14 +610,14 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
 	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
 	collectionAccounts := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
 
 	if collectionAccounts == nil {
-		rest.Error(w, "Error with Database (accounts) connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database (accounts) connectivity", http.StatusInternalServerError)
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -630,7 +630,7 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 		Decode(&device)
 
 	if err != nil {
-		rest.Error(w, "No Access", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
 		return
 	}
 
@@ -638,12 +638,12 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 		// XXX: fixme; needs delegation of authorization for device accessing its resources
 		// could be subscriptions, but also something else
 		if callerIsDevice && device.Prn != authId {
-			rest.Error(w, "No Access", http.StatusForbidden)
+			utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
 			return
 		}
 
 		if callerIsUser && device.Owner != authId {
-			rest.Error(w, "No Access", http.StatusForbidden)
+			utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
 			return
 		}
 	} else if authId != device.Prn && authId != device.Owner {
@@ -666,7 +666,7 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 				Decode(&ownerAccount)
 
 			if err != nil {
-				rest.Error(w, "Owner account not Found", http.StatusInternalServerError)
+				utils.RestErrorWrapper(w, "Owner account not Found", http.StatusInternalServerError)
 				return
 			}
 		}
@@ -690,7 +690,7 @@ func (a *DevicesApp) handle_getuserdevice(w rest.ResponseWriter, r *rest.Request
 	authId, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in.", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in.", http.StatusForbidden)
 		return
 	}
 
@@ -698,7 +698,7 @@ func (a *DevicesApp) handle_getuserdevice(w rest.ResponseWriter, r *rest.Request
 
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in with a known authentication type.", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in with a known authentication type.", http.StatusForbidden)
 		return
 	}
 
@@ -710,7 +710,7 @@ func (a *DevicesApp) handle_getuserdevice(w rest.ResponseWriter, r *rest.Request
 	} else if authType == "USER" {
 		callerIsUser = true
 	} else {
-		rest.Error(w, "You need to be logged in with either USER or DEVICE account type.", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in with either USER or DEVICE account type.", http.StatusForbidden)
 		return
 	}
 
@@ -729,7 +729,7 @@ func (a *DevicesApp) handle_getuserdevice(w rest.ResponseWriter, r *rest.Request
 
 		collAccounts := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
 		if collAccounts == nil {
-			rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+			utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 			return
 		}
 
@@ -741,7 +741,7 @@ func (a *DevicesApp) handle_getuserdevice(w rest.ResponseWriter, r *rest.Request
 
 		if err != nil {
 			log.Println("ERROR: error getting account by nick; will return Forbidden to cover up details from backend: " + err.Error())
-			rest.Error(w, "Forbidden", http.StatusForbidden)
+			utils.RestErrorWrapper(w, "Forbidden", http.StatusForbidden)
 			return
 		}
 	}
@@ -749,7 +749,7 @@ func (a *DevicesApp) handle_getuserdevice(w rest.ResponseWriter, r *rest.Request
 	collDevices := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
 	if collDevices == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -762,7 +762,7 @@ func (a *DevicesApp) handle_getuserdevice(w rest.ResponseWriter, r *rest.Request
 
 	if err != nil {
 		log.Println("ERROR: error getting device by nick: " + err.Error())
-		rest.Error(w, "Forbidden", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
@@ -770,12 +770,12 @@ func (a *DevicesApp) handle_getuserdevice(w rest.ResponseWriter, r *rest.Request
 		// XXX: fixme; needs delegation of authorization for device accessing its resources
 		// could be subscriptions, but also something else
 		if callerIsDevice && device.Prn != authId {
-			rest.Error(w, "No Access", http.StatusForbidden)
+			utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
 			return
 		}
 
 		if callerIsUser && device.Owner != authId {
-			rest.Error(w, "No Access", http.StatusForbidden)
+			utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
 			return
 		}
 	} else if !callerIsDevice && !callerIsUser {
@@ -799,7 +799,7 @@ func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) 
 	authId, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in.", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in.", http.StatusForbidden)
 		return
 	}
 
@@ -807,19 +807,19 @@ func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) 
 
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in with a known authentication type.", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in with a known authentication type.", http.StatusForbidden)
 		return
 	}
 
 	if authType == "DEVICE" {
-		rest.Error(w, "Devices cannot change their own public state.", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Devices cannot change their own public state.", http.StatusForbidden)
 		return
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
 	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -827,7 +827,7 @@ func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) 
 	defer cancel()
 	deviceID, err := primitive.ObjectIDFromHex(patchId)
 	if err != nil {
-		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	err = collection.FindOne(ctx, bson.M{
@@ -835,12 +835,12 @@ func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) 
 		"garbage": bson.M{"$ne": true},
 	}).Decode(&newDevice)
 	if err != nil {
-		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
 	}
 
 	if newDevice.Owner == "" || newDevice.Owner != authId {
-		rest.Error(w, "Not User Accessible Resource Id", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Not User Accessible Resource Id", http.StatusForbidden)
 		return
 	}
 
@@ -850,7 +850,7 @@ func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) 
 	err = r.DecodeJsonPayload(&patch)
 
 	if err != nil {
-		rest.Error(w, "Internal Error (decode patch)", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Internal Error (decode patch)", http.StatusInternalServerError)
 		return
 	}
 	if patch.Nick != "" {
@@ -859,11 +859,11 @@ func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) 
 	}
 	isValidNick, err := regexp.MatchString(DeviceNickRule, newDevice.Nick)
 	if err != nil {
-		rest.Error(w, "Error Validating Device nick "+err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error Validating Device nick "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	if !isValidNick {
-		rest.Error(w, "Invalid Device Nick(Only allowed characters:[A-Za-z0-9-_+%])", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Invalid Device Nick(Only allowed characters:[A-Za-z0-9-_+%])", http.StatusBadRequest)
 		return
 	}
 
@@ -878,7 +878,7 @@ func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) 
 			updateOptions,
 		)
 		if err != nil {
-			rest.Error(w, "Error updating patched device state", http.StatusForbidden)
+			utils.RestErrorWrapper(w, "Error updating patched device state", http.StatusForbidden)
 			return
 		}
 	}
@@ -893,39 +893,39 @@ func (a *DevicesApp) handle_patchdevicedata(w rest.ResponseWriter, r *rest.Reque
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 	device := Device{}
 
 	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
 	if !ok {
-		rest.Error(w, "Missing JWT_PAYLOAD", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD", http.StatusBadRequest)
 		return
 	}
 
 	var owner interface{}
 	owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
 	if !ok {
-		rest.Error(w, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
 		return
 	}
 
 	var authType interface{}
 	authType, ok = jwtPayload.(jwtgo.MapClaims)["type"]
 	if !ok {
-		rest.Error(w, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
 		return
 	}
 
 	if authType != "DEVICE" {
-		rest.Error(w, "Device data can only be updated by Device", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Device data can only be updated by Device", http.StatusBadRequest)
 		return
 	}
 
 	deviceID, err := a.ParseDeviceIDOrNick(r.PathParam("id"))
 	if err != nil {
-		rest.Error(w, "Error Parsing Device ID or Nick:"+err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error Parsing Device ID or Nick:"+err.Error(), http.StatusBadRequest)
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -935,14 +935,14 @@ func (a *DevicesApp) handle_patchdevicedata(w rest.ResponseWriter, r *rest.Reque
 		"garbage": bson.M{"$ne": true},
 	}).Decode(&device)
 	if err != nil {
-		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
 	}
 
 	data := map[string]interface{}{}
 	err = r.DecodeJsonPayload(&data)
 	if err != nil {
-		rest.Error(w, "Error parsing data: "+err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error parsing data: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	for k, v := range data {
@@ -965,11 +965,11 @@ func (a *DevicesApp) handle_patchdevicedata(w rest.ResponseWriter, r *rest.Reque
 		}},
 	)
 	if updateResult.MatchedCount == 0 {
-		rest.Error(w, "Error updating device-meta: not found", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error updating device-meta: not found", http.StatusBadRequest)
 		return
 	}
 	if err != nil {
-		rest.Error(w, "Error updating device-meta: "+err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error updating device-meta: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -985,7 +985,7 @@ func (a *DevicesApp) handle_putpublic(w rest.ResponseWriter, r *rest.Request) {
 	authId, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in.", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in.", http.StatusForbidden)
 		return
 	}
 
@@ -993,26 +993,26 @@ func (a *DevicesApp) handle_putpublic(w rest.ResponseWriter, r *rest.Request) {
 
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in with a known authentication type.", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in with a known authentication type.", http.StatusForbidden)
 		return
 	}
 
 	if authType == "DEVICE" {
-		rest.Error(w, "Devices cannot change their own public state.", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Devices cannot change their own public state.", http.StatusForbidden)
 		return
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
 	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	deviceObjectID, err := primitive.ObjectIDFromHex(putId)
 	if err != nil {
-		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	err = collection.FindOne(ctx, bson.M{
@@ -1021,12 +1021,12 @@ func (a *DevicesApp) handle_putpublic(w rest.ResponseWriter, r *rest.Request) {
 	}).Decode(&newDevice)
 
 	if err != nil {
-		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
 	}
 
 	if newDevice.Owner != "" && newDevice.Owner != authId {
-		rest.Error(w, "Not User Accessible Resource Id", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Not User Accessible Resource Id", http.StatusForbidden)
 		return
 	}
 
@@ -1044,7 +1044,7 @@ func (a *DevicesApp) handle_putpublic(w rest.ResponseWriter, r *rest.Request) {
 		updateOptions,
 	)
 	if err != nil {
-		rest.Error(w, "Error updating device public state", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Error updating device public state", http.StatusForbidden)
 		return
 	}
 
@@ -1060,7 +1060,7 @@ func (a *DevicesApp) handle_deletepublic(w rest.ResponseWriter, r *rest.Request)
 	authId, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in.", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in.", http.StatusForbidden)
 		return
 	}
 
@@ -1068,26 +1068,26 @@ func (a *DevicesApp) handle_deletepublic(w rest.ResponseWriter, r *rest.Request)
 
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in with a known authentication type.", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in with a known authentication type.", http.StatusForbidden)
 		return
 	}
 
 	if authType == "DEVICE" {
-		rest.Error(w, "Devices cannot change their own public state.", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Devices cannot change their own public state.", http.StatusForbidden)
 		return
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
 	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	deviceObjectID, err := primitive.ObjectIDFromHex(putId)
 	if err != nil {
-		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	err = collection.FindOne(ctx, bson.M{
@@ -1095,12 +1095,12 @@ func (a *DevicesApp) handle_deletepublic(w rest.ResponseWriter, r *rest.Request)
 		"garbage": bson.M{"$ne": true},
 	}).Decode(&newDevice)
 	if err != nil {
-		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
 	}
 
 	if newDevice.Owner != "" && newDevice.Owner != authId {
-		rest.Error(w, "Not User Accessible Resource Id", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Not User Accessible Resource Id", http.StatusForbidden)
 		return
 	}
 
@@ -1118,7 +1118,7 @@ func (a *DevicesApp) handle_deletepublic(w rest.ResponseWriter, r *rest.Request)
 		updateOptions,
 	)
 	if err != nil {
-		rest.Error(w, "Error updating device public state", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Error updating device public state", http.StatusForbidden)
 		return
 	}
 
@@ -1145,7 +1145,7 @@ func (a *DevicesApp) handle_getdevices(w rest.ResponseWriter, r *rest.Request) {
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
 	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -1176,7 +1176,7 @@ func (a *DevicesApp) handle_getdevices(w rest.ResponseWriter, r *rest.Request) {
 
 	cur, err := collection.Find(ctx, query, findOptions)
 	if err != nil {
-		rest.Error(w, "Error on fetching devices:"+err.Error(), http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Error on fetching devices:"+err.Error(), http.StatusForbidden)
 		return
 	}
 	defer cur.Close(ctx)
@@ -1184,7 +1184,7 @@ func (a *DevicesApp) handle_getdevices(w rest.ResponseWriter, r *rest.Request) {
 		result := Device{}
 		err := cur.Decode(&result)
 		if err != nil {
-			rest.Error(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
+			utils.RestErrorWrapper(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
 			return
 		}
 		result.UserMeta = utils.BsonUnquoteMap(&result.UserMeta)
@@ -1202,14 +1202,14 @@ func (a *DevicesApp) handle_deletedevice(w rest.ResponseWriter, r *rest.Request)
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in as a USER", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in as a USER", http.StatusForbidden)
 		return
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
 	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -1219,7 +1219,7 @@ func (a *DevicesApp) handle_deletedevice(w rest.ResponseWriter, r *rest.Request)
 	defer cancel()
 	deviceObjectID, err := primitive.ObjectIDFromHex(delId)
 	if err != nil {
-		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	err = collection.FindOne(ctx, bson.M{
@@ -1229,7 +1229,7 @@ func (a *DevicesApp) handle_deletedevice(w rest.ResponseWriter, r *rest.Request)
 	if err != nil {
 		if err != mongo.ErrNoDocuments {
 			log.Println("Error deleting device: " + err.Error())
-			rest.Error(w, "Device not found", http.StatusInternalServerError)
+			utils.RestErrorWrapper(w, "Device not found", http.StatusInternalServerError)
 			return
 		}
 
@@ -1243,7 +1243,7 @@ func (a *DevicesApp) handle_deletedevice(w rest.ResponseWriter, r *rest.Request)
 		if res.StatusCode() != 200 {
 			log.Print(res)
 			log.Print(result)
-			rest.Error(w, "Error calling GC API for Marking Device Garbage", http.StatusInternalServerError)
+			utils.RestErrorWrapper(w, "Error calling GC API for Marking Device Garbage", http.StatusInternalServerError)
 			return
 		}
 		if result.Status == 1 {
@@ -1266,7 +1266,7 @@ func MarkDeviceAsGarbage(
 	APIEndPoint := utils.GetEnv("PANTAHUB_GC_API") + "/markgarbage/device/" + deviceID
 	res, err := resty.R().Put(APIEndPoint)
 	if err != nil {
-		rest.Error(w, "internal error calling test server: "+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "internal error calling test server: "+err.Error(), http.StatusInternalServerError)
 	}
 	err = json.Unmarshal(res.Body(), &response)
 	return response, res

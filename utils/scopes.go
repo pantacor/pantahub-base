@@ -201,7 +201,7 @@ func ScopeFilter(filterScopes []Scope, handler rest.HandlerFunc) rest.HandlerFun
 								error_description="The request requires higher privileges than provided by the
 				     access token"
 								`)
-				rest.Error(w, "InSufficient Scopes", http.StatusForbidden)
+				RestErrorWrapper(w, "InSufficient Scopes", http.StatusForbidden)
 				return
 			}
 		}

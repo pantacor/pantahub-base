@@ -172,7 +172,7 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 	device, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
@@ -180,14 +180,14 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 
 	if authType != "DEVICE" {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in as a DEVICE to post new trails", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in as a DEVICE to post new trails", http.StatusForbidden)
 		return
 	}
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["owner"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "Device needs an owner", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Device needs an owner", http.StatusForbidden)
 		return
 	}
 	deviceID := prnGetId(device.(string))
@@ -196,7 +196,7 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 	newTrail := Trail{}
 	deviceObjectID, err := primitive.ObjectIDFromHex(deviceID)
 	if err != nil {
-		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	newTrail.Id = deviceObjectID
@@ -206,7 +206,7 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 	newTrail.LastTouched = newTrail.LastInSync
 	objectList, err := ProcessObjectsInState(newTrail.Owner, initialState, a)
 	if err != nil {
-		rest.Error(w, "Error processing trail objects in factory-state:"+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error processing trail objects in factory-state:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	newTrail.UsedObjects = objectList
@@ -218,7 +218,7 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 	newStep.Rev = 0
 	stateSha, err := utils.StateSha(&initialState)
 	if err != nil {
-		rest.Error(w, "Error calculating state sha"+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error calculating state sha"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	newStep.StateSha = stateSha
@@ -233,12 +233,12 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_trails")
 
 	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 	objectList, err = ProcessObjectsInState(newStep.Owner, initialState, a)
 	if err != nil {
-		rest.Error(w, "Error processing step objects in state"+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error processing step objects in state"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	newStep.UsedObjects = objectList
@@ -252,14 +252,14 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 		newTrail,
 	)
 	if err != nil {
-		rest.Error(w, "Error inserting trail into database "+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error inserting trail into database "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	collection = a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
 	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
@@ -270,7 +270,7 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 	)
 
 	if err != nil {
-		rest.Error(w, "Error inserting step into database "+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error inserting step into database "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -292,7 +292,7 @@ func (a *TrailsApp) handle_gettrails(w rest.ResponseWriter, r *rest.Request) {
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
@@ -301,7 +301,7 @@ func (a *TrailsApp) handle_gettrails(w rest.ResponseWriter, r *rest.Request) {
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_trails")
 
 	if coll == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 	ownerField := ""
@@ -322,7 +322,7 @@ func (a *TrailsApp) handle_gettrails(w rest.ResponseWriter, r *rest.Request) {
 		"garbage":  bson.M{"$ne": true},
 	}, findOptions)
 	if err != nil {
-		rest.Error(w, "Error on fetching devices:"+err.Error(), http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Error on fetching devices:"+err.Error(), http.StatusForbidden)
 		return
 	}
 	defer cur.Close(ctx)
@@ -331,7 +331,7 @@ func (a *TrailsApp) handle_gettrails(w rest.ResponseWriter, r *rest.Request) {
 		result := Trail{}
 		err := cur.Decode(&result)
 		if err != nil {
-			rest.Error(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
+			utils.RestErrorWrapper(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
 			return
 		}
 		result.FactoryState = utils.BsonUnquoteMap(&result.FactoryState)
@@ -360,7 +360,7 @@ func (a *TrailsApp) handle_gettrail(w rest.ResponseWriter, r *rest.Request) {
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
@@ -369,7 +369,7 @@ func (a *TrailsApp) handle_gettrail(w rest.ResponseWriter, r *rest.Request) {
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_trails")
 
 	if coll == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -379,13 +379,13 @@ func (a *TrailsApp) handle_gettrail(w rest.ResponseWriter, r *rest.Request) {
 	isPublic, err := a.isTrailPublic(getId)
 
 	if err != nil {
-		rest.Error(w, "Error getting public trail", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error getting public trail", http.StatusInternalServerError)
 		return
 	}
 	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
 	trailObjectID, err := primitive.ObjectIDFromHex(getId)
 	if err != nil {
-		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if isPublic {
@@ -408,7 +408,7 @@ func (a *TrailsApp) handle_gettrail(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if err != nil {
-		rest.Error(w, "No access to resource: "+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "No access to resource: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -424,7 +424,7 @@ func (a *TrailsApp) handle_gettrailpvrinfo(w rest.ResponseWriter, r *rest.Reques
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
@@ -433,7 +433,7 @@ func (a *TrailsApp) handle_gettrailpvrinfo(w rest.ResponseWriter, r *rest.Reques
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
 	if coll == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -443,13 +443,13 @@ func (a *TrailsApp) handle_gettrailpvrinfo(w rest.ResponseWriter, r *rest.Reques
 	isPublic, err := a.isTrailPublic(getId)
 
 	if err != nil {
-		rest.Error(w, "Error getting trail public", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error getting trail public", http.StatusInternalServerError)
 		return
 	}
 	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
 	trailObjectID, err := primitive.ObjectIDFromHex(getId)
 	if err != nil {
-		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	findOneOptions := options.FindOne()
@@ -475,12 +475,12 @@ func (a *TrailsApp) handle_gettrailpvrinfo(w rest.ResponseWriter, r *rest.Reques
 	}
 
 	if err == mongo.ErrNoDocuments {
-		rest.Error(w, "No access to device trail "+trailObjectID.Hex(), http.StatusForbidden)
+		utils.RestErrorWrapper(w, "No access to device trail "+trailObjectID.Hex(), http.StatusForbidden)
 		return
 	}
 
 	if err != nil {
-		rest.Error(w, "No access to resource: "+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "No access to resource: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -510,7 +510,7 @@ func (a *TrailsApp) handle_getsteppvrinfo(w rest.ResponseWriter, r *rest.Request
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
@@ -519,7 +519,7 @@ func (a *TrailsApp) handle_getsteppvrinfo(w rest.ResponseWriter, r *rest.Request
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
 	if coll == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -531,7 +531,7 @@ func (a *TrailsApp) handle_getsteppvrinfo(w rest.ResponseWriter, r *rest.Request
 	isPublic, err := a.isTrailPublic(getId)
 
 	if err != nil {
-		rest.Error(w, "Error getting trail public", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error getting trail public", http.StatusInternalServerError)
 		return
 	}
 
@@ -558,12 +558,12 @@ func (a *TrailsApp) handle_getsteppvrinfo(w rest.ResponseWriter, r *rest.Request
 	}
 
 	if err == mongo.ErrNoDocuments {
-		rest.Error(w, "No access to device step trail "+stepId, http.StatusForbidden)
+		utils.RestErrorWrapper(w, "No access to device step trail "+stepId, http.StatusForbidden)
 		return
 	}
 
 	if err != nil {
-		rest.Error(w, "No access to resource: "+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "No access to resource: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -638,7 +638,7 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 		owner, ok = r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 		if !ok {
 			// XXX: find right error
-			rest.Error(w, "You need to be logged in as user or device", http.StatusForbidden)
+			utils.RestErrorWrapper(w, "You need to be logged in as user or device", http.StatusForbidden)
 			return
 		}
 	}
@@ -648,7 +648,7 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 	collTrails := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_trails")
 
 	if collTrails == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -659,7 +659,7 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 	defer cancel()
 	trailObjectID, err := primitive.ObjectIDFromHex(trailId)
 	if err != nil {
-		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -669,24 +669,24 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 			"garbage": bson.M{"$ne": true},
 		}).Decode(&trail)
 	} else {
-		rest.Error(w, "Need to be logged in as USER to post trail steps", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Need to be logged in as USER to post trail steps", http.StatusForbidden)
 		return
 	}
 
 	if err != nil {
-		rest.Error(w, "No resource access possible", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "No resource access possible", http.StatusInternalServerError)
 		return
 	}
 
 	if trail.Owner != owner {
-		rest.Error(w, "No access", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "No access", http.StatusForbidden)
 		return
 	}
 
 	collSteps := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
 	if collSteps == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -697,7 +697,7 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 	if newStep.Rev == -1 {
 		trailObjectID, err := primitive.ObjectIDFromHex(trailId)
 		if err != nil {
-			rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+			utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		newStep.Rev, err = a.get_latest_steprev(trailObjectID)
@@ -705,7 +705,7 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if err != nil {
-		rest.Error(w, "Error auto appending step 1 "+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error auto appending step 1 "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -719,7 +719,7 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 
 	if err != nil {
 		// XXX: figure how to be better on error cases here...
-		rest.Error(w, "No access to resource or bad step rev", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "No access to resource or bad step rev", http.StatusInternalServerError)
 		return
 	}
 
@@ -739,13 +739,13 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 	newStep.StateSha, err = utils.StateSha(&newStep.State)
 
 	if err != nil {
-		rest.Error(w, "Error calculating Sha "+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error calculating Sha "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	objectList, err := ProcessObjectsInState(newStep.Owner, newStep.State, a)
 	if err != nil {
-		rest.Error(w, "Error processing step objects in state:"+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error processing step objects in state:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	newStep.UsedObjects = objectList
@@ -764,7 +764,7 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 
 	if err != nil {
 		// XXX: figure how to be better on error cases here...
-		rest.Error(w, "No access to resource or bad step rev1 "+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "No access to resource or bad step rev1 "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
@@ -780,7 +780,7 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 		}},
 	)
 	if updateResult.MatchedCount == 0 {
-		rest.Error(w, "Trail not found", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Trail not found", http.StatusBadRequest)
 		return
 	}
 	if err != nil {
@@ -809,7 +809,7 @@ func (a *TrailsApp) handle_getsteps(w rest.ResponseWriter, r *rest.Request) {
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
@@ -818,7 +818,7 @@ func (a *TrailsApp) handle_getsteps(w rest.ResponseWriter, r *rest.Request) {
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
 	if coll == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -830,12 +830,12 @@ func (a *TrailsApp) handle_getsteps(w rest.ResponseWriter, r *rest.Request) {
 	isPublic, err := a.isTrailPublic(trailId)
 
 	if err != nil {
-		rest.Error(w, "Error getting trail public", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error getting trail public", http.StatusInternalServerError)
 		return
 	}
 	trailObjectID, err := primitive.ObjectIDFromHex(trailId)
 	if err != nil {
-		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if isPublic {
@@ -883,7 +883,7 @@ func (a *TrailsApp) handle_getsteps(w rest.ResponseWriter, r *rest.Request) {
 	defer cancel()
 	cur, err := coll.Find(ctx, query, findOptions)
 	if err != nil {
-		rest.Error(w, "Error on fetching steps:"+err.Error(), http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Error on fetching steps:"+err.Error(), http.StatusForbidden)
 		return
 	}
 	defer cur.Close(ctx)
@@ -892,7 +892,7 @@ func (a *TrailsApp) handle_getsteps(w rest.ResponseWriter, r *rest.Request) {
 		result := Step{}
 		err := cur.Decode(&result)
 		if err != nil {
-			rest.Error(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
+			utils.RestErrorWrapper(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
 			return
 		}
 		result.Meta = utils.BsonUnquoteMap(&result.Meta)
@@ -915,7 +915,7 @@ func (a *TrailsApp) handle_getstep(w rest.ResponseWriter, r *rest.Request) {
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
@@ -926,13 +926,13 @@ func (a *TrailsApp) handle_getstep(w rest.ResponseWriter, r *rest.Request) {
 	isPublic, err := a.isTrailPublic(trailId)
 
 	if err != nil {
-		rest.Error(w, "Error getting trail public", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error getting trail public", http.StatusInternalServerError)
 	}
 
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
 	if coll == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -958,12 +958,12 @@ func (a *TrailsApp) handle_getstep(w rest.ResponseWriter, r *rest.Request) {
 			"garbage": bson.M{"$ne": true},
 		}).Decode(&step)
 	} else {
-		rest.Error(w, "No Access to step", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "No Access to step", http.StatusForbidden)
 		return
 	}
 
 	if err != nil {
-		rest.Error(w, "No access", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "No access", http.StatusInternalServerError)
 		return
 	}
 
@@ -986,7 +986,7 @@ func (a *TrailsApp) handle_getstepmeta(w rest.ResponseWriter, r *rest.Request) {
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
@@ -995,7 +995,7 @@ func (a *TrailsApp) handle_getstepmeta(w rest.ResponseWriter, r *rest.Request) {
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
 	if coll == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -1006,7 +1006,7 @@ func (a *TrailsApp) handle_getstepmeta(w rest.ResponseWriter, r *rest.Request) {
 	isPublic, err := a.isTrailPublic(trailId)
 
 	if err != nil {
-		rest.Error(w, "Error getting trail public", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error getting trail public", http.StatusInternalServerError)
 		return
 	}
 
@@ -1050,7 +1050,7 @@ func (a *TrailsApp) handle_getstepstate(w rest.ResponseWriter, r *rest.Request) 
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
@@ -1059,7 +1059,7 @@ func (a *TrailsApp) handle_getstepstate(w rest.ResponseWriter, r *rest.Request) 
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
 	if coll == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -1071,7 +1071,7 @@ func (a *TrailsApp) handle_getstepstate(w rest.ResponseWriter, r *rest.Request) 
 	isPublic, err := a.isTrailPublic(trailId)
 
 	if err != nil {
-		rest.Error(w, "Error getting trail public", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error getting trail public", http.StatusInternalServerError)
 		return
 	}
 
@@ -1103,7 +1103,7 @@ func (a *TrailsApp) handle_getstepsobjects(w rest.ResponseWriter, r *rest.Reques
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
@@ -1112,7 +1112,7 @@ func (a *TrailsApp) handle_getstepsobjects(w rest.ResponseWriter, r *rest.Reques
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
 	if coll == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -1124,7 +1124,7 @@ func (a *TrailsApp) handle_getstepsobjects(w rest.ResponseWriter, r *rest.Reques
 	isPublic, err := a.isTrailPublic(trailId)
 
 	if err != nil {
-		rest.Error(w, "Error getting trail public", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error getting trail public", http.StatusInternalServerError)
 		return
 	}
 	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
@@ -1168,14 +1168,14 @@ func (a *TrailsApp) handle_getstepsobjects(w rest.ResponseWriter, r *rest.Reques
 		collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 
 		if collection == nil {
-			rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+			utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 			return
 		}
 
 		callingPrincipalStr, ok := owner.(string)
 		if !ok {
 			// XXX: find right error
-			rest.Error(w, "Invalid Access", http.StatusForbidden)
+			utils.RestErrorWrapper(w, "Invalid Access", http.StatusForbidden)
 			return
 		}
 
@@ -1183,7 +1183,7 @@ func (a *TrailsApp) handle_getstepsobjects(w rest.ResponseWriter, r *rest.Reques
 		sha, err := utils.DecodeSha256HexString(objID)
 
 		if err != nil {
-			rest.Error(w, "Get Steps Object id must be a valid sha256", http.StatusBadRequest)
+			utils.RestErrorWrapper(w, "Get Steps Object id must be a valid sha256", http.StatusBadRequest)
 			return
 		}
 
@@ -1198,12 +1198,12 @@ func (a *TrailsApp) handle_getstepsobjects(w rest.ResponseWriter, r *rest.Reques
 		}).Decode(&newObject)
 
 		if err != nil {
-			rest.Error(w, "Not Accessible Resource Id: "+storageId+" ERR: "+err.Error(), http.StatusForbidden)
+			utils.RestErrorWrapper(w, "Not Accessible Resource Id: "+storageId+" ERR: "+err.Error(), http.StatusForbidden)
 			return
 		}
 
 		if newObject.Owner != step.Owner {
-			rest.Error(w, "Invalid Object Access", http.StatusForbidden)
+			utils.RestErrorWrapper(w, "Invalid Object Access", http.StatusForbidden)
 			return
 		}
 
@@ -1221,7 +1221,7 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
@@ -1230,7 +1230,7 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
 	if coll == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -1240,7 +1240,7 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 	rev := r.PathParam("rev")
 
 	if authType != "DEVICE" && authType != "USER" {
-		rest.Error(w, "Unknown AuthType", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Unknown AuthType", http.StatusBadRequest)
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -1251,15 +1251,15 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 	}).
 		Decode(&step)
 	if err != nil {
-		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
 	}
 
 	if authType == "DEVICE" && step.Device != owner {
-		rest.Error(w, "No access for device", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "No access for device", http.StatusForbidden)
 		return
 	} else if authType == "USER" && step.Owner != owner {
-		rest.Error(w, "No access for user", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "No access for user", http.StatusForbidden)
 		return
 	}
 
@@ -1271,14 +1271,14 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 
 	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
 	sha, err := utils.DecodeSha256HexString(newObject.Sha)
 
 	if err != nil {
-		rest.Error(w, "Post Steps Object id must be a valid sha256", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Post Steps Object id must be a valid sha256", http.StatusBadRequest)
 		return
 	}
 
@@ -1292,7 +1292,7 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 
 	if err != nil {
 		log.Println("Error to calc diskquota: " + err.Error())
-		rest.Error(w, "Error posting object", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error posting object", http.StatusInternalServerError)
 		return
 	}
 
@@ -1300,12 +1300,12 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 
 	if err != nil {
 		log.Println("Error get diskquota setting: " + err.Error())
-		rest.Error(w, "Error to calc quota", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error to calc quota", http.StatusInternalServerError)
 		return
 	}
 
 	if result.Total > quota {
-		rest.Error(w, "Quota exceeded; delete some objects or request a quota bump from team@pantahub.com",
+		utils.RestErrorWrapper(w, "Quota exceeded; delete some objects or request a quota bump from team@pantahub.com",
 			http.StatusPreconditionFailed)
 	}
 
@@ -1362,7 +1362,7 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
@@ -1371,7 +1371,7 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
 	if coll == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -1381,7 +1381,7 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 	putId := r.PathParam("obj")
 
 	if authType != "DEVICE" && authType != "USER" {
-		rest.Error(w, "Unknown AuthType", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Unknown AuthType", http.StatusBadRequest)
 		return
 	}
 
@@ -1392,15 +1392,15 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 		"garbage": bson.M{"$ne": true},
 	}).Decode(&step)
 	if err != nil {
-		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
 	}
 
 	if authType == "DEVICE" && step.Device != owner {
-		rest.Error(w, "No access for device", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "No access for device", http.StatusForbidden)
 		return
 	} else if authType == "USER" && step.Owner != owner {
-		rest.Error(w, "No access for user", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "No access for user", http.StatusForbidden)
 		return
 	}
 
@@ -1408,14 +1408,14 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 
 	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
 	sha, err := utils.DecodeSha256HexString(putId)
 
 	if err != nil {
-		rest.Error(w, "Put Trails Steps Object id must be a valid sha256", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Put Trails Steps Object id must be a valid sha256", http.StatusBadRequest)
 		return
 	}
 
@@ -1429,12 +1429,12 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 	}).Decode(&newObject)
 
 	if err != nil {
-		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
 	}
 
 	if newObject.Owner != step.Owner {
-		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
 	}
 
@@ -1444,15 +1444,15 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 	r.DecodeJsonPayload(&newObject)
 
 	if newObject.Id != nId {
-		rest.Error(w, "Illegal Call Parameter Id", http.StatusConflict)
+		utils.RestErrorWrapper(w, "Illegal Call Parameter Id", http.StatusConflict)
 		return
 	}
 	if newObject.Owner != nOwner {
-		rest.Error(w, "Illegal Call Parameter Owner", http.StatusConflict)
+		utils.RestErrorWrapper(w, "Illegal Call Parameter Owner", http.StatusConflict)
 		return
 	}
 	if newObject.StorageId != nStorageId {
-		rest.Error(w, "Illegal Call Parameter StorageId", http.StatusConflict)
+		utils.RestErrorWrapper(w, "Illegal Call Parameter StorageId", http.StatusConflict)
 		return
 	}
 
@@ -1461,7 +1461,7 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 
 	if err != nil {
 		log.Println("Error to calc diskquota: " + err.Error())
-		rest.Error(w, "Error posting object", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error posting object", http.StatusInternalServerError)
 		return
 	}
 
@@ -1469,12 +1469,12 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 
 	if err != nil {
 		log.Println("Error get diskquota setting: " + err.Error())
-		rest.Error(w, "Error to calc quota", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error to calc quota", http.StatusInternalServerError)
 		return
 	}
 
 	if result.Total > quota {
-		rest.Error(w, "Quota exceeded; delete some objects or request a quota bump from team@pantahub.com",
+		utils.RestErrorWrapper(w, "Quota exceeded; delete some objects or request a quota bump from team@pantahub.com",
 			http.StatusPreconditionFailed)
 	}
 
@@ -1506,7 +1506,7 @@ func (a *TrailsApp) handle_getstepsobject(w rest.ResponseWriter, r *rest.Request
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
@@ -1515,7 +1515,7 @@ func (a *TrailsApp) handle_getstepsobject(w rest.ResponseWriter, r *rest.Request
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
 	if coll == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -1527,7 +1527,7 @@ func (a *TrailsApp) handle_getstepsobject(w rest.ResponseWriter, r *rest.Request
 
 	isPublic, err := a.isTrailPublic(trailId)
 	if err != nil {
-		rest.Error(w, "Error getting traitrailsIdl public", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error getting traitrailsIdl public", http.StatusInternalServerError)
 		return
 	}
 	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
@@ -1551,7 +1551,7 @@ func (a *TrailsApp) handle_getstepsobject(w rest.ResponseWriter, r *rest.Request
 		}).Decode(&step)
 	}
 	if err != nil {
-		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
 	}
 
@@ -1574,14 +1574,14 @@ func (a *TrailsApp) handle_getstepsobject(w rest.ResponseWriter, r *rest.Request
 		collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 
 		if collection == nil {
-			rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+			utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 			return
 		}
 
 		callingPrincipalStr, ok := owner.(string)
 		if !ok {
 			// XXX: find right error
-			rest.Error(w, "Invalid Access", http.StatusForbidden)
+			utils.RestErrorWrapper(w, "Invalid Access", http.StatusForbidden)
 			return
 		}
 
@@ -1594,7 +1594,7 @@ func (a *TrailsApp) handle_getstepsobject(w rest.ResponseWriter, r *rest.Request
 		sha, err := utils.DecodeSha256HexString(objId)
 
 		if err != nil {
-			rest.Error(w, "Get Trails Steps Object id must be a valid sha256", http.StatusBadRequest)
+			utils.RestErrorWrapper(w, "Get Trails Steps Object id must be a valid sha256", http.StatusBadRequest)
 			return
 		}
 
@@ -1610,12 +1610,12 @@ func (a *TrailsApp) handle_getstepsobject(w rest.ResponseWriter, r *rest.Request
 			Decode(&newObject)
 
 		if err != nil {
-			rest.Error(w, "Not Accessible Resource Id: "+storageId+" ERR: "+err.Error(), http.StatusForbidden)
+			utils.RestErrorWrapper(w, "Not Accessible Resource Id: "+storageId+" ERR: "+err.Error(), http.StatusForbidden)
 			return
 		}
 
 		if newObject.Owner != step.Owner {
-			rest.Error(w, "Invalid Object Access ("+newObject.Owner+":"+step.Owner+")", http.StatusForbidden)
+			utils.RestErrorWrapper(w, "Invalid Object Access ("+newObject.Owner+":"+step.Owner+")", http.StatusForbidden)
 			return
 		}
 
@@ -1630,7 +1630,7 @@ func (a *TrailsApp) handle_getstepsobject(w rest.ResponseWriter, r *rest.Request
 	if objWithAccess != nil {
 		w.WriteJson(&objWithAccess)
 	} else {
-		rest.Error(w, "Invalid Object", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Invalid Object", http.StatusForbidden)
 	}
 }
 
@@ -1639,7 +1639,7 @@ func (a *TrailsApp) handle_getstepsobjectfile(w rest.ResponseWriter, r *rest.Req
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
@@ -1648,7 +1648,7 @@ func (a *TrailsApp) handle_getstepsobjectfile(w rest.ResponseWriter, r *rest.Req
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
 	if coll == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -1661,7 +1661,7 @@ func (a *TrailsApp) handle_getstepsobjectfile(w rest.ResponseWriter, r *rest.Req
 	isPublic, err := a.isTrailPublic(trailId)
 
 	if err != nil {
-		rest.Error(w, "Error getting trail public", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error getting trail public", http.StatusInternalServerError)
 		return
 	}
 	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
@@ -1684,7 +1684,7 @@ func (a *TrailsApp) handle_getstepsobjectfile(w rest.ResponseWriter, r *rest.Req
 		}).Decode(&step)
 	}
 	if err != nil {
-		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
 	}
 
@@ -1707,14 +1707,14 @@ func (a *TrailsApp) handle_getstepsobjectfile(w rest.ResponseWriter, r *rest.Req
 		collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 
 		if collection == nil {
-			rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+			utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 			return
 		}
 
 		callingPrincipalStr, ok := owner.(string)
 		if !ok {
 			// XXX: find right error
-			rest.Error(w, "Invalid Access", http.StatusForbidden)
+			utils.RestErrorWrapper(w, "Invalid Access", http.StatusForbidden)
 			return
 		}
 
@@ -1727,7 +1727,7 @@ func (a *TrailsApp) handle_getstepsobjectfile(w rest.ResponseWriter, r *rest.Req
 		sha, err := utils.DecodeSha256HexString(objId)
 
 		if err != nil {
-			rest.Error(w, "Get Trails Steps Object File by ID must be a valid sha256", http.StatusBadRequest)
+			utils.RestErrorWrapper(w, "Get Trails Steps Object File by ID must be a valid sha256", http.StatusBadRequest)
 			return
 		}
 
@@ -1742,12 +1742,12 @@ func (a *TrailsApp) handle_getstepsobjectfile(w rest.ResponseWriter, r *rest.Req
 		}).Decode(&newObject)
 
 		if err != nil {
-			rest.Error(w, "Not Accessible Resource Id: "+storageId+" ERR: "+err.Error(), http.StatusForbidden)
+			utils.RestErrorWrapper(w, "Not Accessible Resource Id: "+storageId+" ERR: "+err.Error(), http.StatusForbidden)
 			return
 		}
 
 		if newObject.Owner != step.Owner {
-			rest.Error(w, "Invalid Object Access", http.StatusForbidden)
+			utils.RestErrorWrapper(w, "Invalid Object Access", http.StatusForbidden)
 			return
 		}
 
@@ -1760,7 +1760,7 @@ func (a *TrailsApp) handle_getstepsobjectfile(w rest.ResponseWriter, r *rest.Req
 	}
 
 	if objWithAccess == nil {
-		rest.Error(w, "Invalid Object", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Invalid Object", http.StatusForbidden)
 		return
 	}
 
@@ -1780,7 +1780,7 @@ func (a *TrailsApp) handle_putstepstate(w rest.ResponseWriter, r *rest.Request) 
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
@@ -1788,7 +1788,7 @@ func (a *TrailsApp) handle_putstepstate(w rest.ResponseWriter, r *rest.Request) 
 
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 	if coll == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -1797,7 +1797,7 @@ func (a *TrailsApp) handle_putstepstate(w rest.ResponseWriter, r *rest.Request) 
 	rev := r.PathParam("rev")
 
 	if authType != "USER" {
-		rest.Error(w, "Need to be logged in as USER to put step state", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Need to be logged in as USER to put step state", http.StatusForbidden)
 		return
 	}
 
@@ -1810,18 +1810,18 @@ func (a *TrailsApp) handle_putstepstate(w rest.ResponseWriter, r *rest.Request) 
 	}).Decode(&step)
 
 	if err != nil {
-		rest.Error(w, "Error with accessing data: "+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with accessing data: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	if step.Owner != owner {
-		rest.Error(w, "No write access to step state", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "No write access to step state", http.StatusForbidden)
 	}
 
 	stateMap := map[string]interface{}{}
 	err = r.DecodeJsonPayload(&stateMap)
 	if err != nil {
-		rest.Error(w, "Error with request: "+err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error with request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -1833,7 +1833,7 @@ func (a *TrailsApp) handle_putstepstate(w rest.ResponseWriter, r *rest.Request) 
 
 	objectList, err := ProcessObjectsInState(step.Owner, stateMap, a)
 	if err != nil {
-		rest.Error(w, "Error processing step objects in state:"+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error processing step objects in state:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	step.UsedObjects = objectList
@@ -1852,12 +1852,12 @@ func (a *TrailsApp) handle_putstepstate(w rest.ResponseWriter, r *rest.Request) 
 		bson.M{"$set": step},
 	)
 	if updateResult.MatchedCount == 0 {
-		rest.Error(w, "Error updating step state: not found", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error updating step state: not found", http.StatusBadRequest)
 		return
 	}
 
 	if err != nil {
-		rest.Error(w, "Error updating step state: "+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error updating step state: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -1876,7 +1876,7 @@ func (a *TrailsApp) handle_putstepmeta(w rest.ResponseWriter, r *rest.Request) {
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
@@ -1884,7 +1884,7 @@ func (a *TrailsApp) handle_putstepmeta(w rest.ResponseWriter, r *rest.Request) {
 
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 	if coll == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -1893,7 +1893,7 @@ func (a *TrailsApp) handle_putstepmeta(w rest.ResponseWriter, r *rest.Request) {
 	rev := r.PathParam("rev")
 
 	if authType != "USER" {
-		rest.Error(w, "Need to be logged in as USER to put step meta", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Need to be logged in as USER to put step meta", http.StatusForbidden)
 		return
 	}
 
@@ -1905,18 +1905,18 @@ func (a *TrailsApp) handle_putstepmeta(w rest.ResponseWriter, r *rest.Request) {
 	}).Decode(&step)
 
 	if err != nil {
-		rest.Error(w, "Error with accessing data: "+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with accessing data: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	if step.Owner != owner {
-		rest.Error(w, "No write access to step meta", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "No write access to step meta", http.StatusForbidden)
 	}
 
 	metaMap := map[string]interface{}{}
 	err = r.DecodeJsonPayload(&metaMap)
 	if err != nil {
-		rest.Error(w, "Error with request: "+err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error with request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -1934,12 +1934,12 @@ func (a *TrailsApp) handle_putstepmeta(w rest.ResponseWriter, r *rest.Request) {
 		bson.M{"$set": step},
 	)
 	if updateResult.MatchedCount == 0 {
-		rest.Error(w, "Error updating step meta: not found", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error updating step meta: not found", http.StatusBadRequest)
 		return
 	}
 
 	if err != nil {
-		rest.Error(w, "Error updating step meta: "+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error updating step meta: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -1966,7 +1966,7 @@ func (a *TrailsApp) handle_putstepprogress(w rest.ResponseWriter, r *rest.Reques
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
@@ -1975,19 +1975,19 @@ func (a *TrailsApp) handle_putstepprogress(w rest.ResponseWriter, r *rest.Reques
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
 	if coll == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
 	collTrails := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_trails")
 
 	if collTrails == nil {
-		rest.Error(w, "Error with Database connectivity - trails", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity - trails", http.StatusInternalServerError)
 		return
 	}
 
 	if authType != "DEVICE" {
-		rest.Error(w, "Only devices can update step status", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Only devices can update step status", http.StatusForbidden)
 		return
 	}
 
@@ -2007,19 +2007,19 @@ func (a *TrailsApp) handle_putstepprogress(w rest.ResponseWriter, r *rest.Reques
 		}},
 	)
 	if updateResult.MatchedCount == 0 {
-		rest.Error(w, "Error updating trail: not found", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error updating trail: not found", http.StatusBadRequest)
 		return
 	}
 
 	if err != nil {
-		rest.Error(w, "Cannot update step progress "+err.Error(), http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Cannot update step progress "+err.Error(), http.StatusForbidden)
 		return
 	}
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	trailObjectID, err := primitive.ObjectIDFromHex(trailId)
 	if err != nil {
-		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	updateResult, err = collTrails.UpdateOne(
@@ -2031,7 +2031,7 @@ func (a *TrailsApp) handle_putstepprogress(w rest.ResponseWriter, r *rest.Reques
 		bson.M{"$set": bson.M{"last-touched": progressTime}},
 	)
 	if updateResult.MatchedCount == 0 {
-		rest.Error(w, "Error updating trail: not found", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error updating trail: not found", http.StatusBadRequest)
 		return
 	}
 
@@ -2058,28 +2058,28 @@ func (a *TrailsApp) handle_gettrailstepsummary(w rest.ResponseWriter, r *rest.Re
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
 	summaryCol := a.mongoClient.Database("pantabase_devicesummary").Collection("device_summary_short_new_v2")
 
 	if summaryCol == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	if authType != "USER" {
-		rest.Error(w, "Need to be logged in as USER to get trail summary", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Need to be logged in as USER to get trail summary", http.StatusForbidden)
 		return
 	}
 
 	trailId := r.PathParam("id")
 
 	if trailId == "" {
-		rest.Error(w, "need to specify a device id", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "need to specify a device id", http.StatusForbidden)
 		return
 	}
 
@@ -2098,7 +2098,7 @@ func (a *TrailsApp) handle_gettrailstepsummary(w rest.ResponseWriter, r *rest.Re
 	err := summaryCol.FindOne(ctx, query).Decode(&summary)
 
 	if err != nil {
-		rest.Error(w, "error finding new trailId", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "error finding new trailId", http.StatusForbidden)
 		return
 	}
 
@@ -2120,21 +2120,21 @@ func (a *TrailsApp) handle_gettrailsummary(w rest.ResponseWriter, r *rest.Reques
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
 	summaryCol := a.mongoClient.Database("pantabase_devicesummary").Collection("device_summary_short_new_v2")
 
 	if summaryCol == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
 	if authType != "USER" {
-		rest.Error(w, "Need to be logged in as USER to get trail summary", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Need to be logged in as USER to get trail summary", http.StatusForbidden)
 		return
 	}
 
@@ -2149,7 +2149,7 @@ func (a *TrailsApp) handle_gettrailsummary(w rest.ResponseWriter, r *rest.Reques
 	if filterParam != "" {
 		err := json.Unmarshal([]byte(filterParam), &m)
 		if err != nil {
-			rest.Error(w, "Illegal Filter "+err.Error(), http.StatusBadRequest)
+			utils.RestErrorWrapper(w, "Illegal Filter "+err.Error(), http.StatusBadRequest)
 			return
 		}
 	}
@@ -2173,7 +2173,7 @@ func (a *TrailsApp) handle_gettrailsummary(w rest.ResponseWriter, r *rest.Reques
 	defer cancel()
 	cur, err := summaryCol.Find(ctx, m, findOptions)
 	if err != nil {
-		rest.Error(w, "Error on fetching summaries:"+err.Error(), http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Error on fetching summaries:"+err.Error(), http.StatusForbidden)
 		return
 	}
 	defer cur.Close(ctx)
@@ -2181,7 +2181,7 @@ func (a *TrailsApp) handle_gettrailsummary(w rest.ResponseWriter, r *rest.Reques
 		result := TrailSummary{}
 		err := cur.Decode(&result)
 		if err != nil {
-			rest.Error(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
+			utils.RestErrorWrapper(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
 			return
 		}
 		summaries = append(summaries, result)

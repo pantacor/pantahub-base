@@ -38,7 +38,7 @@ func (s *SubscriptionsApp) get(w rest.ResponseWriter, r *rest.Request) {
 
 	if authInfo == nil {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
@@ -47,7 +47,7 @@ func (s *SubscriptionsApp) get(w rest.ResponseWriter, r *rest.Request) {
 		errID := bson.NewObjectId()
 		log.Printf("ERROR (%s): processing list subscription request for user %s: %s\n",
 			errID.Hex(), authInfo.Caller, err.Error())
-		rest.Error(w, "Error processing request ("+errID.Hex()+")", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error processing request ("+errID.Hex()+")", http.StatusInternalServerError)
 		return
 	}
 
@@ -74,7 +74,7 @@ func (s *SubscriptionsApp) get(w rest.ResponseWriter, r *rest.Request) {
 			errID := bson.NewObjectId()
 			log.Printf("ERROR (%s): processing list subscription request for user %s: %s\n",
 				errID.Hex(), authInfo.Caller, err.Error())
-			rest.Error(w, "Error processing request ("+errID.Hex()+")", http.StatusInternalServerError)
+			utils.RestErrorWrapper(w, "Error processing request ("+errID.Hex()+")", http.StatusInternalServerError)
 			return
 		}
 
@@ -82,7 +82,7 @@ func (s *SubscriptionsApp) get(w rest.ResponseWriter, r *rest.Request) {
 		if err != nil {
 			errID := bson.NewObjectId()
 			log.Printf("ERROR (%s): writing JSON response: %s ", errID.Hex(), err.Error())
-			rest.Error(w, "Error processing request ("+errID.Hex()+")", http.StatusInternalServerError)
+			utils.RestErrorWrapper(w, "Error processing request ("+errID.Hex()+")", http.StatusInternalServerError)
 			return
 		}
 		return
@@ -92,7 +92,7 @@ func (s *SubscriptionsApp) get(w rest.ResponseWriter, r *rest.Request) {
 	errID := bson.NewObjectId()
 	log.Printf("WARNING (%s): DEVICE/SERVICE  %s is using unsupported api method 'list subscriptios'\n",
 		errID.Hex(), authInfo.Caller)
-	rest.Error(w, "NOT IMPLEMENTED ("+errID.Hex()+")", http.StatusNotImplemented)
+	utils.RestErrorWrapper(w, "NOT IMPLEMENTED ("+errID.Hex()+")", http.StatusNotImplemented)
 	return
 
 }
@@ -103,12 +103,12 @@ func (s *SubscriptionsApp) put(w rest.ResponseWriter, r *rest.Request) {
 
 	if authInfo == nil {
 		// XXX: find right error
-		rest.Error(w, "You need to be logged in", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
 
 	if !s.service.IsAdmin(authInfo.Caller) {
-		rest.Error(w, "You need to have admin role for subscriptin service", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "You need to have admin role for subscriptin service", http.StatusForbidden)
 		return
 	}
 
@@ -119,7 +119,7 @@ func (s *SubscriptionsApp) put(w rest.ResponseWriter, r *rest.Request) {
 		errID := bson.NewObjectId()
 		log.Printf("ERROR (%s): error parsing form 'post subscriptions' by user %s: %s'\n",
 			errID.Hex(), authInfo.Caller, err.Error())
-		rest.Error(w, "NOT IMPLEMENTED ("+errID.Hex()+")", http.StatusNotImplemented)
+		utils.RestErrorWrapper(w, "NOT IMPLEMENTED ("+errID.Hex()+")", http.StatusNotImplemented)
 		return
 	}
 
@@ -131,7 +131,7 @@ func (s *SubscriptionsApp) put(w rest.ResponseWriter, r *rest.Request) {
 		errID := bson.NewObjectId()
 		log.Printf("WARNING (%s): error parsing body as json in 'post subscriptions' by user %s: %s'\n",
 			errID.Hex(), authInfo.Caller, err.Error())
-		rest.Error(w, "BAD REQUEST RECEIVED ("+errID.Hex()+")", http.StatusPreconditionFailed)
+		utils.RestErrorWrapper(w, "BAD REQUEST RECEIVED ("+errID.Hex()+")", http.StatusPreconditionFailed)
 		return
 	}
 
@@ -142,7 +142,7 @@ func (s *SubscriptionsApp) put(w rest.ResponseWriter, r *rest.Request) {
 		errID := bson.NewObjectId()
 		log.Printf("ERROR (%s): error using database in 'post subscriptions' by user %s: %s'\n",
 			errID.Hex(), authInfo.Caller, err.Error())
-		rest.Error(w, "INTERNAL ERROR ("+errID.Hex()+")", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "INTERNAL ERROR ("+errID.Hex()+")", http.StatusInternalServerError)
 		return
 	}
 
@@ -157,7 +157,7 @@ func (s *SubscriptionsApp) put(w rest.ResponseWriter, r *rest.Request) {
 		errID := bson.NewObjectId()
 		log.Printf("ERROR (%s): error updating plan and attrs in 'post subscriptions' by user %s: %s'\n",
 			errID.Hex(), authInfo.Caller, err.Error())
-		rest.Error(w, "INTERNAL ERROR ("+errID.Hex()+")", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "INTERNAL ERROR ("+errID.Hex()+")", http.StatusInternalServerError)
 		return
 	}
 	return

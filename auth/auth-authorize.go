@@ -53,7 +53,7 @@ type implicitTokenRequest struct {
 	RedirectURI string `json:"redirect_uri"`
 }
 
-func (app *AuthApp) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Request) {
+func (app *App) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Request) {
 	var err error
 
 	// this is the claim of the service authenticating itself
@@ -61,12 +61,12 @@ func (app *AuthApp) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Requ
 	callerType := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"].(string)
 
 	if caller == "" {
-		rest.Error(w, "must be authenticated as user", http.StatusUnauthorized)
+		utils.RestErrorWrapper(w, "must be authenticated as user", http.StatusUnauthorized)
 		return
 	}
 
 	if callerType != "USER" {
-		rest.Error(w, "only USER's can request implicit access tokens", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "only USER's can request implicit access tokens", http.StatusForbidden)
 		return
 	}
 
@@ -74,28 +74,28 @@ func (app *AuthApp) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Requ
 	err = r.DecodeJsonPayload(&req)
 
 	if err != nil {
-		rest.Error(w, "error decoding token request", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "error decoding token request", http.StatusBadRequest)
 		log.Println("WARNING: implicit access token request received with wrong request body: " + err.Error())
 		return
 	}
 
 	if req.Service == "" {
-		rest.Error(w, "implicit  access token requested with invalid service", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "implicit  access token requested with invalid service", http.StatusBadRequest)
 		return
 	}
 
 	errCode, err := app.validateScopesAndURIs("", req.Service, req.Scopes, req.RedirectURI)
 	if err != nil {
-		rest.Error(w, err.Error(), errCode)
+		utils.RestErrorWrapper(w, err.Error(), errCode)
 		return
 	}
 
-	token := jwtgo.New(jwtgo.GetSigningMethod(app.jwt_middleware.SigningAlgorithm))
+	token := jwtgo.New(jwtgo.GetSigningMethod(app.jwtMiddleware.SigningAlgorithm))
 	tokenClaims := token.Claims.(jwtgo.MapClaims)
 
 	// lets get the standard payload for a user and modify it so its a service accesstoken
-	if app.jwt_middleware.PayloadFunc != nil {
-		for key, value := range app.jwt_middleware.PayloadFunc(caller) {
+	if app.jwtMiddleware.PayloadFunc != nil {
+		for key, value := range app.jwtMiddleware.PayloadFunc(caller) {
 			tokenClaims[key] = value
 		}
 	}
@@ -105,12 +105,12 @@ func (app *AuthApp) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Requ
 	tokenClaims["aud"] = req.Service
 	tokenClaims["scopes"] = req.Scopes
 	tokenClaims["prn"] = caller
-	tokenClaims["exp"] = time.Now().Add(app.jwt_middleware.Timeout)
-	tokenString, err := token.SignedString(app.jwt_middleware.Key)
+	tokenClaims["exp"] = time.Now().Add(app.jwtMiddleware.Timeout)
+	tokenString, err := token.SignedString(app.jwtMiddleware.Key)
 
 	if err != nil {
 		log.Println("WARNING: error signing implicit access token for service / user / scopes(" + req.Service + " / " + caller + " / " + req.Scopes + ")")
-		rest.Error(w, "error signing implicit access token for service / user / scopes("+req.Service+" / "+caller+" / "+req.Scopes+")", http.StatusUnauthorized)
+		utils.RestErrorWrapper(w, "error signing implicit access token for service / user / scopes("+req.Service+" / "+caller+" / "+req.Scopes+")", http.StatusUnauthorized)
 		return
 	}
 
@@ -125,7 +125,7 @@ func (app *AuthApp) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Requ
 	collection := app.mongoClient.Database(utils.MongoDb).Collection("pantahub_oauth_accesstokens")
 
 	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 	// XXX: prototype: for production we need to prevent posting twice!!
@@ -136,14 +136,14 @@ func (app *AuthApp) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Requ
 		tokenStore,
 	)
 	if err != nil {
-		rest.Error(w, "Error inserting oauth token into database "+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error inserting oauth token into database "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	params := url.Values{}
 	params.Add("token_type", "bearer")
 	params.Add("access_token", tokenString)
-	params.Add("expires_in", fmt.Sprintf("%d", app.jwt_middleware.Timeout/time.Second))
+	params.Add("expires_in", fmt.Sprintf("%d", app.jwtMiddleware.Timeout/time.Second))
 	params.Add("scope", req.Scopes)
 	params.Add("state", req.State)
 
@@ -157,7 +157,7 @@ func (app *AuthApp) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Requ
 	w.WriteJson(response)
 }
 
-func (app *AuthApp) handlePostCode(w rest.ResponseWriter, r *rest.Request) {
+func (app *App) handlePostCode(w rest.ResponseWriter, r *rest.Request) {
 	var err error
 
 	// this is the claim of the service authenticating itself
@@ -165,12 +165,12 @@ func (app *AuthApp) handlePostCode(w rest.ResponseWriter, r *rest.Request) {
 	callerType := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"].(string)
 
 	if caller == "" {
-		rest.Error(w, "must be authenticated as user", http.StatusUnauthorized)
+		utils.RestErrorWrapper(w, "must be authenticated as user", http.StatusUnauthorized)
 		return
 	}
 
 	if callerType != "USER" {
-		rest.Error(w, "only USER's can request access codes", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "only USER's can request access codes", http.StatusForbidden)
 		return
 	}
 
@@ -179,7 +179,7 @@ func (app *AuthApp) handlePostCode(w rest.ResponseWriter, r *rest.Request) {
 
 	errCode, err := app.validateScopesAndURIs("", req.Service, req.Scopes, req.RedirectURI)
 	if err != nil {
-		rest.Error(w, err.Error(), errCode)
+		utils.RestErrorWrapper(w, err.Error(), errCode)
 		return
 	}
 
@@ -203,10 +203,10 @@ func (app *AuthApp) handlePostCode(w rest.ResponseWriter, r *rest.Request) {
 	mapClaim["exp"] = time.Now().Add(time.Minute * 5)
 
 	response := codeResponse{}
-	code := jwtgo.New(jwtgo.GetSigningMethod(app.jwt_middleware.SigningAlgorithm))
+	code := jwtgo.New(jwtgo.GetSigningMethod(app.jwtMiddleware.SigningAlgorithm))
 	code.Claims = mapClaim
 
-	response.Code, err = code.SignedString(app.jwt_middleware.Key)
+	response.Code, err = code.SignedString(app.jwtMiddleware.Key)
 	response.Scopes = req.Scopes
 
 	params := url.Values{}
@@ -225,7 +225,7 @@ func containsStringWithPrefix(slice []string, prefix string) bool {
 	return false
 }
 
-func (app *AuthApp) validateScopesAndURIs(caller, reqService, reqScopes, reqRedirectURI string) (int, error) {
+func (app *App) validateScopesAndURIs(caller, reqService, reqScopes, reqRedirectURI string) (int, error) {
 	defaultAccount := false
 	service, _, err := apps.SearchApp(caller, reqService, app.mongoClient.Database(utils.MongoDb))
 	if err != nil {
