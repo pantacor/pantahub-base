@@ -13,6 +13,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
 package accounts
 
 import (
@@ -49,6 +50,7 @@ func SetAccountIDs() {
 	client1ObjectID, _ = primitive.ObjectIDFromHex("223651236512365123650010")
 }
 
+// DefaultAccounts all hardcoded accounts for admins, devices and services
 var DefaultAccounts = map[string]Account{
 	"prn:pantahub.com:auth:/admin": Account{
 		ID:           adminObjectID,

@@ -13,6 +13,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
 package dash
 
 import (
@@ -36,17 +37,24 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-type DashApp struct {
-	jwt_middleware *jwt.JWTMiddleware
-	Api            *rest.Api
-	mongoClient    *mongo.Client
-	subService     subscriptions.SubscriptionService
+// App define a new rest application for dash
+type App struct {
+	jwtMiddleware *jwt.JWTMiddleware
+	API           *rest.Api
+	mongoClient   *mongo.Client
+	subService    subscriptions.SubscriptionService
 }
 
+// QuotaType type of quota
 type QuotaType string
+
+// QuotaValue quota value
 type QuotaValue string
+
+// PlanQuotas map with thefinitions of all plans
 type PlanQuotas map[QuotaType]QuotaValue
 
+// BillingInfo billing information, how amount to be charged, current and vat
 type BillingInfo struct {
 	Type      string
 	AmountDue float32
@@ -54,12 +62,14 @@ type BillingInfo struct {
 	VatRegion string
 }
 
+// Plan definition of a billing plan
 type Plan struct {
 	Name    string
 	Quotas  map[QuotaType]Quota
 	Billing BillingInfo
 }
 
+// Quota definition of a quota
 type Quota struct {
 	Name   QuotaType
 	Actual float64
@@ -67,14 +77,16 @@ type Quota struct {
 	Unit   string
 }
 
+// SubscriptionInfo subscription information
 type SubscriptionInfo struct {
-	PlanId     string              `json:"plan-id"`
+	PlanID     string              `json:"plan-id"`
 	Billing    BillingInfo         `json:"billing"`
 	QuotaStats map[QuotaType]Quota `json:"quota-stats"`
 }
 
+// DeviceInfo define the payload for device information
 type DeviceInfo struct {
-	DeviceId     string    `json:"device-id"`
+	DeviceID     string    `json:"device-id"`
 	Nick         string    `json:"nick"`
 	Prn          string    `json:"prn"`
 	Message      string    `json:"message"`
@@ -83,6 +95,7 @@ type DeviceInfo struct {
 	LastActivity time.Time `json:"last-activity"`
 }
 
+// Summary user dashboard summary including their top devices and subscription
 type Summary struct {
 	Prn        string           `json:"prn"`
 	Nick       string           `json:"nick"`
@@ -90,46 +103,57 @@ type Summary struct {
 	TopDevices []DeviceInfo     `json:"top-devices"`
 }
 
+// DiskQuotaUsageResult define disk usage metrics
 type DiskQuotaUsageResult struct {
-	Id    string  `json:"id" bson:"_id"`
+	ID    string  `json:"id" bson:"_id"`
 	Total float64 `json:"total"`
 }
 
 const (
-	QUOTA_OBJECTS     = QuotaType("OBJECTS")
-	QUOTA_BANDWIDTH   = QuotaType("BANDWIDTH")
-	QUOTA_DEVICES     = QuotaType("DEVICES")
-	QUOTA_BILLINGDAYS = QuotaType("BILLINGPERIOD")
+	// QuotaObjects type of quota used by objects
+	QuotaObjects = QuotaType("OBJECTS")
+
+	// QuotaBandwidth type of quota used by bandwith metrics
+	QuotaBandwidth = QuotaType("BANDWIDTH")
+
+	// QuotaDevices type of quota used by devices
+	QuotaDevices = QuotaType("DEVICES")
+
+	// QuotaBillingDays type of quota used for billing period
+	QuotaBillingDays = QuotaType("BILLINGPERIOD")
 )
 
 var (
+	// StandardBilling default billing info for standard plans
 	StandardBilling = BillingInfo{
 		Type:      "Monthly",
 		AmountDue: 0,
 		Currency:  "USD",
 		VatRegion: "World",
 	}
-	STANDARD_PLANS = map[string]Plan{
+
+	// StandardPlans define standard plans
+	StandardPlans = map[string]Plan{
 		"AlphaTester": Plan{
 			Name: "AlphaTester",
 			Quotas: map[QuotaType]Quota{
-				QUOTA_OBJECTS: Quota{
-					Name: QUOTA_OBJECTS,
+				QuotaObjects: Quota{
+					Name: QuotaObjects,
 					Max:  2,
 					Unit: "GiB",
 				},
-				QUOTA_BANDWIDTH: Quota{
-					Name: QUOTA_BANDWIDTH,
+				QuotaBandwidth: Quota{
+					Name: QuotaBandwidth,
 					Max:  2,
 					Unit: "GiB",
 				},
-				QUOTA_DEVICES: Quota{
-					Name: QUOTA_DEVICES,
+				QuotaDevices: Quota{
+					Name: QuotaDevices,
 					Max:  25,
 					Unit: "Piece",
 				},
-				QUOTA_BILLINGDAYS: Quota{
-					Name: QUOTA_BILLINGDAYS,
+				QuotaBillingDays: Quota{
+					Name: QuotaBillingDays,
 					Max:  30,
 					Unit: "Days",
 				},
@@ -144,23 +168,23 @@ var (
 		"VIP": Plan{
 			Name: "VIP",
 			Quotas: map[QuotaType]Quota{
-				QUOTA_OBJECTS: Quota{
-					Name: QUOTA_OBJECTS,
+				QuotaObjects: Quota{
+					Name: QuotaObjects,
 					Max:  25,
 					Unit: "GiB",
 				},
-				QUOTA_BANDWIDTH: Quota{
-					Name: QUOTA_BANDWIDTH,
+				QuotaBandwidth: Quota{
+					Name: QuotaBandwidth,
 					Max:  50,
 					Unit: "GiB",
 				},
-				QUOTA_DEVICES: Quota{
-					Name: QUOTA_DEVICES,
+				QuotaDevices: Quota{
+					Name: QuotaDevices,
 					Max:  100,
 					Unit: "Piece",
 				},
-				QUOTA_BILLINGDAYS: Quota{
-					Name: QUOTA_BILLINGDAYS,
+				QuotaBillingDays: Quota{
+					Name: QuotaBillingDays,
 					Max:  30,
 					Unit: "Days",
 				},
@@ -175,20 +199,21 @@ var (
 	}
 )
 
-func handle_auth(w rest.ResponseWriter, r *rest.Request) {
-	jwtClaims := r.Env["JWT_PAYLOAD"]
-	w.WriteJson(jwtClaims)
-}
-
+// ModelError error payload (code, message)
 type ModelError struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 }
 
+func handleAuth(w rest.ResponseWriter, r *rest.Request) {
+	jwtClaims := r.Env["JWT_PAYLOAD"]
+	w.WriteJson(jwtClaims)
+}
+
 func copySubToDashMap(sub subscriptions.Subscription) map[QuotaType]Quota {
 	newMap := map[QuotaType]Quota{}
 
-	deviceQuota := sub.GetProperty(string(QUOTA_DEVICES))
+	deviceQuota := sub.GetProperty(string(QuotaDevices))
 	deviceQuotaI, err := strconv.ParseFloat(deviceQuota.(string), 64)
 
 	if err != nil {
@@ -196,30 +221,30 @@ func copySubToDashMap(sub subscriptions.Subscription) map[QuotaType]Quota {
 			sub.GetPrn(), deviceQuota)
 		deviceQuotaI = 0
 	}
-	newMap[QUOTA_DEVICES] = Quota{
-		Name: QUOTA_DEVICES,
+	newMap[QuotaDevices] = Quota{
+		Name: QuotaDevices,
 		Max:  float64(deviceQuotaI),
 		Unit: "Piece",
 	}
-	objectsQuota := sub.GetProperty(string(QUOTA_OBJECTS))
+	objectsQuota := sub.GetProperty(string(QuotaObjects))
 	objectsQuotaI, err := units.ParseStrictBytes(objectsQuota.(string))
 	if err != nil {
 		objectsQuotaI = 0
 	}
 	objectsQuotaG := units.Base2Bytes(objectsQuotaI) / units.Gibibyte
-	newMap[QUOTA_OBJECTS] = Quota{
-		Name: QUOTA_OBJECTS,
+	newMap[QuotaObjects] = Quota{
+		Name: QuotaObjects,
 		Max:  float64(objectsQuotaG),
 		Unit: "GiB",
 	}
-	networkQuota := sub.GetProperty(string(QUOTA_BANDWIDTH))
+	networkQuota := sub.GetProperty(string(QuotaBandwidth))
 	networkQuotaI, err := units.ParseStrictBytes(networkQuota.(string))
 	if err != nil {
 		objectsQuotaI = 0
 	}
 	networkQuotaG := units.Base2Bytes(networkQuotaI) / units.GiB
-	newMap[QUOTA_BANDWIDTH] = Quota{
-		Name: QUOTA_BANDWIDTH,
+	newMap[QuotaBandwidth] = Quota{
+		Name: QuotaBandwidth,
 		Max:  float64(networkQuotaG),
 		Unit: "GiB",
 	}
@@ -227,7 +252,7 @@ func copySubToDashMap(sub subscriptions.Subscription) map[QuotaType]Quota {
 	return newMap
 }
 
-func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetSummary(w rest.ResponseWriter, r *rest.Request) {
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		err := ModelError{}
@@ -298,7 +323,7 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 		dInfo.Message = "Device changed at " + v.TrailTouchedTime.String()
 		dInfo.Type = "INFO"
 		dInfo.Nick = v.DeviceNick
-		dInfo.DeviceId = v.DeviceId
+		dInfo.DeviceID = v.DeviceID
 		dInfo.Status = v.Status
 		dInfo.LastActivity = v.Timestamp
 		summary.TopDevices = append(summary.TopDevices, dInfo)
@@ -321,8 +346,8 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	summary.Sub = SubscriptionInfo{
-		PlanId:     prnInfo.Resource,
-		Billing:    STANDARD_PLANS["AlphaTester"].Billing,
+		PlanID:     prnInfo.Resource,
+		Billing:    StandardPlans["AlphaTester"].Billing,
 		QuotaStats: copySubToDashMap(sub),
 	}
 
@@ -340,9 +365,9 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	quota := summary.Sub.QuotaStats[QUOTA_DEVICES]
+	quota := summary.Sub.QuotaStats[QuotaDevices]
 	quota.Actual = float64(deviceCount)
-	summary.Sub.QuotaStats[QUOTA_DEVICES] = quota
+	summary.Sub.QuotaStats[QuotaDevices] = quota
 
 	// quota on disk
 	resp := DiskQuotaUsageResult{}
@@ -383,7 +408,7 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if err == nil {
-		quotaObjects := summary.Sub.QuotaStats[QUOTA_OBJECTS]
+		quotaObjects := summary.Sub.QuotaStats[QuotaObjects]
 		uM, err := units.ParseStrictBytes("1" + quotaObjects.Unit)
 		if err != nil {
 			utils.RestErrorWrapper(w, "ERROR Quota Unit: "+err.Error(), http.StatusInternalServerError)
@@ -391,7 +416,7 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 		}
 		fRound := float64(int64(float64(resp.Total)/float64(uM)*100)) / 100
 		quotaObjects.Actual = fRound
-		summary.Sub.QuotaStats[QUOTA_OBJECTS] = quotaObjects
+		summary.Sub.QuotaStats[QuotaObjects] = quotaObjects
 	} else if err != nil {
 		utils.RestErrorWrapper(w, "Error finding quota usage of disk: "+err.Error(),
 			http.StatusInternalServerError)
@@ -401,23 +426,24 @@ func (a *DashApp) handle_getsummary(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(summary)
 }
 
+// New create a dash rest application
 func New(jwtMiddleware *jwt.JWTMiddleware,
 	subService subscriptions.SubscriptionService,
-	mongoClient *mongo.Client) *DashApp {
+	mongoClient *mongo.Client) *App {
 
-	app := new(DashApp)
-	app.jwt_middleware = jwtMiddleware
+	app := new(App)
+	app.jwtMiddleware = jwtMiddleware
 	app.mongoClient = mongoClient
 	app.subService = subService
 
-	app.Api = rest.NewApi()
+	app.API = rest.NewApi()
 	// we dont use default stack because we dont want content type enforcement
-	app.Api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
+	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
 		"/dash:", log.Lshortfile)})
-	app.Api.Use(&utils.AccessLogFluentMiddleware{Prefix: "dash"})
+	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "dash"})
 
-	app.Api.Use(rest.DefaultCommonStack...)
-	app.Api.Use(&rest.CorsMiddleware{
+	app.API.Use(rest.DefaultCommonStack...)
+	app.API.Use(&rest.CorsMiddleware{
 		RejectNonCorsRequests: false,
 		OriginValidator: func(origin string, request *rest.Request) bool {
 			return true
@@ -429,15 +455,15 @@ func New(jwtMiddleware *jwt.JWTMiddleware,
 		AccessControlMaxAge:           3600,
 	})
 
-	app.Api.Use(&rest.IfMiddleware{
+	app.API.Use(&rest.IfMiddleware{
 		Condition: func(request *rest.Request) bool {
 			// all need auth
 			return true
 		},
-		IfTrue: app.jwt_middleware,
+		IfTrue: app.jwtMiddleware,
 	})
 
-	app.Api.Use(&rest.IfMiddleware{
+	app.API.Use(&rest.IfMiddleware{
 		Condition: func(request *rest.Request) bool {
 			// all need auth
 			return true
@@ -446,11 +472,11 @@ func New(jwtMiddleware *jwt.JWTMiddleware,
 	})
 
 	// /auth_status endpoints
-	api_router, _ := rest.MakeRouter(
-		rest.Get("/auth_status", handle_auth),
-		rest.Get("/", app.handle_getsummary),
+	apiRouter, _ := rest.MakeRouter(
+		rest.Get("/auth_status", handleAuth),
+		rest.Get("/", app.handleGetSummary),
 	)
-	app.Api.SetApp(api_router)
+	app.API.SetApp(apiRouter)
 
 	return app
 }

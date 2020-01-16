@@ -13,6 +13,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
 package base
 
 import (
@@ -45,8 +46,8 @@ import (
 
 // DoInit init pantahub REST Aplication
 func DoInit() {
-	phAuth := utils.GetEnv(utils.ENV_PANTAHUB_AUTH)
-	jwtSecretBase64 := utils.GetEnv(utils.ENV_PANTAHUB_JWT_AUTH_SECRET)
+	phAuth := utils.GetEnv(utils.EnvPantahubAuth)
+	jwtSecretBase64 := utils.GetEnv(utils.EnvPantahubJWTAuthSecret)
 	jwtSecretPem, err := base64.StdEncoding.DecodeString(jwtSecretBase64)
 	if err != nil {
 		panic(fmt.Errorf("No valid JWT secret (PANTAHUB_JWT_AUTH_SECRET) in base64 format: %s", err.Error()))
@@ -56,7 +57,7 @@ func DoInit() {
 		panic(fmt.Errorf("No valid JWT secret (PANTAHUB_JWT_AUTH_SECRET); must be rsa private key in PEM format: %s", err.Error()))
 	}
 
-	jwtPubBase64 := utils.GetEnv(utils.ENV_PANTAHUB_JWT_AUTH_PUB)
+	jwtPubBase64 := utils.GetEnv(utils.EnvPantahubJWTAuthPub)
 	jwtPubPem, err := base64.StdEncoding.DecodeString(jwtPubBase64)
 	if err != nil {
 		panic(fmt.Errorf("No valid JWT PUB KEY (PANTAHUB_JWT_AUTH_PUB) in base64 format: %s", err.Error()))
@@ -73,13 +74,13 @@ func DoInit() {
 		adminUsers, subscriptions.SubscriptionProperties)
 
 	{
-		timeoutStr := utils.GetEnv(utils.ENV_PANTAHUB_JWT_TIMEOUT_MINUTES)
+		timeoutStr := utils.GetEnv(utils.EnvPantahubJWTTimeoutMinutes)
 		timeout, err := strconv.Atoi(timeoutStr)
 		if err != nil {
 			panic(err)
 		}
 
-		maxRefreshStr := utils.GetEnv(utils.ENV_PANTAHUB_JWT_MAX_REFRESH_MINUTES)
+		maxRefreshStr := utils.GetEnv(utils.EnvPantahubJWTMaxRefreshMinutes)
 		maxRefresh, err := strconv.Atoi(maxRefreshStr)
 		if err != nil {
 			panic(err)
@@ -105,7 +106,7 @@ func DoInit() {
 			Authenticator:    falseAuthenticator,
 			SigningAlgorithm: "RS256",
 		}, subService, mongoClient)
-		http.Handle("/objects/", http.StripPrefix("/objects", app.Api.MakeHandler()))
+		http.Handle("/objects/", http.StripPrefix("/objects", app.API.MakeHandler()))
 	}
 	{
 		app := devices.New(&jwt.JWTMiddleware{
@@ -114,7 +115,7 @@ func DoInit() {
 			Authenticator:    falseAuthenticator,
 			SigningAlgorithm: "RS256",
 		}, mongoClient)
-		http.Handle("/devices/", http.StripPrefix("/devices", app.Api.MakeHandler()))
+		http.Handle("/devices/", http.StripPrefix("/devices", app.API.MakeHandler()))
 	}
 	{
 		app := trails.New(&jwt.JWTMiddleware{
@@ -123,7 +124,7 @@ func DoInit() {
 			Authenticator:    falseAuthenticator,
 			SigningAlgorithm: "RS256",
 		}, mongoClient)
-		http.Handle("/trails/", http.StripPrefix("/trails", app.Api.MakeHandler()))
+		http.Handle("/trails/", http.StripPrefix("/trails", app.API.MakeHandler()))
 	}
 	{
 		app := plog.New(&jwt.JWTMiddleware{
@@ -132,7 +133,7 @@ func DoInit() {
 			Authenticator:    falseAuthenticator,
 			SigningAlgorithm: "RS256",
 		}, mongoClient)
-		http.Handle("/plog/", http.StripPrefix("/plog", app.Api.MakeHandler()))
+		http.Handle("/plog/", http.StripPrefix("/plog", app.API.MakeHandler()))
 	}
 	{
 		app := logs.New(&jwt.JWTMiddleware{
@@ -142,12 +143,12 @@ func DoInit() {
 			Authenticator:    falseAuthenticator,
 			SigningAlgorithm: "RS256",
 		}, mongoClient)
-		http.Handle("/logs/", http.StripPrefix("/logs", app.Api.MakeHandler()))
+		http.Handle("/logs/", http.StripPrefix("/logs", app.API.MakeHandler()))
 	}
 
 	{
 		app := healthz.New(mongoClient)
-		http.Handle("/healthz/", http.StripPrefix("/healthz", app.Api.MakeHandler()))
+		http.Handle("/healthz/", http.StripPrefix("/healthz", app.API.MakeHandler()))
 	}
 	{
 		app := dash.New(&jwt.JWTMiddleware{
@@ -156,10 +157,10 @@ func DoInit() {
 			Authenticator:    falseAuthenticator,
 			SigningAlgorithm: "RS256",
 		}, subService, mongoClient)
-		http.Handle("/dash/", http.StripPrefix("/dash", app.Api.MakeHandler()))
+		http.Handle("/dash/", http.StripPrefix("/dash", app.API.MakeHandler()))
 	}
 	{
-		app := subscriptions.NewResty(&jwt.JWTMiddleware{
+		app := subscriptions.New(&jwt.JWTMiddleware{
 			Pub:              jwtPub,
 			Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
 			Authenticator:    falseAuthenticator,
@@ -174,7 +175,7 @@ func DoInit() {
 			Authenticator:    falseAuthenticator,
 			SigningAlgorithm: "RS256",
 		}, mongoClient)
-		http.Handle("/metrics/", http.StripPrefix("/metrics", app.Api.MakeHandler()))
+		http.Handle("/metrics/", http.StripPrefix("/metrics", app.API.MakeHandler()))
 	}
 	{
 		app := apps.New(&jwt.JWTMiddleware{
@@ -187,7 +188,7 @@ func DoInit() {
 	}
 
 	var fservermux FileUploadServer
-	switch utils.GetEnv(utils.ENV_PANTAHUB_STORAGE_DRIVER) {
+	switch utils.GetEnv(utils.EnvPantahubStorageDriver) {
 	case "s3":
 		log.Println("INFO: using 's3' driver to serve object blobs/files")
 		fservermux = NewS3FileServer()

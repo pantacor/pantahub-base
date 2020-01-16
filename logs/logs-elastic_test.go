@@ -24,7 +24,7 @@ import (
 var elasticTestLogger *elasticLogger
 
 func testElasticDoLog(t *testing.T) {
-	logs := genLogs(LogsEntry{
+	logs := genLogs(Entry{
 		Device:      "testdevice",
 		Owner:       "testowner",
 		TimeCreated: timeBase,
@@ -44,7 +44,7 @@ func testElasticDoLog(t *testing.T) {
 }
 
 func testElasticDoGetLogs(t *testing.T) {
-	logs := genLogs(LogsEntry{
+	logs := genLogs(Entry{
 		Device:      "testdevice",
 		Owner:       "testowner",
 		TimeCreated: timeBase,
@@ -62,8 +62,8 @@ func testElasticDoGetLogs(t *testing.T) {
 		t.Fail()
 	}
 
-	filter := &LogsEntry{}
-	sort := LogsSort{}
+	filter := &Entry{}
+	sort := Sorts{}
 	pager, err := elasticTestLogger.getLogs(0, 3, nil, false, filter, sort, false)
 
 	if err != nil {
@@ -96,7 +96,7 @@ func testElasticDoGetLogs(t *testing.T) {
 }
 
 func testElasticDoGetLogsAfter(t *testing.T) {
-	logs := genLogs(LogsEntry{
+	logs := genLogs(Entry{
 		Device:      "testdevice",
 		Owner:       "testowner",
 		TimeCreated: timeBase,
@@ -114,8 +114,8 @@ func testElasticDoGetLogsAfter(t *testing.T) {
 		t.Fail()
 	}
 
-	filter := &LogsEntry{}
-	sort := LogsSort{}
+	filter := &Entry{}
+	sort := Sorts{}
 	pager, err := elasticTestLogger.getLogs(0, 3, &timeBase, true, filter, sort, false)
 
 	if err != nil {

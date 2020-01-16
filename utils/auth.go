@@ -13,6 +13,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
 package utils
 
 import (
@@ -23,9 +24,10 @@ import (
 	jwtgo "github.com/dgrijalva/jwt-go"
 )
 
-type AuthMiddleware struct {
-}
+// AuthMiddleware authentication default middleware
+type AuthMiddleware struct{}
 
+// AuthInfo authentication information
 type AuthInfo struct {
 	Caller     Prn
 	CallerType string
@@ -37,6 +39,7 @@ type AuthInfo struct {
 	RemoteUser string
 }
 
+// GetAuthInfo get authentication information from a request
 func GetAuthInfo(r *rest.Request) *AuthInfo {
 	authInfo, ok := r.Env["PH_AUTH_INFO"]
 	if !ok {
@@ -46,6 +49,7 @@ func GetAuthInfo(r *rest.Request) *AuthInfo {
 	return &rs
 }
 
+// MiddlewareFunc authentication middleware function
 func (s *AuthMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFunc {
 	return func(w rest.ResponseWriter, r *rest.Request) {
 		var origCallerClaims, callerClaims jwtgo.MapClaims

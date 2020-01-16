@@ -34,9 +34,10 @@ type LocalFileServerTestSuite struct {
 }
 
 func (suite *LocalFileServerTestSuite) SetupTest() {
-	basePath := objects.PantahubS3Path()
-	fileServer := http.FileServer(http.Dir(basePath))
-	suite.server = &LocalFileServer{fileServer: fileServer}
+	// TODO finish this test
+	// basePath := objects.PantahubS3Path()
+	// fileServer := http.FileServer(http.Dir(basePath))
+	// suite.server = &LocalFileServer{fileServer: fileServer}
 }
 
 func (suite *LocalFileServerTestSuite) TestOpenForWrite() {

@@ -13,12 +13,14 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
 package base
 
 import (
 	"net/http"
 )
 
+// FileUploadServer interface for the file uploader server
 type FileUploadServer interface {
 	ServeHTTP(w http.ResponseWriter, r *http.Request)
 }

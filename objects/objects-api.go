@@ -13,6 +13,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
 package objects
 
 import (
@@ -43,40 +44,43 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-type ObjectsApp struct {
-	jwt_middleware *jwt.JWTMiddleware
-	Api            *rest.Api
-	mongoClient    *mongo.Client
-	subService     subscriptions.SubscriptionService
+// App objects rest application
+type App struct {
+	jwtMiddleware *jwt.JWTMiddleware
+	API           *rest.Api
+	mongoClient   *mongo.Client
+	subService    subscriptions.SubscriptionService
 
 	awsS3Bucket string
 	awsRegion   string
 }
 
-var pantahubHttpsUrl string
+var pantahubHTTPSURL string
 
 func init() {
-	pantahubHost := utils.GetEnv(utils.ENV_PANTAHUB_HOST)
-	pantahubPort := utils.GetEnv(utils.ENV_PANTAHUB_PORT)
-	pantahubScheme := utils.GetEnv(utils.ENV_PANTAHUB_SCHEME)
+	pantahubHost := utils.GetEnv(utils.EnvPantahubHost)
+	pantahubPort := utils.GetEnv(utils.EnvPantahubPort)
+	pantahubScheme := utils.GetEnv(utils.EnvPantahubScheme)
 
-	pantahubHttpsUrl = pantahubScheme + "://" + pantahubHost
+	pantahubHTTPSURL = pantahubScheme + "://" + pantahubHost
 
 	if pantahubPort != "" {
-		pantahubHttpsUrl += ":" + pantahubPort
+		pantahubHTTPSURL += ":" + pantahubPort
 	}
 }
 
-func PantahubS3DevUrl() string {
-	return pantahubHttpsUrl
+// PantahubS3DevURL s3 dev url
+func PantahubS3DevURL() string {
+	return pantahubHTTPSURL
 }
 
-func handle_auth(w rest.ResponseWriter, r *rest.Request) {
+func handleAuth(w rest.ResponseWriter, r *rest.Request) {
 	jwtClaims := r.Env["JWT_PAYLOAD"]
 	w.WriteJson(jwtClaims)
 }
 
-func MakeStorageId(owner string, sha []byte) string {
+// MakeStorageID crerate a new storage ID
+func MakeStorageID(owner string, sha []byte) string {
 	shaStr := hex.EncodeToString(sha)
 	res := sha256.Sum256(append([]byte(owner + "/" + shaStr)))
 	newSha := res[:]
@@ -85,7 +89,7 @@ func MakeStorageId(owner string, sha []byte) string {
 	return string(hexRes)
 }
 
-func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePostObject(w rest.ResponseWriter, r *rest.Request) {
 
 	newObject := Object{}
 
@@ -145,13 +149,13 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	storageId := MakeStorageId(ownerStr, sha)
-	newObject.StorageId = storageId
-	newObject.Id = newObject.Sha
+	storageID := MakeStorageID(ownerStr, sha)
+	newObject.StorageID = storageID
+	newObject.ID = newObject.Sha
 
 	SyncObjectSizes(&newObject)
 
-	result, err := CalcUsageAfterPost(ownerStr, a.mongoClient, newObject.Id, newObject.SizeInt)
+	result, err := CalcUsageAfterPost(ownerStr, a.mongoClient, newObject.ID, newObject.SizeInt)
 
 	if err != nil {
 		log.Printf("ERROR: CalcUsageAfterPost failed: %s\n", err.Error())
@@ -182,7 +186,7 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 	)
 
 	if err != nil {
-		filePath, err := utils.MakeLocalS3PathForName(storageId)
+		filePath, err := utils.MakeLocalS3PathForName(storageID)
 
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -201,7 +205,7 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 		defer cancel()
 		updatedResult, err := collection.UpdateOne(
 			ctx,
-			bson.M{"_id": newObject.StorageId},
+			bson.M{"_id": newObject.StorageID},
 			bson.M{"$set": newObject},
 		)
 		if updatedResult.MatchedCount == 0 {
@@ -218,12 +222,12 @@ func (a *ObjectsApp) handle_postobject(w rest.ResponseWriter, r *rest.Request) {
 	}
 conflict:
 
-	issuerUrl := utils.GetApiEndpoint("/objects")
-	newObjectWithAccess := MakeObjAccessible(issuerUrl, ownerStr, newObject, storageId)
+	issuerURL := utils.GetAPIEndpoint("/objects")
+	newObjectWithAccess := MakeObjAccessible(issuerURL, ownerStr, newObject, storageID)
 	w.WriteJson(newObjectWithAccess)
 }
 
-func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePutObject(w rest.ResponseWriter, r *rest.Request) {
 
 	newObject := Object{}
 
@@ -247,20 +251,20 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "Invalid Access", http.StatusForbidden)
 		return
 	}
-	putId := r.PathParam("id")
+	putID := r.PathParam("id")
 
-	sha, err := utils.DecodeSha256HexString(putId)
+	sha, err := utils.DecodeSha256HexString(putID)
 
 	if err != nil {
 		utils.RestErrorWrapper(w, "Post New Object sha must be a valid sha256", http.StatusBadRequest)
 		return
 	}
 
-	storageId := MakeStorageId(ownerStr, sha)
+	storageID := MakeStorageID(ownerStr, sha)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	err = collection.FindOne(ctx, bson.M{
-		"_id":     storageId,
+		"_id":     storageID,
 		"garbage": bson.M{"$ne": true},
 	}).Decode(&newObject)
 
@@ -277,11 +281,11 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 	r.DecodeJsonPayload(&newObject)
 
 	newObject.Owner = owner.(string)
-	newObject.StorageId = storageId
-	newObject.Id = putId
+	newObject.StorageID = storageID
+	newObject.ID = putID
 
 	SyncObjectSizes(&newObject)
-	result, err := CalcUsageAfterPut(ownerStr, a.mongoClient, newObject.Id, newObject.SizeInt)
+	result, err := CalcUsageAfterPut(ownerStr, a.mongoClient, newObject.ID, newObject.SizeInt)
 
 	if err != nil {
 		log.Println("Error to calc diskquota: " + err.Error())
@@ -308,7 +312,7 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 	updateOptions.SetUpsert(true)
 	_, err = collection.UpdateOne(
 		ctx,
-		bson.M{"_id": storageId},
+		bson.M{"_id": storageID},
 		bson.M{"$set": newObject},
 		updateOptions,
 	)
@@ -320,7 +324,8 @@ func (a *ObjectsApp) handle_putobject(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(newObject)
 }
 
-func (a *ObjectsApp) GetDiskQuota(prn string) (float64, error) {
+// GetDiskQuota get disk quota for a object
+func (a *App) GetDiskQuota(prn string) (float64, error) {
 
 	sub, err := a.subService.LoadBySubject(utils.Prn(prn))
 	if err != nil {
@@ -337,12 +342,14 @@ func (a *ObjectsApp) GetDiskQuota(prn string) (float64, error) {
 	return float64(uM), err
 }
 
-var defaultObjectsApp *ObjectsApp
+var defaultObjectsApp *App
 
+// GetDiskQuota public function to get the default disk quota
 func GetDiskQuota(prn string) (float64, error) {
 	return defaultObjectsApp.GetDiskQuota(prn)
 }
 
+// SyncObjectSizes syncronize objects sizes
 func SyncObjectSizes(obj *Object) {
 	var err error
 	var strInt64 int64
@@ -364,7 +371,8 @@ func SyncObjectSizes(obj *Object) {
 	}
 }
 
-func MakeObjAccessible(Issuer string, Subject string, obj Object, storageId string) ObjectWithAccess {
+// MakeObjAccessible make a object accessible
+func MakeObjAccessible(Issuer string, Subject string, obj Object, storageID string) ObjectWithAccess {
 	filesObjWithAccess := ObjectWithAccess{}
 	filesObjWithAccess.Object = obj
 
@@ -375,34 +383,34 @@ func MakeObjAccessible(Issuer string, Subject string, obj Object, storageId stri
 	size, err := strconv.ParseInt(obj.Size, 10, 64)
 	if err != nil {
 		log.Println("INTERNAL ERROR (size parsing) local-s3: " + err.Error())
-		filesObjWithAccess.SignedGetUrl = PantahubS3DevUrl() + "/local-s3/INTERNAL-ERROR"
-		filesObjWithAccess.SignedPutUrl = PantahubS3DevUrl() + "/local-s3/INTERNAL-ERROR"
+		filesObjWithAccess.SignedGetURL = PantahubS3DevURL() + "/local-s3/INTERNAL-ERROR"
+		filesObjWithAccess.SignedPutURL = PantahubS3DevURL() + "/local-s3/INTERNAL-ERROR"
 		return filesObjWithAccess
 	}
 
-	objAccessTokGet := NewObjectAccessForSec(obj.ObjectName, http.MethodGet, size, filesObjWithAccess.Sha, Issuer, Subject, storageId, OBJECT_TOKEN_VALID_SEC)
+	objAccessTokGet := NewObjectAccessForSec(obj.ObjectName, http.MethodGet, size, filesObjWithAccess.Sha, Issuer, Subject, storageID, ObjectTokenValidSec)
 	tokGet, err := objAccessTokGet.Sign()
 	if err != nil {
 		log.Println("INTERNAL ERROR local-s3: " + err.Error())
-		filesObjWithAccess.SignedGetUrl = PantahubS3DevUrl() + "/local-s3/INTERNAL-ERROR"
+		filesObjWithAccess.SignedGetURL = PantahubS3DevURL() + "/local-s3/INTERNAL-ERROR"
 	} else {
-		filesObjWithAccess.SignedGetUrl = PantahubS3DevUrl() + "/local-s3/" + tokGet
+		filesObjWithAccess.SignedGetURL = PantahubS3DevURL() + "/local-s3/" + tokGet
 	}
 
 	if Subject == obj.Owner {
-		objAccessTokPut := NewObjectAccessForSec(obj.ObjectName, http.MethodPut, size, filesObjWithAccess.Sha, Issuer, Subject, storageId, OBJECT_TOKEN_VALID_SEC)
+		objAccessTokPut := NewObjectAccessForSec(obj.ObjectName, http.MethodPut, size, filesObjWithAccess.Sha, Issuer, Subject, storageID, ObjectTokenValidSec)
 		tokPut, err := objAccessTokPut.Sign()
 		if err != nil {
 			log.Println("INTERNAL ERROR local-s3: " + err.Error())
-			filesObjWithAccess.SignedPutUrl = PantahubS3DevUrl() + "/local-s3/INTERNAL-ERROR"
+			filesObjWithAccess.SignedPutURL = PantahubS3DevURL() + "/local-s3/INTERNAL-ERROR"
 		} else {
-			filesObjWithAccess.SignedPutUrl = PantahubS3DevUrl() + "/local-s3/" + tokPut
+			filesObjWithAccess.SignedPutURL = PantahubS3DevURL() + "/local-s3/" + tokPut
 		}
 	}
 	return filesObjWithAccess
 }
 
-func (a *ObjectsApp) handle_getobject(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetObject(w rest.ResponseWriter, r *rest.Request) {
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["owner"]
 	if !ok {
@@ -429,21 +437,21 @@ func (a *ObjectsApp) handle_getobject(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	objId := r.PathParam("id")
-	sha, err := utils.DecodeSha256HexString(objId)
+	objID := r.PathParam("id")
+	sha, err := utils.DecodeSha256HexString(objID)
 
 	if err != nil {
 		utils.RestErrorWrapper(w, "Get New Object :id must be a valid sha256", http.StatusBadRequest)
 		return
 	}
 
-	storageId := MakeStorageId(ownerStr, sha)
+	storageID := MakeStorageID(ownerStr, sha)
 
 	var filesObj Object
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	err = collection.FindOne(ctx, bson.M{
-		"_id":     storageId,
+		"_id":     storageID,
 		"garbage": bson.M{"$ne": true},
 	}).Decode(&filesObj)
 
@@ -459,14 +467,13 @@ func (a *ObjectsApp) handle_getobject(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	issuerUrl := utils.GetApiEndpoint("/objects")
-	filesObjWithAccess := MakeObjAccessible(issuerUrl, ownerStr, filesObj, storageId)
+	issuerURL := utils.GetAPIEndpoint("/objects")
+	filesObjWithAccess := MakeObjAccessible(issuerURL, ownerStr, filesObj, storageID)
 
 	w.WriteJson(filesObjWithAccess)
 }
 
-func (a *ObjectsApp) handle_getobjectfile(w rest.ResponseWriter, r *rest.Request) {
-
+func (a *App) handleGetObjectFile(w rest.ResponseWriter, r *rest.Request) {
 	// XXX: refactor: dupe code with getobject with getobject
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["owner"]
 	if !ok {
@@ -493,23 +500,23 @@ func (a *ObjectsApp) handle_getobjectfile(w rest.ResponseWriter, r *rest.Request
 		return
 	}
 
-	objId := r.PathParam("id")
-	sha, err := utils.DecodeSha256HexString(objId)
+	objID := r.PathParam("id")
+	sha, err := utils.DecodeSha256HexString(objID)
 
 	if err != nil {
 		utils.RestErrorWrapper(w, "Post New Object sha must be a valid sha256", http.StatusBadRequest)
 		return
 	}
-	storageId := MakeStorageId(ownerStr, sha)
+	storageID := MakeStorageID(ownerStr, sha)
 
 	var filesObj Object
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
 	err = collection.FindOne(ctx, bson.M{
-		"_id":     storageId,
+		"_id":     storageID,
 		"garbage": bson.M{"$ne": true},
 	}).Decode(&filesObj)
-
 	if err != nil {
 		utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
 		return
@@ -522,16 +529,16 @@ func (a *ObjectsApp) handle_getobjectfile(w rest.ResponseWriter, r *rest.Request
 		return
 	}
 
-	issuerUrl := utils.GetApiEndpoint("/objects")
-	filesObjWithAccess := MakeObjAccessible(issuerUrl, ownerStr, filesObj, storageId)
+	issuerURL := utils.GetAPIEndpoint("/objects")
+	filesObjWithAccess := MakeObjAccessible(issuerURL, ownerStr, filesObj, storageID)
 
-	url := filesObjWithAccess.SignedGetUrl
+	url := filesObjWithAccess.SignedGetURL
 
 	w.Header().Add("Location", url)
 	w.WriteHeader(http.StatusFound)
 }
 
-func (a *ObjectsApp) handle_getobjects(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetObjects(w rest.ResponseWriter, r *rest.Request) {
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
@@ -586,7 +593,7 @@ func (a *ObjectsApp) handle_getobjects(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(newObjects)
 }
 
-func (a *ObjectsApp) handle_deleteobject(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleDeleteObject(w rest.ResponseWriter, r *rest.Request) {
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
@@ -610,20 +617,20 @@ func (a *ObjectsApp) handle_deleteobject(w rest.ResponseWriter, r *rest.Request)
 		return
 	}
 
-	delId := r.PathParam("id")
-	sha, err := utils.DecodeSha256HexString(delId)
+	delID := r.PathParam("id")
+	sha, err := utils.DecodeSha256HexString(delID)
 
 	if err != nil {
 		utils.RestErrorWrapper(w, "Post New Object sha must be a valid sha256", http.StatusBadRequest)
 		return
 	}
-	storageId := MakeStorageId(ownerStr, sha)
+	storageID := MakeStorageID(ownerStr, sha)
 
 	newObject := Object{}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	err = collection.FindOne(ctx, bson.M{
-		"_id":     storageId,
+		"_id":     storageID,
 		"garbage": bson.M{"$ne": true},
 	}).Decode(&newObject)
 	if err != nil {
@@ -635,7 +642,7 @@ func (a *ObjectsApp) handle_deleteobject(w rest.ResponseWriter, r *rest.Request)
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		deleteResult, err := collection.DeleteOne(ctx, bson.M{
-			"_id":     storageId,
+			"_id":     storageID,
 			"garbage": bson.M{"$ne": true},
 		})
 		if err != nil {
@@ -651,14 +658,15 @@ func (a *ObjectsApp) handle_deleteobject(w rest.ResponseWriter, r *rest.Request)
 	w.WriteJson(newObject)
 }
 
+// New create a new object rest application
 func New(jwtMiddleware *jwt.JWTMiddleware, subService subscriptions.SubscriptionService,
-	mongoClient *mongo.Client) *ObjectsApp {
+	mongoClient *mongo.Client) *App {
 
-	app := new(ObjectsApp)
+	app := new(App)
 	if defaultObjectsApp == nil {
 		defaultObjectsApp = app
 	}
-	app.jwt_middleware = jwtMiddleware
+	app.jwtMiddleware = jwtMiddleware
 	app.mongoClient = mongoClient
 	app.subService = subService
 
@@ -690,17 +698,17 @@ func New(jwtMiddleware *jwt.JWTMiddleware, subService subscriptions.Subscription
 		return nil
 	}
 
-	app.Api = rest.NewApi()
+	app.API = rest.NewApi()
 	// we dont use default stack because we dont want content type enforcement
-	app.Api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
+	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
 		"/objects:", log.Lshortfile)})
-	app.Api.Use(&utils.AccessLogFluentMiddleware{Prefix: "objects"})
-	app.Api.Use(&rest.StatusMiddleware{})
-	app.Api.Use(&rest.TimerMiddleware{})
-	app.Api.Use(&metrics.MetricsMiddleware{})
+	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "objects"})
+	app.API.Use(&rest.StatusMiddleware{})
+	app.API.Use(&rest.TimerMiddleware{})
+	app.API.Use(&metrics.Middleware{})
 
-	app.Api.Use(rest.DefaultCommonStack...)
-	app.Api.Use(&rest.CorsMiddleware{
+	app.API.Use(rest.DefaultCommonStack...)
+	app.API.Use(&rest.CorsMiddleware{
 		RejectNonCorsRequests: false,
 		OriginValidator: func(origin string, request *rest.Request) bool {
 			return true
@@ -712,13 +720,13 @@ func New(jwtMiddleware *jwt.JWTMiddleware, subService subscriptions.Subscription
 		AccessControlMaxAge:           3600,
 	})
 
-	app.Api.Use(&rest.IfMiddleware{
+	app.API.Use(&rest.IfMiddleware{
 		Condition: func(request *rest.Request) bool {
 			return true
 		},
-		IfTrue: app.jwt_middleware,
+		IfTrue: app.jwtMiddleware,
 	})
-	app.Api.Use(&rest.IfMiddleware{
+	app.API.Use(&rest.IfMiddleware{
 		Condition: func(request *rest.Request) bool {
 			return true
 		},
@@ -739,16 +747,16 @@ func New(jwtMiddleware *jwt.JWTMiddleware, subService subscriptions.Subscription
 	}
 
 	// /auth_status endpoints
-	api_router, _ := rest.MakeRouter(
-		rest.Get("/auth_status", utils.ScopeFilter(readObjectsScopes, handle_auth)),
-		rest.Get("/", utils.ScopeFilter(readObjectsScopes, app.handle_getobjects)),
-		rest.Post("/", utils.ScopeFilter(writeObjectScopes, app.handle_postobject)),
-		rest.Get("/:id", utils.ScopeFilter(readObjectsScopes, app.handle_getobject)),
-		rest.Get("/:id/blob", utils.ScopeFilter(readObjectsScopes, app.handle_getobjectfile)),
-		rest.Put("/:id", utils.ScopeFilter(writeObjectScopes, app.handle_putobject)),
-		rest.Delete("/:id", utils.ScopeFilter(writeObjectScopes, app.handle_deleteobject)),
+	apiRouter, _ := rest.MakeRouter(
+		rest.Get("/auth_status", utils.ScopeFilter(readObjectsScopes, handleAuth)),
+		rest.Get("/", utils.ScopeFilter(readObjectsScopes, app.handleGetObjects)),
+		rest.Post("/", utils.ScopeFilter(writeObjectScopes, app.handlePostObject)),
+		rest.Get("/:id", utils.ScopeFilter(readObjectsScopes, app.handleGetObject)),
+		rest.Get("/:id/blob", utils.ScopeFilter(readObjectsScopes, app.handleGetObjectFile)),
+		rest.Put("/:id", utils.ScopeFilter(writeObjectScopes, app.handlePutObject)),
+		rest.Delete("/:id", utils.ScopeFilter(writeObjectScopes, app.handleDeleteObject)),
 	)
-	app.Api.SetApp(api_router)
+	app.API.SetApp(apiRouter)
 
 	return app
 }

@@ -10,11 +10,11 @@ import (
 	"gopkg.in/resty.v1"
 )
 
-// returns deviceId of new test device
-func CreateOwnedDevice(t *testing.T, serverUrl *url.URL, ownerAuthToken string,
+// CreateOwnedDevice returns deviceId of new test device
+func CreateOwnedDevice(t *testing.T, serverURL *url.URL, ownerAuthToken string,
 	nick string, secret string) *devices.Device {
 
-	u := serverUrl
+	u := serverURL
 	u.Path = "/"
 
 	res, err := resty.R().SetAuthToken(ownerAuthToken).SetBody(
@@ -43,7 +43,7 @@ func CreateOwnedDevice(t *testing.T, serverUrl *url.URL, ownerAuthToken string,
 		t.Fail()
 	}
 
-	if device.Id.Hex() == "" {
+	if device.ID.Hex() == "" {
 		t.Errorf("Body contained no id: " + string(res.Body()))
 		t.Fail()
 	}

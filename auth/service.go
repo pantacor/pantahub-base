@@ -288,7 +288,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "auth"})
 	app.API.Use(&rest.StatusMiddleware{})
 	app.API.Use(&rest.TimerMiddleware{})
-	app.API.Use(&metrics.MetricsMiddleware{})
+	app.API.Use(&metrics.Middleware{})
 	app.API.Use(rest.DefaultDevStack...)
 	app.API.Use(&rest.CorsMiddleware{
 		RejectNonCorsRequests: false,
@@ -390,9 +390,9 @@ func handleGetEncryptedAccount(accountData *accountCreationPayload) (*encryptedA
 		return nil, err
 	}
 
-	urlPrefix := utils.GetEnv(utils.ENV_PANTAHUB_SCHEME) + "://"
-	urlPrefix += utils.GetEnv(utils.ENV_PANTAHUB_HOST_WWW)
-	urlPrefix += utils.GetEnv(utils.ENV_PANTAHUB_SIGNUP_PATH)
+	urlPrefix := utils.GetEnv(utils.EnvPantahubScheme) + "://"
+	urlPrefix += utils.GetEnv(utils.EnvPantahubWWWHost)
+	urlPrefix += utils.GetEnv(utils.EnvPantahubSignupPath)
 	urlPrefix += "#account=" + encryptedAccountData
 
 	response := &encryptedAccountToken{
@@ -550,7 +550,7 @@ func (a *App) accountPayload(idEmailNick string) map[string]interface{} {
 func (a *App) deviceAuth(deviceID string, secret string) bool {
 	c := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
-	id := utils.PrnGetId(deviceID)
+	id := utils.PrnGetID(deviceID)
 	mgoID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return false
@@ -580,7 +580,7 @@ func (a *App) devicePayload(deviceID string) map[string]interface{} {
 
 	c := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
-	id := utils.PrnGetId(deviceID)
+	id := utils.PrnGetID(deviceID)
 	mgoID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil

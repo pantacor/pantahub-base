@@ -66,14 +66,14 @@ func main() {
 	base.DoInit()
 
 	docs.SwaggerInfo.BasePath = "/"
-	docs.SwaggerInfo.Schemes = []string{utils.GetEnv(utils.ENV_PANTAHUB_SCHEME)}
-	docs.SwaggerInfo.Host = utils.GetEnv(utils.ENV_PANTAHUB_HOST)
+	docs.SwaggerInfo.Schemes = []string{utils.GetEnv(utils.EnvPantahubScheme)}
+	docs.SwaggerInfo.Host = utils.GetEnv(utils.EnvPantahubHost)
 
-	portInt := utils.GetEnv(utils.ENV_PANTAHUB_PORT_INT)
-	portIntTls := utils.GetEnv(utils.ENV_PANTAHUB_PORT_INT_TLS)
+	portInt := utils.GetEnv(utils.EnvPantahubPortInt)
+	portIntTLS := utils.GetEnv(utils.EnvPantahubPortIntTLS)
 
 	go func() {
-		log.Fatal(http.ListenAndServeTLS(":"+portIntTls, "localhost.cert.pem", "localhost.key.pem", nil))
+		log.Fatal(http.ListenAndServeTLS(":"+portIntTLS, "localhost.cert.pem", "localhost.key.pem", nil))
 	}()
 
 	ifaces, _ := net.Interfaces()
@@ -87,7 +87,7 @@ func main() {
 			case *net.IPAddr:
 				ip = v.IP
 			}
-			log.Printf("Serving @ https://" + ip.String() + ":" + portIntTls + "/\n")
+			log.Printf("Serving @ https://" + ip.String() + ":" + portIntTLS + "/\n")
 			log.Printf("Serving @ http://" + ip.String() + ":" + portInt + "/\n")
 		}
 	}

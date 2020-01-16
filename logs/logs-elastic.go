@@ -45,7 +45,7 @@ var (
 )
 
 type elasticLogEntry struct {
-	*LogsEntry
+	*Entry
 
 	TimeEvent  time.Time `json:"timeevent"`
 	TimeRecord time.Time `json:"timerecord"`
@@ -161,7 +161,7 @@ func (s *elasticLogger) unregister(deleteIndex bool) error {
 }
 
 func (s *elasticLogger) getLogs(start int64, page int64, beforeOrAfter *time.Time,
-	after bool, query LogsFilter, sort LogsSort, cursor bool) (*LogsPager, error) {
+	after bool, query Filters, sort Sorts, cursor bool) (*Pager, error) {
 	queryFmt := fmt.Sprintf(s.elasticIndexPrefix + "-*/pv/_search")
 
 	queryURL, err := url.Parse(queryFmt)
@@ -262,18 +262,18 @@ func (s *elasticLogger) getLogs(start int64, page int64, beforeOrAfter *time.Tim
 		return nil, err
 	}
 
-	var pagerResult LogsPager
+	var pagerResult Pager
 
 	pagerResult.Count = elasticResult.TotalHits()
 	pagerResult.Start = start
 	pagerResult.Page = int64(len(elasticResult.Hits.Hits))
 	pagerResult.NextCursor = elasticResult.ScrollId
 
-	prototype := LogsEntry{}
+	prototype := Entry{}
 	arr := elasticResult.Each(reflect.TypeOf(&prototype))
 
 	for _, v := range arr {
-		pagerResult.Entries = append(pagerResult.Entries, v.(*LogsEntry))
+		pagerResult.Entries = append(pagerResult.Entries, v.(*Entry))
 	}
 	pagerResult.Count = int64(len(arr))
 
@@ -293,18 +293,18 @@ func (s *elasticLogger) scrollBuildNextURL(pretty bool) (string, url.Values, err
 	return path, params, nil
 }
 
-func (s *elasticLogger) scrollBuildBodyNext(keepAlive string, scrollId string) (interface{}, error) {
+func (s *elasticLogger) scrollBuildBodyNext(keepAlive string, scrollID string) (interface{}, error) {
 	body := struct {
 		Scroll   string `json:"scroll"`
-		ScrollId string `json:"scroll_id,omitempty"`
+		ScrollID string `json:"scroll_id,omitempty"`
 	}{
 		Scroll:   keepAlive,
-		ScrollId: scrollId,
+		ScrollID: scrollID,
 	}
 	return body, nil
 }
 
-func (s *elasticLogger) getLogsByCursor(nextCursor string) (*LogsPager, error) {
+func (s *elasticLogger) getLogsByCursor(nextCursor string) (*Pager, error) {
 	queryFmt, values, err := s.scrollBuildNextURL(false)
 	queryURL, err := url.Parse(queryFmt)
 	queryURL.RawQuery = values.Encode()
@@ -339,25 +339,25 @@ func (s *elasticLogger) getLogsByCursor(nextCursor string) (*LogsPager, error) {
 		return nil, err
 	}
 
-	var pagerResult LogsPager
+	var pagerResult Pager
 
 	pagerResult.Count = elasticResult.TotalHits()
 	pagerResult.Start = 0
 	pagerResult.Page = int64(len(elasticResult.Hits.Hits))
 	pagerResult.NextCursor = elasticResult.ScrollId
 
-	prototype := LogsEntry{}
+	prototype := Entry{}
 	arr := elasticResult.Each(reflect.TypeOf(&prototype))
 
 	for _, v := range arr {
-		pagerResult.Entries = append(pagerResult.Entries, v.(*LogsEntry))
+		pagerResult.Entries = append(pagerResult.Entries, v.(*Entry))
 	}
 	pagerResult.Count = int64(len(arr))
 
 	return &pagerResult, nil
 }
 
-func (s *elasticLogger) postLogs(e []LogsEntry) error {
+func (s *elasticLogger) postLogs(e []Entry) error {
 	if !s.works {
 		return errors.New("logger not initialized/works")
 	}
@@ -396,7 +396,7 @@ func (s *elasticLogger) postLogs(e []LogsEntry) error {
 
 		eventTime := time.Unix(v.LogTSec, v.LogTNano)
 		ve := elasticLogEntry{
-			LogsEntry:  &v,
+			Entry:      &v,
 			TimeEvent:  eventTime,
 			TimeRecord: v.TimeCreated,
 		}
@@ -439,7 +439,7 @@ func (s *elasticLogger) postLogs(e []LogsEntry) error {
 // to initialize the elastic logger.
 //
 // You need to call register() afterwards.
-func NewElasticLogger() (LogsBackend, error) {
+func NewElasticLogger() (Backend, error) {
 	return newElasticLogger()
 }
 
@@ -449,11 +449,11 @@ func newElasticLogger() (*elasticLogger, error) {
 	defaultLogger := &elasticLogger{}
 	defaultLogger.works = false
 
-	defaultLogger.elasticBaseURL = utils.GetEnv(utils.ENV_ELASTIC_URL)
-	defaultLogger.elasticBasicAuthUser = utils.GetEnv(utils.ENV_ELASTIC_USERNAME)
-	defaultLogger.elasticBasicAuthPass = utils.GetEnv(utils.ENV_ELASTIC_PASSWORD)
-	defaultLogger.elasticBearerToken = utils.GetEnv(utils.ENV_ELASTIC_BEARER)
-	defaultLogger.elasticIndexPrefix = utils.GetEnv(utils.ENV_PANTAHUB_PRODUCTNAME)
+	defaultLogger.elasticBaseURL = utils.GetEnv(utils.EnvElasticURL)
+	defaultLogger.elasticBasicAuthUser = utils.GetEnv(utils.EnvElasticUsername)
+	defaultLogger.elasticBasicAuthPass = utils.GetEnv(utils.EnvElasticPassword)
+	defaultLogger.elasticBearerToken = utils.GetEnv(utils.EnvElasticBearer)
+	defaultLogger.elasticIndexPrefix = utils.GetEnv(utils.EnvPantahubProductName)
 
 	if defaultLogger.elasticBaseURL == "" {
 		defaultLogger.works = false

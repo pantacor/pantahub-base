@@ -64,7 +64,7 @@ func teardownMongo(t *testing.T) error {
 
 func doLog() error {
 
-	logs := genLogs(LogsEntry{
+	logs := genLogs(Entry{
 		Device:      "testdevice",
 		Owner:       "testowner",
 		TimeCreated: timeBase,
@@ -95,8 +95,8 @@ func testMongoGetLogs(t *testing.T) {
 		t.Fail()
 	}
 
-	filter := &LogsEntry{}
-	sort := LogsSort{}
+	filter := &Entry{}
+	sort := Sorts{}
 	pager, err := mgoTestLogger.getLogs(0, -1, nil, false, filter, sort, false)
 
 	if err != nil {
@@ -111,7 +111,7 @@ func testMongoGetLogs(t *testing.T) {
 }
 
 func testMongoDoGetLogs(t *testing.T) {
-	logs := genLogs(LogsEntry{
+	logs := genLogs(Entry{
 		Device:      "testdevice",
 		Owner:       "testowner",
 		TimeCreated: timeBase,
@@ -129,8 +129,8 @@ func testMongoDoGetLogs(t *testing.T) {
 		t.Fail()
 	}
 
-	filter := &LogsEntry{}
-	sort := LogsSort{}
+	filter := &Entry{}
+	sort := Sorts{}
 	pager, err := mgoTestLogger.getLogs(0, 3, nil, false, filter, sort, false)
 
 	if err != nil {
@@ -163,7 +163,7 @@ func testMongoDoGetLogs(t *testing.T) {
 }
 
 func testMongoDoGetLogsAfter(t *testing.T) {
-	logs := genLogs(LogsEntry{
+	logs := genLogs(Entry{
 		Device:      "testdevice",
 		Owner:       "testowner",
 		TimeCreated: timeBase,
@@ -181,8 +181,8 @@ func testMongoDoGetLogsAfter(t *testing.T) {
 		t.Fail()
 	}
 
-	filter := &LogsEntry{}
-	sort := LogsSort{}
+	filter := &Entry{}
+	sort := Sorts{}
 	pager, err := mgoTestLogger.getLogs(0, 3, &timeBase, false, filter, sort, false)
 
 	if err != nil {

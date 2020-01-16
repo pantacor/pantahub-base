@@ -65,7 +65,7 @@ func (suite S3DownloaderTestSuite) TestDownloadWithSuccessfullDownload() {
 	inputDownloader := mockInputS3Downloader{}
 	inputDownloader.On("Download", mock.Anything, expectedInput, mock.Anything).Return(nil, nil)
 
-	params := S3ConnectionParameters{
+	params := ConnectionParameters{
 		Bucket: bucket,
 	}
 	downloader := &s3impl{
@@ -89,7 +89,7 @@ func (suite S3DownloaderTestSuite) TestDownloadWithError() {
 	inputDownloader := mockInputS3Downloader{}
 	inputDownloader.On("Download", mock.Anything, expectedInput, mock.Anything).Return(nil, assert.AnError)
 
-	params := S3ConnectionParameters{
+	params := ConnectionParameters{
 		Bucket: bucket,
 	}
 	downloader := &s3impl{

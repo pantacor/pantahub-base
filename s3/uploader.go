@@ -13,6 +13,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
 package s3
 
 import (
@@ -27,7 +28,8 @@ type inputS3Uploader interface {
 	Upload(input *s3manager.UploadInput, options ...func(*s3manager.Uploader)) (*s3manager.UploadOutput, error)
 }
 
-type S3Uploader interface {
+// Uploader Uploader interface
+type Uploader interface {
 	UploadURL(key string) (string, error)
 }
 

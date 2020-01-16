@@ -13,9 +13,8 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
-package plog
 
-// Plog offers a simple mean to share pvr repos with others.
+// Package plog offers a simple mean to share pvr repos with others.
 // Similar to a blog you post your pvr repo with a title, some description text
 // and tags/sections.
 //
@@ -23,7 +22,8 @@ package plog
 //
 // AccessControl is either private or public. More advanced ACL features will
 // be available later or for users of organization accounts.
-//
+package plog
+
 import (
 	"context"
 	"log"
@@ -42,26 +42,29 @@ import (
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
 
-type PlogApp struct {
-	jwt_middleware *jwt.JWTMiddleware
-	Api            *rest.Api
-	mongoClient    *mongo.Client
+// App plog rest application
+type App struct {
+	jwtMiddleware *jwt.JWTMiddleware
+	API           *rest.Api
+	mongoClient   *mongo.Client
 }
 
-type PlogPost struct {
-	Id          primitive.ObjectID     `json:"id" bson:"_id"`
+// Post plog post payload
+type Post struct {
+	ID          primitive.ObjectID     `json:"id" bson:"_id"`
 	Owner       string                 `json:"owner"`
 	LastInSync  time.Time              `json:"last-insync" bson:"last-insync"`
 	LastTouched time.Time              `json:"last-touched" bson:"last-touched"`
-	json        map[string]interface{} `json:"json" bson:"json"`
+	JSON        map[string]interface{} `json:"json" bson:"json"`
 }
 
+// PvrRemote remote PVR
 type PvrRemote struct {
 	RemoteSpec         string   `json:"pvr-spec"`         // the pvr remote protocol spec available
-	JsonGetUrl         string   `json:"json-get-url"`     // where to pvr post stuff
-	JsonKey            string   `json:"json-key"`         // what key is to use in post json [default: json]
-	ObjectsEndpointUrl string   `json:"objects-endpoint"` // where to store/retrieve objects
-	PostUrl            string   `json:"post-url"`         // where to post/announce new revisions
+	JSONGetURL         string   `json:"json-get-url"`     // where to pvr post stuff
+	JSONKey            string   `json:"json-key"`         // what key is to use in post json [default: json]
+	ObjectsEndpointURL string   `json:"objects-endpoint"` // where to store/retrieve objects
+	PostURL            string   `json:"post-url"`         // where to post/announce new revisions
 	PostFields         []string `json:"post-fields"`      // what fields require input
 	PostFieldsOpt      []string `json:"post-fields-opt"`  // what optional fields are available [default: <empty>]
 }
@@ -69,7 +72,7 @@ type PvrRemote struct {
 //
 // ## GET /trails/summary
 //   get summary of all trails by the calling owner.
-func (a *PlogApp) handle_getplogposts(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetPlogPosts(w rest.ResponseWriter, r *rest.Request) {
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
@@ -92,7 +95,7 @@ func (a *PlogApp) handle_getplogposts(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	plogPosts := make([]PlogPost, 0)
+	plogPosts := make([]Post, 0)
 	findOptions := options.Find()
 	findOptions.SetNoCursorTimeout(true)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -106,7 +109,7 @@ func (a *PlogApp) handle_getplogposts(w rest.ResponseWriter, r *rest.Request) {
 	}
 	defer cur.Close(ctx)
 	for cur.Next(ctx) {
-		result := PlogPost{}
+		result := Post{}
 		err := cur.Decode(&result)
 		if err != nil {
 			utils.RestErrorWrapper(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
@@ -118,22 +121,23 @@ func (a *PlogApp) handle_getplogposts(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(plogPosts)
 }
 
-func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *PlogApp {
+// New creates a new plog rest application
+func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 
-	app := new(PlogApp)
-	app.jwt_middleware = jwtMiddleware
+	app := new(App)
+	app.jwtMiddleware = jwtMiddleware
 	app.mongoClient = mongoClient
 
-	app.Api = rest.NewApi()
+	app.API = rest.NewApi()
 
 	// we dont use default stack because we dont want content type enforcement
-	app.Api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
+	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
 		"/plog:", log.Lshortfile)})
-	app.Api.Use(&utils.AccessLogFluentMiddleware{Prefix: "plog"})
-	app.Api.Use(rest.DefaultCommonStack...)
+	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "plog"})
+	app.API.Use(rest.DefaultCommonStack...)
 
 	// we allow calls from other domains to allow webapps; XXX: review
-	app.Api.Use(&rest.CorsMiddleware{
+	app.API.Use(&rest.CorsMiddleware{
 		RejectNonCorsRequests: false,
 		OriginValidator: func(origin string, request *rest.Request) bool {
 			return true
@@ -146,23 +150,23 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *PlogApp {
 	})
 
 	// no authentication needed for /login
-	app.Api.Use(&rest.IfMiddleware{
+	app.API.Use(&rest.IfMiddleware{
 		Condition: func(request *rest.Request) bool {
 			return true
 		},
-		IfTrue: app.jwt_middleware,
+		IfTrue: app.jwtMiddleware,
 	})
 
 	// /auth_status endpoints
 	// XXX: this is all needs to be done so that paths that do not trail with /
 	//      get a MOVED PERMANTENTLY error with the redir path with / like the main
 	//      API routers (bad rest.MakeRouter I suspect)
-	api_router, _ := rest.MakeRouter(
+	apiRouter, _ := rest.MakeRouter(
 		//rest.Get("/", app.handle_getploginfo),
-		rest.Get("/posts", app.handle_getplogposts),
-	//	rest.Post("/posts", app.handle_postplogposts),
+		rest.Get("/posts", app.handleGetPlogPosts),
+	//	rest.Post("/posts", app.handlePostPlogPosts),
 	)
-	app.Api.SetApp(api_router)
+	app.API.SetApp(apiRouter)
 
 	return app
 }
