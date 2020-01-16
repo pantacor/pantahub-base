@@ -193,7 +193,7 @@ func ScopeFilter(filterScopes []Scope, handler rest.HandlerFunc) rest.HandlerFun
 		authInfo := GetAuthInfo(r)
 		if authInfo != nil && len(parsedFilterScopes) > 0 {
 			if !MatchScope(parsedFilterScopes, authInfo.Scopes) {
-				phAuth := GetEnv(ENV_PANTAHUB_AUTH)
+				phAuth := GetEnv(EnvPantahubAuth)
 				w.Header().Set("WWW-Authenticate", `Bearer Realm="pantahub services",
 								ph-aeps="`+phAuth+`",
 								scope="`+strings.Join(parsedFilterScopes, " ")+`",

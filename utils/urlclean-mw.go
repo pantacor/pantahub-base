@@ -8,7 +8,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 )
 
-// RecorderMiddleware keeps a record of the HTTP status code of the response,
+// URLCleanMiddleware keeps a record of the HTTP status code of the response,
 // and the number of bytes written.
 // The result is available to the wrapping handlers as request.Env["STATUS_CODE"].(int),
 // and as request.Env["BYTES_WRITTEN"].(int64)

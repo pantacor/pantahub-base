@@ -16,9 +16,11 @@ var responseTime *prometheus.HistogramVec = prometheus.NewHistogramVec(
 	[]string{"endpoint", "method", "code"},
 )
 
-type MetricsMiddleware struct{}
+// Middleware Metrics middleware
+type Middleware struct{}
 
-func (m *MetricsMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFunc {
+// MiddlewareFunc metrics middleware function
+func (m *Middleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFunc {
 	return func(w rest.ResponseWriter, r *rest.Request) {
 		handler(w, r)
 		elapse := r.Env["ELAPSED_TIME"].(*time.Duration)

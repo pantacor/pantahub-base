@@ -13,6 +13,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
 package base
 
 import (
@@ -33,6 +34,7 @@ import (
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
 
+// S3FileServer s3 file server definition
 type S3FileServer struct {
 	s3 s3.S3
 }
@@ -49,11 +51,11 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	objClaims := tok.Token.Claims.(*objects.ObjectAccessClaims)
-	storageId := objClaims.Audience
-	p, _ := url.Parse(path.Join(dirName, storageId))
+	storageID := objClaims.Audience
+	p, _ := url.Parse(path.Join(dirName, storageID))
 	r.URL = r.URL.ResolveReference(p)
 
-	finalName, err := utils.MakeLocalS3PathForName(storageId)
+	finalName, err := utils.MakeLocalS3PathForName(storageID)
 	if err != nil {
 		log.Println("ERROR: creating filepath for write: " + err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
@@ -171,16 +173,17 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+// NewS3FileServer create new s3 file server
 func NewS3FileServer() *S3FileServer {
-	connParams := s3.S3ConnectionParameters{
-		AccessKey: utils.GetEnv(utils.ENV_PANTAHUB_S3_ACCESS_KEY_ID),
-		SecretKey: utils.GetEnv(utils.ENV_PANTAHUB_S3_SECRET_ACCESS_KEY),
-		Region:    utils.GetEnv(utils.ENV_PANTAHUB_S3_REGION),
-		Bucket:    utils.GetEnv(utils.ENV_PANTAHUB_S3_BUCKET),
-		Endpoint:  utils.GetEnv(utils.ENV_PANTAHUB_S3_ENDPOINT),
+	connParams := s3.ConnectionParameters{
+		AccessKey: utils.GetEnv(utils.EnvPantahubS3AccessKeyID),
+		SecretKey: utils.GetEnv(utils.EnvPantahubS3SecretAccessKeyID),
+		Region:    utils.GetEnv(utils.EnvPantahubS3Region),
+		Bucket:    utils.GetEnv(utils.EnvPantahubS3Bucket),
+		Endpoint:  utils.GetEnv(utils.EnvPantahubS3Endpoint),
 	}
 
 	return &S3FileServer{
-		s3: s3.NewS3(connParams),
+		s3: s3.New(connParams),
 	}
 }

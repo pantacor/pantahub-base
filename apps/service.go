@@ -113,7 +113,7 @@ func (app *App) setAPI() {
 	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "apps"})
 	app.API.Use(&rest.StatusMiddleware{})
 	app.API.Use(&rest.TimerMiddleware{})
-	app.API.Use(&metrics.MetricsMiddleware{})
+	app.API.Use(&metrics.Middleware{})
 	app.API.Use(rest.DefaultCommonStack...)
 	app.API.Use(&rest.CorsMiddleware{
 		RejectNonCorsRequests: false,

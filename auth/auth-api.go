@@ -193,7 +193,7 @@ func (a *App) handlePostAccount(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	// if account creation doesn't have captcha encrypt data and send a redirect link to finish the process
-	useCaptcha := utils.GetEnv(utils.ENV_PANTAHUB_USE_CAPTCHA) == "true"
+	useCaptcha := utils.GetEnv(utils.EnvPantahubUseCaptcha) == "true"
 	if newAccount.Captcha == "" && useCaptcha {
 		response, err := handleGetEncryptedAccount(&newAccount)
 		if err != nil {
@@ -254,10 +254,10 @@ func (a *App) handlePostAccount(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	urlPrefix := utils.GetEnv(utils.ENV_PANTAHUB_SCHEME) + "://" + utils.GetEnv(utils.ENV_PANTAHUB_HOST_WWW)
-	if utils.GetEnv(utils.ENV_PANTAHUB_PORT) != "" {
+	urlPrefix := utils.GetEnv(utils.EnvPantahubScheme) + "://" + utils.GetEnv(utils.EnvPantahubWWWHost)
+	if utils.GetEnv(utils.EnvPantahubPort) != "" {
 		urlPrefix += ":"
-		urlPrefix += utils.GetEnv(utils.ENV_PANTAHUB_PORT)
+		urlPrefix += utils.GetEnv(utils.EnvPantahubPort)
 	}
 
 	utils.SendVerification(newAccount.Email, newAccount.Nick, newAccount.ID.Hex(), newAccount.Challenge, urlPrefix)
@@ -533,7 +533,7 @@ func (a *App) handlePasswordRecovery(writer rest.ResponseWriter, r *rest.Request
 		return
 	}
 
-	restorePasswordTTL, err := strconv.Atoi(utils.GetEnv(utils.ENV_PANTAHUB_RECOVER_JWT_TIMEOUT_MINUTES))
+	restorePasswordTTL, err := strconv.Atoi(utils.GetEnv(utils.EnvPantahubRecoverJWTTimeoutMinutes))
 	if err != nil {
 		utils.RestError(writer, err, err.Error(), http.StatusInternalServerError)
 	}

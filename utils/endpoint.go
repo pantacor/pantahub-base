@@ -13,25 +13,27 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
 package utils
 
 import (
 	"strings"
 )
 
-func GetApiEndpoint(localEndpoint string) string {
+// GetAPIEndpoint get pantahub api URL endpoint
+func GetAPIEndpoint(localEndpoint string) string {
 	// XXX: this is a hack for nginx proxying apparently not setting right scheme
-	urlScheme := GetEnv(ENV_PANTAHUB_SCHEME)
-	urlHost := GetEnv(ENV_PANTAHUB_HOST)
-	urlPort := GetEnv(ENV_PANTAHUB_PORT)
-	urlApiVersion := GetEnv(ENV_PANTAHUB_APIVERSION)
+	urlScheme := GetEnv(EnvPantahubScheme)
+	urlHost := GetEnv(EnvPantahubHost)
+	urlPort := GetEnv(EnvPantahubPort)
+	urlAPIVersion := GetEnv(EnvPantahubAPIVersion)
 
 	url := urlScheme + "://" + urlHost
 	if urlPort != "" {
 		url += ":" + urlPort
 	}
-	if urlApiVersion != "" {
-		url += "/" + urlApiVersion
+	if urlAPIVersion != "" {
+		url += "/" + urlAPIVersion
 	}
 	if localEndpoint == "" {
 		return url

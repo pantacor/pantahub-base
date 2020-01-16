@@ -13,6 +13,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
 package devices
 
 import (
@@ -37,8 +38,9 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
+// PantahubDevicesJoinToken devices join token payload
 type PantahubDevicesJoinToken struct {
-	Id              primitive.ObjectID     `json:"id" bson:"_id"`
+	ID              primitive.ObjectID     `json:"id" bson:"_id"`
 	Prn             string                 `json:"prn"`
 	Nick            string                 `json:"nick"`
 	Owner           string                 `json:"owner"`
@@ -50,7 +52,7 @@ type PantahubDevicesJoinToken struct {
 	TimeModified    time.Time              `json:"time-modified"`
 }
 
-func (a *DevicesApp) handle_posttokens(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePostTokens(w rest.ResponseWriter, r *rest.Request) {
 
 	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
 	if !ok {
@@ -87,8 +89,8 @@ func (a *DevicesApp) handle_posttokens(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	req.Id = primitive.NewObjectID()
-	req.Prn = utils.IdGetPrn(req.Id, "devices-tokens")
+	req.ID = primitive.NewObjectID()
+	req.Prn = utils.IDGetPrn(req.ID, "devices-tokens")
 
 	if req.Nick == "" {
 		req.Nick = petname.Generate(3, "_")
@@ -131,7 +133,7 @@ func (a *DevicesApp) handle_posttokens(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(&req)
 }
 
-func (a *DevicesApp) handle_disabletokens(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleDisableTokens(w rest.ResponseWriter, r *rest.Request) {
 
 	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
 	if !ok {
@@ -159,8 +161,8 @@ func (a *DevicesApp) handle_disabletokens(w rest.ResponseWriter, r *rest.Request
 	}
 
 	r.ParseForm()
-	tokenId := r.PathParam("id")
-	tokenIdBson := bson.ObjectIdHex(tokenId)
+	tokenID := r.PathParam("id")
+	tokenIDBson := bson.ObjectIdHex(tokenID)
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -170,7 +172,7 @@ func (a *DevicesApp) handle_disabletokens(w rest.ResponseWriter, r *rest.Request
 	_, err := collection.UpdateOne(
 		ctx,
 		bson.M{
-			"_id":   tokenIdBson,
+			"_id":   tokenIDBson,
 			"owner": caller.(string),
 		},
 		bson.M{"$set": bson.M{"disabled": true}},
@@ -185,7 +187,7 @@ func (a *DevicesApp) handle_disabletokens(w rest.ResponseWriter, r *rest.Request
 	w.WriteJson(bson.M{"status": "OK"})
 }
 
-func (a *DevicesApp) handle_gettokens(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetTokens(w rest.ResponseWriter, r *rest.Request) {
 
 	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
 	if !ok {
@@ -249,7 +251,7 @@ type autoTokenInfo struct {
 }
 
 // helper function to make it easy to get info based on auth auth token...
-func (a *DevicesApp) getBase64AutoTokenInfo(tokenBase64 string) (*autoTokenInfo, error) {
+func (a *App) getBase64AutoTokenInfo(tokenBase64 string) (*autoTokenInfo, error) {
 
 	tok := make([]byte, 24)
 
@@ -285,8 +287,8 @@ func (a *DevicesApp) getBase64AutoTokenInfo(tokenBase64 string) (*autoTokenInfo,
 	return &result, nil
 }
 
-func (a *DevicesApp) EnsureTokenIndices() error {
-
+// EnsureTokenIndices create devices database indices
+func (a *App) EnsureTokenIndices() error {
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
 
 	CreateIndexesOptions := options.CreateIndexesOptions{}

@@ -18,14 +18,26 @@ import (
 const (
 	collectionSubscription = "pantahub_subscriptions"
 
-	SubscriptionTypeCustom    = utils.Prn("prn::subscriptions:CUSTOM")
+	// SubscriptionTypeCustom custom subscription
+	SubscriptionTypeCustom = utils.Prn("prn::subscriptions:CUSTOM")
+
+	// SubscriptionTypeCancelled canceled subscription
 	SubscriptionTypeCancelled = utils.Prn("prn::subscriptions:CANCELLED")
-	SubscriptionTypeLocked    = utils.Prn("prn::subscriptions:LOCKED")
-	SubscriptionTypePrefix    = utils.Prn("prn::subscriptions:")
-	SubscriptionTypeFree      = utils.Prn(SubscriptionTypePrefix + "FREE")
-	SubscriptionTypeVIP       = utils.Prn(SubscriptionTypePrefix + "VIP")
+
+	// SubscriptionTypeLocked locked subscription
+	SubscriptionTypeLocked = utils.Prn("prn::subscriptions:LOCKED")
+
+	// SubscriptionTypePrefix prefix for all subscription
+	SubscriptionTypePrefix = utils.Prn("prn::subscriptions:")
+
+	// SubscriptionTypeFree free subscription
+	SubscriptionTypeFree = utils.Prn(SubscriptionTypePrefix + "FREE")
+
+	// SubscriptionTypeVIP vip subscription
+	SubscriptionTypeVIP = utils.Prn(SubscriptionTypePrefix + "VIP")
 )
 
+// Subscription define a subscription interface
 type Subscription interface {
 	GetID() string
 	GetPrn() utils.Prn
@@ -55,6 +67,7 @@ type Subscription interface {
 	Lock(issuer utils.Prn) error
 }
 
+// SubscriptionMgo define Subscription mongo payload
 type SubscriptionMgo struct {
 	service SubscriptionService
 
@@ -89,6 +102,7 @@ type SubscriptionMgo struct {
 }
 
 var (
+	// SubscriptionProperties define the subscriptions capabilities
 	SubscriptionProperties = map[utils.Prn]interface{}{
 		SubscriptionTypeFree: map[string]interface{}{
 			"OBJECTS":   "2GiB",
@@ -110,32 +124,48 @@ var (
 	}
 )
 
+// GetID get subscription ID
 func (i SubscriptionMgo) GetID() string {
 	return i.ID
 }
+
+// GetIssuer get subscription issuer
 func (i SubscriptionMgo) GetIssuer() utils.Prn {
 	return i.Issuer
 }
+
+// GetPlan get subscription type
 func (i SubscriptionMgo) GetPlan() utils.Prn {
 	return i.Type
 }
+
+// GetPrn get subscription PRN
 func (i SubscriptionMgo) GetPrn() utils.Prn {
 	return i.Prn
 }
+
+// GetSubject get subscription subject
 func (i SubscriptionMgo) GetSubject() utils.Prn {
 	return i.Subject
 }
+
+// GetService get subscription service
 func (i SubscriptionMgo) GetService() utils.Prn {
 	return i.Service
 }
+
+// HasProperty check if a subscription has a specific property
 func (i SubscriptionMgo) HasProperty(key string) bool {
 	_, ok := i.Attributes[key]
 	return ok
 }
+
+// GetProperty get a subscription property
 func (i SubscriptionMgo) GetProperty(key string) interface{} {
 	return i.Attributes[key]
 }
 
+// GetHistory get the history of a subscription
 func (i SubscriptionMgo) GetHistory() []Subscription {
 	subs := make([]Subscription, len(i.History))
 	for k := range i.History {
@@ -145,24 +175,29 @@ func (i SubscriptionMgo) GetHistory() []Subscription {
 	return subs
 }
 
+// GetTimeModified last time the subscription was modified
 func (i SubscriptionMgo) GetTimeModified() time.Time {
 	return i.LastModified
 }
 
+// GetTimeCreated Get the time when the subscription was created
 func (i SubscriptionMgo) GetTimeCreated() time.Time {
 	return i.TimeCreated
 }
 
+// GetPeriodStart get when the current period of the subscription started
 func (i SubscriptionMgo) GetPeriodStart() time.Time {
 	now := i.service.Now().UTC()
 	return time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
 }
 
+// GetPeriodEnd get when the current period end
 func (i SubscriptionMgo) GetPeriodEnd() time.Time {
 	now := i.service.Now().UTC()
 	return time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, time.UTC)
 }
 
+// GetPeriodProgression get the progression of the current period
 func (i SubscriptionMgo) GetPeriodProgression() float64 {
 	start := i.GetPeriodStart()
 	end := i.GetPeriodEnd()
@@ -172,13 +207,17 @@ func (i SubscriptionMgo) GetPeriodProgression() float64 {
 	return math.Abs(float64(periodIn) / float64(periodLenSec))
 }
 
+// IsCancelled check if the subscription is cancelled
 func (i SubscriptionMgo) IsCancelled() bool {
 	return i.Type == SubscriptionTypeCancelled
 }
+
+// IsLocked check if the subscription is locked
 func (i SubscriptionMgo) IsLocked() bool {
 	return i.Type == SubscriptionTypeLocked
 }
 
+// UpdatePlan udpdate a plan with new configuration and saved the previous as history
 func (i SubscriptionMgo) UpdatePlan(issuer utils.Prn, plan utils.Prn, attrs map[string]interface{}) error {
 
 	// create a clone where we can strip history history
@@ -212,11 +251,13 @@ func (i SubscriptionMgo) UpdatePlan(issuer utils.Prn, plan utils.Prn, attrs map[
 	return err
 }
 
+// Cancel cancel a subscription
 func (i SubscriptionMgo) Cancel(issuer utils.Prn) error {
 	err := i.UpdatePlan(issuer, SubscriptionTypeCancelled, i.Attributes)
 	return err
 }
 
+// Lock lock a subscription
 func (i SubscriptionMgo) Lock(issuer utils.Prn) error {
 	err := i.UpdatePlan(issuer, SubscriptionTypeLocked, i.Attributes)
 	return err

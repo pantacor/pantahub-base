@@ -13,9 +13,8 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
-package trails
 
-// Trails offer a two party master/slave relationship enabling
+// Package trails offer a two party master/slave relationship enabling
 // the master to asynchronously deploy configuration changes to its
 // slave in a stepwise manner.
 //
@@ -43,6 +42,8 @@ package trails
 //     progress
 //   - find smart way to figure when device is in sync based on reported state
 //   - consider enforcing sequential processing of steps to have a clean tail?
+package trails
+
 import (
 	"encoding/json"
 	"errors"
@@ -69,24 +70,27 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
+// PvrRemote pvr remote specification payload
 type PvrRemote struct {
 	RemoteSpec         string   `json:"pvr-spec"`         // the pvr remote protocol spec available
-	JsonGetUrl         string   `json:"json-get-url"`     // where to pvr post stuff
-	JsonKey            string   `json:"json-key"`         // what key is to use in post json [default: json]
-	ObjectsEndpointUrl string   `json:"objects-endpoint"` // where to store/retrieve objects
-	PostUrl            string   `json:"post-url"`         // where to post/announce new revisions
+	JSONGetURL         string   `json:"json-get-url"`     // where to pvr post stuff
+	JSONKey            string   `json:"json-key"`         // what key is to use in post json [default: json]
+	ObjectsEndpointURL string   `json:"objects-endpoint"` // where to store/retrieve objects
+	PostURL            string   `json:"post-url"`         // where to post/announce new revisions
 	PostFields         []string `json:"post-fields"`      // what fields require input
 	PostFieldsOpt      []string `json:"post-fields-opt"`  // what optional fields are available [default: <empty>]
 }
 
-type TrailsApp struct {
-	jwt_middleware *jwt.JWTMiddleware
-	Api            *rest.Api
-	mongoClient    *mongo.Client
+// App trails rest application
+type App struct {
+	jwtMiddleware *jwt.JWTMiddleware
+	API           *rest.Api
+	mongoClient   *mongo.Client
 }
 
+// Trail define the structure of a trail
 type Trail struct {
-	Id     primitive.ObjectID `json:"id" bson:"_id"`
+	ID     primitive.ObjectID `json:"id" bson:"_id"`
 	Owner  string             `json:"owner"`
 	Device string             `json:"device"`
 	//  Admins   []string `json:"admins"`   // XXX: maybe this is best way to do delegating device access....
@@ -96,15 +100,15 @@ type Trail struct {
 	UsedObjects  []string               `bson:"used_objects" json:"used_objects"`
 }
 
-// step wanted can be added by the device owner or delegate.
+// Step wanted can be added by the device owner or delegate.
 // steps that were not reported can be deleted still. other steps
 // cannot be deleted until the device gets deleted as well.
 type Step struct {
-	Id           string                 `json:"id" bson:"_id"` // XXX: make type
+	ID           string                 `json:"id" bson:"_id"` // XXX: make type
 	Owner        string                 `json:"owner"`
 	Device       string                 `json:"device"`
 	Committer    string                 `json:"committer"`
-	TrailId      primitive.ObjectID     `json:"trail-id" bson:"trail-id"` //parent id
+	TrailID      primitive.ObjectID     `json:"trail-id" bson:"trail-id"` //parent id
 	Rev          int                    `json:"rev"`
 	CommitMsg    string                 `json:"commit-msg" bson:"commit-msg"`
 	State        map[string]interface{} `json:"state"` // json blurb
@@ -116,6 +120,7 @@ type Step struct {
 	UsedObjects  []string               `bson:"used_objects" json:"used_objects"`
 }
 
+// StepProgress progression of a step
 type StepProgress struct {
 	Progress  int    `json:"progress"`                    // progress number. steps or 1-100
 	StatusMsg string `json:"status-msg" bson:"statusmsg"` // message of progress status
@@ -123,8 +128,9 @@ type StepProgress struct {
 	Log       string `json:"log"`                         // log if available
 }
 
+// TrailSummary details about a trail
 type TrailSummary struct {
-	DeviceId         string    `json:"deviceid" bson:"deviceid"`
+	DeviceID         string    `json:"deviceid" bson:"deviceid"`
 	Device           string    `json:"device" bson:"device"`
 	DeviceNick       string    `json:"device-nick" bson:"device_nick"`
 	Rev              int       `json:"revision" bson:"revision"`
@@ -146,14 +152,14 @@ type TrailSummary struct {
 	Owner            string    `json:"-" bson:"owner"`
 }
 
-func handle_auth(w rest.ResponseWriter, r *rest.Request) {
+func handleAuth(w rest.ResponseWriter, r *rest.Request) {
 	jwtClaims := r.Env["JWT_PAYLOAD"]
 	w.WriteJson(jwtClaims)
 }
 
 // XXX: no product without fixing this to only parse ids that belong to this
 // service instance
-func prnGetId(prn string) string {
+func prnGetID(prn string) string {
 	idx := strings.Index(prn, "/")
 	return prn[idx+1:]
 }
@@ -163,7 +169,7 @@ func prnGetId(prn string) string {
 //   initiates the trail by using the reported state as stepwanted 0 and setting
 //   the step 0 to be the POSTED JSON. Either device accounts or user accounts can
 //   do this for devices owned, but there can always only be ONE trail per device.
-func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 
 	initialState := map[string]interface{}{}
 
@@ -190,7 +196,7 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "Device needs an owner", http.StatusForbidden)
 		return
 	}
-	deviceID := prnGetId(device.(string))
+	deviceID := prnGetID(device.(string))
 
 	// do we need tip/tail here? or is that always read-only?
 	newTrail := Trail{}
@@ -199,7 +205,7 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	newTrail.Id = deviceObjectID
+	newTrail.ID = deviceObjectID
 	newTrail.Owner = owner.(string)
 	newTrail.Device = device.(string)
 	newTrail.LastInSync = time.Time{}
@@ -213,8 +219,8 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 	newTrail.FactoryState = utils.BsonQuoteMap(&initialState)
 
 	newStep := Step{}
-	newStep.Id = newTrail.Id.Hex() + "-0"
-	newStep.TrailId = newTrail.Id
+	newStep.ID = newTrail.ID.Hex() + "-0"
+	newStep.TrailID = newTrail.ID
 	newStep.Rev = 0
 	stateSha, err := utils.StateSha(&initialState)
 	if err != nil {
@@ -283,7 +289,7 @@ func (a *TrailsApp) handle_posttrail(w rest.ResponseWriter, r *rest.Request) {
 //   devices get a list of one and only one trail. users get trails for all the
 //   devices they have trail control over (right now simplified for owner)
 //
-func (a *TrailsApp) handle_gettrails(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetTrails(w rest.ResponseWriter, r *rest.Request) {
 
 	initialState := map[string]interface{}{}
 
@@ -353,7 +359,7 @@ func (a *TrailsApp) handle_gettrails(w rest.ResponseWriter, r *rest.Request) {
 //   can get a trail. If not found or if no access, NotFound status code is
 //   returned (XXX: make that true)
 //
-func (a *TrailsApp) handle_gettrail(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetTrail(w rest.ResponseWriter, r *rest.Request) {
 
 	var err error
 
@@ -373,17 +379,19 @@ func (a *TrailsApp) handle_gettrail(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	getId := r.PathParam("id")
+	getID := r.PathParam("id")
 	trail := Trail{}
 
-	isPublic, err := a.isTrailPublic(getId)
+	isPublic, err := a.isTrailPublic(getID)
 
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error getting public trail", http.StatusInternalServerError)
 		return
 	}
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
-	trailObjectID, err := primitive.ObjectIDFromHex(getId)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	trailObjectID, err := primitive.ObjectIDFromHex(getID)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
@@ -417,8 +425,7 @@ func (a *TrailsApp) handle_gettrail(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(trail)
 }
 
-func (a *TrailsApp) handle_gettrailpvrinfo(w rest.ResponseWriter, r *rest.Request) {
-
+func (a *App) handleGetTrailPvrInfo(w rest.ResponseWriter, r *rest.Request) {
 	var err error
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
@@ -437,17 +444,19 @@ func (a *TrailsApp) handle_gettrailpvrinfo(w rest.ResponseWriter, r *rest.Reques
 		return
 	}
 
-	getId := r.PathParam("id")
+	getID := r.PathParam("id")
 	step := Step{}
 
-	isPublic, err := a.isTrailPublic(getId)
+	isPublic, err := a.isTrailPublic(getID)
 
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error getting trail public", http.StatusInternalServerError)
 		return
 	}
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
-	trailObjectID, err := primitive.ObjectIDFromHex(getId)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	trailObjectID, err := primitive.ObjectIDFromHex(getID)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
@@ -484,18 +493,18 @@ func (a *TrailsApp) handle_gettrailpvrinfo(w rest.ResponseWriter, r *rest.Reques
 		return
 	}
 
-	oe := utils.GetApiEndpoint("/trails/" + getId + "/steps/" + strconv.Itoa(step.Rev) + "/objects")
-	jsonGet := utils.GetApiEndpoint("/trails/" + getId + "/steps/" + strconv.Itoa(step.Rev) + "/state")
-	postUrl := utils.GetApiEndpoint("/trails/" + getId + "/steps")
+	oe := utils.GetAPIEndpoint("/trails/" + getID + "/steps/" + strconv.Itoa(step.Rev) + "/objects")
+	jsonGet := utils.GetAPIEndpoint("/trails/" + getID + "/steps/" + strconv.Itoa(step.Rev) + "/state")
+	postURL := utils.GetAPIEndpoint("/trails/" + getID + "/steps")
 	postFields := []string{"commit-msg"}
 	postFieldsOpt := []string{"rev"}
 
 	remoteInfo := PvrRemote{
 		RemoteSpec:         "pvr-pantahub-1",
-		JsonGetUrl:         jsonGet,
-		ObjectsEndpointUrl: oe,
-		JsonKey:            "state",
-		PostUrl:            postUrl,
+		JSONGetURL:         jsonGet,
+		ObjectsEndpointURL: oe,
+		JSONKey:            "state",
+		PostURL:            postURL,
 		PostFields:         postFields,
 		PostFieldsOpt:      postFieldsOpt,
 	}
@@ -503,8 +512,7 @@ func (a *TrailsApp) handle_gettrailpvrinfo(w rest.ResponseWriter, r *rest.Reques
 	w.WriteJson(remoteInfo)
 }
 
-func (a *TrailsApp) handle_getsteppvrinfo(w rest.ResponseWriter, r *rest.Request) {
-
+func (a *App) handleGetStepPvrInfo(w rest.ResponseWriter, r *rest.Request) {
 	var err error
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
@@ -523,42 +531,44 @@ func (a *TrailsApp) handle_getsteppvrinfo(w rest.ResponseWriter, r *rest.Request
 		return
 	}
 
-	getId := r.PathParam("id")
-	revId := r.PathParam("rev")
-	stepId := getId + "-" + revId
+	getID := r.PathParam("id")
+	revID := r.PathParam("rev")
+	stepID := getID + "-" + revID
 	step := Step{}
 
-	isPublic, err := a.isTrailPublic(getId)
+	isPublic, err := a.isTrailPublic(getID)
 
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error getting trail public", http.StatusInternalServerError)
 		return
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	//	get last step
 	if isPublic {
 		err = coll.FindOne(ctx, bson.M{
-			"_id":     stepId,
+			"_id":     stepID,
 			"garbage": bson.M{"$ne": true},
 		}).Decode(&step)
 
 	} else if authType == "DEVICE" {
 		err = coll.FindOne(ctx, bson.M{
 			"device":  owner,
-			"_id":     stepId,
+			"_id":     stepID,
 			"garbage": bson.M{"$ne": true},
 		}).Decode(&step)
 	} else if authType == "USER" {
 		err = coll.FindOne(ctx, bson.M{
 			"owner":   owner,
-			"_id":     stepId,
+			"_id":     stepID,
 			"garbage": bson.M{"$ne": true},
 		}).Decode(&step)
 	}
 
 	if err == mongo.ErrNoDocuments {
-		utils.RestErrorWrapper(w, "No access to device step trail "+stepId, http.StatusForbidden)
+		utils.RestErrorWrapper(w, "No access to device step trail "+stepID, http.StatusForbidden)
 		return
 	}
 
@@ -567,22 +577,22 @@ func (a *TrailsApp) handle_getsteppvrinfo(w rest.ResponseWriter, r *rest.Request
 		return
 	}
 
-	oe := utils.GetApiEndpoint("/trails/" + getId + "/steps/" +
-		revId + "/objects")
+	oe := utils.GetAPIEndpoint("/trails/" + getID + "/steps/" +
+		revID + "/objects")
 
-	jsonUrl := utils.GetApiEndpoint("/trails/" + getId + "/steps/" +
-		revId + "/state")
+	jsonURL := utils.GetAPIEndpoint("/trails/" + getID + "/steps/" +
+		revID + "/state")
 
-	postUrl := utils.GetApiEndpoint("/trails/" + getId + "/steps")
+	postURL := utils.GetAPIEndpoint("/trails/" + getID + "/steps")
 	postFields := []string{"msg"}
 	postFieldsOpt := []string{}
 
 	remoteInfo := PvrRemote{
 		RemoteSpec:         "pvr-pantahub-1",
-		JsonGetUrl:         jsonUrl,
-		ObjectsEndpointUrl: oe,
-		JsonKey:            "state",
-		PostUrl:            postUrl,
+		JSONGetURL:         jsonURL,
+		ObjectsEndpointURL: oe,
+		JSONKey:            "state",
+		PostURL:            postURL,
 		PostFields:         postFields,
 		PostFieldsOpt:      postFieldsOpt,
 	}
@@ -590,7 +600,7 @@ func (a *TrailsApp) handle_getsteppvrinfo(w rest.ResponseWriter, r *rest.Request
 	w.WriteJson(remoteInfo)
 }
 
-func (a *TrailsApp) get_latest_steprev(trailId primitive.ObjectID) (int, error) {
+func (a *App) getLatestStePrev(trailID primitive.ObjectID) (int, error) {
 	collSteps := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
 	if collSteps == nil {
@@ -604,7 +614,7 @@ func (a *TrailsApp) get_latest_steprev(trailId primitive.ObjectID) (int, error) 
 	findOneOptions.SetSort(bson.M{"rev": -1})
 
 	err := collSteps.FindOne(ctx, bson.M{
-		"trail-id": trailId,
+		"trail-id": trailID,
 		"garbage":  bson.M{"$ne": true},
 	}, findOneOptions).
 		Decode(&step)
@@ -613,7 +623,7 @@ func (a *TrailsApp) get_latest_steprev(trailId primitive.ObjectID) (int, error) 
 		return -1, err
 	}
 	if step == nil {
-		return -1, errors.New("no step found for trail: " + trailId.Hex())
+		return -1, errors.New("no step found for trail: " + trailID.Hex())
 	}
 	return step.Rev, err
 }
@@ -627,8 +637,7 @@ func (a *TrailsApp) get_latest_steprev(trailId primitive.ObjectID) (int, error) 
 //  it will be unique. Also no step will be added if the previous one does not
 //  exist that. This will include completeness of the step rev sequence.
 //
-func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
-
+func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 	var err error
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["owner"]
@@ -652,12 +661,12 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	trailId := r.PathParam("id")
+	trailID := r.PathParam("id")
 	trail := Trail{}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	trailObjectID, err := primitive.ObjectIDFromHex(trailId)
+	trailObjectID, err := primitive.ObjectIDFromHex(trailID)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
@@ -695,13 +704,13 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 	r.DecodeJsonPayload(&newStep)
 
 	if newStep.Rev == -1 {
-		trailObjectID, err := primitive.ObjectIDFromHex(trailId)
+		trailObjectID, err := primitive.ObjectIDFromHex(trailID)
 		if err != nil {
 			utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		newStep.Rev, err = a.get_latest_steprev(trailObjectID)
-		newStep.Rev += 1
+		newStep.Rev, err = a.getLatestStePrev(trailObjectID)
+		newStep.Rev++
 	}
 
 	if err != nil {
@@ -709,11 +718,11 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	stepId := trailId + "-" + strconv.Itoa(newStep.Rev-1)
+	stepID := trailID + "-" + strconv.Itoa(newStep.Rev-1)
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	err = collSteps.FindOne(ctx, bson.M{
-		"_id":     stepId,
+		"_id":     stepID,
 		"garbage": bson.M{"$ne": true},
 	}).Decode(&previousStep)
 
@@ -725,13 +734,13 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 
 	// XXX: introduce step diffs here and store them precalced
 
-	newStep.Id = trail.Id.Hex() + "-" + strconv.Itoa(newStep.Rev)
+	newStep.ID = trail.ID.Hex() + "-" + strconv.Itoa(newStep.Rev)
 	newStep.Owner = trail.Owner
 	newStep.Device = trail.Device
 	newStep.StepProgress = StepProgress{
 		Status: "NEW",
 	}
-	newStep.TrailId = trail.Id
+	newStep.TrailID = trail.ID
 	newStep.StepTime = time.Now()
 	newStep.ProgressTime = time.Unix(0, 0)
 
@@ -772,7 +781,7 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 	updateResult, err := collTrails.UpdateOne(
 		ctx,
 		bson.M{
-			"_id":     trail.Id,
+			"_id":     trail.ID,
 			"garbage": bson.M{"$ne": true},
 		},
 		bson.M{"$set": bson.M{
@@ -785,7 +794,7 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 	}
 	if err != nil {
 		// XXX: figure how to be better on error cases here...
-		log.Printf("Error updating last-touched for trail in poststep; not failing because step was written: %s\n  => ERROR: %s\n ", trail.Id.Hex(), err.Error())
+		log.Printf("Error updating last-touched for trail in poststep; not failing because step was written: %s\n  => ERROR: %s\n ", trail.ID.Hex(), err.Error())
 	}
 
 	newStep.State = utils.BsonUnquoteMap(&newStep.State)
@@ -804,7 +813,7 @@ func (a *TrailsApp) handle_poststep(w rest.ResponseWriter, r *rest.Request) {
 //   conveyes that the devices knows about the step to go and will keep the
 //   post updates to the walk elements as they go.
 //
-func (a *TrailsApp) handle_getsteps(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetSteps(w rest.ResponseWriter, r *rest.Request) {
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
@@ -824,16 +833,16 @@ func (a *TrailsApp) handle_getsteps(w rest.ResponseWriter, r *rest.Request) {
 
 	steps := make([]Step, 0)
 
-	trailId := r.PathParam("id")
+	trailID := r.PathParam("id")
 	query := bson.M{}
 
-	isPublic, err := a.isTrailPublic(trailId)
+	isPublic, err := a.isTrailPublic(trailID)
 
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error getting trail public", http.StatusInternalServerError)
 		return
 	}
-	trailObjectID, err := primitive.ObjectIDFromHex(trailId)
+	trailObjectID, err := primitive.ObjectIDFromHex(trailID)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
@@ -861,12 +870,12 @@ func (a *TrailsApp) handle_getsteps(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	// allow override of progress.status defaults
-	progress_status := r.URL.Query().Get("progress.status")
-	if progress_status != "" {
+	progressStatus := r.URL.Query().Get("progress.status")
+	if progressStatus != "" {
 		m := map[string]interface{}{}
-		err := json.Unmarshal([]byte(progress_status), &m)
+		err := json.Unmarshal([]byte(progressStatus), &m)
 		if err != nil {
-			query["progress.status"] = progress_status
+			query["progress.status"] = progressStatus
 		} else {
 			query["progress.status"] = m
 		}
@@ -910,7 +919,7 @@ func (a *TrailsApp) handle_getsteps(w rest.ResponseWriter, r *rest.Request) {
 //   device of. devices can PUT progress to the /progress pseudo subnode. Besides
 //   that steps are read only for the matter of the API
 //
-func (a *TrailsApp) handle_getstep(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetStep(w rest.ResponseWriter, r *rest.Request) {
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
@@ -921,9 +930,9 @@ func (a *TrailsApp) handle_getstep(w rest.ResponseWriter, r *rest.Request) {
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
-	trailId := r.PathParam("id")
+	trailID := r.PathParam("id")
 
-	isPublic, err := a.isTrailPublic(trailId)
+	isPublic, err := a.isTrailPublic(trailID)
 
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error getting trail public", http.StatusInternalServerError)
@@ -940,11 +949,13 @@ func (a *TrailsApp) handle_getstep(w rest.ResponseWriter, r *rest.Request) {
 	rev := r.PathParam("rev")
 
 	query := bson.M{
-		"_id":     trailId + "-" + rev,
+		"_id":     trailID + "-" + rev,
 		"garbage": bson.M{"$ne": true},
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	if isPublic {
 		err = coll.FindOne(ctx, query).Decode(&step)
 	} else if authType == "DEVICE" {
@@ -953,7 +964,7 @@ func (a *TrailsApp) handle_getstep(w rest.ResponseWriter, r *rest.Request) {
 	} else if authType == "USER" {
 		query["owner"] = owner
 		err = coll.FindOne(ctx, bson.M{
-			"_id":     trailId + "-" + rev,
+			"_id":     trailID + "-" + rev,
 			"owner":   owner,
 			"garbage": bson.M{"$ne": true},
 		}).Decode(&step)
@@ -979,7 +990,7 @@ func (a *TrailsApp) handle_getstep(w rest.ResponseWriter, r *rest.Request) {
 //
 //   just the raw data of a step without metainfo...
 //
-func (a *TrailsApp) handle_getstepmeta(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetStepMeta(w rest.ResponseWriter, r *rest.Request) {
 
 	var err error
 
@@ -1000,31 +1011,33 @@ func (a *TrailsApp) handle_getstepmeta(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	step := Step{}
-	trailId := r.PathParam("id")
+	trailID := r.PathParam("id")
 	rev := r.PathParam("rev")
 
-	isPublic, err := a.isTrailPublic(trailId)
+	isPublic, err := a.isTrailPublic(trailID)
 
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error getting trail public", http.StatusInternalServerError)
 		return
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	if isPublic {
 		err = coll.FindOne(ctx, bson.M{
-			"_id":     trailId + "-" + rev,
+			"_id":     trailID + "-" + rev,
 			"garbage": bson.M{"$ne": true},
 		}).Decode(&step)
 	} else if authType == "DEVICE" {
 		err = coll.FindOne(ctx, bson.M{
-			"_id":     trailId + "-" + rev,
+			"_id":     trailID + "-" + rev,
 			"device":  owner,
 			"garbage": bson.M{"$ne": true},
 		}).Decode(&step)
 	} else if authType == "USER" {
 		err = coll.FindOne(ctx, bson.M{
-			"_id":     trailId + "-" + rev,
+			"_id":     trailID + "-" + rev,
 			"owner":   owner,
 			"garbage": bson.M{"$ne": true},
 		}).Decode(&step)
@@ -1043,7 +1056,7 @@ func (a *TrailsApp) handle_getstepmeta(w rest.ResponseWriter, r *rest.Request) {
 //
 //   just the raw data of a step without metainfo...
 //
-func (a *TrailsApp) handle_getstepstate(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetStepState(w rest.ResponseWriter, r *rest.Request) {
 
 	var err error
 
@@ -1065,31 +1078,33 @@ func (a *TrailsApp) handle_getstepstate(w rest.ResponseWriter, r *rest.Request) 
 
 	step := Step{}
 
-	trailId := r.PathParam("id")
+	trailID := r.PathParam("id")
 	rev := r.PathParam("rev")
 
-	isPublic, err := a.isTrailPublic(trailId)
+	isPublic, err := a.isTrailPublic(trailID)
 
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error getting trail public", http.StatusInternalServerError)
 		return
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	if isPublic {
 		err = coll.FindOne(ctx, bson.M{
-			"_id":     trailId + "-" + rev,
+			"_id":     trailID + "-" + rev,
 			"garbage": bson.M{"$ne": true},
 		}).Decode(&step)
 	} else if authType == "DEVICE" {
 		err = coll.FindOne(ctx, bson.M{
-			"_id":     trailId + "-" + rev,
+			"_id":     trailID + "-" + rev,
 			"device":  owner,
 			"garbage": bson.M{"$ne": true},
 		}).Decode(&step)
 	} else if authType == "USER" {
 		err = coll.FindOne(ctx, bson.M{
-			"_id":     trailId + "-" + rev,
+			"_id":     trailID + "-" + rev,
 			"owner":   owner,
 			"garbage": bson.M{"$ne": true},
 		}).Decode(&step)
@@ -1098,7 +1113,7 @@ func (a *TrailsApp) handle_getstepstate(w rest.ResponseWriter, r *rest.Request) 
 	w.WriteJson(utils.BsonUnquoteMap(&step.State))
 }
 
-func (a *TrailsApp) handle_getstepsobjects(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetStepsObjects(w rest.ResponseWriter, r *rest.Request) {
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
@@ -1118,31 +1133,32 @@ func (a *TrailsApp) handle_getstepsobjects(w rest.ResponseWriter, r *rest.Reques
 
 	step := Step{}
 
-	trailId := r.PathParam("id")
+	trailID := r.PathParam("id")
 	rev := r.PathParam("rev")
 
-	isPublic, err := a.isTrailPublic(trailId)
+	isPublic, err := a.isTrailPublic(trailID)
 
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error getting trail public", http.StatusInternalServerError)
 		return
 	}
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
 	if isPublic {
 		err = coll.FindOne(ctx, bson.M{
-			"_id":     trailId + "-" + rev,
+			"_id":     trailID + "-" + rev,
 			"garbage": bson.M{"$ne": true},
 		}).Decode(&step)
 	} else if authType == "DEVICE" {
 		err = coll.FindOne(ctx, bson.M{
-			"_id":     trailId + "-" + rev,
+			"_id":     trailID + "-" + rev,
 			"device":  owner,
 			"garbage": bson.M{"$ne": true},
 		}).Decode(&step)
 	} else if authType == "USER" {
 		err = coll.FindOne(ctx, bson.M{
-			"_id":     trailId + "-" + rev,
+			"_id":     trailID + "-" + rev,
 			"owner":   owner,
 			"garbage": bson.M{"$ne": true},
 		}).Decode(&step)
@@ -1187,18 +1203,18 @@ func (a *TrailsApp) handle_getstepsobjects(w rest.ResponseWriter, r *rest.Reques
 			return
 		}
 
-		storageId := objects.MakeStorageId(step.Owner, sha)
+		storageID := objects.MakeStorageID(step.Owner, sha)
 
 		var newObject objects.Object
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		err = collection.FindOne(ctx, bson.M{
-			"_id":     storageId,
+			"_id":     storageID,
 			"garbage": bson.M{"$ne": true},
 		}).Decode(&newObject)
 
 		if err != nil {
-			utils.RestErrorWrapper(w, "Not Accessible Resource Id: "+storageId+" ERR: "+err.Error(), http.StatusForbidden)
+			utils.RestErrorWrapper(w, "Not Accessible Resource Id: "+storageID+" ERR: "+err.Error(), http.StatusForbidden)
 			return
 		}
 
@@ -1209,14 +1225,14 @@ func (a *TrailsApp) handle_getstepsobjects(w rest.ResponseWriter, r *rest.Reques
 
 		newObject.ObjectName = k
 
-		issuerUrl := utils.GetApiEndpoint("/trails")
-		objWithAccess := objects.MakeObjAccessible(issuerUrl, callingPrincipalStr, newObject, storageId)
+		issuerURL := utils.GetAPIEndpoint("/trails")
+		objWithAccess := objects.MakeObjAccessible(issuerURL, callingPrincipalStr, newObject, storageID)
 		objectsWithAccess = append(objectsWithAccess, objWithAccess)
 	}
 	w.WriteJson(&objectsWithAccess)
 }
 
-func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePostStepsObject(w rest.ResponseWriter, r *rest.Request) {
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
@@ -1236,7 +1252,7 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 
 	step := Step{}
 
-	trailId := r.PathParam("id")
+	trailID := r.PathParam("id")
 	rev := r.PathParam("rev")
 
 	if authType != "DEVICE" && authType != "USER" {
@@ -1246,7 +1262,7 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	err := coll.FindOne(ctx, bson.M{
-		"_id":     trailId + "-" + rev,
+		"_id":     trailID + "-" + rev,
 		"garbage": bson.M{"$ne": true},
 	}).
 		Decode(&step)
@@ -1282,13 +1298,13 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 		return
 	}
 
-	storageId := objects.MakeStorageId(newObject.Owner, sha)
-	newObject.StorageId = storageId
-	newObject.Id = newObject.Sha
+	storageID := objects.MakeStorageID(newObject.Owner, sha)
+	newObject.StorageID = storageID
+	newObject.ID = newObject.Sha
 
 	objects.SyncObjectSizes(&newObject)
 
-	result, err := objects.CalcUsageAfterPost(newObject.Owner, a.mongoClient, newObject.Id, newObject.SizeInt)
+	result, err := objects.CalcUsageAfterPost(newObject.Owner, a.mongoClient, newObject.ID, newObject.SizeInt)
 
 	if err != nil {
 		log.Println("Error to calc diskquota: " + err.Error())
@@ -1317,7 +1333,7 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 	)
 
 	if err != nil {
-		filePath, err := utils.MakeLocalS3PathForName(storageId)
+		filePath, err := utils.MakeLocalS3PathForName(storageID)
 
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -1336,7 +1352,7 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 		defer cancel()
 		updatedResult, err := collection.UpdateOne(
 			ctx,
-			bson.M{"_id": newObject.StorageId},
+			bson.M{"_id": newObject.StorageID},
 			bson.M{"$set": newObject},
 		)
 		if updatedResult.MatchedCount == 0 {
@@ -1352,12 +1368,12 @@ func (a *TrailsApp) handle_poststepsobject(w rest.ResponseWriter, r *rest.Reques
 		// we return anyway with the already available info about this object
 	}
 conflict:
-	issuerUrl := utils.GetApiEndpoint("/trails")
-	newObjectWithAccess := objects.MakeObjAccessible(issuerUrl, newObject.Owner, newObject, storageId)
+	issuerURL := utils.GetAPIEndpoint("/trails")
+	newObjectWithAccess := objects.MakeObjAccessible(issuerURL, newObject.Owner, newObject, storageID)
 	w.WriteJson(newObjectWithAccess)
 }
 
-func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePutStepsObject(w rest.ResponseWriter, r *rest.Request) {
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
@@ -1376,9 +1392,9 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 	}
 
 	step := Step{}
-	trailId := r.PathParam("id")
+	trailID := r.PathParam("id")
 	rev := r.PathParam("rev")
-	putId := r.PathParam("obj")
+	putID := r.PathParam("obj")
 
 	if authType != "DEVICE" && authType != "USER" {
 		utils.RestErrorWrapper(w, "Unknown AuthType", http.StatusBadRequest)
@@ -1388,7 +1404,7 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	err := coll.FindOne(ctx, bson.M{
-		"_id":     trailId + "-" + rev,
+		"_id":     trailID + "-" + rev,
 		"garbage": bson.M{"$ne": true},
 	}).Decode(&step)
 	if err != nil {
@@ -1412,19 +1428,19 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 		return
 	}
 
-	sha, err := utils.DecodeSha256HexString(putId)
+	sha, err := utils.DecodeSha256HexString(putID)
 
 	if err != nil {
 		utils.RestErrorWrapper(w, "Put Trails Steps Object id must be a valid sha256", http.StatusBadRequest)
 		return
 	}
 
-	storageId := objects.MakeStorageId(step.Owner, sha)
+	storageID := objects.MakeStorageID(step.Owner, sha)
 
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	err = collection.FindOne(ctx, bson.M{
-		"_id":     storageId,
+		"_id":     storageID,
 		"garbage": bson.M{"$ne": true},
 	}).Decode(&newObject)
 
@@ -1438,12 +1454,12 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 		return
 	}
 
-	nId := newObject.Id
+	nID := newObject.ID
 	nOwner := newObject.Owner
-	nStorageId := newObject.StorageId
+	nStorageID := newObject.StorageID
 	r.DecodeJsonPayload(&newObject)
 
-	if newObject.Id != nId {
+	if newObject.ID != nID {
 		utils.RestErrorWrapper(w, "Illegal Call Parameter Id", http.StatusConflict)
 		return
 	}
@@ -1451,13 +1467,13 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 		utils.RestErrorWrapper(w, "Illegal Call Parameter Owner", http.StatusConflict)
 		return
 	}
-	if newObject.StorageId != nStorageId {
+	if newObject.StorageID != nStorageID {
 		utils.RestErrorWrapper(w, "Illegal Call Parameter StorageId", http.StatusConflict)
 		return
 	}
 
 	objects.SyncObjectSizes(&newObject)
-	result, err := objects.CalcUsageAfterPut(newObject.Owner, a.mongoClient, newObject.Id, newObject.SizeInt)
+	result, err := objects.CalcUsageAfterPut(newObject.Owner, a.mongoClient, newObject.ID, newObject.SizeInt)
 
 	if err != nil {
 		log.Println("Error to calc diskquota: " + err.Error())
@@ -1478,12 +1494,14 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 			http.StatusPreconditionFailed)
 	}
 
-	ctx, _ = context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	updateOptions := options.Update()
 	updateOptions.SetUpsert(true)
 	updateResult, err := collection.UpdateOne(
 		ctx,
-		bson.M{"_id": storageId},
+		bson.M{"_id": storageID},
 		bson.M{"$set": newObject},
 		updateOptions,
 	)
@@ -1496,13 +1514,12 @@ func (a *TrailsApp) handle_putstepsobject(w rest.ResponseWriter, r *rest.Request
 		w.Header().Add("X-PH-Error", "Error inserting object into database "+err.Error())
 	}
 
-	issuerUrl := utils.GetApiEndpoint("/trails")
-	newObjectWithAccess := objects.MakeObjAccessible(issuerUrl, newObject.Owner, newObject, storageId)
+	issuerURL := utils.GetAPIEndpoint("/trails")
+	newObjectWithAccess := objects.MakeObjAccessible(issuerURL, newObject.Owner, newObject, storageID)
 	w.WriteJson(newObjectWithAccess)
 }
 
-func (a *TrailsApp) handle_getstepsobject(w rest.ResponseWriter, r *rest.Request) {
-
+func (a *App) handleGetStepsObject(w rest.ResponseWriter, r *rest.Request) {
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
@@ -1521,31 +1538,32 @@ func (a *TrailsApp) handle_getstepsobject(w rest.ResponseWriter, r *rest.Request
 
 	step := Step{}
 
-	trailId := r.PathParam("id")
+	trailID := r.PathParam("id")
 	rev := r.PathParam("rev")
-	objIdParam := r.PathParam("obj")
+	objIDParam := r.PathParam("obj")
 
-	isPublic, err := a.isTrailPublic(trailId)
+	isPublic, err := a.isTrailPublic(trailID)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error getting traitrailsIdl public", http.StatusInternalServerError)
 		return
 	}
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
 	if isPublic {
 		err = coll.FindOne(ctx, bson.M{
-			"_id":     trailId + "-" + rev,
+			"_id":     trailID + "-" + rev,
 			"garbage": bson.M{"$ne": true},
 		}).Decode(&step)
 	} else if authType == "DEVICE" {
 		err = coll.FindOne(ctx, bson.M{
-			"_id":     trailId + "-" + rev,
+			"_id":     trailID + "-" + rev,
 			"device":  owner,
 			"garbage": bson.M{"$ne": true},
 		}).Decode(&step)
 	} else if authType == "USER" {
 		err = coll.FindOne(ctx, bson.M{
-			"_id":     trailId + "-" + rev,
+			"_id":     trailID + "-" + rev,
 			"owner":   owner,
 			"garbage": bson.M{"$ne": true},
 		}).Decode(&step)
@@ -1585,32 +1603,32 @@ func (a *TrailsApp) handle_getstepsobject(w rest.ResponseWriter, r *rest.Request
 			return
 		}
 
-		objId := v.(string)
+		objID := v.(string)
 
-		if objIdParam != objId {
+		if objIDParam != objID {
 			continue
 		}
 
-		sha, err := utils.DecodeSha256HexString(objId)
+		sha, err := utils.DecodeSha256HexString(objID)
 
 		if err != nil {
 			utils.RestErrorWrapper(w, "Get Trails Steps Object id must be a valid sha256", http.StatusBadRequest)
 			return
 		}
 
-		storageId := objects.MakeStorageId(step.Owner, sha)
+		storageID := objects.MakeStorageID(step.Owner, sha)
 
 		var newObject objects.Object
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		err = collection.FindOne(ctx, bson.M{
-			"_id":     storageId,
+			"_id":     storageID,
 			"garbage": bson.M{"$ne": true},
 		}).
 			Decode(&newObject)
 
 		if err != nil {
-			utils.RestErrorWrapper(w, "Not Accessible Resource Id: "+storageId+" ERR: "+err.Error(), http.StatusForbidden)
+			utils.RestErrorWrapper(w, "Not Accessible Resource Id: "+storageID+" ERR: "+err.Error(), http.StatusForbidden)
 			return
 		}
 
@@ -1621,8 +1639,8 @@ func (a *TrailsApp) handle_getstepsobject(w rest.ResponseWriter, r *rest.Request
 
 		newObject.ObjectName = k
 
-		issuerUrl := utils.GetApiEndpoint("/trails")
-		tmp := objects.MakeObjAccessible(issuerUrl, callingPrincipalStr, newObject, storageId)
+		issuerURL := utils.GetAPIEndpoint("/trails")
+		tmp := objects.MakeObjAccessible(issuerURL, callingPrincipalStr, newObject, storageID)
 		objWithAccess = &tmp
 		break
 	}
@@ -1634,7 +1652,7 @@ func (a *TrailsApp) handle_getstepsobject(w rest.ResponseWriter, r *rest.Request
 	}
 }
 
-func (a *TrailsApp) handle_getstepsobjectfile(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetStepsObjectFile(w rest.ResponseWriter, r *rest.Request) {
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
@@ -1654,31 +1672,33 @@ func (a *TrailsApp) handle_getstepsobjectfile(w rest.ResponseWriter, r *rest.Req
 
 	step := Step{}
 
-	trailId := r.PathParam("id")
+	trailID := r.PathParam("id")
 	rev := r.PathParam("rev")
-	objIdParam := r.PathParam("obj")
+	objIDParam := r.PathParam("obj")
 
-	isPublic, err := a.isTrailPublic(trailId)
+	isPublic, err := a.isTrailPublic(trailID)
 
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error getting trail public", http.StatusInternalServerError)
 		return
 	}
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	if isPublic {
 		err = coll.FindOne(ctx, bson.M{
-			"_id":     trailId + "-" + rev,
+			"_id":     trailID + "-" + rev,
 			"garbage": bson.M{"$ne": true},
 		}).Decode(&step)
 	} else if authType == "DEVICE" {
 		err = coll.FindOne(ctx, bson.M{
-			"_id":     trailId + "-" + rev,
+			"_id":     trailID + "-" + rev,
 			"device":  owner,
 			"garbage": bson.M{"$ne": true},
 		}).Decode(&step)
 	} else if authType == "USER" {
 		err = coll.FindOne(ctx, bson.M{
-			"_id":     trailId + "-" + rev,
+			"_id":     trailID + "-" + rev,
 			"owner":   owner,
 			"garbage": bson.M{"$ne": true},
 		}).Decode(&step)
@@ -1718,31 +1738,31 @@ func (a *TrailsApp) handle_getstepsobjectfile(w rest.ResponseWriter, r *rest.Req
 			return
 		}
 
-		objId := v.(string)
+		objID := v.(string)
 
-		if objIdParam != objId {
+		if objIDParam != objID {
 			continue
 		}
 
-		sha, err := utils.DecodeSha256HexString(objId)
+		sha, err := utils.DecodeSha256HexString(objID)
 
 		if err != nil {
 			utils.RestErrorWrapper(w, "Get Trails Steps Object File by ID must be a valid sha256", http.StatusBadRequest)
 			return
 		}
 
-		storageId := objects.MakeStorageId(step.Owner, sha)
+		storageID := objects.MakeStorageID(step.Owner, sha)
 
 		var newObject objects.Object
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		err = collection.FindOne(ctx, bson.M{
-			"_id":     storageId,
+			"_id":     storageID,
 			"garbage": bson.M{"$ne": true},
 		}).Decode(&newObject)
 
 		if err != nil {
-			utils.RestErrorWrapper(w, "Not Accessible Resource Id: "+storageId+" ERR: "+err.Error(), http.StatusForbidden)
+			utils.RestErrorWrapper(w, "Not Accessible Resource Id: "+storageID+" ERR: "+err.Error(), http.StatusForbidden)
 			return
 		}
 
@@ -1753,8 +1773,8 @@ func (a *TrailsApp) handle_getstepsobjectfile(w rest.ResponseWriter, r *rest.Req
 
 		newObject.ObjectName = k
 
-		issuerUrl := utils.GetApiEndpoint("/trails")
-		tmp := objects.MakeObjAccessible(issuerUrl, callingPrincipalStr, newObject, storageId)
+		issuerURL := utils.GetAPIEndpoint("/trails")
+		tmp := objects.MakeObjAccessible(issuerURL, callingPrincipalStr, newObject, storageID)
 		objWithAccess = &tmp
 		break
 	}
@@ -1764,7 +1784,7 @@ func (a *TrailsApp) handle_getstepsobjectfile(w rest.ResponseWriter, r *rest.Req
 		return
 	}
 
-	url := objWithAccess.SignedGetUrl
+	url := objWithAccess.SignedGetURL
 	w.Header().Add("Location", url)
 	w.WriteHeader(http.StatusFound)
 }
@@ -1775,7 +1795,7 @@ func (a *TrailsApp) handle_getstepsobjectfile(w rest.ResponseWriter, r *rest.Req
 //
 //   just the raw data of a step without metainfo like pvr put ...
 //
-func (a *TrailsApp) handle_putstepstate(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePutStepState(w rest.ResponseWriter, r *rest.Request) {
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
@@ -1793,7 +1813,7 @@ func (a *TrailsApp) handle_putstepstate(w rest.ResponseWriter, r *rest.Request) 
 	}
 
 	step := Step{}
-	trailId := r.PathParam("id")
+	trailID := r.PathParam("id")
 	rev := r.PathParam("rev")
 
 	if authType != "USER" {
@@ -1804,7 +1824,7 @@ func (a *TrailsApp) handle_putstepstate(w rest.ResponseWriter, r *rest.Request) 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	err := coll.FindOne(ctx, bson.M{
-		"_id":             trailId + "-" + rev,
+		"_id":             trailID + "-" + rev,
 		"progress.status": "NEW",
 		"garbage":         bson.M{"$ne": true},
 	}).Decode(&step)
@@ -1829,7 +1849,7 @@ func (a *TrailsApp) handle_putstepstate(w rest.ResponseWriter, r *rest.Request) 
 
 	step.StepTime = time.Now()
 	step.ProgressTime = time.Unix(0, 0)
-	step.Id = trailId + "-" + rev
+	step.ID = trailID + "-" + rev
 
 	objectList, err := ProcessObjectsInState(step.Owner, stateMap, a)
 	if err != nil {
@@ -1844,7 +1864,7 @@ func (a *TrailsApp) handle_putstepstate(w rest.ResponseWriter, r *rest.Request) 
 	updateResult, err := coll.UpdateOne(
 		ctx,
 		bson.M{
-			"_id":             trailId + "-" + rev,
+			"_id":             trailID + "-" + rev,
 			"owner":           owner,
 			"progress.status": "NEW",
 			"garbage":         bson.M{"$ne": true},
@@ -1871,7 +1891,7 @@ func (a *TrailsApp) handle_putstepstate(w rest.ResponseWriter, r *rest.Request) 
 //
 //   just the raw data of a step without metainfo like pvr put ...
 //
-func (a *TrailsApp) handle_putstepmeta(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePutStepMeta(w rest.ResponseWriter, r *rest.Request) {
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
@@ -1889,7 +1909,7 @@ func (a *TrailsApp) handle_putstepmeta(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	step := Step{}
-	trailId := r.PathParam("id")
+	trailID := r.PathParam("id")
 	rev := r.PathParam("rev")
 
 	if authType != "USER" {
@@ -1900,7 +1920,7 @@ func (a *TrailsApp) handle_putstepmeta(w rest.ResponseWriter, r *rest.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	err := coll.FindOne(ctx, bson.M{
-		"_id":     trailId + "-" + rev,
+		"_id":     trailID + "-" + rev,
 		"garbage": bson.M{"$ne": true},
 	}).Decode(&step)
 
@@ -1927,7 +1947,7 @@ func (a *TrailsApp) handle_putstepmeta(w rest.ResponseWriter, r *rest.Request) {
 	updateResult, err := coll.UpdateOne(
 		ctx,
 		bson.M{
-			"_id":     trailId + "-" + rev,
+			"_id":     trailID + "-" + rev,
 			"owner":   owner,
 			"garbage": bson.M{"$ne": true},
 		},
@@ -1956,12 +1976,12 @@ func (a *TrailsApp) handle_putstepmeta(w rest.ResponseWriter, r *rest.Request) {
 //   all input paramaters besides the device-progress one are ignored.
 //
 //
-func (a *TrailsApp) handle_putstepprogress(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePutStepProgress(w rest.ResponseWriter, r *rest.Request) {
 
 	stepProgress := StepProgress{}
 	r.DecodeJsonPayload(&stepProgress)
-	trailId := r.PathParam("id")
-	stepId := trailId + "-" + r.PathParam("rev")
+	trailID := r.PathParam("id")
+	stepID := trailID + "-" + r.PathParam("rev")
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
@@ -1997,7 +2017,7 @@ func (a *TrailsApp) handle_putstepprogress(w rest.ResponseWriter, r *rest.Reques
 	updateResult, err := coll.UpdateOne(
 		ctx,
 		bson.M{
-			"_id":     stepId,
+			"_id":     stepID,
 			"device":  owner,
 			"garbage": bson.M{"$ne": true},
 		},
@@ -2017,7 +2037,7 @@ func (a *TrailsApp) handle_putstepprogress(w rest.ResponseWriter, r *rest.Reques
 	}
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	trailObjectID, err := primitive.ObjectIDFromHex(trailId)
+	trailObjectID, err := primitive.ObjectIDFromHex(trailID)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
@@ -2037,7 +2057,7 @@ func (a *TrailsApp) handle_putstepprogress(w rest.ResponseWriter, r *rest.Reques
 
 	if err != nil {
 		// XXX: figure how to be better on error cases here...
-		log.Printf("Error updating last-touched for trail in poststepprogress; not failing because step was written: %s\n", trailId)
+		log.Printf("Error updating last-touched for trail in poststepprogress; not failing because step was written: %s\n", trailID)
 	}
 
 	w.WriteJson(stepProgress)
@@ -2053,7 +2073,7 @@ func (a *TrailsApp) handle_putstepprogress(w rest.ResponseWriter, r *rest.Reques
 //   conveyes that the devices knows about the step to go and will keep the
 //   post updates to the walk elements as they go.
 //
-func (a *TrailsApp) handle_gettrailstepsummary(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetTrailStepSummary(w rest.ResponseWriter, r *rest.Request) {
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
@@ -2076,15 +2096,15 @@ func (a *TrailsApp) handle_gettrailstepsummary(w rest.ResponseWriter, r *rest.Re
 		return
 	}
 
-	trailId := r.PathParam("id")
+	trailID := r.PathParam("id")
 
-	if trailId == "" {
+	if trailID == "" {
 		utils.RestErrorWrapper(w, "need to specify a device id", http.StatusForbidden)
 		return
 	}
 
 	query := bson.M{
-		"deviceid": trailId,
+		"deviceid": trailID,
 		"garbage":  bson.M{"$ne": true},
 		"$or": []bson.M{
 			{"owner": owner},
@@ -2115,7 +2135,7 @@ func (a *TrailsApp) handle_gettrailstepsummary(w rest.ResponseWriter, r *rest.Re
 //
 // ## GET /trails/summary
 //   get summary of all trails by the calling owner.
-func (a *TrailsApp) handle_gettrailsummary(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetTrailSummary(w rest.ResponseWriter, r *rest.Request) {
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
@@ -2198,7 +2218,7 @@ func (a *TrailsApp) handle_gettrailsummary(w rest.ResponseWriter, r *rest.Reques
 func ProcessObjectsInState(
 	owner string,
 	state map[string]interface{},
-	a *TrailsApp,
+	a *App,
 ) (
 	objects []string,
 	err error,
@@ -2218,7 +2238,7 @@ func ProcessObjectsInState(
 func GetStateObjects(
 	owner string,
 	state map[string]interface{},
-	a *TrailsApp,
+	a *App,
 ) (
 	[]string,
 	error,
@@ -2259,7 +2279,7 @@ func GetStateObjects(
 		}
 		// lets use proper storage shas to reflect that fact that each
 		// owner has its own copy of the object instance on DB side
-		storageSha := objects.MakeStorageId(owner, shaBytes)
+		storageSha := objects.MakeStorageID(owner, shaBytes)
 		result, _ := IsObjectValid(storageSha, a)
 		if !result {
 			return objectList, errors.New("state_object: Object sha is not found in the db[storage-id(_id):" + storageSha + "]")
@@ -2274,7 +2294,7 @@ func GetStateObjects(
 // RestoreObjects : Takes the list of objects and unmarks them garbage.
 func RestoreObjects(
 	objectList []string,
-	a *TrailsApp,
+	a *App,
 ) error {
 
 	for _, storageSha := range objectList {
@@ -2294,7 +2314,7 @@ func RestoreObjects(
 }
 
 // IsObjectValid : to check if an object is valid or not
-func IsObjectValid(ObjectID string, a *TrailsApp) (
+func IsObjectValid(ObjectID string, a *App) (
 	result bool,
 	errs error,
 ) {
@@ -2313,7 +2333,7 @@ func IsObjectValid(ObjectID string, a *TrailsApp) (
 }
 
 // IsObjectGarbage : to check if an object is garbage or not
-func IsObjectGarbage(ObjectID string, a *TrailsApp) (
+func IsObjectGarbage(ObjectID string, a *App) (
 	bool,
 	error,
 ) {
@@ -2334,7 +2354,7 @@ func IsObjectGarbage(ObjectID string, a *TrailsApp) (
 }
 
 // UnMarkObjectAsGarbage : to unmark object as garbage
-func UnMarkObjectAsGarbage(ObjectID string, a *TrailsApp) error {
+func UnMarkObjectAsGarbage(ObjectID string, a *App) error {
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -2356,16 +2376,15 @@ func UnMarkObjectAsGarbage(ObjectID string, a *TrailsApp) error {
 	return nil
 }
 
-// XXX:
+// New create a new trails rest application
 //   finish getsteps
 //   post walk
 //   get walks
 //   search attributes for advanced steps/walk searching inside trail
 //
-func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *TrailsApp {
-
-	app := new(TrailsApp)
-	app.jwt_middleware = jwtMiddleware
+func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
+	app := new(App)
+	app.jwtMiddleware = jwtMiddleware
 	app.mongoClient = mongoClient
 
 	// Indexing for the owner,garbage fields in pantahub_trails
@@ -2464,18 +2483,18 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *TrailsApp
 		return nil
 	}
 
-	app.Api = rest.NewApi()
+	app.API = rest.NewApi()
 
 	// we dont use default stack because we dont want content type enforcement
-	app.Api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
+	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
 		"/trails:", log.Lshortfile)})
-	app.Api.Use(&utils.AccessLogFluentMiddleware{Prefix: "trails"})
-	app.Api.Use(&rest.StatusMiddleware{})
-	app.Api.Use(&rest.TimerMiddleware{})
-	app.Api.Use(&metrics.MetricsMiddleware{})
+	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "trails"})
+	app.API.Use(&rest.StatusMiddleware{})
+	app.API.Use(&rest.TimerMiddleware{})
+	app.API.Use(&metrics.Middleware{})
 
-	app.Api.Use(rest.DefaultCommonStack...)
-	app.Api.Use(&rest.CorsMiddleware{
+	app.API.Use(rest.DefaultCommonStack...)
+	app.API.Use(&rest.CorsMiddleware{
 		RejectNonCorsRequests: false,
 		OriginValidator: func(origin string, request *rest.Request) bool {
 			return true
@@ -2486,15 +2505,15 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *TrailsApp
 		AccessControlAllowCredentials: true,
 		AccessControlMaxAge:           3600,
 	})
-	app.Api.Use(&utils.URLCleanMiddleware{})
+	app.API.Use(&utils.URLCleanMiddleware{})
 
-	app.Api.Use(&rest.IfMiddleware{
+	app.API.Use(&rest.IfMiddleware{
 		Condition: func(request *rest.Request) bool {
 			return true
 		},
-		IfTrue: app.jwt_middleware,
+		IfTrue: app.jwtMiddleware,
 	})
-	app.Api.Use(&rest.IfMiddleware{
+	app.API.Use(&rest.IfMiddleware{
 		Condition: func(request *rest.Request) bool {
 			return true
 		},
@@ -2516,29 +2535,29 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *TrailsApp
 		utils.Scopes.Trails,
 		utils.Scopes.WriteTrails,
 	}
-	api_router, _ := rest.MakeRouter(
-		rest.Get("/auth_status", utils.ScopeFilter(readTrailsScopes, handle_auth)),
-		rest.Get("/", utils.ScopeFilter(readTrailsScopes, app.handle_gettrails)),
-		rest.Post("/", utils.ScopeFilter(writeTrailsScopes, app.handle_posttrail)),
-		rest.Get("/summary", utils.ScopeFilter(readTrailsScopes, app.handle_gettrailsummary)),
-		rest.Get("/:id", utils.ScopeFilter(readTrailsScopes, app.handle_gettrail)),
-		rest.Get("/:id/.pvrremote", utils.ScopeFilter(readTrailsScopes, app.handle_gettrailpvrinfo)),
-		rest.Post("/:id/steps", utils.ScopeFilter(writeTrailsScopes, app.handle_poststep)),
-		rest.Get("/:id/steps", utils.ScopeFilter(readTrailsScopes, app.handle_getsteps)),
-		rest.Get("/:id/steps/:rev", utils.ScopeFilter(readTrailsScopes, app.handle_getstep)),
-		rest.Get("/:id/steps/:rev/.pvrremote", utils.ScopeFilter(readTrailsScopes, app.handle_getsteppvrinfo)),
-		rest.Get("/:id/steps/:rev/meta", utils.ScopeFilter(readTrailsScopes, app.handle_getstepmeta)),
-		rest.Get("/:id/steps/:rev/state", utils.ScopeFilter(readTrailsScopes, app.handle_getstepstate)),
-		rest.Get("/:id/steps/:rev/objects", utils.ScopeFilter(readTrailsScopes, app.handle_getstepsobjects)),
-		rest.Post("/:id/steps/:rev/objects", utils.ScopeFilter(writeTrailsScopes, app.handle_poststepsobject)),
-		rest.Get("/:id/steps/:rev/objects/:obj", utils.ScopeFilter(readTrailsScopes, app.handle_getstepsobject)),
-		rest.Get("/:id/steps/:rev/objects/:obj/blob", utils.ScopeFilter(readTrailsScopes, app.handle_getstepsobjectfile)),
-		rest.Put("/:id/steps/:rev/meta", utils.ScopeFilter(writeTrailsScopes, app.handle_putstepmeta)),
-		rest.Put("/:id/steps/:rev/state", utils.ScopeFilter(writeTrailsScopes, app.handle_putstepstate)),
-		rest.Put("/:id/steps/:rev/progress", utils.ScopeFilter(writeTrailsScopes, app.handle_putstepprogress)),
-		rest.Get("/:id/summary", utils.ScopeFilter(readTrailsScopes, app.handle_gettrailstepsummary)),
+	apiRouter, _ := rest.MakeRouter(
+		rest.Get("/auth_status", utils.ScopeFilter(readTrailsScopes, handleAuth)),
+		rest.Get("/", utils.ScopeFilter(readTrailsScopes, app.handleGetTrails)),
+		rest.Post("/", utils.ScopeFilter(writeTrailsScopes, app.handlePostTrail)),
+		rest.Get("/summary", utils.ScopeFilter(readTrailsScopes, app.handleGetTrailSummary)),
+		rest.Get("/:id", utils.ScopeFilter(readTrailsScopes, app.handleGetTrail)),
+		rest.Get("/:id/.pvrremote", utils.ScopeFilter(readTrailsScopes, app.handleGetTrailPvrInfo)),
+		rest.Post("/:id/steps", utils.ScopeFilter(writeTrailsScopes, app.handlePostStep)),
+		rest.Get("/:id/steps", utils.ScopeFilter(readTrailsScopes, app.handleGetSteps)),
+		rest.Get("/:id/steps/:rev", utils.ScopeFilter(readTrailsScopes, app.handleGetStep)),
+		rest.Get("/:id/steps/:rev/.pvrremote", utils.ScopeFilter(readTrailsScopes, app.handleGetStepPvrInfo)),
+		rest.Get("/:id/steps/:rev/meta", utils.ScopeFilter(readTrailsScopes, app.handleGetStepMeta)),
+		rest.Get("/:id/steps/:rev/state", utils.ScopeFilter(readTrailsScopes, app.handleGetStepState)),
+		rest.Get("/:id/steps/:rev/objects", utils.ScopeFilter(readTrailsScopes, app.handleGetStepsObjects)),
+		rest.Post("/:id/steps/:rev/objects", utils.ScopeFilter(writeTrailsScopes, app.handlePostStepsObject)),
+		rest.Get("/:id/steps/:rev/objects/:obj", utils.ScopeFilter(readTrailsScopes, app.handleGetStepsObject)),
+		rest.Get("/:id/steps/:rev/objects/:obj/blob", utils.ScopeFilter(readTrailsScopes, app.handleGetStepsObjectFile)),
+		rest.Put("/:id/steps/:rev/meta", utils.ScopeFilter(writeTrailsScopes, app.handlePutStepMeta)),
+		rest.Put("/:id/steps/:rev/state", utils.ScopeFilter(writeTrailsScopes, app.handlePutStepState)),
+		rest.Put("/:id/steps/:rev/progress", utils.ScopeFilter(writeTrailsScopes, app.handlePutStepProgress)),
+		rest.Get("/:id/summary", utils.ScopeFilter(readTrailsScopes, app.handleGetTrailStepSummary)),
 	)
-	app.Api.SetApp(api_router)
+	app.API.SetApp(apiRouter)
 
 	return app
 }

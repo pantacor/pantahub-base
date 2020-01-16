@@ -15,14 +15,14 @@ type RError struct {
 }
 
 // RestError Create a rest error with id and log
-func RestError(w rest.ResponseWriter, err error, message string, status_code int) {
+func RestError(w rest.ResponseWriter, err error, message string, statusCode int) {
 	errStr := "<nil>"
 	if err != nil {
 		errStr = err.Error()
 	}
 	errID := primitive.NewObjectID()
-	log.Println("ERROR: " + message + " -- " + errStr + " -- statuscode: " + fmt.Sprintf("%d", status_code) + " -- sid: " + errID.Hex())
-	RestErrorWrapper(w, message+" (sid: "+errID.Hex()+")", status_code)
+	log.Println("ERROR: " + message + " -- " + errStr + " -- statuscode: " + fmt.Sprintf("%d", statusCode) + " -- sid: " + errID.Hex())
+	RestErrorWrapper(w, message+" (sid: "+errID.Hex()+")", statusCode)
 }
 
 // RestErrorWrapper wrap the normal rest error in an struct

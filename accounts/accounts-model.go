@@ -13,6 +13,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
 package accounts
 
 import (
@@ -67,12 +68,11 @@ type Account struct {
 
 // AccountPublic Public information for one account
 type AccountPublic struct {
-	Id primitive.ObjectID `json:"-" bson:"_id"`
-
-	Type  AccountType `json:"type" bson:"type"`
-	Email string      `json:"email" bson:"email"`
-	Nick  string      `json:"nick" bson:"nick"`
-	Prn   string      `json:"prn" bson:"prn"`
+	ID    primitive.ObjectID `json:"-" bson:"_id"`
+	Type  AccountType        `json:"type" bson:"type"`
+	Email string             `json:"email" bson:"email"`
+	Nick  string             `json:"nick" bson:"nick"`
+	Prn   string             `json:"prn" bson:"prn"`
 
 	TimeCreated  time.Time `json:"time-created" bson:"time-created"`
 	TimeModified time.Time `json:"time-modified" bson:"time-modified"`

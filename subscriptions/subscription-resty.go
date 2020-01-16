@@ -20,19 +20,21 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-type SubscriptionsApp struct {
-	jwt_middleware *jwt.JWTMiddleware
-	api            *rest.Api
-	service        SubscriptionService
+// App subscription rest application
+type App struct {
+	jwtMiddleware *jwt.JWTMiddleware
+	API           *rest.Api
+	service       SubscriptionService
 }
 
+// SubscriptionReq subscription request
 type SubscriptionReq struct {
 	Subject utils.Prn              `json:"subject"`
 	Plan    utils.Prn              `json:"plan"`
 	Attrs   map[string]interface{} `json:"attrs"`
 }
 
-func (s *SubscriptionsApp) get(w rest.ResponseWriter, r *rest.Request) {
+func (s *App) get(w rest.ResponseWriter, r *rest.Request) {
 
 	authInfo := utils.GetAuthInfo(r)
 
@@ -97,7 +99,7 @@ func (s *SubscriptionsApp) get(w rest.ResponseWriter, r *rest.Request) {
 
 }
 
-func (s *SubscriptionsApp) put(w rest.ResponseWriter, r *rest.Request) {
+func (s *App) put(w rest.ResponseWriter, r *rest.Request) {
 
 	authInfo := utils.GetAuthInfo(r)
 
@@ -163,23 +165,25 @@ func (s *SubscriptionsApp) put(w rest.ResponseWriter, r *rest.Request) {
 	return
 }
 
-func (s *SubscriptionsApp) MakeHandler() http.Handler {
-	return s.api.MakeHandler()
+// MakeHandler make the api handler
+func (s *App) MakeHandler() http.Handler {
+	return s.API.MakeHandler()
 }
 
-func NewResty(jwtMiddleware *jwt.JWTMiddleware, subscriptionService SubscriptionService, mongoClient *mongo.Client) *SubscriptionsApp {
+// New create a new subscription rest application
+func New(jwtMiddleware *jwt.JWTMiddleware, subscriptionService SubscriptionService, mongoClient *mongo.Client) *App {
 
-	app := new(SubscriptionsApp)
-	app.jwt_middleware = jwtMiddleware
+	app := new(App)
+	app.jwtMiddleware = jwtMiddleware
 	app.service = subscriptionService
-	app.api = rest.NewApi()
+	app.API = rest.NewApi()
 
 	// we dont use default stack because we dont want content type enforcement
-	app.api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
+	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
 		"/subscriptions:", log.Lshortfile)})
-	app.api.Use(&utils.AccessLogFluentMiddleware{Prefix: "subscription"})
-	app.api.Use(rest.DefaultCommonStack...)
-	app.api.Use(&rest.CorsMiddleware{
+	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "subscription"})
+	app.API.Use(rest.DefaultCommonStack...)
+	app.API.Use(&rest.CorsMiddleware{
 		RejectNonCorsRequests: false,
 		OriginValidator: func(origin string, request *rest.Request) bool {
 			return true
@@ -190,26 +194,26 @@ func NewResty(jwtMiddleware *jwt.JWTMiddleware, subscriptionService Subscription
 		AccessControlAllowCredentials: true,
 		AccessControlMaxAge:           3600,
 	})
-	app.api.Use(&utils.URLCleanMiddleware{})
+	app.API.Use(&utils.URLCleanMiddleware{})
 
 	// no authentication ngeeded for /login
-	app.api.Use(&rest.IfMiddleware{
+	app.API.Use(&rest.IfMiddleware{
 		Condition: func(request *rest.Request) bool {
 			return true
 		},
-		IfTrue: app.jwt_middleware,
+		IfTrue: app.jwtMiddleware,
 	})
 
-	app.api.Use(&utils.AuthMiddleware{})
+	app.API.Use(&utils.AuthMiddleware{})
 
 	// /auth_status endpoints
 	// XXX: this is all needs to be done so that paths that do not trail with /
 	//      get a MOVED PERMANTENTLY error with the redir path with / like the main
 	//      API routers (bad rest.MakeRouter I suspect)
-	api_router, _ := rest.MakeRouter(
+	apiRouter, _ := rest.MakeRouter(
 		rest.Get("/", app.get),
 		rest.Put("/admin/subscription", app.put),
 	)
-	app.api.SetApp(api_router)
+	app.API.SetApp(apiRouter)
 	return app
 }

@@ -13,6 +13,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
 package logs
 
 import (
@@ -190,8 +191,8 @@ func (s *mgoLogger) unregister(delete bool) error {
 }
 
 func (s *mgoLogger) getLogs(start int64, page int64, beforeOrAfter *time.Time,
-	after bool, query LogsFilter, sort LogsSort, cursor bool) (*LogsPager, error) {
-	var result LogsPager
+	after bool, query Filters, sort Sorts, cursor bool) (*Pager, error) {
+	var result Pager
 	var err error
 
 	if cursor {
@@ -275,10 +276,10 @@ func (s *mgoLogger) getLogs(start int64, page int64, beforeOrAfter *time.Time,
 	}
 
 	defer cur.Close(ctx)
-	entries := []*LogsEntry{}
+	entries := []*Entry{}
 
 	for cur.Next(ctx) {
-		result := &LogsEntry{}
+		result := &Entry{}
 		err := cur.Decode(&result)
 		if err != nil {
 			return nil, err
@@ -299,11 +300,11 @@ func (s *mgoLogger) getLogs(start int64, page int64, beforeOrAfter *time.Time,
 	return &result, nil
 }
 
-func (s *mgoLogger) getLogsByCursor(nextCursor string) (*LogsPager, error) {
+func (s *mgoLogger) getLogsByCursor(nextCursor string) (*Pager, error) {
 	return nil, ErrCursorNotImplemented
 }
 
-func (s *mgoLogger) postLogs(e []LogsEntry) error {
+func (s *mgoLogger) postLogs(e []Entry) error {
 	collLogs := s.mongoClient.Database(utils.MongoDb).Collection(s.mgoCollection)
 
 	if collLogs == nil {
@@ -314,7 +315,9 @@ func (s *mgoLogger) postLogs(e []LogsEntry) error {
 	for i, v := range e {
 		arr[i] = v
 	}
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	_, err := collLogs.InsertMany(
 		ctx,
 		arr,
@@ -328,13 +331,13 @@ func (s *mgoLogger) postLogs(e []LogsEntry) error {
 
 // NewMgoLogger instantiates an mongoClient logger backend. Expects an
 // mongoClient configuration
-func NewMgoLogger(mongoClient *mongo.Client) (LogsBackend, error) {
+func NewMgoLogger(mongoClient *mongo.Client) (Backend, error) {
 	return newMgoLogger(mongoClient)
 }
 
 func newMgoLogger(mongoClient *mongo.Client) (*mgoLogger, error) {
 	self := &mgoLogger{}
-	self.mgoCollection = utils.GetEnv(utils.ENV_PANTAHUB_PRODUCTNAME) + "_logs"
+	self.mgoCollection = utils.GetEnv(utils.EnvPantahubProductName) + "_logs"
 	self.mongoClient = mongoClient
 
 	return self, nil

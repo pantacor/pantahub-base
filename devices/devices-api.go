@@ -13,6 +13,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
 package devices
 
 import (
@@ -43,24 +44,28 @@ import (
 	"gopkg.in/resty.v1"
 )
 
+// PantahubDevicesAutoTokenV1 device auto token name
 const PantahubDevicesAutoTokenV1 = "Pantahub-Devices-Auto-Token-V1"
 
 //DeviceNickRule : Device nick rule used to create/update a device nick
 const DeviceNickRule = `(?m)^[a-zA-Z0-9_\-+%]+$`
 
-func init() {
-	// seed this for petname as dustin dropped our patch upstream... moo
-	rand.Seed(time.Now().Unix())
+// App Web app structure
+type App struct {
+	jwtMiddleware *jwt.JWTMiddleware
+	API           *rest.Api
+	mongoClient   *mongo.Client
 }
 
-type DevicesApp struct {
-	jwt_middleware *jwt.JWTMiddleware
-	Api            *rest.Api
-	mongoClient    *mongo.Client
+// ModelError error type
+type ModelError struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
 }
 
+// Device device structure
 type Device struct {
-	Id           primitive.ObjectID     `json:"id" bson:"_id"`
+	ID           primitive.ObjectID     `json:"id" bson:"_id"`
 	Prn          string                 `json:"prn"`
 	Nick         string                 `json:"nick"`
 	Owner        string                 `json:"owner"`
@@ -75,12 +80,17 @@ type Device struct {
 	Garbage      bool                   `json:"garbage" bson:"garbage"`
 }
 
-func handle_auth(w rest.ResponseWriter, r *rest.Request) {
+func init() {
+	// seed this for petname as dustin dropped our patch upstream... moo
+	rand.Seed(time.Now().Unix())
+}
+
+func handleAuth(w rest.ResponseWriter, r *rest.Request) {
 	jwtClaims := r.Env["JWT_PAYLOAD"]
 	w.WriteJson(jwtClaims)
 }
 
-func (a *DevicesApp) handle_patchuserdata(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePatchUserData(w rest.ResponseWriter, r *rest.Request) {
 
 	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
 	if !ok {
@@ -162,8 +172,7 @@ func (a *DevicesApp) handle_patchuserdata(w rest.ResponseWriter, r *rest.Request
 	w.WriteJson(utils.BsonUnquoteMap(&data))
 }
 
-func (a *DevicesApp) handle_putuserdata(w rest.ResponseWriter, r *rest.Request) {
-
+func (a *App) handlePutUserData(w rest.ResponseWriter, r *rest.Request) {
 	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
 	if !ok {
 		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD", http.StatusBadRequest)
@@ -189,7 +198,7 @@ func (a *DevicesApp) handle_putuserdata(w rest.ResponseWriter, r *rest.Request) 
 		return
 	}
 
-	deviceId := r.PathParam("id")
+	deviceID := r.PathParam("id")
 
 	data := map[string]interface{}{}
 	err := r.DecodeJsonPayload(&data)
@@ -206,7 +215,7 @@ func (a *DevicesApp) handle_putuserdata(w rest.ResponseWriter, r *rest.Request) 
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	deviceObjectID, err := primitive.ObjectIDFromHex(deviceId)
+	deviceObjectID, err := primitive.ObjectIDFromHex(deviceID)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
@@ -234,7 +243,7 @@ func (a *DevicesApp) handle_putuserdata(w rest.ResponseWriter, r *rest.Request) 
 	w.WriteJson(utils.BsonUnquoteMap(&data))
 }
 
-func (a *DevicesApp) handle_putdevicedata(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePutDeviceData(w rest.ResponseWriter, r *rest.Request) {
 
 	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
 	if !ok {
@@ -261,8 +270,8 @@ func (a *DevicesApp) handle_putdevicedata(w rest.ResponseWriter, r *rest.Request
 		return
 	}
 
-	deviceId := r.PathParam("id")
-	deviceObjectID, err := primitive.ObjectIDFromHex(deviceId)
+	deviceID := r.PathParam("id")
+	deviceObjectID, err := primitive.ObjectIDFromHex(deviceID)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
@@ -307,7 +316,7 @@ func (a *DevicesApp) handle_putdevicedata(w rest.ResponseWriter, r *rest.Request
 	w.WriteJson(utils.BsonUnquoteMap(&data))
 }
 
-func (a *DevicesApp) handle_postdevice(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePostDevice(w rest.ResponseWriter, r *rest.Request) {
 
 	newDevice := Device{}
 
@@ -319,8 +328,8 @@ func (a *DevicesApp) handle_postdevice(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	newDevice.Id = ObjectID
-	newDevice.Prn = "prn:::devices:/" + newDevice.Id.Hex()
+	newDevice.ID = ObjectID
+	newDevice.Prn = "prn:::devices:/" + newDevice.ID.Hex()
 
 	// if user does not provide a secret, we invent one ...
 	if newDevice.Secret == "" {
@@ -416,13 +425,13 @@ func (a *DevicesApp) handle_postdevice(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(newDevice)
 }
 
-func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePutDevice(w rest.ResponseWriter, r *rest.Request) {
 
 	newDevice := Device{}
 
-	putId := r.PathParam("id")
+	putID := r.PathParam("id")
 
-	authId, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	authID, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		utils.RestErrorWrapper(w, "You need to be logged in.", http.StatusForbidden)
@@ -454,7 +463,7 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	deviceObjectID, err := primitive.ObjectIDFromHex(putId)
+	deviceObjectID, err := primitive.ObjectIDFromHex(putID)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
@@ -477,19 +486,19 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 	userMeta := utils.BsonUnquoteMap(&newDevice.UserMeta)
 	deviceMeta := utils.BsonUnquoteMap(&newDevice.DeviceMeta)
 
-	if callerIsDevice && newDevice.Prn != authId {
+	if callerIsDevice && newDevice.Prn != authID {
 		utils.RestErrorWrapper(w, "Not Device Accessible Resource Id", http.StatusForbidden)
 		return
 	}
 
-	if callerIsUser && newDevice.Owner != "" && newDevice.Owner != authId {
+	if callerIsUser && newDevice.Owner != "" && newDevice.Owner != authID {
 		utils.RestErrorWrapper(w, "Not User Accessible Resource Id", http.StatusForbidden)
 		return
 	}
 
 	r.DecodeJsonPayload(&newDevice)
 
-	if newDevice.Id.Hex() != putId {
+	if newDevice.ID.Hex() != putID {
 		utils.RestErrorWrapper(w, "Cannot change device Id in PUT", http.StatusForbidden)
 		return
 	}
@@ -529,7 +538,7 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 	/* in case someone claims the device like this, update owner */
 	if len(challenge) > 0 {
 		if challenge == challengeVal {
-			newDevice.Owner = authId.(string)
+			newDevice.Owner = authID.(string)
 			newDevice.Challenge = ""
 		} else {
 			utils.RestErrorWrapper(w, "No Access to Device", http.StatusForbidden)
@@ -554,7 +563,7 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 	updateOptions.SetUpsert(true)
 	_, err = collection.UpdateOne(
 		ctx,
-		bson.M{"_id": newDevice.Id},
+		bson.M{"_id": newDevice.ID},
 		bson.M{"$set": newDevice},
 		updateOptions,
 	)
@@ -567,15 +576,15 @@ func (a *DevicesApp) handle_putdevice(w rest.ResponseWriter, r *rest.Request) {
 }
 
 //ParseDeviceIDOrNick : Parse DeviceID Or Nick from the given string and return device objectID
-func (a *DevicesApp) ParseDeviceIDOrNick(param string) (*primitive.ObjectID, error) {
+func (a *App) ParseDeviceIDOrNick(param string) (*primitive.ObjectID, error) {
 	mgoid, err := primitive.ObjectIDFromHex(param)
 	if err != nil {
 		return a.LookupDeviceNick(param)
 	}
 	return &mgoid, nil
 }
-func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 
+func (a *App) handleDetDevice(w rest.ResponseWriter, r *rest.Request) {
 	var device Device
 	mgoid, err := a.ParseDeviceIDOrNick(r.PathParam("id"))
 	if err != nil {
@@ -583,7 +592,7 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	authId, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	authID, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		utils.RestErrorWrapper(w, "You need to be logged in.", http.StatusForbidden)
@@ -637,16 +646,16 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 	if !device.IsPublic {
 		// XXX: fixme; needs delegation of authorization for device accessing its resources
 		// could be subscriptions, but also something else
-		if callerIsDevice && device.Prn != authId {
+		if callerIsDevice && device.Prn != authID {
 			utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
 			return
 		}
 
-		if callerIsUser && device.Owner != authId {
+		if callerIsUser && device.Owner != authID {
 			utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
 			return
 		}
-	} else if authId != device.Prn && authId != device.Owner {
+	} else if authID != device.Prn && authID != device.Owner {
 		device.Secret = ""
 		device.Challenge = ""
 		device.UserMeta = map[string]interface{}{}
@@ -679,7 +688,7 @@ func (a *DevicesApp) handle_getdevice(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(device)
 }
 
-func (a *DevicesApp) handle_getuserdevice(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetUserDevice(w rest.ResponseWriter, r *rest.Request) {
 
 	var device Device
 	var account accounts.Account
@@ -687,7 +696,7 @@ func (a *DevicesApp) handle_getuserdevice(w rest.ResponseWriter, r *rest.Request
 	usernick := r.PathParam("usernick")
 	devicenick := r.PathParam("devicenick")
 
-	authId, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	authID, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		utils.RestErrorWrapper(w, "You need to be logged in.", http.StatusForbidden)
@@ -769,12 +778,12 @@ func (a *DevicesApp) handle_getuserdevice(w rest.ResponseWriter, r *rest.Request
 	if !device.IsPublic {
 		// XXX: fixme; needs delegation of authorization for device accessing its resources
 		// could be subscriptions, but also something else
-		if callerIsDevice && device.Prn != authId {
+		if callerIsDevice && device.Prn != authID {
 			utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
 			return
 		}
 
-		if callerIsUser && device.Owner != authId {
+		if callerIsUser && device.Owner != authID {
 			utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
 			return
 		}
@@ -790,13 +799,11 @@ func (a *DevicesApp) handle_getuserdevice(w rest.ResponseWriter, r *rest.Request
 	w.WriteJson(device)
 }
 
-func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) {
-
+func (a *App) handlePatchDevice(w rest.ResponseWriter, r *rest.Request) {
 	newDevice := Device{}
+	patchID := r.PathParam("id")
 
-	patchId := r.PathParam("id")
-
-	authId, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	authID, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		utils.RestErrorWrapper(w, "You need to be logged in.", http.StatusForbidden)
@@ -804,7 +811,6 @@ func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) 
 	}
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
-
 	if !ok {
 		// XXX: find right error
 		utils.RestErrorWrapper(w, "You need to be logged in with a known authentication type.", http.StatusForbidden)
@@ -825,7 +831,7 @@ func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) 
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	deviceID, err := primitive.ObjectIDFromHex(patchId)
+	deviceID, err := primitive.ObjectIDFromHex(patchID)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
@@ -839,7 +845,7 @@ func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) 
 		return
 	}
 
-	if newDevice.Owner == "" || newDevice.Owner != authId {
+	if newDevice.Owner == "" || newDevice.Owner != authID {
 		utils.RestErrorWrapper(w, "Not User Accessible Resource Id", http.StatusForbidden)
 		return
 	}
@@ -873,7 +879,7 @@ func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) 
 		updateOptions.SetUpsert(true)
 		_, err = collection.UpdateOne(
 			ctx,
-			bson.M{"_id": newDevice.Id},
+			bson.M{"_id": newDevice.ID},
 			bson.M{"$set": newDevice},
 			updateOptions,
 		)
@@ -889,7 +895,7 @@ func (a *DevicesApp) handle_patchdevice(w rest.ResponseWriter, r *rest.Request) 
 	w.WriteJson(newDevice)
 }
 
-func (a *DevicesApp) handle_patchdevicedata(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePatchDeviceData(w rest.ResponseWriter, r *rest.Request) {
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
@@ -976,13 +982,11 @@ func (a *DevicesApp) handle_patchdevicedata(w rest.ResponseWriter, r *rest.Reque
 	w.WriteJson(utils.BsonUnquoteMap(&device.DeviceMeta))
 }
 
-func (a *DevicesApp) handle_putpublic(w rest.ResponseWriter, r *rest.Request) {
-
+func (a *App) handlePutPublic(w rest.ResponseWriter, r *rest.Request) {
 	newDevice := Device{}
+	putID := r.PathParam("id")
 
-	putId := r.PathParam("id")
-
-	authId, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	authID, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		utils.RestErrorWrapper(w, "You need to be logged in.", http.StatusForbidden)
@@ -1010,7 +1014,7 @@ func (a *DevicesApp) handle_putpublic(w rest.ResponseWriter, r *rest.Request) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	deviceObjectID, err := primitive.ObjectIDFromHex(putId)
+	deviceObjectID, err := primitive.ObjectIDFromHex(putID)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
@@ -1025,7 +1029,7 @@ func (a *DevicesApp) handle_putpublic(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	if newDevice.Owner != "" && newDevice.Owner != authId {
+	if newDevice.Owner != "" && newDevice.Owner != authID {
 		utils.RestErrorWrapper(w, "Not User Accessible Resource Id", http.StatusForbidden)
 		return
 	}
@@ -1039,7 +1043,7 @@ func (a *DevicesApp) handle_putpublic(w rest.ResponseWriter, r *rest.Request) {
 	updateOptions.SetUpsert(true)
 	_, err = collection.UpdateOne(
 		ctx,
-		bson.M{"_id": newDevice.Id},
+		bson.M{"_id": newDevice.ID},
 		bson.M{"$set": newDevice},
 		updateOptions,
 	)
@@ -1051,13 +1055,11 @@ func (a *DevicesApp) handle_putpublic(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(newDevice)
 }
 
-func (a *DevicesApp) handle_deletepublic(w rest.ResponseWriter, r *rest.Request) {
-
+func (a *App) handleDeletePublic(w rest.ResponseWriter, r *rest.Request) {
 	newDevice := Device{}
+	putID := r.PathParam("id")
 
-	putId := r.PathParam("id")
-
-	authId, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	authID, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		utils.RestErrorWrapper(w, "You need to be logged in.", http.StatusForbidden)
@@ -1065,7 +1067,6 @@ func (a *DevicesApp) handle_deletepublic(w rest.ResponseWriter, r *rest.Request)
 	}
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
-
 	if !ok {
 		// XXX: find right error
 		utils.RestErrorWrapper(w, "You need to be logged in with a known authentication type.", http.StatusForbidden)
@@ -1078,18 +1079,20 @@ func (a *DevicesApp) handle_deletepublic(w rest.ResponseWriter, r *rest.Request)
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
-
 	if collection == nil {
 		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	deviceObjectID, err := primitive.ObjectIDFromHex(putId)
+
+	deviceObjectID, err := primitive.ObjectIDFromHex(putID)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
+
 	err = collection.FindOne(ctx, bson.M{
 		"_id":     deviceObjectID,
 		"garbage": bson.M{"$ne": true},
@@ -1099,7 +1102,7 @@ func (a *DevicesApp) handle_deletepublic(w rest.ResponseWriter, r *rest.Request)
 		return
 	}
 
-	if newDevice.Owner != "" && newDevice.Owner != authId {
+	if newDevice.Owner != "" && newDevice.Owner != authID {
 		utils.RestErrorWrapper(w, "Not User Accessible Resource Id", http.StatusForbidden)
 		return
 	}
@@ -1113,7 +1116,7 @@ func (a *DevicesApp) handle_deletepublic(w rest.ResponseWriter, r *rest.Request)
 	updateOptions.SetUpsert(true)
 	_, err = collection.UpdateOne(
 		ctx,
-		bson.M{"_id": newDevice.Id},
+		bson.M{"_id": newDevice.ID},
 		bson.M{"$set": newDevice},
 		updateOptions,
 	)
@@ -1125,12 +1128,7 @@ func (a *DevicesApp) handle_deletepublic(w rest.ResponseWriter, r *rest.Request)
 	w.WriteJson(newDevice)
 }
 
-type ModelError struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-}
-
-func (a *DevicesApp) handle_getdevices(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetDevices(w rest.ResponseWriter, r *rest.Request) {
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		err := ModelError{}
@@ -1195,9 +1193,8 @@ func (a *DevicesApp) handle_getdevices(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(devices)
 }
 
-func (a *DevicesApp) handle_deletedevice(w rest.ResponseWriter, r *rest.Request) {
-
-	delId := r.PathParam("id")
+func (a *App) handleDeleteDevice(w rest.ResponseWriter, r *rest.Request) {
+	delID := r.PathParam("id")
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
@@ -1217,7 +1214,7 @@ func (a *DevicesApp) handle_deletedevice(w rest.ResponseWriter, r *rest.Request)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	deviceObjectID, err := primitive.ObjectIDFromHex(delId)
+	deviceObjectID, err := primitive.ObjectIDFromHex(delID)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
@@ -1233,13 +1230,13 @@ func (a *DevicesApp) handle_deletedevice(w rest.ResponseWriter, r *rest.Request)
 			return
 		}
 
-		device.Id = deviceObjectID
+		device.ID = deviceObjectID
 		w.WriteJson(device)
 		return
 	}
 
 	if device.Owner == owner {
-		result, res := MarkDeviceAsGarbage(w, delId)
+		result, res := MarkDeviceAsGarbage(w, delID)
 		if res.StatusCode() != 200 {
 			log.Print(res)
 			log.Print(result)
@@ -1273,7 +1270,7 @@ func MarkDeviceAsGarbage(
 }
 
 // LookupDeviceNick : Lookup Device Nicks and return device id
-func (a *DevicesApp) LookupDeviceNick(deviceID string) (*primitive.ObjectID, error) {
+func (a *App) LookupDeviceNick(deviceID string) (*primitive.ObjectID, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
@@ -1299,15 +1296,16 @@ func (a *DevicesApp) LookupDeviceNick(deviceID string) (*primitive.ObjectID, err
 		if err != nil {
 			return nil, errors.New("Error finding device:" + deviceID + ",err:" + err.Error())
 		}
-		return &deviceObject.Id, nil
+		return &deviceObject.ID, nil
 
 	}
 	return nil, errors.New("Device not found")
 }
-func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *DevicesApp {
 
-	app := new(DevicesApp)
-	app.jwt_middleware = jwtMiddleware
+// New create devices web app
+func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
+	app := new(App)
+	app.jwtMiddleware = jwtMiddleware
 	app.mongoClient = mongoClient
 
 	collection := app.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
@@ -1424,17 +1422,17 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *DevicesAp
 		return nil
 	}
 
-	app.Api = rest.NewApi()
+	app.API = rest.NewApi()
 	// we dont use default stack because we dont want content type enforcement
-	app.Api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
+	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
 		"/devices:", log.Lshortfile)})
-	app.Api.Use(&utils.AccessLogFluentMiddleware{Prefix: "devices"})
-	app.Api.Use(&rest.StatusMiddleware{})
-	app.Api.Use(&rest.TimerMiddleware{})
-	app.Api.Use(&metrics.MetricsMiddleware{})
+	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "devices"})
+	app.API.Use(&rest.StatusMiddleware{})
+	app.API.Use(&rest.TimerMiddleware{})
+	app.API.Use(&metrics.Middleware{})
 
-	app.Api.Use(rest.DefaultCommonStack...)
-	app.Api.Use(&rest.CorsMiddleware{
+	app.API.Use(rest.DefaultCommonStack...)
+	app.API.Use(&rest.CorsMiddleware{
 		RejectNonCorsRequests: false,
 		OriginValidator: func(origin string, request *rest.Request) bool {
 			return true
@@ -1446,7 +1444,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *DevicesAp
 		AccessControlMaxAge:           3600,
 	})
 
-	app.Api.Use(&rest.IfMiddleware{
+	app.API.Use(&rest.IfMiddleware{
 		Condition: func(request *rest.Request) bool {
 			// if call is coming with authorization attempt, ensure JWT middleware
 			// is used... otherwise let through anonymous POST for registration
@@ -1458,9 +1456,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *DevicesAp
 			// post new device means to register... allow this unauthenticated
 			return !(request.Method == "POST" && request.URL.Path == "/")
 		},
-		IfTrue: app.jwt_middleware,
+		IfTrue: app.jwtMiddleware,
 	})
-	app.Api.Use(&rest.IfMiddleware{
+	app.API.Use(&rest.IfMiddleware{
 		Condition: func(request *rest.Request) bool {
 			// if call is coming with authorization attempt, ensure JWT middleware
 			// is used... otherwise let through anonymous POST for registration
@@ -1492,30 +1490,30 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *DevicesAp
 	}
 
 	// /auth_status endpoints
-	api_router, _ := rest.MakeRouter(
+	apiRouter, _ := rest.MakeRouter(
 		// token api
-		rest.Post("/tokens", utils.ScopeFilter(readDevicesScopes, app.handle_posttokens)),
-		rest.Delete("/tokens/:id", utils.ScopeFilter(updateDevicesScopes, app.handle_disabletokens)),
-		rest.Get("/tokens", utils.ScopeFilter(readDevicesScopes, app.handle_gettokens)),
+		rest.Post("/tokens", utils.ScopeFilter(readDevicesScopes, app.handlePostTokens)),
+		rest.Delete("/tokens/:id", utils.ScopeFilter(updateDevicesScopes, app.handleDisableTokens)),
+		rest.Get("/tokens", utils.ScopeFilter(readDevicesScopes, app.handleGetTokens)),
 
 		// default api
-		rest.Get("/auth_status", utils.ScopeFilter(readDevicesScopes, handle_auth)),
-		rest.Get("/", utils.ScopeFilter(readDevicesScopes, app.handle_getdevices)),
-		rest.Post("/", utils.ScopeFilter(writeDevicesScopes, app.handle_postdevice)),
-		rest.Get("/:id", utils.ScopeFilter(readDevicesScopes, app.handle_getdevice)),
-		rest.Put("/:id", utils.ScopeFilter(writeDevicesScopes, app.handle_putdevice)),
-		rest.Patch("/:id", utils.ScopeFilter(writeDevicesScopes, app.handle_patchdevice)),
-		rest.Put("/:id/public", utils.ScopeFilter(writeDevicesScopes, app.handle_putpublic)),
-		rest.Delete("/:id/public", utils.ScopeFilter(writeDevicesScopes, app.handle_deletepublic)),
-		rest.Put("/:id/user-meta", utils.ScopeFilter(writeDevicesScopes, app.handle_putuserdata)),
-		rest.Patch("/:id/user-meta", utils.ScopeFilter(writeDevicesScopes, app.handle_patchuserdata)),
-		rest.Put("/:id/device-meta", utils.ScopeFilter(writeDevicesScopes, app.handle_putdevicedata)),
-		rest.Patch("/:id/device-meta", utils.ScopeFilter(writeDevicesScopes, app.handle_patchdevicedata)),
-		rest.Delete("/:id", utils.ScopeFilter(writeDevicesScopes, app.handle_deletedevice)),
+		rest.Get("/auth_status", utils.ScopeFilter(readDevicesScopes, handleAuth)),
+		rest.Get("/", utils.ScopeFilter(readDevicesScopes, app.handleGetDevices)),
+		rest.Post("/", utils.ScopeFilter(writeDevicesScopes, app.handlePostDevice)),
+		rest.Get("/:id", utils.ScopeFilter(readDevicesScopes, app.handleDetDevice)),
+		rest.Put("/:id", utils.ScopeFilter(writeDevicesScopes, app.handlePutDevice)),
+		rest.Patch("/:id", utils.ScopeFilter(writeDevicesScopes, app.handlePatchDevice)),
+		rest.Put("/:id/public", utils.ScopeFilter(writeDevicesScopes, app.handlePutPublic)),
+		rest.Delete("/:id/public", utils.ScopeFilter(writeDevicesScopes, app.handleDeletePublic)),
+		rest.Put("/:id/user-meta", utils.ScopeFilter(writeDevicesScopes, app.handlePutUserData)),
+		rest.Patch("/:id/user-meta", utils.ScopeFilter(writeDevicesScopes, app.handlePatchUserData)),
+		rest.Put("/:id/device-meta", utils.ScopeFilter(writeDevicesScopes, app.handlePutDeviceData)),
+		rest.Patch("/:id/device-meta", utils.ScopeFilter(writeDevicesScopes, app.handlePatchDeviceData)),
+		rest.Delete("/:id", utils.ScopeFilter(writeDevicesScopes, app.handleDeleteDevice)),
 		// lookup by nick-path (np)
-		rest.Get("/np/:usernick/:devicenick", utils.ScopeFilter(readDevicesScopes, app.handle_getuserdevice)),
+		rest.Get("/np/:usernick/:devicenick", utils.ScopeFilter(readDevicesScopes, app.handleGetUserDevice)),
 	)
-	app.Api.SetApp(api_router)
+	app.API.SetApp(apiRouter)
 
 	return app
 }

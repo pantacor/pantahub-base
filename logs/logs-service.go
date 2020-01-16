@@ -47,25 +47,27 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-type logsApp struct {
-	jwt_middleware *jwt.JWTMiddleware
-	Api            *rest.Api
-	mongoClient    *mongo.Client
-	backend        LogsBackend
+// App logs rest application
+type App struct {
+	jwtMiddleware *jwt.JWTMiddleware
+	API           *rest.Api
+	mongoClient   *mongo.Client
+	backend       Backend
 }
 
-// LogsFilter uses a prototype LogsEntry instance to filter
+// Filters uses a prototype Entry instance to filter
 // the values. It honours the string fields: Device, Owner,
 // Source, Level and Text, where a non-empty field will
 // make the backend filter results by the field.
-type LogsFilter *LogsEntry
+type Filters *Entry
 
-// LogsSort is about a map of sort fields prefixed with '-'
+// Sorts is about a map of sort fields prefixed with '-'
 // if the order of this field should be descending (like mgo)
-type LogsSort []string
+type Sorts []string
 
-type LogsEntry struct {
-	Id          primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+// Entry log entry payload
+type Entry struct {
+	ID          primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
 	Device      string             `json:"dev,omitempty" bson:"dev"`
 	Owner       string             `json:"own,omitempty" bson:"own"`
 	TimeCreated time.Time          `json:"time-created,omitempty" bson:"time-created"`
@@ -76,32 +78,37 @@ type LogsEntry struct {
 	LogText     string             `json:"msg,omitempty" bson:"msg"`
 }
 
-type LogsPager struct {
-	Start      int64        `json:"start"`
-	Page       int64        `json:"page"`
-	Count      int64        `json:"count"`
-	NextCursor string       `json:"next-cursor,omitempty"`
-	Entries    []*LogsEntry `json:"entries,omitempty"`
+// Pager logs pagination structure
+type Pager struct {
+	Start      int64    `json:"start"`
+	Page       int64    `json:"page"`
+	Count      int64    `json:"count"`
+	NextCursor string   `json:"next-cursor,omitempty"`
+	Entries    []*Entry `json:"entries,omitempty"`
 }
 
-type LogsBackend interface {
+// Backend logs interface
+type Backend interface {
 	getLogs(start int64, page int64, beforeOrafter *time.Time, after bool,
-		query LogsFilter, sort LogsSort, cursor bool) (*LogsPager, error)
-	getLogsByCursor(nextCursor string) (*LogsPager, error)
-	postLogs(e []LogsEntry) error
+		query Filters, sort Sorts, cursor bool) (*Pager, error)
+	getLogsByCursor(nextCursor string) (*Pager, error)
+	postLogs(e []Entry) error
 	register() error
 	unregister(deleteIndices bool) error
 }
 
-var ErrCursorTimedOut error = errors.New("Cursor Invalid or expired.")
-var ErrCursorNotImplemented error = errors.New("Cursor not supported by backend.")
+// ErrCursorTimedOut invalid cursor error
+var ErrCursorTimedOut error = errors.New("cursor Invalid or expired")
 
-type LogsCursorClaim struct {
+// ErrCursorNotImplemented cursor not implemented
+var ErrCursorNotImplemented error = errors.New("cursor not supported by backend")
+
+// CursorClaim claim log cursor
+type CursorClaim struct {
 	NextCursor string `json:"next-cursor"`
 	jwtgo.StandardClaims
 }
 
-//
 // ## GET /logs/
 //   Post one or many log entries as an error of LogEntry
 //   Page through your logs.
@@ -126,9 +133,9 @@ type LogsCursorClaim struct {
 //   Cursor Parameters:
 //     - cursor: true in case you want us to return a cursor ID as well.
 //
-func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetLogs(w rest.ResponseWriter, r *rest.Request) {
 
-	var result *LogsPager
+	var result *Pager
 	var err error
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
@@ -181,14 +188,14 @@ func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 	}
 	levelParam := r.FormValue("lvl")
 
-	filter := &LogsEntry{
+	filter := &Entry{
 		Owner:     own.(string),
 		LogLevel:  levelParam,
 		LogSource: sourceParam,
 		Device:    deviceParam,
 	}
 
-	logsSort := LogsSort{}
+	logsSort := Sorts{}
 	sortParam := r.FormValue("sort")
 
 	sorts := strings.Split(sortParam, ",")
@@ -243,7 +250,7 @@ func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if result.NextCursor != "" {
-		claims := LogsCursorClaim{
+		claims := CursorClaim{
 			NextCursor: result.NextCursor,
 			StandardClaims: jwtgo.StandardClaims{
 				ExpiresAt: time.Now().Add(time.Duration(time.Minute * 2)).Unix(),
@@ -251,8 +258,8 @@ func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 				Audience:  own.(string),
 			},
 		}
-		token := jwtgo.NewWithClaims(jwtgo.GetSigningMethod(a.jwt_middleware.SigningAlgorithm), claims)
-		ss, err := token.SignedString(a.jwt_middleware.Key)
+		token := jwtgo.NewWithClaims(jwtgo.GetSigningMethod(a.jwtMiddleware.SigningAlgorithm), claims)
+		ss, err := token.SignedString(a.jwtMiddleware.Key)
 		if err != nil {
 			utils.RestErrorWrapper(w, "ERROR: signing scrollid token: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -264,7 +271,7 @@ func (a *logsApp) handle_getlogs(w rest.ResponseWriter, r *rest.Request) {
 }
 
 // ParseDeviceString : Parse Device Nicks & Device Id's from a string and replace them with device Prn
-func (a *logsApp) ParseDeviceString(devicesString string) (string, error) {
+func (a *App) ParseDeviceString(devicesString string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
@@ -312,7 +319,7 @@ func (a *logsApp) ParseDeviceString(devicesString string) (string, error) {
 	return strings.Join(devicePrns, ","), nil
 }
 
-func (a *logsApp) handle_getlogscursor(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetLogsCursor(w rest.ResponseWriter, r *rest.Request) {
 
 	var err error
 
@@ -351,8 +358,8 @@ func (a *logsApp) handle_getlogscursor(w rest.ResponseWriter, r *rest.Request) {
 
 	}
 
-	token, err := jwtgo.ParseWithClaims(nextCursorJWT, &LogsCursorClaim{}, func(token *jwtgo.Token) (interface{}, error) {
-		return a.jwt_middleware.Pub, nil
+	token, err := jwtgo.ParseWithClaims(nextCursorJWT, &CursorClaim{}, func(token *jwtgo.Token) (interface{}, error) {
+		return a.jwtMiddleware.Pub, nil
 	})
 
 	if err != nil {
@@ -360,8 +367,8 @@ func (a *logsApp) handle_getlogscursor(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	if claims, ok := token.Claims.(*LogsCursorClaim); ok && token.Valid {
-		var result *LogsPager
+	if claims, ok := token.Claims.(*CursorClaim); ok && token.Valid {
+		var result *Pager
 
 		caller := claims.StandardClaims.Audience
 		if caller != own {
@@ -377,7 +384,7 @@ func (a *logsApp) handle_getlogscursor(w rest.ResponseWriter, r *rest.Request) {
 		}
 
 		if result.NextCursor != "" {
-			claims := LogsCursorClaim{
+			claims := CursorClaim{
 				NextCursor: result.NextCursor,
 				StandardClaims: jwtgo.StandardClaims{
 					ExpiresAt: time.Now().Add(time.Duration(time.Minute * 2)).Unix(),
@@ -385,8 +392,8 @@ func (a *logsApp) handle_getlogscursor(w rest.ResponseWriter, r *rest.Request) {
 					Audience:  own.(string),
 				},
 			}
-			token := jwtgo.NewWithClaims(jwtgo.GetSigningMethod(a.jwt_middleware.SigningAlgorithm), claims)
-			ss, err := token.SignedString(a.jwt_middleware.Key)
+			token := jwtgo.NewWithClaims(jwtgo.GetSigningMethod(a.jwtMiddleware.SigningAlgorithm), claims)
+			ss, err := token.SignedString(a.jwtMiddleware.Key)
 			if err != nil {
 				utils.RestErrorWrapper(w, "ERROR: signing scrollid token: "+err.Error(), http.StatusInternalServerError)
 				return
@@ -402,8 +409,8 @@ func (a *logsApp) handle_getlogscursor(w rest.ResponseWriter, r *rest.Request) {
 	return
 }
 
-func unmarshalBody(body []byte) ([]LogsEntry, error) {
-	entries := make([]LogsEntry, 1)
+func unmarshalBody(body []byte) ([]Entry, error) {
+	entries := make([]Entry, 1)
 
 	err := json.Unmarshal(body, &entries)
 
@@ -423,7 +430,7 @@ func unmarshalBody(body []byte) ([]LogsEntry, error) {
 //
 // ## POST /logs/
 //   Post one or many log entries as an error of LogEntry
-func (a *logsApp) handle_postlogs(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePostLogs(w rest.ResponseWriter, r *rest.Request) {
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
@@ -459,10 +466,10 @@ func (a *logsApp) handle_postlogs(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	newEntries := []LogsEntry{}
+	newEntries := []Entry{}
 
 	for _, v := range entries {
-		v.Id, err = primitive.ObjectIDFromHex(bson.NewObjectId().Hex())
+		v.ID, err = primitive.ObjectIDFromHex(bson.NewObjectId().Hex())
 		if err != nil {
 			utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 			return
@@ -486,12 +493,11 @@ func (a *logsApp) handle_postlogs(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(newEntries)
 }
 
-func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *logsApp {
-
+// New create a new logs rest application
+func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	var err error
-
-	app := new(logsApp)
-	app.jwt_middleware = jwtMiddleware
+	app := new(App)
+	app.jwtMiddleware = jwtMiddleware
 	app.mongoClient = mongoClient
 
 	app.backend, err = NewElasticLogger()
@@ -516,17 +522,17 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *logsApp {
 		log.Println("INFO: will log to stdout now ...")
 	}
 
-	app.Api = rest.NewApi()
+	app.API = rest.NewApi()
 
 	// we dont use default stack because we dont want content type enforcement
-	app.Api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
+	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
 		"/logs:", log.Lshortfile)})
-	app.Api.Use(&utils.AccessLogFluentMiddleware{Prefix: "logs"})
+	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "logs"})
 
-	app.Api.Use(rest.DefaultCommonStack...)
+	app.API.Use(rest.DefaultCommonStack...)
 
 	// we allow calls from other domains to allow webapps; XXX: review
-	app.Api.Use(&rest.CorsMiddleware{
+	app.API.Use(&rest.CorsMiddleware{
 		RejectNonCorsRequests: false,
 		OriginValidator: func(origin string, request *rest.Request) bool {
 			return true
@@ -538,14 +544,14 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *logsApp {
 		AccessControlMaxAge:           3600,
 	})
 
-	app.Api.Use(&rest.IfMiddleware{
+	app.API.Use(&rest.IfMiddleware{
 		Condition: func(request *rest.Request) bool {
 			return true
 		},
-		IfTrue: app.jwt_middleware,
+		IfTrue: app.jwtMiddleware,
 	})
 
-	app.Api.Use(&rest.IfMiddleware{
+	app.API.Use(&rest.IfMiddleware{
 		Condition: func(request *rest.Request) bool {
 			return true
 		},
@@ -555,13 +561,13 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *logsApp {
 	// XXX: this is all needs to be done so that paths that do not trail with /
 	//      get a MOVED PERMANTENTLY error with the redir path with / like the main
 	//      API routers (bad rest.MakeRouter I suspect)
-	api_router, _ := rest.MakeRouter(
-		rest.Get("/", app.handle_getlogs),
-		rest.Get("/cursor", app.handle_getlogscursor),
-		rest.Post("/cursor", app.handle_getlogscursor),
-		rest.Post("/", app.handle_postlogs),
+	apiRouter, _ := rest.MakeRouter(
+		rest.Get("/", app.handleGetLogs),
+		rest.Get("/cursor", app.handleGetLogsCursor),
+		rest.Post("/cursor", app.handleGetLogsCursor),
+		rest.Post("/", app.handlePostLogs),
 	)
-	app.Api.SetApp(api_router)
+	app.API.SetApp(apiRouter)
 
 	return app
 }

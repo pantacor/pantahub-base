@@ -12,6 +12,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
 package utils
 
 import (
@@ -21,12 +22,13 @@ import (
 	"strings"
 )
 
+// PantahubS3Path get S3 pantahub path from environment
 func PantahubS3Path() string {
-	if GetEnv(ENV_PANTAHUB_STORAGE_DRIVER) == "s3" {
-		return GetEnv(ENV_PANTAHUB_STORAGE_PATH)
+	if GetEnv(EnvPantahubStorageDriver) == "s3" {
+		return GetEnv(EnvPantahubStoragePath)
 	}
 
-	basePath := path.Join(GetEnv(ENV_PANTAHUB_S3PATH), GetEnv(ENV_PANTAHUB_STORAGE_PATH))
+	basePath := path.Join(GetEnv(EnvPantahubS3Path), GetEnv(EnvPantahubStoragePath))
 
 	if basePath == "" {
 		basePath = "."
@@ -35,6 +37,7 @@ func PantahubS3Path() string {
 	return basePath
 }
 
+// MakeLocalS3PathForName create a local S3 path for name
 func MakeLocalS3PathForName(name string) (string, error) {
 	if filepath.Separator != '/' && strings.ContainsRune(name, filepath.Separator) ||
 		strings.Contains(name, "\x00") {
