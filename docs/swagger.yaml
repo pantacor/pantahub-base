@@ -85,6 +85,25 @@ definitions:
       type:
         type: string
     type: object
+  auth.accountClaims:
+    properties:
+      exp:
+        type: string
+      id:
+        type: string
+      nick:
+        type: string
+      orig_iat:
+        type: string
+      prn:
+        type: string
+      roles:
+        type: string
+      scopes:
+        type: string
+      type:
+        type: string
+    type: object
   auth.accountCreationPayload:
     properties:
       captcha:
@@ -129,6 +148,160 @@ definitions:
     properties:
       email:
         type: string
+    type: object
+  dash.BillingInfo:
+    properties:
+      amountDue:
+        type: number
+      currency:
+        type: string
+      type:
+        type: string
+      vatRegion:
+        type: string
+    type: object
+  dash.DeviceInfo:
+    properties:
+      device-id:
+        type: string
+      last-activity:
+        type: string
+      message:
+        type: string
+      nick:
+        type: string
+      prn:
+        type: string
+      status:
+        type: string
+      type:
+        type: string
+    type: object
+  dash.Quota:
+    properties:
+      actual:
+        type: number
+      max:
+        type: number
+      name:
+        type: string
+      unit:
+        type: string
+    type: object
+  dash.SubscriptionInfo:
+    properties:
+      billing:
+        $ref: '#/definitions/dash.BillingInfo'
+        type: object
+      plan-id:
+        type: string
+      quota-stats:
+        additionalProperties:
+          $ref: '#/definitions/dash.Quota'
+        type: object
+    type: object
+  dash.Summary:
+    properties:
+      nick:
+        type: string
+      prn:
+        type: string
+      subscription:
+        $ref: '#/definitions/dash.SubscriptionInfo'
+        type: object
+      top-devices:
+        items:
+          $ref: '#/definitions/dash.DeviceInfo'
+        type: array
+    type: object
+  dash.accountClaims:
+    properties:
+      exp:
+        type: string
+      id:
+        type: string
+      nick:
+        type: string
+      orig_iat:
+        type: string
+      prn:
+        type: string
+      roles:
+        type: string
+      scopes:
+        type: string
+      type:
+        type: string
+    type: object
+  devices.Device:
+    properties:
+      challenge:
+        type: string
+      device-meta:
+        additionalProperties: true
+        type: object
+      garbage:
+        type: boolean
+      id:
+        type: string
+      nick:
+        type: string
+      owner:
+        type: string
+      owner-nick:
+        type: string
+      prn:
+        type: string
+      public:
+        type: boolean
+      secret:
+        type: string
+      time-created:
+        type: string
+      time-modified:
+        type: string
+      user-meta:
+        additionalProperties: true
+        type: object
+    type: object
+  devices.PantahubDevicesJoinToken:
+    properties:
+      default-user-meta:
+        additionalProperties: true
+        type: object
+      disabled:
+        type: boolean
+      id:
+        type: string
+      nick:
+        type: string
+      owner:
+        type: string
+      prn:
+        type: string
+      time-created:
+        type: string
+      time-modified:
+        type: string
+      token:
+        type: string
+      token-sha:
+        items:
+          type: integer
+        type: array
+    type: object
+  devices.challengePayload:
+    properties:
+      challenge:
+        type: string
+    type: object
+  devices.disableToken:
+    properties:
+      status:
+        type: string
+    type: object
+  devices.metaDataPayload:
+    additionalProperties: true
     type: object
   utils.RError:
     properties:
@@ -473,7 +646,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/accounts.Account'
+            $ref: '#/definitions/auth.accountClaims'
         "400":
           description: Invalid payload
           schema:
@@ -580,6 +753,621 @@ paths:
           schema:
             $ref: '#/definitions/utils.RError'
       summary: Verify account payload
+  /dash/:
+    get:
+      consumes:
+      - application/json
+      description: The summary contains information about the necessary data need
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dash.Summary'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get summary information about an Account
+  /dash/auth_status:
+    get:
+      consumes:
+      - application/json
+      description: Get account JWT token claims payload
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dash.accountClaims'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get account JWT token payload
+  /devices:
+    get:
+      consumes:
+      - application/json
+      description: Get all accounts devices
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/devices.Device'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get all accounts devices
+    post:
+      consumes:
+      - application/json
+      description: Create a new device for an account
+      parameters:
+      - description: Device payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/devices.Device'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/devices.Device'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new device for an account
+  /devices/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Mark a device to be deleted by device garbage collector
+      parameters:
+      - description: ID|PRN|NICK
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/devices.Device'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Mark a device to be deleted by device garbage collector
+    get:
+      consumes:
+      - application/json
+      description: Get a device using the device ID or the PRN or the device Nick
+      parameters:
+      - description: ID|Nick|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/devices.Device'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get a device using the device ID or the PRN or the device Nick
+    patch:
+      consumes:
+      - application/json
+      description: update a device
+      parameters:
+      - description: ID|PRN|NICK
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Device payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/devices.Device'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/devices.Device'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: update a device
+    put:
+      consumes:
+      - application/json
+      description: Claim a device as a logged in user with TOKEN
+      parameters:
+      - description: ID|PRN|NICK
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Device payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/devices.challengePayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/devices.Device'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Claim a device by resolving challenge
+  /devices/{id}/device-meta:
+    patch:
+      consumes:
+      - application/json
+      description: 'Update device metadata using the user credentials:'
+      parameters:
+      - description: ID|PRN|NICK
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Device payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/devices.metaDataPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/devices.Device'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: 'Update device metadata using the user credentials:'
+    put:
+      consumes:
+      - application/json
+      description: 'Update device metadata using the device credentials:'
+      parameters:
+      - description: ID|PRN|NICK
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Device payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/devices.metaDataPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/devices.Device'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: 'Update device metadata using the device credentials:'
+  /devices/{id}/public:
+    delete:
+      consumes:
+      - application/json
+      description: Make a device private
+      parameters:
+      - description: ID|PRN|NICK
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/devices.Device'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Make a device private
+    put:
+      consumes:
+      - application/json
+      description: Make a device public
+      parameters:
+      - description: ID|PRN|NICK
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/devices.Device'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Make a device public
+  /devices/{id}/user-meta:
+    patch:
+      consumes:
+      - application/json
+      description: 'Update user metadata using the user credentials:'
+      parameters:
+      - description: ID|PRN|NICK
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Device payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/devices.metaDataPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/devices.Device'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: 'Update user metadata using the user credentials:'
+    put:
+      consumes:
+      - application/json
+      description: Update user metadata using the user credentials
+      parameters:
+      - description: ID|PRN|NICK
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Device payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/devices.metaDataPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/devices.Device'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Update user metadata using the user credentials
+  /devices/np/{usernick}/{devicenick}:
+    get:
+      consumes:
+      - application/json
+      description: get device by owner nick and device nick
+      parameters:
+      - description: NICK
+        in: path
+        name: usernick
+        required: true
+        type: string
+      - description: NICK
+        in: path
+        name: devicenick
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/devices.Device'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: get device by owner nick and device nick
+  /devices/tokens:
+    get:
+      consumes:
+      - application/json
+      description: Get all device tokens
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/devices.PantahubDevicesJoinToken'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get all device tokens
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Pantahub base offers a built in basic factory story in the sense that we offer the ability to auto assing devices to a specific owner.
+        For that right now we use a simple token based approach:
+        1. Owner uses ```/devices/tokens/``` end point to create a new token; optionally he can also provide a set of default user-meta information that the auto assign feature will put in place for every device joinig using such token.
+        2. Token is a one-time-visible secret that will only be displayed on reply of the token registration, but not afterwards. If user looses a token he can generate a new one. Old token can stay active if user does not believe the token has been compromised
+        3. User configures device at factory to use the produced token as its pantahub registration credential. Pantavisor will then use the token when registering itself for first time. It uses ```Pantahub-Devices-Auto-Token-V1``` to pass the token to pantahub when registering itself. With this pantahub will auto assign the device to the owner of the given token and will put UserMeta in place.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/devices.PantahubDevicesJoinToken'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new device token, used for authenticate as device
+  /devices/tokens/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Disable a device token in order to be unable to used as authetication
+      parameters:
+      - description: ID|Nick|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/devices.disableToken'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Disable a device token in order to be unable to used as authetication
 securityDefinitions:
   ApiKeyAuth:
     in: header
