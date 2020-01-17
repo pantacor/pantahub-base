@@ -36,7 +36,7 @@ import (
 // @Security ApiKeyAuth
 // @Param id path string true "ID|PRN|NICK"
 // @Param body body metaDataPayload true "Device payload"
-// @Success 200 {array} Device
+// @Success 200 {object} metaDataPayload
 // @Failure 400 {object} utils.RError
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError

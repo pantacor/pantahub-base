@@ -40,7 +40,7 @@ import (
 // @Produce  json
 // @Security ApiKeyAuth
 // @Param body body Device true "Device payload"
-// @Success 200 {array} Device
+// @Success 200 {object} Device
 // @Failure 400 {object} utils.RError
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError

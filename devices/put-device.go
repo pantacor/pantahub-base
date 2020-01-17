@@ -42,7 +42,7 @@ type challengePayload struct {
 // @Security ApiKeyAuth
 // @Param id path string true "ID|PRN|NICK"
 // @Param body body challengePayload true "Device payload"
-// @Success 200 {array} Device
+// @Success 200 {object} Device
 // @Failure 400 {object} utils.RError
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError

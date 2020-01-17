@@ -50,6 +50,18 @@ type Response struct {
 	Start     time.Time     `json:"start-time"`
 }
 
+// handleHealthz Get information of the health of the api services
+// @Summary Get information of the health of the api services
+// @Description Get information of the health of the api services
+// @Accept  json
+// @Produce  json
+// @Security BasicAuth
+// @Param id path string true "ID|PRN|NICK"
+// @Success 200 {object} Response
+// @Failure 400 {object} utils.RError
+// @Failure 404 {object} utils.RError
+// @Failure 500 {object} utils.RError
+// @Router /healthz [get]
 func (a *App) handleHealthz(w rest.ResponseWriter, r *rest.Request) {
 	m.Lock()
 	defer m.Unlock()
