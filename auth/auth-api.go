@@ -34,13 +34,24 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+type accountClaims struct {
+	Exp     string `json:"exp"`
+	ID      string `json:"id"`
+	Nick    string `json:"nick"`
+	OrigIat string `json:"orig_iat"`
+	Prn     string `json:"prn"`
+	Roles   string `json:"roles"`
+	Scopes  string `json:"scopes"`
+	Type    string `json:"type"`
+}
+
 // handleAuthStatus Get JWT claims from Authorization header
 // @Summary Get JWT claims from Authorization header
 // @Description Get JWT claims from Authorization header
 // @Accept  json
 // @Produce  json
 // @Security ApiKeyAuth
-// @Success 200 {object} accounts.Account
+// @Success 200 {object} accountClaims
 // @Failure 400 {object} utils.RError "Invalid payload"
 // @Failure 404 {object} utils.RError "Account not found"
 // @Failure 500 {object} utils.RError "Error processing request"
