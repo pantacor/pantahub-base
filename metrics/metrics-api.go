@@ -41,6 +41,16 @@ type RestRequestResponseAdapter struct {
 	Response rest.ResponseWriter
 }
 
+// handleGetMetrics Get API metrics
+// @Summary Get API metrics
+// @Description Get API metrics
+// @Accept  plain/text
+// @Produce  plain/text
+// @Success 200
+// @Failure 400 {object} utils.RError
+// @Failure 404 {object} utils.RError
+// @Failure 500 {object} utils.RError
+// @Router /metrics [get]
 func (a *App) handleGetMetrics(w rest.ResponseWriter, r *rest.Request) {
 	var httpResp http.ResponseWriter = w
 

@@ -815,10 +815,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/devices.Device"
-                            }
+                            "$ref": "#/definitions/devices.Device"
                         }
                     },
                     "400": {
@@ -923,10 +920,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/devices.PantahubDevicesJoinToken"
-                            }
+                            "$ref": "#/definitions/devices.PantahubDevicesJoinToken"
                         }
                     },
                     "400": {
@@ -1121,10 +1115,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/devices.Device"
-                            }
+                            "$ref": "#/definitions/devices.Device"
                         }
                     },
                     "400": {
@@ -1174,10 +1165,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/devices.Device"
-                            }
+                            "$ref": "#/definitions/devices.Device"
                         }
                     },
                     "400": {
@@ -1236,10 +1224,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/devices.Device"
-                            }
+                            "$ref": "#/definitions/devices.Device"
                         }
                     },
                     "400": {
@@ -1300,10 +1285,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/devices.Device"
-                            }
+                            "$ref": "#/definitions/devices.metaDataPayload"
                         }
                     },
                     "400": {
@@ -1417,10 +1399,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/devices.Device"
-                            }
+                            "$ref": "#/definitions/devices.Device"
                         }
                     },
                     "400": {
@@ -1596,12 +1575,287 @@
                     "200": {
                         "description": "OK",
                         "schema": {
+                            "$ref": "#/definitions/devices.metaDataPayload"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/healthz": {
+            "get": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "description": "Get information of the health of the api services",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Get information of the health of the api services",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID|PRN|NICK",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/healthz.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/logs": {
+            "get": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "description": "Get one or many log entries as an error of LogEntry\nPage through your logs.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Get one or many log entries as an error of LogEntry",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "list position to start page; either number or ID or '\u003ctsec\u003e.\u003ctnano\u003e' of log entry",
+                        "name": "start",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "length of page",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "comma separated list of device prns  to include",
+                        "name": "dev",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "comma separated list of log levels",
+                        "name": "lvl",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "comma separated list of log levels",
+                        "name": "src",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "common list of items of 'tsec,tnano,device,src,lvl,time-created' you can use - on each individual item to reverse order",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "true in case you want us to return a cursor ID as well.",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/logs.Pager"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "description": "Post one or many log entries as an error of LogEntry",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Post one or many log entries as an error of LogEntry",
+                "parameters": [
+                    {
+                        "description": "New logs body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/logs.Entry"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/devices.Device"
+                                "$ref": "#/definitions/logs.Entry"
                             }
                         }
                     },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/logs/cursor": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get or one or many log entries",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Get or one or many log entries",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "next-cursor ID",
+                        "name": "next-cursor",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/logs.Pager"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/metrics": {
+            "get": {
+                "description": "Get API metrics",
+                "consumes": [
+                    "plain/text"
+                ],
+                "produces": [
+                    "plain/text"
+                ],
+                "summary": "Get API metrics",
+                "responses": {
+                    "200": {},
                     "400": {
                         "description": "Bad Request",
                         "schema": {
@@ -2080,6 +2334,75 @@
         "devices.metaDataPayload": {
             "type": "object",
             "additionalProperties": true
+        },
+        "healthz.Response": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "duration": {
+                    "type": "string"
+                },
+                "start-time": {
+                    "type": "string"
+                }
+            }
+        },
+        "logs.Entry": {
+            "type": "object",
+            "properties": {
+                "dev": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "lvl": {
+                    "type": "string"
+                },
+                "msg": {
+                    "type": "string"
+                },
+                "own": {
+                    "type": "string"
+                },
+                "src": {
+                    "type": "string"
+                },
+                "time-created": {
+                    "type": "string"
+                },
+                "tnano": {
+                    "type": "integer"
+                },
+                "tsec": {
+                    "type": "integer"
+                }
+            }
+        },
+        "logs.Pager": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "entries": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/logs.Entry"
+                    }
+                },
+                "next-cursor": {
+                    "type": "string"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "start": {
+                    "type": "integer"
+                }
+            }
         },
         "utils.RError": {
             "type": "object",

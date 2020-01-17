@@ -303,6 +303,51 @@ definitions:
   devices.metaDataPayload:
     additionalProperties: true
     type: object
+  healthz.Response:
+    properties:
+      code:
+        type: integer
+      duration:
+        type: string
+      start-time:
+        type: string
+    type: object
+  logs.Entry:
+    properties:
+      dev:
+        type: string
+      id:
+        type: string
+      lvl:
+        type: string
+      msg:
+        type: string
+      own:
+        type: string
+      src:
+        type: string
+      time-created:
+        type: string
+      tnano:
+        type: integer
+      tsec:
+        type: integer
+    type: object
+  logs.Pager:
+    properties:
+      count:
+        type: integer
+      entries:
+        items:
+          $ref: '#/definitions/logs.Entry'
+        type: array
+      next-cursor:
+        type: string
+      page:
+        type: integer
+      start:
+        type: integer
+    type: object
   utils.RError:
     properties:
       code:
@@ -845,9 +890,7 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/devices.Device'
-            type: array
+            $ref: '#/definitions/devices.Device'
         "400":
           description: Bad Request
           schema:
@@ -880,9 +923,7 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/devices.Device'
-            type: array
+            $ref: '#/definitions/devices.Device'
         "400":
           description: Bad Request
           schema:
@@ -954,9 +995,7 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/devices.Device'
-            type: array
+            $ref: '#/definitions/devices.Device'
         "400":
           description: Bad Request
           schema:
@@ -994,9 +1033,7 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/devices.Device'
-            type: array
+            $ref: '#/definitions/devices.Device'
         "400":
           description: Bad Request
           schema:
@@ -1075,9 +1112,7 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/devices.Device'
-            type: array
+            $ref: '#/definitions/devices.metaDataPayload'
         "400":
           description: Bad Request
           schema:
@@ -1144,9 +1179,7 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/devices.Device'
-            type: array
+            $ref: '#/definitions/devices.Device'
         "400":
           description: Bad Request
           schema:
@@ -1185,9 +1218,7 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/devices.Device'
-            type: array
+            $ref: '#/definitions/devices.metaDataPayload'
         "400":
           description: Bad Request
           schema:
@@ -1294,9 +1325,7 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/devices.PantahubDevicesJoinToken'
-            type: array
+            $ref: '#/definitions/devices.PantahubDevicesJoinToken'
         "400":
           description: Bad Request
           schema:
@@ -1368,6 +1397,188 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Disable a device token in order to be unable to used as authetication
+  /healthz:
+    get:
+      consumes:
+      - application/json
+      description: Get information of the health of the api services
+      parameters:
+      - description: ID|PRN|NICK
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/healthz.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - BasicAuth: []
+      summary: Get information of the health of the api services
+  /logs:
+    get:
+      consumes:
+      - application/json
+      description: |-
+        Get one or many log entries as an error of LogEntry
+        Page through your logs.
+      parameters:
+      - description: list position to start page; either number or ID or '<tsec>.<tnano>'
+          of log entry
+        in: query
+        name: start
+        type: string
+      - description: length of page
+        in: query
+        name: page
+        type: string
+      - description: comma separated list of device prns  to include
+        in: query
+        name: dev
+        type: string
+      - description: comma separated list of log levels
+        in: query
+        name: lvl
+        type: string
+      - description: comma separated list of log levels
+        in: query
+        name: src
+        type: string
+      - description: common list of items of 'tsec,tnano,device,src,lvl,time-created'
+          you can use - on each individual item to reverse order
+        in: query
+        name: sort
+        type: string
+      - description: true in case you want us to return a cursor ID as well.
+        in: query
+        name: cursor
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/logs.Pager'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - BasicAuth: []
+      summary: Get one or many log entries as an error of LogEntry
+    post:
+      consumes:
+      - application/json
+      description: Post one or many log entries as an error of LogEntry
+      parameters:
+      - description: New logs body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/logs.Entry'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/logs.Entry'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - BasicAuth: []
+      summary: Post one or many log entries as an error of LogEntry
+  /logs/cursor:
+    get:
+      consumes:
+      - application/json
+      description: Get or one or many log entries
+      parameters:
+      - description: next-cursor ID
+        in: formData
+        name: next-cursor
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/logs.Pager'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get or one or many log entries
+  /metrics:
+    get:
+      consumes:
+      - plain/text
+      description: Get API metrics
+      produces:
+      - plain/text
+      responses:
+        "200": {}
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      summary: Get API metrics
 securityDefinitions:
   ApiKeyAuth:
     in: header
