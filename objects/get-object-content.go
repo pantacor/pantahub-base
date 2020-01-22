@@ -35,7 +35,8 @@ import (
 // @Security ApiKeyAuth
 // @Tags objects
 // @Param id path string true "Object ID"
-// @Success 200 {object} Object
+// @Header 200 {string} Location "File location URL"
+// @Success 200
 // @Failure 400 {object} utils.RError
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
