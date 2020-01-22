@@ -36,6 +36,7 @@ import (
 // @Accept  json
 // @Produce  json
 // @Security ApiKeyAuth
+// @Tags devices
 // @Param id path string true "ID|PRN|NICK"
 // @Param body body Device true "Device payload"
 // @Success 200 {object} Device

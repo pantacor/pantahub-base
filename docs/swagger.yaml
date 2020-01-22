@@ -348,6 +348,37 @@ definitions:
       start:
         type: integer
     type: object
+  objects.Object:
+    properties:
+      id:
+        type: string
+      initialized:
+        type: boolean
+      mime-type:
+        type: string
+      objectname:
+        type: string
+      owner:
+        type: string
+      sha256sum:
+        type: string
+      size:
+        type: string
+      sizeint:
+        type: integer
+      storage-id:
+        type: string
+    type: object
+  subscriptions.SubscriptionReq:
+    properties:
+      attrs:
+        additionalProperties: true
+        type: object
+      plan:
+        type: string
+      subject:
+        type: string
+    type: object
   utils.RError:
     properties:
       code:
@@ -410,6 +441,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Get all applications owned by a user
+      tags:
+      - apps
   /apps/:
     post:
       consumes:
@@ -444,6 +477,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Create a new third party application
+      tags:
+      - apps
   /apps/{id}:
     delete:
       consumes:
@@ -477,6 +512,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: delete an oauth client
+      tags:
+      - apps
     get:
       consumes:
       - application/json
@@ -509,6 +546,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Get an oauth application
+      tags:
+      - apps
     put:
       consumes:
       - application/json
@@ -547,6 +586,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Update a third party application
+      tags:
+      - apps
   /apps/scopes:
     get:
       consumes:
@@ -579,6 +620,8 @@ paths:
           schema:
             $ref: '#/definitions/utils.RError'
       summary: Get scopes for OAuth applications
+      tags:
+      - apps
   /auth:
     get:
       consumes:
@@ -612,6 +655,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Get user profile
+      tags:
+      - auth
   /auth/accounts:
     get:
       consumes:
@@ -645,6 +690,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Get list of accounts
+      tags:
+      - auth
     post:
       consumes:
       - application/json
@@ -680,6 +727,8 @@ paths:
           schema:
             $ref: '#/definitions/utils.RError'
       summary: Create a new account
+      tags:
+      - auth
   /auth/auth_status:
     get:
       consumes:
@@ -707,6 +756,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Get JWT claims from Authorization header
+      tags:
+      - auth
   /auth/password:
     post:
       consumes:
@@ -740,6 +791,8 @@ paths:
           schema:
             $ref: '#/definitions/utils.RError'
       summary: send email with token to user in order to reset password to given user
+      tags:
+      - auth
   /auth/recover:
     post:
       consumes:
@@ -773,6 +826,8 @@ paths:
           schema:
             $ref: '#/definitions/utils.RError'
       summary: send email with token to user in order to reset password to given user
+      tags:
+      - auth
   /auth/verify:
     get:
       consumes:
@@ -798,6 +853,8 @@ paths:
           schema:
             $ref: '#/definitions/utils.RError'
       summary: Verify account payload
+      tags:
+      - auth
   /dash/:
     get:
       consumes:
@@ -821,6 +878,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Get summary information about an Account
+      tags:
+      - dash
   /dash/auth_status:
     get:
       consumes:
@@ -844,6 +903,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Get account JWT token payload
+      tags:
+      - dash
   /devices:
     get:
       consumes:
@@ -873,6 +934,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Get all accounts devices
+      tags:
+      - devices
     post:
       consumes:
       - application/json
@@ -906,6 +969,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Create a new device for an account
+      tags:
+      - devices
   /devices/{id}:
     delete:
       consumes:
@@ -939,6 +1004,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Mark a device to be deleted by device garbage collector
+      tags:
+      - devices
     get:
       consumes:
       - application/json
@@ -973,6 +1040,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Get a device using the device ID or the PRN or the device Nick
+      tags:
+      - devices
     patch:
       consumes:
       - application/json
@@ -1011,6 +1080,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: update a device
+      tags:
+      - devices
     put:
       consumes:
       - application/json
@@ -1049,6 +1120,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Claim a device by resolving challenge
+      tags:
+      - devices
   /devices/{id}/device-meta:
     patch:
       consumes:
@@ -1090,6 +1163,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: 'Update device metadata using the user credentials:'
+      tags:
+      - devices
     put:
       consumes:
       - application/json
@@ -1128,6 +1203,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: 'Update device metadata using the device credentials:'
+      tags:
+      - devices
   /devices/{id}/public:
     delete:
       consumes:
@@ -1163,6 +1240,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Make a device private
+      tags:
+      - devices
     put:
       consumes:
       - application/json
@@ -1195,6 +1274,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Make a device public
+      tags:
+      - devices
   /devices/{id}/user-meta:
     patch:
       consumes:
@@ -1234,6 +1315,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: 'Update user metadata using the user credentials:'
+      tags:
+      - devices
     put:
       consumes:
       - application/json
@@ -1274,6 +1357,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Update user metadata using the user credentials
+      tags:
+      - devices
   /devices/np/{usernick}/{devicenick}:
     get:
       consumes:
@@ -1314,6 +1399,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: get device by owner nick and device nick
+      tags:
+      - devices
   /devices/tokens:
     get:
       consumes:
@@ -1341,6 +1428,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Get all device tokens
+      tags:
+      - devices
     post:
       consumes:
       - application/json
@@ -1368,6 +1457,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Create a new device token, used for authenticate as device
+      tags:
+      - devices
   /devices/tokens/{id}:
     delete:
       consumes:
@@ -1397,6 +1488,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Disable a device token in order to be unable to used as authetication
+      tags:
+      - devices
   /healthz:
     get:
       consumes:
@@ -1430,6 +1523,8 @@ paths:
       security:
       - BasicAuth: []
       summary: Get information of the health of the api services
+      tags:
+      - health
   /logs:
     get:
       consumes:
@@ -1488,8 +1583,10 @@ paths:
           schema:
             $ref: '#/definitions/utils.RError'
       security:
-      - BasicAuth: []
+      - ApiKeyAuth: []
       summary: Get one or many log entries as an error of LogEntry
+      tags:
+      - logs
     post:
       consumes:
       - application/json
@@ -1523,8 +1620,10 @@ paths:
           schema:
             $ref: '#/definitions/utils.RError'
       security:
-      - BasicAuth: []
+      - ApiKeyAuth: []
       summary: Post one or many log entries as an error of LogEntry
+      tags:
+      - logs
   /logs/cursor:
     get:
       consumes:
@@ -1557,6 +1656,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Get or one or many log entries
+      tags:
+      - logs
   /metrics:
     get:
       consumes:
@@ -1579,6 +1680,250 @@ paths:
           schema:
             $ref: '#/definitions/utils.RError'
       summary: Get API metrics
+      tags:
+      - metrics
+  /objects:
+    get:
+      consumes:
+      - application/json
+      description: Get all object of the token owner
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/objects.Object'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get all object of the token owner
+      tags:
+      - objects
+    post:
+      consumes:
+      - application/json
+      description: Create a new object for a owner token
+      parameters:
+      - description: Object payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/objects.Object'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/objects.Object'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new object for a owner token
+      tags:
+      - objects
+  /objects/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Mark a object to be deleted
+      parameters:
+      - description: Object ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/objects.Object'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Mark a object to be deleted
+      tags:
+      - objects
+    get:
+      consumes:
+      - application/json
+      description: Retrive and object by ID
+      parameters:
+      - description: Object ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/objects.Object'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Retrive and object by ID
+      tags:
+      - objects
+    put:
+      consumes:
+      - application/json
+      description: Update a object content
+      parameters:
+      - description: Object ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Object payload
+        in: body
+        name: body
+        schema:
+          type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/objects.Object'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Update a object content
+      tags:
+      - objects
+  /objects/{id}/blog:
+    get:
+      consumes:
+      - application/json
+      description: Retrive and object content by Object ID
+      parameters:
+      - description: Object ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/objects.Object'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Retrive and object content by Object ID
+      tags:
+      - objects
+  /subscriptions:
+    get:
+      consumes:
+      - application/json
+      description: Add a new subscription as a admin
+      parameters:
+      - description: Subscription request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/subscriptions.SubscriptionReq'
+      produces:
+      - application/json
+      responses:
+        "200": {}
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Add a new subscription as a admin
+      tags:
+      - subscriptions
 securityDefinitions:
   ApiKeyAuth:
     in: header

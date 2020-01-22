@@ -48,6 +48,7 @@ type accountClaims struct {
 // @Accept  json
 // @Produce  json
 // @Security ApiKeyAuth
+// @Tags dash
 // @Success 200 {object} accountClaims
 // @Failure 400 {object} utils.RError
 // @Failure 500 {object} utils.RError
@@ -65,6 +66,7 @@ func handleAuth(w rest.ResponseWriter, r *rest.Request) {
 // @Accept  json
 // @Produce  json
 // @Security ApiKeyAuth
+// @Tags dash
 // @Success 200 {object} Summary
 // @Failure 400 {object} utils.RError
 // @Failure 500 {object} utils.RError

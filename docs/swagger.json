@@ -26,6 +26,9 @@
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "apps"
+                ],
                 "summary": "Get all applications owned by a user",
                 "parameters": [
                     {
@@ -81,6 +84,9 @@
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "apps"
+                ],
                 "summary": "Create a new third party application",
                 "parameters": [
                     {
@@ -129,6 +135,9 @@
                 ],
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "apps"
                 ],
                 "summary": "Get scopes for OAuth applications",
                 "parameters": [
@@ -184,6 +193,9 @@
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "apps"
+                ],
                 "summary": "Get an oauth application",
                 "parameters": [
                     {
@@ -233,6 +245,9 @@
                 ],
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "apps"
                 ],
                 "summary": "Update a third party application",
                 "parameters": [
@@ -293,6 +308,9 @@
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "apps"
+                ],
                 "summary": "delete an oauth client",
                 "parameters": [
                     {
@@ -344,6 +362,9 @@
                 ],
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "auth"
                 ],
                 "summary": "Get user profile",
                 "parameters": [
@@ -397,6 +418,9 @@
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "auth"
+                ],
                 "summary": "Get list of accounts",
                 "responses": {
                     "200": {
@@ -441,6 +465,9 @@
                 ],
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "auth"
                 ],
                 "summary": "Create a new account",
                 "parameters": [
@@ -502,6 +529,9 @@
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "auth"
+                ],
                 "summary": "Get JWT claims from Authorization header",
                 "responses": {
                     "200": {
@@ -539,6 +569,9 @@
                 ],
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "auth"
                 ],
                 "summary": "send email with token to user in order to reset password to given user",
                 "parameters": [
@@ -589,6 +622,9 @@
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "auth"
+                ],
                 "summary": "send email with token to user in order to reset password to given user",
                 "parameters": [
                     {
@@ -638,6 +674,9 @@
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "auth"
+                ],
                 "summary": "Verify account payload",
                 "responses": {
                     "200": {
@@ -681,6 +720,9 @@
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "dash"
+                ],
                 "summary": "Get summary information about an Account",
                 "responses": {
                     "200": {
@@ -718,6 +760,9 @@
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "dash"
+                ],
                 "summary": "Get account JWT token payload",
                 "responses": {
                     "200": {
@@ -754,6 +799,9 @@
                 ],
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "devices"
                 ],
                 "summary": "Get all accounts devices",
                 "responses": {
@@ -798,6 +846,9 @@
                 ],
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "devices"
                 ],
                 "summary": "Create a new device for an account",
                 "parameters": [
@@ -852,6 +903,9 @@
                 ],
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "devices"
                 ],
                 "summary": "get device by owner nick and device nick",
                 "parameters": [
@@ -915,6 +969,9 @@
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "devices"
+                ],
                 "summary": "Get all device tokens",
                 "responses": {
                     "200": {
@@ -956,6 +1013,9 @@
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "devices"
+                ],
                 "summary": "Create a new device token, used for authenticate as device",
                 "responses": {
                     "200": {
@@ -992,6 +1052,9 @@
                 ],
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "devices"
                 ],
                 "summary": "Disable a device token in order to be unable to used as authetication",
                 "parameters": [
@@ -1038,6 +1101,9 @@
                 ],
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "devices"
                 ],
                 "summary": "Get a device using the device ID or the PRN or the device Nick",
                 "parameters": [
@@ -1091,6 +1157,9 @@
                 ],
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "devices"
                 ],
                 "summary": "Claim a device by resolving challenge",
                 "parameters": [
@@ -1151,6 +1220,9 @@
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "devices"
+                ],
                 "summary": "Mark a device to be deleted by device garbage collector",
                 "parameters": [
                     {
@@ -1200,6 +1272,9 @@
                 ],
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "devices"
                 ],
                 "summary": "update a device",
                 "parameters": [
@@ -1262,6 +1337,9 @@
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "devices"
+                ],
                 "summary": "Update device metadata using the device credentials:",
                 "parameters": [
                     {
@@ -1320,6 +1398,9 @@
                 ],
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "devices"
                 ],
                 "summary": "Update device metadata using the user credentials:",
                 "parameters": [
@@ -1385,6 +1466,9 @@
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "devices"
+                ],
                 "summary": "Make a device public",
                 "parameters": [
                     {
@@ -1434,6 +1518,9 @@
                 ],
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "devices"
                 ],
                 "summary": "Make a device private",
                 "parameters": [
@@ -1489,6 +1576,9 @@
                 ],
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "devices"
                 ],
                 "summary": "Update user metadata using the user credentials",
                 "parameters": [
@@ -1552,6 +1642,9 @@
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "devices"
+                ],
                 "summary": "Update user metadata using the user credentials:",
                 "parameters": [
                     {
@@ -1613,6 +1706,9 @@
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "health"
+                ],
                 "summary": "Get information of the health of the api services",
                 "parameters": [
                     {
@@ -1655,7 +1751,7 @@
             "get": {
                 "security": [
                     {
-                        "BasicAuth": []
+                        "ApiKeyAuth": []
                     }
                 ],
                 "description": "Get one or many log entries as an error of LogEntry\nPage through your logs.",
@@ -1664,6 +1760,9 @@
                 ],
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "logs"
                 ],
                 "summary": "Get one or many log entries as an error of LogEntry",
                 "parameters": [
@@ -1740,7 +1839,7 @@
             "post": {
                 "security": [
                     {
-                        "BasicAuth": []
+                        "ApiKeyAuth": []
                     }
                 ],
                 "description": "Post one or many log entries as an error of LogEntry",
@@ -1749,6 +1848,9 @@
                 ],
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "logs"
                 ],
                 "summary": "Post one or many log entries as an error of LogEntry",
                 "parameters": [
@@ -1807,6 +1909,9 @@
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "logs"
+                ],
                 "summary": "Get or one or many log entries",
                 "parameters": [
                     {
@@ -1853,7 +1958,390 @@
                 "produces": [
                     "plain/text"
                 ],
+                "tags": [
+                    "metrics"
+                ],
                 "summary": "Get API metrics",
+                "responses": {
+                    "200": {},
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/objects": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get all object of the token owner",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "objects"
+                ],
+                "summary": "Get all object of the token owner",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/objects.Object"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Create a new object for a owner token",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "objects"
+                ],
+                "summary": "Create a new object for a owner token",
+                "parameters": [
+                    {
+                        "description": "Object payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/objects.Object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/objects.Object"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/objects/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrive and object by ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "objects"
+                ],
+                "summary": "Retrive and object by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Object ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/objects.Object"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Update a object content",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "objects"
+                ],
+                "summary": "Update a object content",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Object ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Object payload",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/objects.Object"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Mark a object to be deleted",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "objects"
+                ],
+                "summary": "Mark a object to be deleted",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Object ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/objects.Object"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/objects/{id}/blog": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrive and object content by Object ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "objects"
+                ],
+                "summary": "Retrive and object content by Object ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Object ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/objects.Object"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/subscriptions": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Add a new subscription as a admin",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "subscriptions"
+                ],
+                "summary": "Add a new subscription as a admin",
+                "parameters": [
+                    {
+                        "description": "Subscription request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/subscriptions.SubscriptionReq"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {},
                     "400": {
@@ -2401,6 +2889,53 @@
                 },
                 "start": {
                     "type": "integer"
+                }
+            }
+        },
+        "objects.Object": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "initialized": {
+                    "type": "boolean"
+                },
+                "mime-type": {
+                    "type": "string"
+                },
+                "objectname": {
+                    "type": "string"
+                },
+                "owner": {
+                    "type": "string"
+                },
+                "sha256sum": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "string"
+                },
+                "sizeint": {
+                    "type": "integer"
+                },
+                "storage-id": {
+                    "type": "string"
+                }
+            }
+        },
+        "subscriptions.SubscriptionReq": {
+            "type": "object",
+            "properties": {
+                "attrs": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "plan": {
+                    "type": "string"
+                },
+                "subject": {
+                    "type": "string"
                 }
             }
         },

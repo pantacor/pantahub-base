@@ -62,7 +62,8 @@ import (
 // @Description Page through your logs.
 // @Accept  json
 // @Produce  json
-// @Security BasicAuth
+// @Security ApiKeyAuth
+// @Tags logs
 // @Param start query string false "list position to start page; either number or ID or '<tsec>.<tnano>' of log entry"
 // @Param page query string false "length of page"
 // @Param dev query string false "comma separated list of device prns  to include"

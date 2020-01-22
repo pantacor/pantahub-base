@@ -41,6 +41,7 @@ import (
 // @Accept  json
 // @Produce  json
 // @Security ApiKeyAuth
+// @Tags devices
 // @Success 200 {object} PantahubDevicesJoinToken
 // @Failure 400 {object} utils.RError
 // @Failure 500 {object} utils.RError

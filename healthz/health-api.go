@@ -56,6 +56,7 @@ type Response struct {
 // @Accept  json
 // @Produce  json
 // @Security BasicAuth
+// @Tags health
 // @Param id path string true "ID|PRN|NICK"
 // @Success 200 {object} Response
 // @Failure 400 {object} utils.RError

@@ -29,6 +29,7 @@ import (
 // @Description Update a third party application
 // @Accept  json
 // @Produce  json
+// @Tags apps
 // @Security ApiKeyAuth
 // @Param id path string true "App ID|Nick|PRN"
 // @Param body body CreateAppPayload true "Update app body"

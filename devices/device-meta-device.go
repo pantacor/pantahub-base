@@ -36,6 +36,7 @@ type metaDataPayload map[string]interface{}
 // @Accept  json
 // @Produce  json
 // @Security ApiKeyAuth
+// @Tags devices
 // @Param id path string true "ID|PRN|NICK"
 // @Param body body metaDataPayload true "Device payload"
 // @Success 200 {object} metaDataPayload
@@ -122,6 +123,7 @@ func (a *App) handlePutDeviceData(w rest.ResponseWriter, r *rest.Request) {
 // @Accept  json
 // @Produce  json
 // @Security ApiKeyAuth
+// @Tags devices
 // @Param id path string true "ID|PRN|NICK"
 // @Param body body metaDataPayload true "Device payload"
 // @Success 200 {array} Device

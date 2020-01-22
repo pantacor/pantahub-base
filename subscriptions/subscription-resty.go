@@ -34,6 +34,18 @@ type SubscriptionReq struct {
 	Attrs   map[string]interface{} `json:"attrs"`
 }
 
+// get Get subscription of a token user
+// @Summary Get subscription of a token user
+// @Description Get subscription of a token user
+// @Accept  json
+// @Produce  json
+// @Security ApiKeyAuth
+// @Tags subscriptions
+// @Success 200
+// @Failure 400 {object} utils.RError
+// @Failure 404 {object} utils.RError
+// @Failure 500 {object} utils.RError
+// @Router /subscriptions [get]
 func (s *App) get(w rest.ResponseWriter, r *rest.Request) {
 
 	authInfo := utils.GetAuthInfo(r)
@@ -99,6 +111,19 @@ func (s *App) get(w rest.ResponseWriter, r *rest.Request) {
 
 }
 
+// put Add a new subscription as a admin
+// @Summary Add a new subscription as a admin
+// @Description Add a new subscription as a admin
+// @Accept  json
+// @Produce  json
+// @Security ApiKeyAuth
+// @Tags subscriptions
+// @Param body body SubscriptionReq true "Subscription request"
+// @Success 200
+// @Failure 400 {object} utils.RError
+// @Failure 404 {object} utils.RError
+// @Failure 500 {object} utils.RError
+// @Router /subscriptions [get]
 func (s *App) put(w rest.ResponseWriter, r *rest.Request) {
 
 	authInfo := utils.GetAuthInfo(r)
