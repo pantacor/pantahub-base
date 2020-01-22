@@ -2065,7 +2065,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/objects.Object"
+                            "$ref": "#/definitions/objects.ObjectWithAccess"
                         }
                     },
                     "400": {
@@ -2286,12 +2286,7 @@
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/objects.Object"
-                        }
-                    },
+                    "200": {},
                     "400": {
                         "description": "Bad Request",
                         "schema": {
@@ -2344,6 +2339,1084 @@
                 ],
                 "responses": {
                     "200": {},
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/trails": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "devices get a list of one and only one trail. users get trails for all the\ndevices they have trail control over (right now simplified for owner)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trails"
+                ],
+                "summary": "Get a list of trails",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/trails.Trail"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Create a new trails. usually done by device on first log in.\ninitiates the trail by using the reported state as stepwanted 0 and setting\nthe step 0 to be the POSTED JSON. Either device accounts or user accounts can\ndo this for devices owned, but there can always only be ONE trail per device.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trails"
+                ],
+                "summary": "Create a new trails",
+                "parameters": [
+                    {
+                        "description": "initial state",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/trails.state"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/trails.Trail"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/trails/.pvrremote": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get last step pvr remote information for a trail revision",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trails"
+                ],
+                "summary": "Get last step pvr remote information for a trail revision",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/trails.PvrRemote"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/trails/summary": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "get summary of all trails by the calling owner.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trails"
+                ],
+                "summary": "get summary of all trails by the calling owner.",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/trails.TrailSummary"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/trails/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "get one trail; owning devices and users with trail control for the device\ncan get a trail. If not found or if no access, NotFound status code is returned",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trails"
+                ],
+                "summary": "Get a trail by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID|NICK|PRN",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/trails.Trail"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/trails/{id}/steps": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get steps of the the given trail.\nFor user accounts querying this will return the list of steps that are not\nDONE or in error state.\nFor device accounts querying this will return the list of unconfirmed steps.\nDevices confirm a step by posting a walk element matching the rev.\nThis conveyes that the devices knows about the step to go and will keep the\npost updates to the walk elements as they go.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trails"
+                ],
+                "summary": "Get steps of the the given trail.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID|NICK|PRN",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/trails.Step"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Post a new step to the head of the trail. You must include the correct Rev\nnumber that must exactly be one incremented from the previous rev numbers.\nIn case of conflict creation of steps one will get an error.\nIn the DB the ID will be composite of trails ID + Rev; this ensures that\nit will be unique. Also no step will be added if the previous one does not\nexist that. This will include completeness of the step rev sequence.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trails"
+                ],
+                "summary": "Post a new step to the head of the trail.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID|NICK|PRN",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Step Payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/trails.Step"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/trails.Trail"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/trails/{id}/steps/{rev}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get step revision of the the given trail.\nBoth user and device accounts can read the steps they own or who they are the\ndevice of. devices can PUT progress to the /progress pseudo subnode. Besides\nthat steps are read only for the matter of the API",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trails"
+                ],
+                "summary": "Get step revision of the the given trail.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID|NICK|PRN",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "REV_ID",
+                        "name": "rev",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/trails.Step"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/trails/{id}/steps/{rev}/.prvremote": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get pvr remote information for a trail revision",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trails"
+                ],
+                "summary": "Get pvr remote information for a trail revision",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID|NICK|PRN",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "REV_ID",
+                        "name": "rev",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/trails.PvrRemote"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/trails/{id}/steps/{rev}/meta": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get step meta just the raw data of a step without metainfo",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trails"
+                ],
+                "summary": "Get step meta just the raw data of a step without metainfo",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID|NICK|PRN",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "REV_ID",
+                        "name": "rev",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/trails.meta"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Put step meta just the raw data of a step without metainfo like pvr put",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trails"
+                ],
+                "summary": "Put step meta just the raw data of a step without metainfo like pvr put",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID|NICK|PRN",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "REV_ID",
+                        "name": "rev",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/trails.meta"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/trails.meta"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/trails/{id}/steps/{rev}/objects": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get trails step objects",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trails"
+                ],
+                "summary": "Get trails step objects",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID|NICK|PRN",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "REV_ID",
+                        "name": "rev",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/objects.ObjectWithAccess"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Create a new object for a trail revision",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trails"
+                ],
+                "summary": "Create a new object for a trail revision",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID|NICK|PRN",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "REV_ID",
+                        "name": "rev",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Object payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/objects.Object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/objects.ObjectWithAccess"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/trails/{id}/steps/{rev}/objects/{object_id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get trails step object content",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trails"
+                ],
+                "summary": "Get trails step object content",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID|NICK|PRN",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "REV_ID",
+                        "name": "rev",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "OBJECT_ID",
+                        "name": "object_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {},
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/trails/{id}/steps/{rev}/progress": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Post Step Progress information for a step.\nOnly device accounts can put status info. they are expected to provide at status field.\nall input paramaters besides the device-progress one are ignored.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trails"
+                ],
+                "summary": "Post Step Progress information for a step.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID|NICK|PRN",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "REV_ID",
+                        "name": "rev",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "StepProgress payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/trails.StepProgress"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/trails.StepProgress"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/trails/{id}/steps/{rev}/state": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get step state just the raw data of a step without metainfo",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trails"
+                ],
+                "summary": "Get step state just the raw data of a step without metainfo",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID|NICK|PRN",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "REV_ID",
+                        "name": "rev",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/trails.meta"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "put step state (only if not yet consumed). just the raw data of a step without metainfo like pvr pu",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trails"
+                ],
+                "summary": "Put step state (only if not yet consumed)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID|NICK|PRN",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "REV_ID",
+                        "name": "rev",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/trails.state"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/trails.state"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/trails/{id}/summary": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get steps summary of the the given trail.\nFor user accounts querying this will return the list of steps that are not\nDONE or in error state.\nFor device accounts querying this will return the list of unconfirmed steps.\nDevices confirm a step by posting a walk element matching the rev.\nThis conveyes that the devices knows about the step to go and will keep the\npost updates to the walk elements as they go.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trails"
+                ],
+                "summary": "Get steps summary of the the given trail.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID|NICK|PRN",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/trails.TrailSummary"
+                        }
+                    },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
@@ -2924,6 +3997,50 @@
                 }
             }
         },
+        "objects.ObjectWithAccess": {
+            "type": "object",
+            "properties": {
+                "expire-time": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "initialized": {
+                    "type": "boolean"
+                },
+                "mime-type": {
+                    "type": "string"
+                },
+                "now": {
+                    "type": "string"
+                },
+                "objectname": {
+                    "type": "string"
+                },
+                "owner": {
+                    "type": "string"
+                },
+                "sha256sum": {
+                    "type": "string"
+                },
+                "signed-geturl": {
+                    "type": "string"
+                },
+                "signed-puturl": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "string"
+                },
+                "sizeint": {
+                    "type": "integer"
+                },
+                "storage-id": {
+                    "type": "string"
+                }
+            }
+        },
         "subscriptions.SubscriptionReq": {
             "type": "object",
             "properties": {
@@ -2938,6 +4055,228 @@
                     "type": "string"
                 }
             }
+        },
+        "trails.PvrRemote": {
+            "type": "object",
+            "properties": {
+                "json-get-url": {
+                    "description": "where to pvr post stuff",
+                    "type": "string"
+                },
+                "json-key": {
+                    "description": "what key is to use in post json [default: json]",
+                    "type": "string"
+                },
+                "objects-endpoint": {
+                    "description": "where to store/retrieve objects",
+                    "type": "string"
+                },
+                "post-fields": {
+                    "description": "what fields require input",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "post-fields-opt": {
+                    "description": "what optional fields are available [default: \u003cempty\u003e]",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "post-url": {
+                    "description": "where to post/announce new revisions",
+                    "type": "string"
+                },
+                "pvr-spec": {
+                    "description": "the pvr remote protocol spec available",
+                    "type": "string"
+                }
+            }
+        },
+        "trails.Step": {
+            "type": "object",
+            "properties": {
+                "commit-msg": {
+                    "type": "string"
+                },
+                "committer": {
+                    "type": "string"
+                },
+                "device": {
+                    "type": "string"
+                },
+                "id": {
+                    "description": "XXX: make type",
+                    "type": "string"
+                },
+                "meta": {
+                    "description": "json blurb",
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "owner": {
+                    "type": "string"
+                },
+                "progress": {
+                    "type": "object",
+                    "$ref": "#/definitions/trails.StepProgress"
+                },
+                "progress-time": {
+                    "type": "string"
+                },
+                "rev": {
+                    "type": "integer"
+                },
+                "state": {
+                    "description": "json blurb",
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "state-sha": {
+                    "type": "string"
+                },
+                "step-time": {
+                    "type": "string"
+                },
+                "trail-id": {
+                    "description": "parent id",
+                    "type": "string"
+                },
+                "used_objects": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "trails.StepProgress": {
+            "type": "object",
+            "properties": {
+                "log": {
+                    "description": "log if available",
+                    "type": "string"
+                },
+                "progress": {
+                    "description": "progress number. steps or 1-100",
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "status code",
+                    "type": "string"
+                },
+                "status-msg": {
+                    "description": "message of progress status",
+                    "type": "string"
+                }
+            }
+        },
+        "trails.Trail": {
+            "type": "object",
+            "properties": {
+                "device": {
+                    "type": "string"
+                },
+                "factory-state": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "id": {
+                    "type": "string"
+                },
+                "last-insync": {
+                    "description": "Admins   []string `json:\"admins\"`   // XXX: maybe this is best way to do delegating device access....",
+                    "type": "string"
+                },
+                "last-touched": {
+                    "type": "string"
+                },
+                "owner": {
+                    "type": "string"
+                },
+                "used_objects": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "trails.TrailSummary": {
+            "type": "object",
+            "properties": {
+                "device": {
+                    "type": "string"
+                },
+                "device-nick": {
+                    "type": "string"
+                },
+                "deviceid": {
+                    "type": "string"
+                },
+                "fleet-group": {
+                    "type": "string"
+                },
+                "fleet-location": {
+                    "type": "string"
+                },
+                "fleet-model": {
+                    "type": "string"
+                },
+                "fleet-rev": {
+                    "type": "string"
+                },
+                "progress": {
+                    "description": "progress number. steps or 1-100",
+                    "type": "integer"
+                },
+                "progress-revision": {
+                    "type": "integer"
+                },
+                "progress-time": {
+                    "type": "string"
+                },
+                "public": {
+                    "type": "boolean"
+                },
+                "real-ip": {
+                    "type": "string"
+                },
+                "revision": {
+                    "type": "integer"
+                },
+                "state-sha": {
+                    "type": "string"
+                },
+                "status": {
+                    "description": "status code",
+                    "type": "string"
+                },
+                "status-msg": {
+                    "description": "message of progress status",
+                    "type": "string"
+                },
+                "step-time": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "description": "greater of last seen and last modified",
+                    "type": "string"
+                },
+                "trail-touched-time": {
+                    "type": "string"
+                }
+            }
+        },
+        "trails.meta": {
+            "type": "object",
+            "additionalProperties": true
+        },
+        "trails.state": {
+            "type": "object",
+            "additionalProperties": true
         },
         "utils.RError": {
             "type": "object",

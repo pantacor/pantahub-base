@@ -1,3 +1,4 @@
+//
 // Copyright 2020  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,71 +14,92 @@
 //   limitations under the License.
 //
 
-package objects
+// Package trails offer a two party master/slave relationship enabling
+// the master to asynchronously deploy configuration changes to its
+// slave in a stepwise manner.
+package trails
 
 import (
-	"context"
 	"log"
 	"net/http"
 	"time"
 
-	jwtgo "github.com/dgrijalva/jwt-go"
+	"context"
 
 	"github.com/ant0ine/go-json-rest/rest"
+	jwtgo "github.com/dgrijalva/jwt-go"
+	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/storagedriver"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gopkg.in/mgo.v2/bson"
 )
 
-// handlePostObject Create a new object for a owner token
-// @Summary Create a new object for a owner token
-// @Description Create a new object for a owner token
+// handlePostStepsObject Create a new object for a trail revision
+// @Summary Create a new object for a trail revision
+// @Description Create a new object for a trail revision
 // @Accept  json
 // @Produce  json
+// @Tags trails
 // @Security ApiKeyAuth
-// @Tags objects
-// @Param body body Object true "Object payload"
-// @Success 200 {object} ObjectWithAccess
+// @Param id path string true "ID|NICK|PRN"
+// @Param rev path string true "REV_ID"
+// @Param body body objects.Object true "Object payload"
+// @Success 200 {object} objects.ObjectWithAccess
 // @Failure 400 {object} utils.RError
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
-// @Router /objects [post]
-func (a *App) handlePostObject(w rest.ResponseWriter, r *rest.Request) {
+// @Router /trails/{id}/steps/{rev}/objects [post]
+func (a *App) handlePostStepsObject(w rest.ResponseWriter, r *rest.Request) {
 
-	newObject := Object{}
-
-	r.DecodeJsonPayload(&newObject)
-
-	var ownerStr string
-
-	caller, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
 		return
 	}
-	callerStr, ok := caller.(string)
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
-	if authType.(string) == "USER" {
-		ownerStr = callerStr
-	} else {
-		owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["owner"]
-		if !ok {
-			// XXX: find right error
-			utils.RestErrorWrapper(w, "You need to be logged in as a USER or DEVICE", http.StatusForbidden)
-			return
-		}
-		ownerStr = owner.(string)
-	}
 
-	if !ok {
-		// XXX: find right error
-		utils.RestErrorWrapper(w, "Invalid Access Token", http.StatusForbidden)
+	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
+
+	if coll == nil {
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
-	newObject.Owner = ownerStr
+	step := Step{}
+
+	trailID := r.PathParam("id")
+	rev := r.PathParam("rev")
+
+	if authType != "DEVICE" && authType != "USER" {
+		utils.RestErrorWrapper(w, "Unknown AuthType", http.StatusBadRequest)
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err := coll.FindOne(ctx, bson.M{
+		"_id":     trailID + "-" + rev,
+		"garbage": bson.M{"$ne": true},
+	}).
+		Decode(&step)
+	if err != nil {
+		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
+		return
+	}
+
+	if authType == "DEVICE" && step.Device != owner {
+		utils.RestErrorWrapper(w, "No access for device", http.StatusForbidden)
+		return
+	} else if authType == "USER" && step.Owner != owner {
+		utils.RestErrorWrapper(w, "No access for user", http.StatusForbidden)
+		return
+	}
+
+	newObject := objects.Object{}
+	r.DecodeJsonPayload(&newObject)
+
+	newObject.Owner = step.Owner
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 
@@ -86,52 +108,41 @@ func (a *App) handlePostObject(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	// check preconditions
-	var sha []byte
-	var err error
-
-	if newObject.Sha == "" {
-		utils.RestErrorWrapper(w, "Post New Object must set a sha", http.StatusBadRequest)
-		return
-	}
-
-	sha, err = utils.DecodeSha256HexString(newObject.Sha)
+	sha, err := utils.DecodeSha256HexString(newObject.Sha)
 
 	if err != nil {
-		utils.RestErrorWrapper(w, "Post New Object sha must be a valid sha256", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Post Steps Object id must be a valid sha256", http.StatusBadRequest)
 		return
 	}
 
-	storageID := MakeStorageID(ownerStr, sha)
+	storageID := objects.MakeStorageID(newObject.Owner, sha)
 	newObject.StorageID = storageID
 	newObject.ID = newObject.Sha
 
-	SyncObjectSizes(&newObject)
+	objects.SyncObjectSizes(&newObject)
 
-	result, err := CalcUsageAfterPost(ownerStr, a.mongoClient, newObject.ID, newObject.SizeInt)
+	result, err := objects.CalcUsageAfterPost(newObject.Owner, a.mongoClient, newObject.ID, newObject.SizeInt)
 
 	if err != nil {
-		log.Printf("ERROR: CalcUsageAfterPost failed: %s\n", err.Error())
+		log.Println("Error to calc diskquota: " + err.Error())
 		utils.RestErrorWrapper(w, "Error posting object", http.StatusInternalServerError)
 		return
 	}
 
-	quota, err := a.GetDiskQuota(ownerStr)
+	quota, err := objects.GetDiskQuota(newObject.Owner)
 
 	if err != nil {
-		log.Println("Error to calc diskquota: " + err.Error())
+		log.Println("Error get diskquota setting: " + err.Error())
 		utils.RestErrorWrapper(w, "Error to calc quota", http.StatusInternalServerError)
 		return
 	}
 
 	if result.Total > quota {
-
-		log.Println("Quota exceeded in post object.")
 		utils.RestErrorWrapper(w, "Quota exceeded; delete some objects or request a quota bump from team@pantahub.com",
 			http.StatusPreconditionFailed)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, err = collection.InsertOne(
 		ctx,
@@ -174,8 +185,7 @@ func (a *App) handlePostObject(w rest.ResponseWriter, r *rest.Request) {
 		// we return anyway with the already available info about this object
 	}
 conflict:
-
-	issuerURL := utils.GetAPIEndpoint("/objects")
-	newObjectWithAccess := MakeObjAccessible(issuerURL, ownerStr, newObject, storageID)
+	issuerURL := utils.GetAPIEndpoint("/trails")
+	newObjectWithAccess := objects.MakeObjAccessible(issuerURL, newObject.Owner, newObject, storageID)
 	w.WriteJson(newObjectWithAccess)
 }

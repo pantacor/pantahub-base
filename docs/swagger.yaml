@@ -369,6 +369,35 @@ definitions:
       storage-id:
         type: string
     type: object
+  objects.ObjectWithAccess:
+    properties:
+      expire-time:
+        type: string
+      id:
+        type: string
+      initialized:
+        type: boolean
+      mime-type:
+        type: string
+      now:
+        type: string
+      objectname:
+        type: string
+      owner:
+        type: string
+      sha256sum:
+        type: string
+      signed-geturl:
+        type: string
+      signed-puturl:
+        type: string
+      size:
+        type: string
+      sizeint:
+        type: integer
+      storage-id:
+        type: string
+    type: object
   subscriptions.SubscriptionReq:
     properties:
       attrs:
@@ -378,6 +407,162 @@ definitions:
         type: string
       subject:
         type: string
+    type: object
+  trails.PvrRemote:
+    properties:
+      json-get-url:
+        description: where to pvr post stuff
+        type: string
+      json-key:
+        description: 'what key is to use in post json [default: json]'
+        type: string
+      objects-endpoint:
+        description: where to store/retrieve objects
+        type: string
+      post-fields:
+        description: what fields require input
+        items:
+          type: string
+        type: array
+      post-fields-opt:
+        description: 'what optional fields are available [default: <empty>]'
+        items:
+          type: string
+        type: array
+      post-url:
+        description: where to post/announce new revisions
+        type: string
+      pvr-spec:
+        description: the pvr remote protocol spec available
+        type: string
+    type: object
+  trails.Step:
+    properties:
+      commit-msg:
+        type: string
+      committer:
+        type: string
+      device:
+        type: string
+      id:
+        description: 'XXX: make type'
+        type: string
+      meta:
+        additionalProperties: true
+        description: json blurb
+        type: object
+      owner:
+        type: string
+      progress:
+        $ref: '#/definitions/trails.StepProgress'
+        type: object
+      progress-time:
+        type: string
+      rev:
+        type: integer
+      state:
+        additionalProperties: true
+        description: json blurb
+        type: object
+      state-sha:
+        type: string
+      step-time:
+        type: string
+      trail-id:
+        description: parent id
+        type: string
+      used_objects:
+        items:
+          type: string
+        type: array
+    type: object
+  trails.StepProgress:
+    properties:
+      log:
+        description: log if available
+        type: string
+      progress:
+        description: progress number. steps or 1-100
+        type: integer
+      status:
+        description: status code
+        type: string
+      status-msg:
+        description: message of progress status
+        type: string
+    type: object
+  trails.Trail:
+    properties:
+      device:
+        type: string
+      factory-state:
+        additionalProperties: true
+        type: object
+      id:
+        type: string
+      last-insync:
+        description: 'Admins   []string `json:"admins"`   // XXX: maybe this is best
+          way to do delegating device access....'
+        type: string
+      last-touched:
+        type: string
+      owner:
+        type: string
+      used_objects:
+        items:
+          type: string
+        type: array
+    type: object
+  trails.TrailSummary:
+    properties:
+      device:
+        type: string
+      device-nick:
+        type: string
+      deviceid:
+        type: string
+      fleet-group:
+        type: string
+      fleet-location:
+        type: string
+      fleet-model:
+        type: string
+      fleet-rev:
+        type: string
+      progress:
+        description: progress number. steps or 1-100
+        type: integer
+      progress-revision:
+        type: integer
+      progress-time:
+        type: string
+      public:
+        type: boolean
+      real-ip:
+        type: string
+      revision:
+        type: integer
+      state-sha:
+        type: string
+      status:
+        description: status code
+        type: string
+      status-msg:
+        description: message of progress status
+        type: string
+      step-time:
+        type: string
+      timestamp:
+        description: greater of last seen and last modified
+        type: string
+      trail-touched-time:
+        type: string
+    type: object
+  trails.meta:
+    additionalProperties: true
+    type: object
+  trails.state:
+    additionalProperties: true
     type: object
   utils.RError:
     properties:
@@ -1730,7 +1915,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/objects.Object'
+            $ref: '#/definitions/objects.ObjectWithAccess'
         "400":
           description: Bad Request
           schema:
@@ -1870,10 +2055,7 @@ paths:
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/objects.Object'
+        "200": {}
         "400":
           description: Bad Request
           schema:
@@ -1924,6 +2106,738 @@ paths:
       summary: Add a new subscription as a admin
       tags:
       - subscriptions
+  /trails:
+    get:
+      consumes:
+      - application/json
+      description: |-
+        devices get a list of one and only one trail. users get trails for all the
+        devices they have trail control over (right now simplified for owner)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/trails.Trail'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get a list of trails
+      tags:
+      - trails
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Create a new trails. usually done by device on first log in.
+        initiates the trail by using the reported state as stepwanted 0 and setting
+        the step 0 to be the POSTED JSON. Either device accounts or user accounts can
+        do this for devices owned, but there can always only be ONE trail per device.
+      parameters:
+      - description: initial state
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/trails.state'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/trails.Trail'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new trails
+      tags:
+      - trails
+  /trails/.pvrremote:
+    get:
+      consumes:
+      - application/json
+      description: Get last step pvr remote information for a trail revision
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/trails.PvrRemote'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get last step pvr remote information for a trail revision
+      tags:
+      - trails
+  /trails/{id}:
+    get:
+      consumes:
+      - application/json
+      description: |-
+        get one trail; owning devices and users with trail control for the device
+        can get a trail. If not found or if no access, NotFound status code is returned
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/trails.Trail'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get a trail by ID
+      tags:
+      - trails
+  /trails/{id}/steps:
+    get:
+      consumes:
+      - application/json
+      description: |-
+        Get steps of the the given trail.
+        For user accounts querying this will return the list of steps that are not
+        DONE or in error state.
+        For device accounts querying this will return the list of unconfirmed steps.
+        Devices confirm a step by posting a walk element matching the rev.
+        This conveyes that the devices knows about the step to go and will keep the
+        post updates to the walk elements as they go.
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/trails.Step'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get steps of the the given trail.
+      tags:
+      - trails
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Post a new step to the head of the trail. You must include the correct Rev
+        number that must exactly be one incremented from the previous rev numbers.
+        In case of conflict creation of steps one will get an error.
+        In the DB the ID will be composite of trails ID + Rev; this ensures that
+        it will be unique. Also no step will be added if the previous one does not
+        exist that. This will include completeness of the step rev sequence.
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Step Payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/trails.Step'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/trails.Trail'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Post a new step to the head of the trail.
+      tags:
+      - trails
+  /trails/{id}/steps/{rev}:
+    get:
+      consumes:
+      - application/json
+      description: |-
+        Get step revision of the the given trail.
+        Both user and device accounts can read the steps they own or who they are the
+        device of. devices can PUT progress to the /progress pseudo subnode. Besides
+        that steps are read only for the matter of the API
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: REV_ID
+        in: path
+        name: rev
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/trails.Step'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get step revision of the the given trail.
+      tags:
+      - trails
+  /trails/{id}/steps/{rev}/.prvremote:
+    get:
+      consumes:
+      - application/json
+      description: Get pvr remote information for a trail revision
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: REV_ID
+        in: path
+        name: rev
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/trails.PvrRemote'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get pvr remote information for a trail revision
+      tags:
+      - trails
+  /trails/{id}/steps/{rev}/meta:
+    get:
+      consumes:
+      - application/json
+      description: Get step meta just the raw data of a step without metainfo
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: REV_ID
+        in: path
+        name: rev
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/trails.meta'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get step meta just the raw data of a step without metainfo
+      tags:
+      - trails
+    put:
+      consumes:
+      - application/json
+      description: Put step meta just the raw data of a step without metainfo like
+        pvr put
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: REV_ID
+        in: path
+        name: rev
+        required: true
+        type: string
+      - description: payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/trails.meta'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/trails.meta'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Put step meta just the raw data of a step without metainfo like pvr
+        put
+      tags:
+      - trails
+  /trails/{id}/steps/{rev}/objects:
+    get:
+      consumes:
+      - application/json
+      description: Get trails step objects
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: REV_ID
+        in: path
+        name: rev
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/objects.ObjectWithAccess'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get trails step objects
+      tags:
+      - trails
+    post:
+      consumes:
+      - application/json
+      description: Create a new object for a trail revision
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: REV_ID
+        in: path
+        name: rev
+        required: true
+        type: string
+      - description: Object payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/objects.Object'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/objects.ObjectWithAccess'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new object for a trail revision
+      tags:
+      - trails
+  /trails/{id}/steps/{rev}/objects/{object_id}:
+    get:
+      consumes:
+      - application/json
+      description: Get trails step object content
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: REV_ID
+        in: path
+        name: rev
+        required: true
+        type: string
+      - description: OBJECT_ID
+        in: path
+        name: object_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200": {}
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get trails step object content
+      tags:
+      - trails
+  /trails/{id}/steps/{rev}/progress:
+    put:
+      consumes:
+      - application/json
+      description: |-
+        Post Step Progress information for a step.
+        Only device accounts can put status info. they are expected to provide at status field.
+        all input paramaters besides the device-progress one are ignored.
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: REV_ID
+        in: path
+        name: rev
+        required: true
+        type: string
+      - description: StepProgress payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/trails.StepProgress'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/trails.StepProgress'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Post Step Progress information for a step.
+      tags:
+      - trails
+  /trails/{id}/steps/{rev}/state:
+    get:
+      consumes:
+      - application/json
+      description: Get step state just the raw data of a step without metainfo
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: REV_ID
+        in: path
+        name: rev
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/trails.meta'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get step state just the raw data of a step without metainfo
+      tags:
+      - trails
+    post:
+      consumes:
+      - application/json
+      description: put step state (only if not yet consumed). just the raw data of
+        a step without metainfo like pvr pu
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: REV_ID
+        in: path
+        name: rev
+        required: true
+        type: string
+      - description: payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/trails.state'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/trails.state'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Put step state (only if not yet consumed)
+      tags:
+      - trails
+  /trails/{id}/summary:
+    get:
+      consumes:
+      - application/json
+      description: |-
+        Get steps summary of the the given trail.
+        For user accounts querying this will return the list of steps that are not
+        DONE or in error state.
+        For device accounts querying this will return the list of unconfirmed steps.
+        Devices confirm a step by posting a walk element matching the rev.
+        This conveyes that the devices knows about the step to go and will keep the
+        post updates to the walk elements as they go.
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/trails.TrailSummary'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get steps summary of the the given trail.
+      tags:
+      - trails
+  /trails/summary:
+    get:
+      consumes:
+      - application/json
+      description: get summary of all trails by the calling owner.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/trails.TrailSummary'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: get summary of all trails by the calling owner.
+      tags:
+      - trails
 securityDefinitions:
   ApiKeyAuth:
     in: header
