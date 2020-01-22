@@ -46,6 +46,7 @@ type RestRequestResponseAdapter struct {
 // @Description Get API metrics
 // @Accept  plain/text
 // @Produce  plain/text
+// @Tags metrics
 // @Success 200
 // @Failure 400 {object} utils.RError
 // @Failure 404 {object} utils.RError

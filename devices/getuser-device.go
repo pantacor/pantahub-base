@@ -35,6 +35,7 @@ import (
 // @Accept  json
 // @Produce  json
 // @Security ApiKeyAuth
+// @Tags devices
 // @Param usernick path string true "NICK"
 // @Param devicenick path string true "NICK"
 // @Success 200 {array} Device

@@ -36,6 +36,7 @@ import (
 // @Accept  json
 // @Produce  json
 // @Security ApiKeyAuth
+// @Tags logs
 // @Param next-cursor formData string false "next-cursor ID"
 // @Success 200 {object} Pager
 // @Failure 400 {object} utils.RError

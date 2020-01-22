@@ -50,6 +50,7 @@ type accountClaims struct {
 // @Description Get JWT claims from Authorization header
 // @Accept  json
 // @Produce  json
+// @Tags auth
 // @Security ApiKeyAuth
 // @Success 200 {object} accountClaims
 // @Failure 400 {object} utils.RError "Invalid payload"
@@ -66,6 +67,7 @@ func handleAuthStatus(w rest.ResponseWriter, r *rest.Request) {
 // @Description Get list of accounts
 // @Accept  json
 // @Produce  json
+// @Tags auth
 // @Security ApiKeyAuth
 // @Success 200 {array} accounts.Account
 // @Failure 400 {object} utils.RError "Invalid payload"
@@ -139,6 +141,7 @@ func (a *App) handleGetAccounts(w rest.ResponseWriter, r *rest.Request) {
 // @Description Create a new account
 // @Accept  json
 // @Produce  json
+// @Tags auth
 // @Param body body accountCreationPayload true "Account Payload"
 // @Success 200 {object} accounts.Account
 // @Failure 400 {object} utils.RError "Invalid payload"
@@ -283,6 +286,7 @@ func (a *App) handlePostAccount(w rest.ResponseWriter, r *rest.Request) {
 // @Description Get user profile
 // @Accept  json
 // @Produce  json
+// @Tags auth
 // @Security ApiKeyAuth
 // @Param id path string true "ID|Nick|PRN"
 // @Success 200 {object} accounts.Account
@@ -329,6 +333,7 @@ func (a *App) handleGetProfile(w rest.ResponseWriter, r *rest.Request) {
 // @Description Verify account payload
 // @Accept  json
 // @Produce  json
+// @Tags auth
 // @Success 200 {object} accounts.Account
 // @Failure 400 {object} utils.RError "Invalid payload"
 // @Failure 404 {object} utils.RError "Account not found"
@@ -406,6 +411,7 @@ func (a *App) handleVerify(w rest.ResponseWriter, r *rest.Request) {
 // @Description send email with token to user in order to reset password to given user
 // @Accept  json
 // @Produce  json
+// @Tags auth
 // @Param body body passwordReset true "New password payload"
 // @Success 200 {object} accounts.Account
 // @Failure 400 {object} utils.RError "Invalid payload"
@@ -507,6 +513,7 @@ func (a *App) handlePasswordReset(writer rest.ResponseWriter, r *rest.Request) {
 // @Description send email with token to user in order to reset password to given user
 // @Accept  json
 // @Produce  json
+// @Tags auth
 // @Param body body passwordResetRequest true "Account recovery payload"
 // @Success 200 {object} accounts.Account
 // @Failure 400 {object} utils.RError "Invalid payload"
@@ -582,6 +589,7 @@ func (a *App) handlePasswordRecovery(writer rest.ResponseWriter, r *rest.Request
 // @Description Get user profile
 // @Accept  json
 // @Produce  json
+// @Tags auth
 // @Security ApiKeyAuth
 // @Param id path string true "ID|Nick|PRN"
 // @Success 200 {object} accounts.Account

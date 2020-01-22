@@ -37,6 +37,7 @@ import (
 // @Accept  json
 // @Produce  json
 // @Security ApiKeyAuth
+// @Tags devices
 // @Success 200 {array} Device
 // @Failure 400 {object} utils.RError
 // @Failure 404 {object} utils.RError
@@ -113,6 +114,7 @@ func (a *App) handleGetDevices(w rest.ResponseWriter, r *rest.Request) {
 // @Accept  json
 // @Produce  json
 // @Security ApiKeyAuth
+// @Tags devices
 // @Param id path string true "ID|Nick|PRN"
 // @Success 200 {array} Device
 // @Failure 400 {object} utils.RError

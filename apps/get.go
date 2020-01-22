@@ -29,6 +29,7 @@ import (
 // @Description Get an oauth application
 // @Accept  json
 // @Produce  json
+// @Tags apps
 // @Security ApiKeyAuth
 // @Param id path string true "App ID|Nick|PRN"
 // @Success 200 {object} TPApp
@@ -67,6 +68,7 @@ func (app *App) handleGetApp(w rest.ResponseWriter, r *rest.Request) {
 // @Description Get all applications owned by a user
 // @Accept  json
 // @Produce  json
+// @Tags apps
 // @Security ApiKeyAuth
 // @Param id path string true "App ID|Nick|PRN"
 // @Success 200 {array} TPApp
@@ -97,6 +99,7 @@ func (app *App) handleGetApps(w rest.ResponseWriter, r *rest.Request) {
 // @Description Get scopes for OAuth applications
 // @Accept  json
 // @Produce  json
+// @Tags apps
 // @Param serviceID query string false "ID|Nick|PRN"
 // @Success 200 {array} utils.Scope
 // @Failure 400 {object} utils.RError "Invalid payload"

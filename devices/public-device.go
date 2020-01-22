@@ -35,6 +35,7 @@ import (
 // @Accept  json
 // @Produce  json
 // @Security ApiKeyAuth
+// @Tags devices
 // @Param id path string true "ID|PRN|NICK"
 // @Success 200 {object} Device
 // @Failure 400 {object} utils.RError
@@ -120,6 +121,7 @@ func (a *App) handlePutPublic(w rest.ResponseWriter, r *rest.Request) {
 // @Accept  json
 // @Produce  json
 // @Security ApiKeyAuth
+// @Tags devices
 // @Param id path string true "ID|PRN|NICK"
 // @Success 200 {array} Device
 // @Failure 400 {object} utils.RError

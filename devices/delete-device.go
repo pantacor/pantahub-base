@@ -36,6 +36,7 @@ import (
 // @Accept  json
 // @Produce  json
 // @Security ApiKeyAuth
+// @Tags devices
 // @Param id path string true "ID|PRN|NICK"
 // @Success 200 {object} Device
 // @Failure 400 {object} utils.RError

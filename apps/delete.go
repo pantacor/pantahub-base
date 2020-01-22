@@ -30,6 +30,7 @@ import (
 // @Description delete an oauth client
 // @Accept  json
 // @Produce  json
+// @Tags apps
 // @Security ApiKeyAuth
 // @Param id path string true "App ID|Nick|PRN"
 // @Success 200 {object} TPApp

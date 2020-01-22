@@ -42,7 +42,8 @@ import (
 // @Description Post one or many log entries as an error of LogEntry
 // @Accept  json
 // @Produce  json
-// @Security BasicAuth
+// @Security ApiKeyAuth
+// @Tags logs
 // @Param body body Entry true "New logs body"
 // @Success 200 {array} Entry
 // @Failure 400 {object} utils.RError

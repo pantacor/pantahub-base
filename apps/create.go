@@ -43,6 +43,7 @@ type CreateAppPayload struct {
 // @Description This define a new application to be used as OAuth client
 // @Accept  json
 // @Produce  json
+// @Tags apps
 // @Security ApiKeyAuth
 // @Param body body CreateAppPayload true "Create app body"
 // @Success 200 {object} TPApp
