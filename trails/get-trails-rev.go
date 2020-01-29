@@ -64,7 +64,7 @@ func (a *App) handleGetStep(w rest.ResponseWriter, r *rest.Request) {
 	isPublic, err := a.isTrailPublic(trailID)
 
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error getting trail public", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error getting trail public:"+err.Error(), http.StatusInternalServerError)
 	}
 
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
