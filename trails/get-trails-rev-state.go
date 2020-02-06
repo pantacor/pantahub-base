@@ -73,7 +73,7 @@ func (a *App) handleGetStepState(w rest.ResponseWriter, r *rest.Request) {
 	isPublic, err := a.isTrailPublic(trailID)
 
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error getting trail public", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error getting trail public:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
