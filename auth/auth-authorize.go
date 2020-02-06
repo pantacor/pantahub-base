@@ -249,7 +249,7 @@ func (app *App) validateScopesAndURIs(caller, reqService, reqScopes, reqRedirect
 
 	// Validate scope only when the app comes from database
 	if defaultAccount == false {
-		scopes := strings.Split(reqScopes, ",")
+		scopes := strings.Fields(reqScopes)
 		allServicesScopes := utils.ParseScopes(service.Scopes)
 		if !utils.MatchAllScope(scopes, allServicesScopes) {
 			return http.StatusBadRequest, errors.New("You use a not allowed scoped for this application")
