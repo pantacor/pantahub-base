@@ -190,8 +190,8 @@ func (s *mgoLogger) unregister(delete bool) error {
 	return nil
 }
 
-func (s *mgoLogger) getLogs(start int64, page int64, beforeOrAfter *time.Time,
-	after bool, query Filters, sort Sorts, cursor bool) (*Pager, error) {
+func (s *mgoLogger) getLogs(start int64, page int64, before *time.Time,
+	after *time.Time, query Filters, sort Sorts, cursor bool) (*Pager, error) {
 	var result Pager
 	var err error
 
@@ -228,15 +228,14 @@ func (s *mgoLogger) getLogs(start int64, page int64, beforeOrAfter *time.Time,
 		}
 	}
 
-	if beforeOrAfter != nil {
-		if after {
-			findFilter["time-created"] = bson.M{
-				"$gt": after,
-			}
-		} else {
-			findFilter["time-created"] = bson.M{
-				"$lt": after,
-			}
+	if before != nil {
+		findFilter["time-created"] = bson.M{
+			"$lt": before,
+		}
+	}
+	if after != nil {
+		findFilter["time-created"] = bson.M{
+			"$gt": after,
 		}
 	}
 
