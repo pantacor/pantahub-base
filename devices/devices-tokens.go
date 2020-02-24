@@ -52,7 +52,7 @@ func (a *App) getBase64AutoTokenInfo(tokenBase64 string) (*autoTokenInfo, error)
 	sum := make([]byte, shaSummer.Size())
 	tokenSha := shaSummer.Sum(sum)
 
-	res := PantahubDevicesJoinToken{}
+	res := utils.PantahubDevicesJoinToken{}
 
 	col := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

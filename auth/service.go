@@ -309,6 +309,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 				!(request.URL.Path == "/accounts" && request.Method == "POST") &&
 				!(request.URL.Path == "/verify" && request.Method == "GET") &&
 				!(request.URL.Path == "/recover" && request.Method == "POST") &&
+				!(request.URL.Path == "/signature/verify" && request.Method == "POST") &&
 				!(request.URL.Path == "/password" && request.Method == "POST")
 		},
 		IfTrue: app.jwtMiddleware,
@@ -321,6 +322,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 				!(request.URL.Path == "/accounts" && request.Method == "POST") &&
 				!(request.URL.Path == "/verify" && request.Method == "GET") &&
 				!(request.URL.Path == "/recover" && request.Method == "POST") &&
+				!(request.URL.Path == "/signature/verify" && request.Method == "POST") &&
 				!(request.URL.Path == "/password" && request.Method == "POST")
 		},
 		IfTrue: &utils.AuthMiddleware{},
@@ -340,6 +342,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		rest.Post("/password", app.handlePasswordReset),
 		rest.Post("/authorize", app.handlePostAuthorizeToken),
 		rest.Post("/code", app.handlePostCode),
+		rest.Post("/signature/verify", app.verifyToken),
 	)
 	app.API.SetApp(apiRouter)
 
@@ -548,9 +551,19 @@ func (a *App) accountPayload(idEmailNick string) map[string]interface{} {
 }
 
 func (a *App) deviceAuth(deviceID string, secret string) bool {
+	id := utils.PrnGetID(deviceID)
+
+	// Validate login with IDevID certificate
+	userIsACertificate, err := authenticateUsingCert(secret, id)
+	if userIsACertificate && err != nil {
+		return false
+	}
+	if userIsACertificate && err == nil {
+		return true
+	}
+
 	c := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
-	id := utils.PrnGetID(deviceID)
 	mgoID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return false

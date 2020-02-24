@@ -69,20 +69,6 @@ type Device struct {
 	Garbage      bool                   `json:"garbage" bson:"garbage"`
 }
 
-// PantahubDevicesJoinToken devices join token payload
-type PantahubDevicesJoinToken struct {
-	ID              primitive.ObjectID     `json:"id" bson:"_id"`
-	Prn             string                 `json:"prn"`
-	Nick            string                 `json:"nick"`
-	Owner           string                 `json:"owner"`
-	Token           string                 `json:"token,omitempty"`
-	TokenSha        []byte                 `json:"token-sha,omitempty"`
-	DefaultUserMeta map[string]interface{} `json:"default-user-meta"`
-	Disabled        bool                   `json:"disabled"`
-	TimeCreated     time.Time              `json:"time-created"`
-	TimeModified    time.Time              `json:"time-modified"`
-}
-
 type autoTokenInfo struct {
 	Owner    string
 	UserMeta map[string]interface{}
@@ -240,7 +226,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 			}
 
 			// post new device means to register... allow this unauthenticated
-			return !(request.Method == "POST" && request.URL.Path == "/")
+			return !((request.Method == "POST" && request.URL.Path == "/") ||
+				(request.Method == "POST" && request.URL.Path == "/register"))
 		},
 		IfTrue: app.jwtMiddleware,
 	})
@@ -254,7 +241,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 			}
 
 			// post new device means to register... allow this unauthenticated
-			return !(request.Method == "POST" && request.URL.Path == "/")
+			return !((request.Method == "POST" && request.URL.Path == "/") ||
+				(request.Method == "POST" && request.URL.Path == "/register"))
 		},
 		IfTrue: &utils.AuthMiddleware{},
 	})
@@ -277,6 +265,10 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 
 	// /auth_status endpoints
 	apiRouter, _ := rest.MakeRouter(
+		// TPM auto enroll register
+		rest.Post("/register", utils.ScopeFilter(readDevicesScopes, app.handleRegister)),
+		rest.Post("/issue/:service", utils.ScopeFilter(updateDevicesScopes, app.handleIssueDeviceCert)),
+
 		// token api
 		rest.Post("/tokens", utils.ScopeFilter(readDevicesScopes, app.handlePostTokens)),
 		rest.Delete("/tokens/:id", utils.ScopeFilter(updateDevicesScopes, app.handleDisableTokens)),

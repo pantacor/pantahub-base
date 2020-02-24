@@ -36,7 +36,7 @@ import (
 // @Produce  json
 // @Security ApiKeyAuth
 // @Tags devices
-// @Success 200 {object} PantahubDevicesJoinToken
+// @Success 200 {object} utils.PantahubDevicesJoinToken
 // @Failure 400 {object} utils.RError
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
@@ -68,7 +68,7 @@ func (a *App) handleGetTokens(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	res := []PantahubDevicesJoinToken{}
+	res := []utils.PantahubDevicesJoinToken{}
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
 	findOptions := options.Find()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -84,7 +84,7 @@ func (a *App) handleGetTokens(w rest.ResponseWriter, r *rest.Request) {
 
 	defer cur.Close(ctx)
 	for cur.Next(ctx) {
-		result := PantahubDevicesJoinToken{}
+		result := utils.PantahubDevicesJoinToken{}
 		err := cur.Decode(&result)
 		if err != nil {
 			utils.RestErrorWrapper(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
