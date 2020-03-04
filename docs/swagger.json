@@ -955,63 +955,6 @@
                 }
             }
         },
-        "/devices/register": {
-            "post": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Register a new device using the IDevID csr",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "devices"
-                ],
-                "summary": "Register a new device using the IDevID csr",
-                "parameters": [
-                    {
-                        "description": "Register Request",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/devices.registerReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/devices.Device"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/utils.RError"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/utils.RError"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/utils.RError"
-                        }
-                    }
-                }
-            }
-        },
         "/devices/tokens": {
             "get": {
                 "security": [
@@ -1034,7 +977,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/utils.PantahubDevicesJoinToken"
+                            "$ref": "#/definitions/devices.PantahubDevicesJoinToken"
                         }
                     },
                     "400": {
@@ -1078,7 +1021,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/utils.PantahubDevicesJoinToken"
+                            "$ref": "#/definitions/devices.PantahubDevicesJoinToken"
                         }
                     },
                     "400": {
@@ -3720,26 +3663,6 @@
                 }
             }
         },
-        "auth.requestPayload": {
-            "type": "object",
-            "properties": {
-                "idevid-name": {
-                    "type": "string"
-                },
-                "owner": {
-                    "type": "string"
-                },
-                "service": {
-                    "type": "string"
-                },
-                "signature": {
-                    "type": "string"
-                },
-                "token-id": {
-                    "type": "string"
-                }
-            }
-        },
         "dash.BillingInfo": {
             "type": "object",
             "properties": {
@@ -3914,6 +3837,45 @@
                 }
             }
         },
+        "devices.PantahubDevicesJoinToken": {
+            "type": "object",
+            "properties": {
+                "default-user-meta": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "disabled": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "nick": {
+                    "type": "string"
+                },
+                "owner": {
+                    "type": "string"
+                },
+                "prn": {
+                    "type": "string"
+                },
+                "time-created": {
+                    "type": "string"
+                },
+                "time-modified": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                },
+                "token-sha": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
         "devices.challengePayload": {
             "type": "object",
             "properties": {
@@ -3933,20 +3895,6 @@
         "devices.metaDataPayload": {
             "type": "object",
             "additionalProperties": true
-        },
-        "devices.registerReq": {
-            "type": "object",
-            "properties": {
-                "csr": {
-                    "type": "string"
-                },
-                "device-name": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                }
-            }
         },
         "healthz.Response": {
             "type": "object",
@@ -4329,45 +4277,6 @@
         "trails.state": {
             "type": "object",
             "additionalProperties": true
-        },
-        "utils.PantahubDevicesJoinToken": {
-            "type": "object",
-            "properties": {
-                "default-user-meta": {
-                    "type": "object",
-                    "additionalProperties": true
-                },
-                "disabled": {
-                    "type": "boolean"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "nick": {
-                    "type": "string"
-                },
-                "owner": {
-                    "type": "string"
-                },
-                "prn": {
-                    "type": "string"
-                },
-                "time-created": {
-                    "type": "string"
-                },
-                "time-modified": {
-                    "type": "string"
-                },
-                "token": {
-                    "type": "string"
-                },
-                "token-sha": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                }
-            }
         },
         "utils.RError": {
             "type": "object",

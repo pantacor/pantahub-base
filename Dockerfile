@@ -1,4 +1,3 @@
-FROM registry.gitlab.com/pantacor/pv-platforms/pantacmp:X86_64 as cmpossl
 FROM golang:alpine3.9 as builder
 
 ENV GO111MODULE=on
@@ -16,7 +15,6 @@ RUN go get -d -v ./... \
     && go install -v ./...
 
 FROM alpine
-COPY --from=cmpossl --chown=0:0 /usr/local/ /usr/local
 
 RUN apk update; apk add ca-certificates
 COPY env.default /opt/ph/bin/

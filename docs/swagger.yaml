@@ -149,19 +149,6 @@ definitions:
       email:
         type: string
     type: object
-  auth.requestPayload:
-    properties:
-      idevid-name:
-        type: string
-      owner:
-        type: string
-      service:
-        type: string
-      signature:
-        type: string
-      token-id:
-        type: string
-    type: object
   dash.BillingInfo:
     properties:
       amountDue:
@@ -277,6 +264,32 @@ definitions:
         additionalProperties: true
         type: object
     type: object
+  devices.PantahubDevicesJoinToken:
+    properties:
+      default-user-meta:
+        additionalProperties: true
+        type: object
+      disabled:
+        type: boolean
+      id:
+        type: string
+      nick:
+        type: string
+      owner:
+        type: string
+      prn:
+        type: string
+      time-created:
+        type: string
+      time-modified:
+        type: string
+      token:
+        type: string
+      token-sha:
+        items:
+          type: integer
+        type: array
+    type: object
   devices.challengePayload:
     properties:
       challenge:
@@ -289,15 +302,6 @@ definitions:
     type: object
   devices.metaDataPayload:
     additionalProperties: true
-    type: object
-  devices.registerReq:
-    properties:
-      csr:
-        type: string
-      device-name:
-        type: string
-      name:
-        type: string
     type: object
   healthz.Response:
     properties:
@@ -559,32 +563,6 @@ definitions:
     type: object
   trails.state:
     additionalProperties: true
-    type: object
-  utils.PantahubDevicesJoinToken:
-    properties:
-      default-user-meta:
-        additionalProperties: true
-        type: object
-      disabled:
-        type: boolean
-      id:
-        type: string
-      nick:
-        type: string
-      owner:
-        type: string
-      prn:
-        type: string
-      time-created:
-        type: string
-      time-modified:
-        type: string
-      token:
-        type: string
-      token-sha:
-        items:
-          type: integer
-        type: array
     type: object
   utils.RError:
     properties:
@@ -1608,42 +1586,6 @@ paths:
       summary: get device by owner nick and device nick
       tags:
       - devices
-  /devices/register:
-    post:
-      consumes:
-      - application/json
-      description: Register a new device using the IDevID csr
-      parameters:
-      - description: Register Request
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/devices.registerReq'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/devices.Device'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/utils.RError'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/utils.RError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/utils.RError'
-      security:
-      - ApiKeyAuth: []
-      summary: Register a new device using the IDevID csr
-      tags:
-      - devices
   /devices/tokens:
     get:
       consumes:
@@ -1655,7 +1597,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/utils.PantahubDevicesJoinToken'
+            $ref: '#/definitions/devices.PantahubDevicesJoinToken'
         "400":
           description: Bad Request
           schema:
@@ -1688,7 +1630,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/utils.PantahubDevicesJoinToken'
+            $ref: '#/definitions/devices.PantahubDevicesJoinToken'
         "400":
           description: Bad Request
           schema:

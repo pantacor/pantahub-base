@@ -4,7 +4,6 @@
 // (c) Pantacor Ltd, 2018
 // License: Apache 2.0 (see COPYRIGHT)
 //
-
 package utils
 
 import (

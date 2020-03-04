@@ -42,7 +42,7 @@ import (
 // @Produce  json
 // @Security ApiKeyAuth
 // @Tags devices
-// @Success 200 {object} utils.PantahubDevicesJoinToken
+// @Success 200 {object} PantahubDevicesJoinToken
 // @Failure 400 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /devices/tokens [post]
@@ -74,7 +74,7 @@ func (a *App) handlePostTokens(w rest.ResponseWriter, r *rest.Request) {
 
 	}
 
-	req := utils.PantahubDevicesJoinToken{}
+	req := PantahubDevicesJoinToken{}
 
 	err := r.DecodeJsonPayload(&req)
 
