@@ -116,10 +116,11 @@ type Step struct {
 
 // StepProgress progression of a step
 type StepProgress struct {
-	Progress  int    `json:"progress"`                    // progress number. steps or 1-100
-	StatusMsg string `json:"status-msg" bson:"statusmsg"` // message of progress status
-	Status    string `json:"status"`                      // status code
-	Log       string `json:"log"`                         // log if available
+	Progress  int         `json:"progress"`                    // progress number. steps or 1-100
+	StatusMsg string      `json:"status-msg" bson:"statusmsg"` // message of progress status
+	Data      interface{} `json:"data,omitempty" bson:"data"`  // data field that can hold things the device wants to remember
+	Status    string      `json:"status"`                      // status code
+	Log       string      `json:"log"`                         // log if available
 }
 
 // TrailSummary details about a trail
