@@ -1,4 +1,3 @@
-
 # Device
 
 PANTAHUB Device Registry
@@ -8,6 +7,7 @@ NOTE: the auth service does not take the secrets here into account yet!
 ## Start Service
 
 Start your server:
+
 ```
 ./pantahub-serv
 ```
@@ -61,6 +61,7 @@ use to claim it.
 Example:
 
 1. device registers itself
+
 ```
 http POST localhost:12365/devices/ secret="mysec1"
 HTTP/1.1 200 OK
@@ -86,11 +87,13 @@ X-Powered-By: go-json-rest
 Note how the output has a challenge entry, but no owner yet...
 
 2. extract the challenge from the json and display to user
+
 ```
 challenge=duly-helped-bat
 ```
 
 3. as a logged in user with TOKEN you claim the device through a simple PUT
+
 ```
 http PUT localhost:12365/devices/59669139632d7234e2703610?challenge=$challenge Authorization:"Bearer $TOKEN"
 HTTP/1.1 200 OK
@@ -115,7 +118,6 @@ X-Powered-By: go-json-rest
 
 As you can see the challenge field is now reset and the owner is assigned.
 
-
 ### Get Your Devices
 
 ... only yours!
@@ -130,17 +132,17 @@ X-Powered-By: go-json-rest
 
 [
     {
-        "prn": "prn:::devices:/57f41438b376a825cf000001", 
-        "id": "57f41438b376a825cf000001", 
-        "nick": "desired_stud", 
-        "owner": "prn:pantahub.com:auth:/user1", 
+        "prn": "prn:::devices:/57f41438b376a825cf000001",
+        "id": "57f41438b376a825cf000001",
+        "nick": "desired_stud",
+        "owner": "prn:pantahub.com:auth:/user1",
         "secret": "yourdevicesecret"
-    }, 
+    },
     {
-        "prn": "prn:::devices:/57f4146bb376a825cf000002", 
-        "id": "57f4146bb376a825cf000002", 
-        "nick": "composed_pheasant", 
-        "owner": "prn:pantahub.com:auth:/user1", 
+        "prn": "prn:::devices:/57f4146bb376a825cf000002",
+        "id": "57f4146bb376a825cf000002",
+        "nick": "composed_pheasant",
+        "owner": "prn:pantahub.com:auth:/user1",
         "secret": "anotherdevice"
     }
 ]
@@ -197,8 +199,9 @@ X-Powered-By: go-json-rest
 ```
 
 Afterwards your device will have this metadata filled in:
+
 ```
-http GET localhost:12365/devices/$DEVICEID Authorization:" Bearer $TOKEN" 
+http GET localhost:12365/devices/$DEVICEID Authorization:" Bearer $TOKEN"
 HTTP/1.1 200 OK
 Content-Length: 351
 Content-Type: application/json; charset=utf-8
@@ -253,7 +256,7 @@ X-Powered-By: go-json-rest
 
 To mark device as public you can either update the public field
 using a full PUT on the device you you can use the convenience
-endpoint ```/devices/:id/public```:
+endpoint `/devices/:id/public`:
 
 ```
 http PUT localhost:12365/devices/$DEVICEID/public Authorization:" Bearer $TOKEN"
@@ -338,9 +341,9 @@ Pantahub base offers a built in basic factory story in the sense that we offer t
 
 For that right now we use a simple token based approach:
 
- 1. Owner uses ```/devices/tokens/``` end point to create a new token; optionally he can also provide a set of default user-meta information that the auto assign feature will put in place for every device joinig using such token.
- 2. Token is a one-time-visible secret that will only be displayed on reply of the token registration, but not afterwards. If user looses a token he can generate a new one. Old token can stay active if user does not believe the token has been compromised
- 3. User configures device at factory to use the produced token as its pantahub registration credential. Pantavisor will then use the token when registering itself for first time. It uses ```Pantahub-Devices-Auto-Token-V1``` to pass the token to pantahub when registering itself. With this pantahub will auto assign the device to the owner of the given token and will put UserMeta in place.
+1.  Owner uses `/devices/tokens/` end point to create a new token; optionally he can also provide a set of default user-meta information that the auto assign feature will put in place for every device joinig using such token.
+2.  Token is a one-time-visible secret that will only be displayed on reply of the token registration, but not afterwards. If user looses a token he can generate a new one. Old token can stay active if user does not believe the token has been compromised
+3.  User configures device at factory to use the produced token as its pantahub registration credential. Pantavisor will then use the token when registering itself for first time. It uses `Pantahub-Devices-Auto-Token-V1` to pass the token to pantahub when registering itself. With this pantahub will auto assign the device to the owner of the given token and will put UserMeta in place.
 
 Example:
 
@@ -372,18 +375,19 @@ X-Runtime: 0.000635
 {
     "default-user-meta": {
         "mykey": "yourvalue"
-    }, 
-    "disabled": false, 
-    "id": "5c0e8a5fc094f62eafcc96b4", 
-    "nick": "informally_trusted_dingo", 
-    "owner": "prn:pantahub.com:auth:/user1", 
-    "prn": "prn:::devices-tokens:/5c0e8a5fc094f62eafcc96b4", 
-    "time-created": "2018-12-10T16:46:39.740026537+01:00", 
-    "time-modified": "2018-12-10T16:46:39.740026537+01:00", 
+    },
+    "disabled": false,
+    "id": "5c0e8a5fc094f62eafcc96b4",
+    "nick": "informally_trusted_dingo",
+    "owner": "prn:pantahub.com:auth:/user1",
+    "prn": "prn:::devices-tokens:/5c0e8a5fc094f62eafcc96b4",
+    "time-created": "2018-12-10T16:46:39.740026537+01:00",
+    "time-modified": "2018-12-10T16:46:39.740026537+01:00",
     "token": "xxxxxxxxxxxx"
 }
 ```
-**Remember the ```token```* you won't be able to retrieve it another time.
+
+\*_Remember the `token`_ you won't be able to retrieve it another time.
 
 ### Auto Assign Devices on Registration
 
@@ -425,7 +429,6 @@ X-Runtime: 0.000788
 }
 ```
 
-
 ### List tokens registered
 
 If you want to see which tokens are already registered by your user, you can do so through a simple get at collection level:
@@ -453,54 +456,53 @@ X-Runtime: 0.000664
     {
         "default-user-meta": {
             "mykey": "yourvalue"
-        }, 
-        "disabled": false, 
-        "id": "5c0e8a5fc094f62eafcc96b4", 
-        "nick": "informally_trusted_dingo", 
-        "owner": "prn:pantahub.com:auth:/user1", 
-        "prn": "prn:::devices-tokens:/5c0e8a5fc094f62eafcc96b4", 
-        "time-created": "2018-12-10T16:46:39.74+01:00", 
+        },
+        "disabled": false,
+        "id": "5c0e8a5fc094f62eafcc96b4",
+        "nick": "informally_trusted_dingo",
+        "owner": "prn:pantahub.com:auth:/user1",
+        "prn": "prn:::devices-tokens:/5c0e8a5fc094f62eafcc96b4",
+        "time-created": "2018-12-10T16:46:39.74+01:00",
         "time-modified": "2018-12-10T16:46:39.74+01:00"
-    }, 
+    },
     {
         "default-user-meta": {
             "mykey": "yourvalue"
-        }, 
-        "disabled": true, 
-        "id": "5c0e6b93c094f67d861e9444", 
-        "nick": "entirely_fit_badger", 
-        "owner": "prn:pantahub.com:auth:/user1", 
-        "prn": "prn:::devices-tokens:/5c0e6b93c094f67d861e9444", 
-        "time-created": "2018-12-10T14:35:15.984+01:00", 
+        },
+        "disabled": true,
+        "id": "5c0e6b93c094f67d861e9444",
+        "nick": "entirely_fit_badger",
+        "owner": "prn:pantahub.com:auth:/user1",
+        "prn": "prn:::devices-tokens:/5c0e6b93c094f67d861e9444",
+        "time-created": "2018-12-10T14:35:15.984+01:00",
         "time-modified": "2018-12-10T14:35:15.984+01:00"
     }, <>
     {
         "default-user-meta": {
             "mykey": "yourvalue"
-        }, 
-        "disabled": true, 
-        "id": "5c0e5affc094f6050521ae9c", 
-        "nick": "correctly_literate_camel", 
-        "owner": "prn:pantahub.com:auth:/user1", 
-        "prn": "prn:::devices-tokens:/5c0e5affc094f6050521ae9c", 
-        "time-created": "2018-12-10T13:24:31.615+01:00", 
+        },
+        "disabled": true,
+        "id": "5c0e5affc094f6050521ae9c",
+        "nick": "correctly_literate_camel",
+        "owner": "prn:pantahub.com:auth:/user1",
+        "prn": "prn:::devices-tokens:/5c0e5affc094f6050521ae9c",
+        "time-created": "2018-12-10T13:24:31.615+01:00",
         "time-modified": "2018-12-10T13:24:31.615+01:00"
-    }, 
+    },
     {
         "default-user-meta": {
             "mykey": "yourvalue"
-        }, 
-        "disabled": true, 
-        "id": "5c0e5ad6c094f603c3d11f7c", 
-        "nick": "miserably_singular_insect", 
-        "owner": "prn:pantahub.com:auth:/user1", 
-        "prn": "prn:::devices-tokens:/5c0e5ad6c094f603c3d11f7c", 
-        "time-created": "2018-12-10T13:23:50.359+01:00", 
+        },
+        "disabled": true,
+        "id": "5c0e5ad6c094f603c3d11f7c",
+        "nick": "miserably_singular_insect",
+        "owner": "prn:pantahub.com:auth:/user1",
+        "prn": "prn:::devices-tokens:/5c0e5ad6c094f603c3d11f7c",
+        "time-created": "2018-12-10T13:23:50.359+01:00",
         "time-modified": "2018-12-10T13:23:50.359+01:00"
     }
 ]
 ```
-
 
 ### Disable Tokens
 
@@ -530,4 +532,132 @@ X-Runtime: 0.000664
     "status": "OK"
 }
 ...
+```
+
+### Get any user's public devices
+
+You can get the list of any user's public devices by using the owner /owner-nick params
+
+```
+http --print=bBhH GET localhost:12365/devices/?owner-nick=asac Authorization:" Bearer $TOK"
+GET /devices?owner-nick=asac HTTP/1.1
+Accept: */*
+Accept-Encoding: gzip, deflate
+Authorization: Bearer xxxxxxxxxxxxxxXxxxxxxxxxxxxxxxxxxxxxxxxxxXXXXXxxxxxXXXXXXXXXXXXXXxxxxXXXXxxxxxxxxQ
+Connection: keep-alive
+Host: localhost:12365
+User-Agent: HTTPie/0.9.9
+
+
+
+HTTP/1.1 200 OK
+Content-Length: 1256
+Content-Type: application/json; charset=utf-8
+Date: Mon, 10 Dec 2018 15:48:14 GMT
+X-Powered-By: go-json-rest
+X-Runtime: 0.000664
+
+[
+    {
+        "id": "5e1875e2fb13950bc38d0ebd",
+        "prn": "prn:::devices:/5e1875e2fb13950bc38d0ebd",
+        "nick": "truly_wanted_krill",
+        "owner": "prn:pantahub.com:auth:/5e1875e2fb13950bc38d0ebd",
+        "secret": "123",
+        "time-created": "2020-01-10T13:02:26.232Z",
+        "time-modified": "2020-03-10T11:52:16.405Z",
+        "public": true,
+        "user-meta": {},
+        "device-meta": {},
+        "garbage": false
+    },
+    {
+        "id": "5e5e8a1afb1395136d8b2ae2",
+        "prn": "prn:::devices:/5e5e8a1afb1395136d8b2ae2",
+        "nick": "trivially_noted_flea",
+        "owner": "prn:pantahub.com:auth:/5e1875e2fb13950bc38d0ebd",
+        "secret": "123",
+        "time-created": "2020-03-03T16:47:22.86Z",
+        "time-modified": "2020-03-03T17:01:11.332Z",
+        "public": true,
+        "user-meta": {},
+        "device-meta": {},
+        "garbage": false
+    },
+    {
+        "id": "5e668963fb139512df214ec4",
+        "prn": "prn:::devices:/5e668963fb139512df214ec4",
+        "nick": "vigorously_master_werewolf",
+        "owner": "prn:pantahub.com:auth:/5e1875e2fb13950bc38d0ebd",
+        "secret": "123",
+        "time-created": "2020-03-09T18:22:27.585Z",
+        "time-modified": "2020-03-09T18:22:51.234Z",
+        "public": true,
+        "user-meta": {},
+        "device-meta": {},
+        "garbage": false
+    }
+]
+```
+
+```
+http --print=bBhH GET localhost:12365/devices/?owner=prn:pantahub.com:auth:/5e1875e2fb13950bc38d0ebd Authorization:" Bearer $TOK"
+GET /devices?owner-nick=prn:pantahub.com:auth:/5e1875e2fb13950bc38d0ebd HTTP/1.1
+Accept: */*
+Accept-Encoding: gzip, deflate
+Authorization: Bearer xxxxxxxxxxxxxxXxxxxxxxxxxxxxxxxxxxxxxxxxxXXXXXxxxxxXXXXXXXXXXXXXXxxxxXXXXxxxxxxxxQ
+Connection: keep-alive
+Host: localhost:12365
+User-Agent: HTTPie/0.9.9
+
+
+
+HTTP/1.1 200 OK
+Content-Length: 1256
+Content-Type: application/json; charset=utf-8
+Date: Mon, 10 Dec 2018 15:48:14 GMT
+X-Powered-By: go-json-rest
+X-Runtime: 0.000664
+
+[
+    {
+        "id": "5e1875e2fb13950bc38d0ebd",
+        "prn": "prn:::devices:/5e1875e2fb13950bc38d0ebd",
+        "nick": "truly_wanted_krill",
+        "owner": "prn:pantahub.com:auth:/5e1875e2fb13950bc38d0ebd",
+        "secret": "123",
+        "time-created": "2020-01-10T13:02:26.232Z",
+        "time-modified": "2020-03-10T11:52:16.405Z",
+        "public": true,
+        "user-meta": {},
+        "device-meta": {},
+        "garbage": false
+    },
+    {
+        "id": "5e5e8a1afb1395136d8b2ae2",
+        "prn": "prn:::devices:/5e5e8a1afb1395136d8b2ae2",
+        "nick": "trivially_noted_flea",
+        "owner": "prn:pantahub.com:auth:/5e1875e2fb13950bc38d0ebd",
+        "secret": "123",
+        "time-created": "2020-03-03T16:47:22.86Z",
+        "time-modified": "2020-03-03T17:01:11.332Z",
+        "public": true,
+        "user-meta": {},
+        "device-meta": {},
+        "garbage": false
+    },
+    {
+        "id": "5e668963fb139512df214ec4",
+        "prn": "prn:::devices:/5e668963fb139512df214ec4",
+        "nick": "vigorously_master_werewolf",
+        "owner": "prn:pantahub.com:auth:/5e1875e2fb13950bc38d0ebd",
+        "secret": "123",
+        "time-created": "2020-03-09T18:22:27.585Z",
+        "time-modified": "2020-03-09T18:22:51.234Z",
+        "public": true,
+        "user-meta": {},
+        "device-meta": {},
+        "garbage": false
+    }
+]
 ```

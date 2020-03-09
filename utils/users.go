@@ -17,6 +17,7 @@
 package utils
 
 import (
+	"regexp"
 	"strings"
 )
 
@@ -51,4 +52,9 @@ func GetSubscriptionAdmins() []Prn {
 		prns[i+offset] = Prn(v)
 	}
 	return prns
+}
+
+// ValidateUserPrn : Validate User Prn
+func ValidateUserPrn(prn string) (bool, error) {
+	return regexp.MatchString(`^prn:[a-zA-Z0-9.]*:[a-zA-Z0-9]*:[/]?[a-zA-Z0-9/._$-+!*'()@%,;:&?#[]]*`, prn)
 }
