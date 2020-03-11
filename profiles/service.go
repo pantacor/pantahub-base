@@ -77,6 +77,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware,
 	})
 	// end points
 	apiRouter, _ := rest.MakeRouter(
+		rest.Get("/", app.handleGetProfiles),
 		rest.Get("/:id", app.handleGetProfile),
 	)
 	app.API.SetApp(apiRouter)
