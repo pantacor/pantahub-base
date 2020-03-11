@@ -86,7 +86,7 @@ type Pager struct {
 
 // Backend logs interface
 type Backend interface {
-	getLogs(start int64, page int64, beforeOrafter *time.Time, after bool,
+	getLogs(start int64, page int64, before *time.Time, after *time.Time,
 		query Filters, sort Sorts, cursor bool) (*Pager, error)
 	getLogsByCursor(nextCursor string) (*Pager, error)
 	postLogs(e []Entry) error

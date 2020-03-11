@@ -160,8 +160,8 @@ func (s *elasticLogger) unregister(deleteIndex bool) error {
 	return nil
 }
 
-func (s *elasticLogger) getLogs(start int64, page int64, beforeOrAfter *time.Time,
-	after bool, query Filters, sort Sorts, cursor bool) (*Pager, error) {
+func (s *elasticLogger) getLogs(start int64, page int64, before *time.Time,
+	after *time.Time, query Filters, sort Sorts, cursor bool) (*Pager, error) {
 	queryFmt := fmt.Sprintf(s.elasticIndexPrefix + "-*/pv/_search")
 
 	queryURL, err := url.Parse(queryFmt)
@@ -201,12 +201,11 @@ func (s *elasticLogger) getLogs(start int64, page int64, beforeOrAfter *time.Tim
 		}
 		q = q.Must(elastic.NewTermsQuery("lvl", levels...))
 	}
-	if beforeOrAfter != nil {
-		if after {
-			q = q.Must(elastic.NewRangeQuery("time-created").Gt(*beforeOrAfter))
-		} else {
-			q = q.Must(elastic.NewRangeQuery("time-created").Lt(*beforeOrAfter))
-		}
+	if before != nil {
+		q = q.Must(elastic.NewRangeQuery("time-created").Lt(*before))
+	}
+	if after != nil {
+		q = q.Must(elastic.NewRangeQuery("time-created").Gt(*after))
 	}
 
 	// build search

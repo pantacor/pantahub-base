@@ -159,10 +159,9 @@ func (a *App) handleGetLogs(w rest.ResponseWriter, r *rest.Request) {
 		}
 	}
 
-	var beforeOrAfter *time.Time
-	var after bool
+	var before *time.Time
+	var after *time.Time
 
-	after = true
 	beforeParam := r.FormValue("before")
 	afterParam := r.FormValue("after")
 
@@ -172,20 +171,19 @@ func (a *App) handleGetLogs(w rest.ResponseWriter, r *rest.Request) {
 			utils.RestErrorWrapper(w, "ERROR: parsing 'before' date "+err.Error(), http.StatusBadRequest)
 			return
 		}
-		beforeOrAfter = &t
-		after = false
-	} else if afterParam != "" {
+		before = &t
+	}
+	if afterParam != "" {
 		t, err := time.Parse(time.RFC3339, afterParam)
 		if err != nil {
 			utils.RestErrorWrapper(w, "ERROR: parsing 'before' date "+err.Error(), http.StatusBadRequest)
 			return
 		}
-		beforeOrAfter = &t
-		after = true
+		after = &t
 	}
 
 	cursor := r.FormValue("cursor") != ""
-	result, err = a.backend.getLogs(startParamInt, pageParamInt, beforeOrAfter, after, filter, logsSort, cursor)
+	result, err = a.backend.getLogs(startParamInt, pageParamInt, before, after, filter, logsSort, cursor)
 
 	if err != nil {
 		utils.RestErrorWrapper(w, "ERROR: getting logs failed "+err.Error(), http.StatusInternalServerError)
