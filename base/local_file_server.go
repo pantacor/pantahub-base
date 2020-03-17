@@ -13,6 +13,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
 package base
 
 import (
@@ -32,16 +33,17 @@ import (
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
 
+// LocalFileServer File server for local
 type LocalFileServer struct {
 	fileServer http.Handler
 	directory  string
 }
 
-func falseAuthenticator(userId string, password string) bool {
+func falseAuthenticator(userID string, password string) bool {
 	return false
 }
 
-func (d LocalFileServer) openForWrite(name string) (*os.File, error) {
+func (lfs LocalFileServer) openForWrite(name string) (*os.File, error) {
 	fpath, err := utils.MakeLocalS3PathForName(name)
 	if err != nil {
 		return nil, err
@@ -59,7 +61,7 @@ func (d LocalFileServer) openForWrite(name string) (*os.File, error) {
 	return f, nil
 }
 
-func (f LocalFileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (lfs LocalFileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	dirName := filepath.Dir(r.URL.Path)
 	fileBase := filepath.Base(r.URL.Path)
 
@@ -71,8 +73,8 @@ func (f LocalFileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	objClaims := tok.Token.Claims.(*objects.ObjectAccessClaims)
-	storageId := objClaims.Audience
-	p, _ := url.Parse(path.Join(dirName, storageId))
+	storageID := objClaims.Audience
+	p, _ := url.Parse(path.Join(dirName, storageID))
 	r.URL = r.URL.ResolveReference(p)
 
 	if r.Method == "GET" {
@@ -83,7 +85,7 @@ func (f LocalFileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		w.Header().Add("Content-Disposition", "attachment; filename=\""+objClaims.DispositionName+"\"")
-		f.fileServer.ServeHTTP(w, r)
+		lfs.fileServer.ServeHTTP(w, r)
 		return
 	}
 
@@ -100,13 +102,13 @@ func (f LocalFileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	uniqueID := bson.NewObjectId().Hex()
 
-	file, err := f.openForWrite(storageId + "." + uniqueID)
+	file, err := lfs.openForWrite(storageID + "." + uniqueID)
 	if err != nil {
 		log.Println("ERROR: opening file for write: " + err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	finalName, err := utils.MakeLocalS3PathForName(storageId)
+	finalName, err := utils.MakeLocalS3PathForName(storageID)
 	if err != nil {
 		log.Println("ERROR: creating filepath for write: " + err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
@@ -162,6 +164,7 @@ fail:
 
 var fserver *LocalFileServer
 
+// GetLocalFileServer get new local file server
 func GetLocalFileServer() *LocalFileServer {
 	return fserver
 }

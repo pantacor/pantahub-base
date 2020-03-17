@@ -11,6 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
+
 package utils
 
 import (
@@ -60,11 +61,11 @@ type JwtRsaKeys struct {
 // GetJwtRsaKeys return an JwtRsaKeys struct with public and private key
 func GetJwtRsaKeys(secret, public string) (*JwtRsaKeys, error) {
 	if secret == "" {
-		secret = ENV_PANTAHUB_JWT_AUTH_SECRET
+		secret = EnvPantahubJWTAuthSecret
 	}
 
 	if public == "" {
-		public = ENV_PANTAHUB_JWT_AUTH_PUB
+		public = EnvPantahubJWTAuthPub
 	}
 
 	jwtSecretBase64 := GetEnv(secret)
@@ -97,7 +98,7 @@ func GetJwtRsaKeys(secret, public string) (*JwtRsaKeys, error) {
 
 // CreateJWE encrypt a JWT token
 func CreateJWE(claims interface{}) (string, error) {
-	keys, err := GetJwtRsaKeys(ENV_PANTAHUB_JWE_SECRET, ENV_PANTAHUB_JWE_PUB)
+	keys, err := GetJwtRsaKeys(EnvPantahubJWESecret, EnvPantahubJWEPub)
 	if err != nil {
 		return "", err
 	}
@@ -121,7 +122,7 @@ func CreateJWE(claims interface{}) (string, error) {
 
 // ParseJWE decrypt a JWT token
 func ParseJWE(raw string, out interface{}) error {
-	keys, err := GetJwtRsaKeys(ENV_PANTAHUB_JWE_SECRET, ENV_PANTAHUB_JWE_PUB)
+	keys, err := GetJwtRsaKeys(EnvPantahubJWESecret, EnvPantahubJWEPub)
 	if err != nil {
 		return err
 	}
@@ -174,7 +175,7 @@ func bcryptCheckPasswordHash(password, hash string) bool {
 }
 
 func scryptHashPassword(password string) (string, error) {
-	bytes, err := scrypt.Key([]byte(password), []byte(GetEnv(ENV_PANTAHUB_SCRYPT_SECRET)), 32768, 8, 1, 32)
+	bytes, err := scrypt.Key([]byte(password), []byte(GetEnv(EnvPantahubScryptSecret)), 32768, 8, 1, 32)
 	return hex.EncodeToString(bytes), err
 }
 

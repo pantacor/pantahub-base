@@ -23,34 +23,41 @@ import (
 )
 
 var (
-	MAX_READ_BODY_SIZE int = int(math.Pow(2, 24)) // 16M
-	READ_BLOCK_SIZE    int = int(math.Pow(2, 16)) // 64k
+	maxReadBodySize int = int(math.Pow(2, 24)) // 16M
+	readBlockSize   int = int(math.Pow(2, 16)) // 64k
 )
 
+// ResponseWriterFunc rest http writer func
 type ResponseWriterFunc func(string, rest.Request)
 
+// ResponseWriterWrapper response writer wrapper for rest
 type ResponseWriterWrapper struct {
 	responseWriter rest.ResponseWriter
 	RequestBody    []byte
 	ResponseBody   []byte
 }
 
+// Count count length of writer
 func (r *ResponseWriterWrapper) Count() uint64 {
 	return r.responseWriter.Count()
 }
 
+// EncodeJson encode json using a interface
 func (r *ResponseWriterWrapper) EncodeJson(v interface{}) ([]byte, error) {
 	return r.responseWriter.EncodeJson(v)
 }
 
+// Header get writer header
 func (r *ResponseWriterWrapper) Header() http.Header {
 	return r.responseWriter.Header()
 }
 
+// WriteHeader write a header code
 func (r *ResponseWriterWrapper) WriteHeader(code int) {
 	r.responseWriter.WriteHeader(code)
 }
 
+// WriteJson write a json response
 func (r *ResponseWriterWrapper) WriteJson(v interface{}) error {
 	c, _ := json.Marshal(v)
 	r.ResponseBody = c
@@ -62,11 +69,12 @@ func (r *ResponseWriterWrapper) Write(c []byte) (int, error) {
 	return r.responseWriter.Write(c)
 }
 
+// NewResponseWriterWrapper create a new wrapper for writer
 func NewResponseWriterWrapper(w rest.ResponseWriter) *ResponseWriterWrapper {
 	return &ResponseWriterWrapper{responseWriter: w}
 }
 
-// AccessLogJsonMiddleware produces the access log with records written as JSON. This middleware
+// AccessLogFluentMiddleware produces the access log with records written as JSON. This middleware
 // depends on TimerMiddleware and RecorderMiddleware that must be in the wrapped middlewares. It
 // also uses request.Env["REMOTE_USER"].(string) set by the auth middlewares.
 type AccessLogFluentMiddleware struct {
@@ -86,13 +94,13 @@ func (mw *AccessLogFluentMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.Han
 		var port int
 		var host string
 
-		portStr := GetEnv(ENV_FLUENT_PORT)
+		portStr := GetEnv(EnvFluentPort)
 		port, err = strconv.Atoi(portStr)
 		if err != nil {
 			log.Fatalln("FATAL: cannot read fluent logger settings: " + err.Error())
 		}
 
-		host = GetEnv(ENV_FLUENT_HOST)
+		host = GetEnv(EnvFluentHost)
 
 		if host != "" {
 			for i := 0; i < 10; i++ {
@@ -106,9 +114,9 @@ func (mw *AccessLogFluentMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.Han
 			if err != nil {
 				log.Fatalln("FATAL: couldn't instantiate fluent logger: " + err.Error())
 			}
-			log.Printf("INFO: fluent logging enabled for endpoint %s; %s: %s, %s: %d\n", mw.Prefix, ENV_FLUENT_HOST, host, ENV_FLUENT_PORT, port)
+			log.Printf("INFO: fluent logging enabled for endpoint %s; %s: %s, %s: %d\n", mw.Prefix, EnvFluentHost, host, EnvFluentPort, port)
 		} else {
-			log.Printf("WARNING: fluent logging disabled for endpoint %s; set %s to enable it.\n\tTo enable fluentd, set at least FLUENTD_HOST environment", mw.Prefix, ENV_FLUENT_HOST)
+			log.Printf("WARNING: fluent logging disabled for endpoint %s; set %s to enable it.\n\tTo enable fluentd, set at least FLUENTD_HOST environment", mw.Prefix, EnvFluentHost)
 		}
 	}
 
@@ -123,11 +131,11 @@ func (mw *AccessLogFluentMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.Han
 	}
 
 	if mw.Hostname == "" {
-		mw.Hostname = GetEnv(ENV_HOSTNAME)
+		mw.Hostname = GetEnv(EnvHostName)
 	}
 
 	if mw.Namespace == "" {
-		mw.Namespace = GetEnv(ENV_K8S_NAMESPACE)
+		mw.Namespace = GetEnv(EnvK8SNamespace)
 	}
 
 	return func(w rest.ResponseWriter, r *rest.Request) {
@@ -137,15 +145,15 @@ func (mw *AccessLogFluentMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.Han
 		ct := r.Header.Get("Content-Type")
 
 		// only read body if the content is json to avoid read binary or uploaded files
-		if ct == "application/json" && GetEnv(ENV_PANTAHUB_LOG_BODY) == "true" {
+		if ct == "application/json" && GetEnv(EnvPantahubLogBody) == "true" {
 			responseWrapper := NewResponseWriterWrapper(w)
 
 			// read blocks of 64k
 			for {
-				readBuf := make([]byte, READ_BLOCK_SIZE)
+				readBuf := make([]byte, readBlockSize)
 				n, _ := r.Request.Body.Read(readBuf)
 				requestBody = append(requestBody, readBuf[:n]...)
-				if n < READ_BLOCK_SIZE {
+				if n < readBlockSize {
 					break
 				}
 			}
@@ -167,13 +175,13 @@ func (mw *AccessLogFluentMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.Han
 		}
 
 		// limit response size to MAX_READ_BODY_SIZE
-		if len(responseBody) > MAX_READ_BODY_SIZE {
-			responseBody = responseBody[:MAX_READ_BODY_SIZE]
+		if len(responseBody) > maxReadBodySize {
+			responseBody = responseBody[:maxReadBodySize]
 		}
 
 		// limit request size to MAX_READ_BODY_SIZE
-		if len(requestBody) > MAX_READ_BODY_SIZE {
-			requestBody = requestBody[:MAX_READ_BODY_SIZE]
+		if len(requestBody) > maxReadBodySize {
+			requestBody = requestBody[:maxReadBodySize]
 		}
 
 		logRec := mw.makeAccessLogFluentRecord(w, responseBody, r, requestBody)
@@ -187,7 +195,8 @@ func (mw *AccessLogFluentMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.Han
 	}
 }
 
-type JsonLog struct {
+// JSONLog json payload for logs
+type JSONLog struct {
 	Log    string    `json:"log"`
 	Stream string    `json:"stream"`
 	Time   time.Time `json:"time"`
@@ -198,7 +207,7 @@ type JsonLog struct {
 type AccessLogFluentRecord struct {
 	Endpoint       string
 	Hostname       string
-	HttpMethod     string
+	HTTPMethod     string
 	Namespace      string
 	RemoteUser     string
 	RequestHeaders map[string]interface{}
@@ -259,7 +268,7 @@ func (mw *AccessLogFluentMiddleware) makeAccessLogFluentRecord(w rest.ResponseWr
 	return &AccessLogFluentRecord{
 		Endpoint:       mw.Prefix,
 		Hostname:       mw.Hostname,
-		HttpMethod:     r.Method,
+		HTTPMethod:     r.Method,
 		Namespace:      mw.Namespace,
 		RemoteUser:     remoteUser,
 		RequestHeaders: reqMap,
@@ -275,7 +284,7 @@ func (mw *AccessLogFluentMiddleware) makeAccessLogFluentRecord(w rest.ResponseWr
 	}
 }
 
-func (r *AccessLogFluentRecord) asJson() []byte {
+func (r *AccessLogFluentRecord) asJSON() []byte {
 	b, err := json.Marshal(r)
 	if err != nil {
 		panic(err)

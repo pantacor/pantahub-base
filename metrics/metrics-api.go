@@ -13,6 +13,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
 package metrics
 
 import (
@@ -27,37 +28,51 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-type MetricsApp struct {
-	jwt_middleware *jwt.JWTMiddleware
-	Api            *rest.Api
-	mongoClient    *mongo.Client
+// App metrics rest application
+type App struct {
+	jwtMiddleware *jwt.JWTMiddleware
+	API           *rest.Api
+	mongoClient   *mongo.Client
 }
 
+// RestRequestResponseAdapter rest responder adapter
 type RestRequestResponseAdapter struct {
 	Request  *rest.Request
 	Response rest.ResponseWriter
 }
 
-func (a *MetricsApp) handle_getmetrics(w rest.ResponseWriter, r *rest.Request) {
+// handleGetMetrics Get API metrics
+// @Summary Get API metrics
+// @Description Get API metrics
+// @Accept  plain/text
+// @Produce  plain/text
+// @Tags metrics
+// @Success 200
+// @Failure 400 {object} utils.RError
+// @Failure 404 {object} utils.RError
+// @Failure 500 {object} utils.RError
+// @Router /metrics [get]
+func (a *App) handleGetMetrics(w rest.ResponseWriter, r *rest.Request) {
 	var httpResp http.ResponseWriter = w
 
 	handler := promhttp.Handler()
 	handler.ServeHTTP(httpResp, r.Request)
 }
 
-func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *MetricsApp {
-	app := new(MetricsApp)
-	app.jwt_middleware = jwtMiddleware
+// New create a new metrics rest application
+func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
+	app := new(App)
+	app.jwtMiddleware = jwtMiddleware
 	app.mongoClient = mongoClient
 
-	app.Api = rest.NewApi()
+	app.API = rest.NewApi()
 	// we dont use default stack because we dont want content type enforcement
-	app.Api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
+	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
 		"/metrics:", log.Lshortfile)})
-	app.Api.Use(&utils.AccessLogFluentMiddleware{Prefix: "metrics"})
+	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "metrics"})
 
-	app.Api.Use(rest.DefaultCommonStack...)
-	app.Api.Use(&rest.CorsMiddleware{
+	app.API.Use(rest.DefaultCommonStack...)
+	app.API.Use(&rest.CorsMiddleware{
 		RejectNonCorsRequests: false,
 		OriginValidator: func(origin string, request *rest.Request) bool {
 			return true
@@ -70,14 +85,14 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *MetricsAp
 	})
 
 	// /auth_status endpoints
-	api_router, _ := rest.MakeRouter(
+	apiRouter, _ := rest.MakeRouter(
 		// default api
 		rest.Get("/", utils.ScopeFilter(
 			[]utils.Scope{utils.Scopes.API, utils.Scopes.Metrics, utils.Scopes.ReadMetrics},
-			app.handle_getmetrics),
+			app.handleGetMetrics),
 		),
 	)
-	app.Api.SetApp(api_router)
+	app.API.SetApp(apiRouter)
 
 	return app
 }

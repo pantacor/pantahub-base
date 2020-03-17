@@ -1,3 +1,19 @@
+//
+// Copyright 2020 Pantacor Ltd.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+//
+
 package s3
 
 import (
@@ -7,6 +23,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 )
 
+// S3 application interface
 type S3 interface {
 	Exists(key string) bool
 	Delete(key string) error
@@ -16,7 +33,7 @@ type S3 interface {
 }
 
 type s3impl struct {
-	connectionParams S3ConnectionParameters
+	connectionParams ConnectionParameters
 	session          *s3.S3
 }
 
@@ -68,7 +85,8 @@ func (s *s3impl) Exists(key string) bool {
 	return len(out.Contents) > 0
 }
 
-func NewS3(params S3ConnectionParameters) S3 {
+// New create a new S3 application
+func New(params ConnectionParameters) S3 {
 	if !params.IsValid() {
 		return nil
 	}

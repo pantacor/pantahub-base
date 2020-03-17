@@ -8,9 +8,10 @@ import (
 	"gopkg.in/resty.v1"
 )
 
-func DoLogin(t *testing.T, serverUrl *url.URL, username string, password string) string {
+// DoLogin test login method
+func DoLogin(t *testing.T, serverURL *url.URL, username string, password string) string {
 
-	u := serverUrl
+	u := serverURL
 	u.Path = "/login"
 
 	res, err := resty.R().SetBody(map[string]string{

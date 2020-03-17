@@ -1,3 +1,19 @@
+//
+// Copyright 2016-2020  Pantacor Ltd.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+//
+
 package objects
 
 import (
@@ -9,9 +25,11 @@ import (
 )
 
 const (
-	OBJECT_TOKEN_VALID_SEC = 86400
+	// ObjectTokenValidSec expiration time for object token
+	ObjectTokenValidSec = 86400
 )
 
+// ObjectAccessToken access token for objects
 type ObjectAccessToken struct {
 	// we use iss for identifying the trails endpoint
 	// we use sub for identifying the requesting user wethat this claim was issued to
@@ -21,6 +39,7 @@ type ObjectAccessToken struct {
 	*jwt.Token
 }
 
+// ObjectAccessClaims object claims for access
 type ObjectAccessClaims struct {
 	jwt.StandardClaims
 	DispositionName string
@@ -31,6 +50,7 @@ type ObjectAccessClaims struct {
 	Sha string
 }
 
+// NewObjectAccessToken Create new Object access token
 func NewObjectAccessToken(
 	name string,
 	method string,
@@ -60,6 +80,7 @@ func NewObjectAccessToken(
 	return o
 }
 
+// NewObjectAccessForSec create new access token valid for a second
 func NewObjectAccessForSec(
 	name string,
 	method string,
@@ -74,10 +95,11 @@ func NewObjectAccessForSec(
 		audience, timeNow, timeNow+validSec)
 }
 
+// NewFromValidToken create a object token from another valid token
 func NewFromValidToken(encodedToken string) (*ObjectAccessToken, error) {
 	claim := ObjectAccessClaims{}
 	tok, err := jwt.ParseWithClaims(encodedToken, &claim, func(*jwt.Token) (interface{}, error) {
-		return []byte(utils.GetEnv(utils.ENV_PANTAHUB_JWT_OBJECT_SECRET)), nil
+		return []byte(utils.GetEnv(utils.EnvPantahubJWTObjectSecret)), nil
 	})
 
 	if err != nil {
@@ -92,6 +114,7 @@ func NewFromValidToken(encodedToken string) (*ObjectAccessToken, error) {
 	return objTok, nil
 }
 
+// Sign sign a access token
 func (o *ObjectAccessToken) Sign() (string, error) {
-	return o.SignedString([]byte(utils.GetEnv(utils.ENV_PANTAHUB_JWT_OBJECT_SECRET)))
+	return o.SignedString([]byte(utils.GetEnv(utils.EnvPantahubJWTObjectSecret)))
 }

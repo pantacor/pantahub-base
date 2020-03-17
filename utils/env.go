@@ -12,6 +12,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
 package utils
 
 import (
@@ -19,356 +20,359 @@ import (
 )
 
 const (
-	// Pantahub Product Name (branding)
-	ENV_PANTAHUB_PRODUCTNAME = "PANTAHUB_PRODUCTNAME"
+	// EnvPantahubProductName Pantahub Product Name (branding)
+	EnvPantahubProductName = "PANTAHUB_PRODUCTNAME"
 
-	// Pantahub JWT Secret. THIS MUST BE SET TO SOMETHING SECRET!!
+	// EnvPantahubJWTAuthSecret Pantahub JWT Secret. THIS MUST BE SET TO SOMETHING SECRET!!
 	// default: "THIS MUST BE CHANGED"
-	ENV_PANTAHUB_JWT_AUTH_SECRET = "PANTAHUB_JWT_SECRET"
-	ENV_PANTAHUB_SCRYPT_SECRET   = "PANTAHUB_SCRYPT_SECRET"
+	EnvPantahubJWTAuthSecret = "PANTAHUB_JWT_SECRET"
 
-	// Pantahub JWT Public Key. Public RSA key in base64 encoded PEM format
-	ENV_PANTAHUB_JWT_AUTH_PUB = "PANTAHUB_JWT_PUB"
+	// EnvPantahubScryptSecret scrypt secret
+	EnvPantahubScryptSecret = "PANTAHUB_SCRYPT_SECRET"
 
-	// Pantahub JWE Secret. THIS MUST BE SET TO SOMETHING SECRET!!
-	ENV_PANTAHUB_JWE_SECRET = "PANTAHUB_JWE_SECRET"
+	// EnvPantahubJWTAuthPub Pantahub JWT Public Key. Public RSA key in base64 encoded PEM format
+	EnvPantahubJWTAuthPub = "PANTAHUB_JWT_PUB"
 
-	// Pantahub JWE Public Key. Public RSA key in base64 encoded PEM format
-	ENV_PANTAHUB_JWE_PUB = "PANTAHUB_JWE_PUB"
+	// EnvPantahubJWESecret Pantahub JWE Secret. THIS MUST BE SET TO SOMETHING SECRET!!
+	EnvPantahubJWESecret = "PANTAHUB_JWE_SECRET"
 
-	// Google Captcha service secret key
+	// EnvPantahubJWEPub Pantahub JWE Public Key. Public RSA key in base64 encoded PEM format
+	EnvPantahubJWEPub = "PANTAHUB_JWE_PUB"
+
+	// EnvGoogleCaptchaSecret Google Captcha service secret key
 	// default: "This must be changed"
-	ENV_GOOGLE_CAPTCHA_SECRET = "GOOGLE_CAPTCHA_SECRET"
+	EnvGoogleCaptchaSecret = "GOOGLE_CAPTCHA_SECRET"
 
-	// Pantahub Use Captcha. Set if captcha will be used by the API.
-	ENV_PANTAHUB_USE_CAPTCHA = "PANTAHUB_USE_CAPTCHA"
+	// EnvPantahubUseCaptcha Pantahub Use Captcha. Set if captcha will be used by the API.
+	EnvPantahubUseCaptcha = "PANTAHUB_USE_CAPTCHA"
 
-	// Pantahub JWT Secret. THIS MUST BE SET TO SOMETHING SECRET!!
+	// EnvPantahubJWTObjectSecret Pantahub JWT Secret. THIS MUST BE SET TO SOMETHING SECRET!!
 	// default: "THIS MUST BE CHANGED"
-	ENV_PANTAHUB_JWT_OBJECT_SECRET = "PANTAHUB_JWT_OBJECT_SECRET"
+	EnvPantahubJWTObjectSecret = "PANTAHUB_JWT_OBJECT_SECRET"
 
-	// Pantahub JWT Token Timeout in Minutes
+	// EnvPantahubJWTTimeoutMinutes Pantahub JWT Token Timeout in Minutes
 	// default: 60
-	ENV_PANTAHUB_JWT_TIMEOUT_MINUTES = "PANTAHUB_JWT_TIMEOUT_MINUTES"
+	EnvPantahubJWTTimeoutMinutes = "PANTAHUB_JWT_TIMEOUT_MINUTES"
 
-	// Pantahub JWT Token for password recovery Timeout in Minutes
+	// EnvPantahubRecoverJWTTimeoutMinutes Pantahub JWT Token for password recovery Timeout in Minutes
 	// default: 60
-	ENV_PANTAHUB_RECOVER_JWT_TIMEOUT_MINUTES = "PANTAHUB_RECOVER_JWT_TIMEOUT_MINUTES"
+	EnvPantahubRecoverJWTTimeoutMinutes = "PANTAHUB_RECOVER_JWT_TIMEOUT_MINUTES"
 
-	// Pantahub JWT Max Refresh timeout in Minutes
+	// EnvPantahubJWTMaxRefreshMinutes Pantahub JWT Max Refresh timeout in Minutes
 	// default: 24 * 60
-	ENV_PANTAHUB_JWT_MAX_REFRESH_MINUTES = "PANTAHUB_JWT_MAX_REFRESH_MINUTES"
+	EnvPantahubJWTMaxRefreshMinutes = "PANTAHUB_JWT_MAX_REFRESH_MINUTES"
 
-	// Host you want clients to reach this server under
+	// EnvPantahubHost Host you want clients to reach this server under
 	// default: localhost
-	ENV_PANTAHUB_HOST = "PANTAHUB_HOST"
+	EnvPantahubHost = "PANTAHUB_HOST"
 
-	// Host you want clients to reach the web-interface
+	// EnvPantahubWWWHost Host you want clients to reach the web-interface
 	// default: localhost
-	ENV_PANTAHUB_HOST_WWW = "PANTAHUB_HOST_WWW"
+	EnvPantahubWWWHost = "PANTAHUB_HOST_WWW"
 
-	// Port you want to make this server available under
+	// EnvPantahubPort Port you want to make this server available under
 	// default: 12365 for http and 12366 for https
-	ENV_PANTAHUB_PORT = "PANTAHUB_PORT"
+	EnvPantahubPort = "PANTAHUB_PORT"
 
-	// Default scheme to use for urls pointing at this server when we encode
+	// EnvPantahubScheme Default scheme to use for urls pointing at this server when we encode
 	// them in json or redirect (e.g. for auth)
 	// default: http
-	ENV_PANTAHUB_SCHEME = "PANTAHUB_SCHEME"
+	EnvPantahubScheme = "PANTAHUB_SCHEME"
 
-	// XXX: not used
-	ENV_PANTAHUB_APIVERSION = "PANTAHUB_APIVERSION"
+	// EnvPantahubAPIVersion not used
+	EnvPantahubAPIVersion = "PANTAHUB_APIVERSION"
 
-	// Set elasticsearch base URL
+	// EnvElasticURL Set elasticsearch base URL
 	// default: https://es5.pantahub.com
-	ENV_ELASTIC_URL = "ELASTIC_URL"
+	EnvElasticURL = "ELASTIC_URL"
 
-	// Set elasticsearch basic auth username; if set
+	// EnvElasticUsername Set elasticsearch basic auth username; if set
 	// a Basic auth token will be generated for you from
 	// ELASTIC_USERNAME & ELASTIC_PASSWORD
 	// default: ""
-	ENV_ELASTIC_USERNAME = "ELASTIC_USERNAME"
+	EnvElasticUsername = "ELASTIC_USERNAME"
 
-	// Set elasticsearch basic auth password
+	// EnvElasticPassword Set elasticsearch basic auth password
 	// default: ""
-	ENV_ELASTIC_PASSWORD = "ELASTIC_PASSWORD"
+	EnvElasticPassword = "ELASTIC_PASSWORD"
 
-	// Set elasticsearch bearer auth token
+	// EnvElasticBearer Set elasticsearch bearer auth token
 	// default: ""
-	ENV_ELASTIC_BEARER = "ELASTIC_BEARER"
+	EnvElasticBearer = "ELASTIC_BEARER"
 
-	// Set Fluent port to send logs to
+	// EnvFluentPort Set Fluent port to send logs to
 	// default: "24224"
-	ENV_FLUENT_PORT = "FLUENT_PORT"
+	EnvFluentPort = "FLUENT_PORT"
 
-	// Set Fluent host to send logs to
+	// EnvFluentHost Set Fluent host to send logs to
 	// default: "127.0.0.1"
-	ENV_FLUENT_HOST = "FLUENT_HOST"
+	EnvFluentHost = "FLUENT_HOST"
 
-	// Set K8S NAMESPACE info
+	// EnvK8SNamespace Set K8S NAMESPACE info
 	// default: "NA"
-	ENV_K8S_NAMESPACE = "K8S_NAMESPACE"
+	EnvK8SNamespace = "K8S_NAMESPACE"
 
-	// Set HOSTNAME info
+	// EnvHostName Set HOSTNAME info
 	// default: "localhost"
-	ENV_HOSTNAME = "HOSTNAME"
+	EnvHostName = "HOSTNAME"
 
-	// Authentication endpoint to point clients to that need access tokens
+	// EnvPantahubAuth Authentication endpoint to point clients to that need access tokens
 	// or need more privileged access tokens.
 	// default: $PANTAHUB_SCHEME://$PANTAHUB_HOST:$PANTAHUB_PORT/auth
-	ENV_PANTAHUB_AUTH = "PH_AUTH"
+	EnvPantahubAuth = "PH_AUTH"
 
-	ENV_PANTAHUB_SIGNUP_PATH = "PANTAHUB_SIGNUP_PATH"
+	// EnvPantahubSignupPath pantahub signup path
+	EnvPantahubSignupPath = "PANTAHUB_SIGNUP_PATH"
 
-	// port to listen to on for http on internal interfaces
+	// EnvPantahubPortInt port to listen to on for http on internal interfaces
 	// default: 12365
-	ENV_PANTAHUB_PORT_INT = "PANTAHUB_PORT_INT"
+	EnvPantahubPortInt = "PANTAHUB_PORT_INT"
 
-	// port to listen to on for https on internal interfaces
+	// EnvPantahubPortIntTLS port to listen to on for https on internal interfaces
 	// default: 12366
-	ENV_PANTAHUB_PORT_INT_TLS = "PANTAHUB_PORT_INT_TLS"
+	EnvPantahubPortIntTLS = "PANTAHUB_PORT_INT_TLS"
 
-	// mailgone domain
+	// EnvMailgunDomain domain
 	// default: <empty>
-	ENV_MAILGUN_DOMAIN = "MAILGUN_DOMAIN"
+	EnvMailgunDomain = "MAILGUN_DOMAIN"
 
-	// mailgone api key
+	// EnvMailgunAPIKey api key
 	// default: <empty>
-	ENV_MAILGUN_APIKEY = "MAILGUN_APIKEY"
+	EnvMailgunAPIKey = "MAILGUN_APIKEY"
 
-	// mailgone pub api key
+	// EnvMailgunPubAPIKey mailgone pub api key
 	// default: <empty>
-	ENV_MAILGUN_PUBAPIKEY = "MAILGUN_PUBAPIKEY"
+	EnvMailgunPubAPIKey = "MAILGUN_PUBAPIKEY"
 
-	// Hostname for mongodb connection
+	// EnvMongoHost Hostname for mongodb connection
 	// default: localhost
-	ENV_MONGO_HOST = "MONGO_HOST"
+	EnvMongoHost = "MONGO_HOST"
 
-	// Port for mongodb connection
+	// EnvMongoPort Port for mongodb connection
 	// default: 27017
-	ENV_MONGO_PORT = "MONGO_PORT"
+	EnvMongoPort = "MONGO_PORT"
 
-	// Database name for mongodb connection
+	// EnvMongoDb Database name for mongodb connection
 	// default: pantabase-serv
-	ENV_MONGO_DB = "MONGO_DB"
+	EnvMongoDb = "MONGO_DB"
 
-	// Database user for mongodb connection
+	// EnvMongoUser Database user for mongodb connection
 	// default: <none>
-	ENV_MONGO_USER = "MONGO_USER"
+	EnvMongoUser = "MONGO_USER"
 
-	// Database password for mongodb connection
+	// EnvMongoPassword Database password for mongodb connection
 	// default: <none>
-	ENV_MONGO_PASS = "MONGO_PASS"
+	EnvMongoPassword = "MONGO_PASS"
 
-	// Database password for mongodb connection
+	// EnvMongoRs Database password for mongodb connection
 	// default: <none>
-	ENV_MONGO_RS = "MONGO_RS"
+	EnvMongoRs = "MONGO_RS"
 
-	// Service Account Admin Secret to use
+	// EnvPantahubSaAdminSecret Service Account Admin Secret to use
 	// default: <none> (Required!)
-	ENV_PANTAHUB_SA_ADMIN_SECRET = "PANTAHUB_SA_ADMIN_SECRET"
+	EnvPantahubSaAdminSecret = "PANTAHUB_SA_ADMIN_SECRET"
 
-	// Comma Separated List of PRNs of users that have pantahub admin role
+	// EnvPantahubAdminSecret Comma Separated List of PRNs of users that have pantahub admin role
 	// default: <none> (Required for Production!)
-	ENV_PANTAHUB_ADMIN_SECRET = "PANTAHUB_ADMIN_SECRET"
+	EnvPantahubAdminSecret = "PANTAHUB_ADMIN_SECRET"
 
-	// Comma Separated List of PRNs of users that have pantahub admin role
+	// EnvPantahubAdmins Comma Separated List of PRNs of users that have pantahub admin role
 	// default: <none>
-	ENV_PANTAHUB_ADMINS = "PANTAHUB_ADMINS"
+	EnvPantahubAdmins = "PANTAHUB_ADMINS"
 
-	// Comma Separated List of PRNs of users that have pantahub subscription admin
+	// EnvPantahubSubscriptionAdmins Comma Separated List of PRNs of users that have pantahub subscription admin
 	// role
 	// default: <none>
-	ENV_PANTAHUB_SUBSCRIPTION_ADMINS = "PANTAHUB_SUBSCRIPTION_ADMINS"
+	EnvPantahubSubscriptionAdmins = "PANTAHUB_SUBSCRIPTION_ADMINS"
 
-	// SMTP host to use for sending mails
+	// EnvSMTPHost SMTP host to use for sending mails
 	// default: <none>
-	ENV_SMTP_HOST = "SMTP_HOST"
+	EnvSMTPHost = "SMTP_HOST"
 
-	// SMTP port to use for sending mails
+	// EnvSMTPPort SMTP port to use for sending mails
 	// default: <none>
-	ENV_SMTP_PORT = "SMTP_PORT"
+	EnvSMTPPort = "SMTP_PORT"
 
-	// SMTP user to use for sending mails
+	// EnvSMTPUser SMTP user to use for sending mails
 	// default: <none>
-	ENV_SMTP_USER = "SMTP_USER"
+	EnvSMTPUser = "SMTP_USER"
 
-	// SMTP pass to use for sending mails
+	// EnvSMTPPass SMTP pass to use for sending mails
 	// default: <none>
-	ENV_SMTP_PASS = "SMTP_PASS"
+	EnvSMTPPass = "SMTP_PASS"
 
-	// SMTP pass to use for sending mails
+	// EnvRegEmail SMTP pass to use for sending mails
 	// default: <none>
-	ENV_REG_EMAIL = "REG_EMAIL"
+	EnvRegEmail = "REG_EMAIL"
 
-	// PANTAHUB_STORAGE_DRIVER used to store objects
-	ENV_PANTAHUB_STORAGE_DRIVER = "PANTAHUB_STORAGE_DRIVER"
+	// EnvPantahubStorageDriver used to store objects
+	EnvPantahubStorageDriver = "PANTAHUB_STORAGE_DRIVER"
 
-	// PANTAHUB_S3_ACCESS_KEY_ID access key of s3 storage credentials
-	ENV_PANTAHUB_S3_ACCESS_KEY_ID = "PANTAHUB_S3_ACCESS_KEY_ID"
+	// EnvPantahubS3AccessKeyID access key of s3 storage credentials
+	EnvPantahubS3AccessKeyID = "PANTAHUB_S3_ACCESS_KEY_ID"
 
-	// PANTAHUB_S3_SECRET_ACCESS_KEY secret access key of s3 storage credentials
-	ENV_PANTAHUB_S3_SECRET_ACCESS_KEY = "PANTAHUB_S3_SECRET_ACCESS_KEY"
+	// EnvPantahubS3SecretAccessKeyID secret access key of s3 storage credentials
+	EnvPantahubS3SecretAccessKeyID = "PANTAHUB_S3_SECRET_ACCESS_KEY"
 
-	// PANTAHUB_S3_USE_ANONYMOUS_CREDENTIALS use anonymous credentials
-	ENV_PANTAHUB_S3_USE_ANONYMOUS_CREDENTIALS = "PANTAHUB_S3_USE_ANONYMOUS_CREDENTIALS"
+	// EnvPantahubS3SAnonymousCredentials use anonymous credentials
+	EnvPantahubS3SAnonymousCredentials = "PANTAHUB_S3_USE_ANONYMOUS_CREDENTIALS"
 
-	// PANTAHUB_S3_REGION region where to store objects
-	ENV_PANTAHUB_S3_REGION = "PANTAHUB_S3_REGION"
+	// EnvPantahubS3Region region where to store objects
+	EnvPantahubS3Region = "PANTAHUB_S3_REGION"
 
-	// PANTAHUB_S3_BUCKET bucket where to store objects
-	ENV_PANTAHUB_S3_BUCKET = "PANTAHUB_S3_BUCKET"
+	// EnvPantahubS3Bucket bucket where to store objects
+	EnvPantahubS3Bucket = "PANTAHUB_S3_BUCKET"
 
-	// PANTAHUB_S3_ENDPOINT enpoint of s3 server
-	ENV_PANTAHUB_S3_ENDPOINT = "PANTAHUB_S3_ENDPOINT"
+	// EnvPantahubS3Endpoint enpoint of s3 server
+	EnvPantahubS3Endpoint = "PANTAHUB_S3_ENDPOINT"
 
-	// PANTAHUB_STORAGE_PATH for backing storage
+	// EnvPantahubStoragePath for backing storage
 	// default: ../local-s3/
-	ENV_PANTAHUB_STORAGE_PATH = "PANTAHUB_STORAGE_PATH"
+	EnvPantahubStoragePath = "PANTAHUB_STORAGE_PATH"
 
-	// PANTAHUB_S3PATH deprecated, please use ENV_PANTAHUB_STORAGE_PATH instead
-	ENV_PANTAHUB_S3PATH = "PANTAHUB_S3PATH"
+	// EnvPantahubS3Path deprecated, please use EnvPantahubStoragePath instead
+	EnvPantahubS3Path = "PANTAHUB_S3PATH"
 
-	// enable resty client debugging if env is set
+	// EnvRestyDebug enable resty client debugging if env is set
 	// default: ""
-	ENV_RESTY_DEBUG = "RESTY_DEBUG"
+	EnvRestyDebug = "RESTY_DEBUG"
 
-	// Pantahub GC API end point
-	ENV_PANTAHUB_GC_API = "PANTAHUB_GC_API"
+	// EnvPantahubGCAPI Pantahub GC API end point
+	EnvPantahubGCAPI = "PANTAHUB_GC_API"
 
-	// Pantahub GC garbage removal flag
-	ENV_PANTAHUB_GC_REMOVE_GARBAGE = "PANTAHUB_GC_REMOVE_GARBAGE"
+	// EnvPantahubGCRemoveGarbage Pantahub GC garbage removal flag
+	EnvPantahubGCRemoveGarbage = "PANTAHUB_GC_REMOVE_GARBAGE"
 
-	// Pantahub GC UnClaimed expiry for device to mark it as garbage
-	ENV_PANTAHUB_GC_UNCLAIMED_EXPIRY = "PANTAHUB_GC_UNCLAIMED_EXPIRY"
+	// EnvPantahubGCUnclaimedExpiry Pantahub GC UnClaimed expiry for device to mark it as garbage
+	EnvPantahubGCUnclaimedExpiry = "PANTAHUB_GC_UNCLAIMED_EXPIRY"
 
-	// Pantahub GC garbage expiry time to remove it
-	ENV_PANTAHUB_GC_GARBAGE_EXPIRY = "PANTAHUB_GC_GARBAGE_EXPIRY"
+	// EnvPantahubGCGarbageExpiry Pantahub GC garbage expiry time to remove it
+	EnvPantahubGCGarbageExpiry = "PANTAHUB_GC_GARBAGE_EXPIRY"
 
-	// Pantahub Demo Account:service1 password
-	ENV_PANTAHUB_DEMOACCOUNTS_PASSWORD_service1 = "PANTAHUB_DEMOACCOUNTS_PASSWORD_service1"
+	// EnvPantahubDemoAccountsPasswordService1 Pantahub Demo Account:service1 password
+	EnvPantahubDemoAccountsPasswordService1 = "PANTAHUB_DEMOACCOUNTS_PASSWORD_service1"
 
-	// enable log requests,responses parameters and bodies
-	ENV_PANTAHUB_LOG_BODY = "PANTAHUB_LOG_BODY"
+	// EnvPantahubLogBody enable log requests,responses parameters and bodies
+	EnvPantahubLogBody = "PANTAHUB_LOG_BODY"
 )
 
 var defaultEnvs = map[string]string{
-	ENV_PANTAHUB_PRODUCTNAME:                    "pantahub-personal",
-	ENV_PANTAHUB_DEMOACCOUNTS_PASSWORD_service1: "O9i8HlpSc",
-	ENV_GOOGLE_CAPTCHA_SECRET:                   "YOU MUST CHANGE THIS",
-	ENV_PANTAHUB_USE_CAPTCHA:                    "true",
-	ENV_PANTAHUB_JWT_AUTH_SECRET:                "YOU MUST CHANGE THIS",
-	ENV_PANTAHUB_JWT_AUTH_PUB:                   "YOU MUST CHANGE THIS",
-	ENV_PANTAHUB_JWE_SECRET:                     "YOU MUST CHANGE THIS",
-	ENV_PANTAHUB_JWE_PUB:                        "YOU MUST CHANGE THIS",
-	ENV_PANTAHUB_SCRYPT_SECRET:                  "YOU MUST CHANGE THIS",
-	ENV_PANTAHUB_JWT_OBJECT_SECRET:              "YOU MUST CHANGE THIS",
-	ENV_PANTAHUB_JWT_TIMEOUT_MINUTES:            "60",
-	ENV_PANTAHUB_RECOVER_JWT_TIMEOUT_MINUTES:    "60",
-	ENV_PANTAHUB_JWT_MAX_REFRESH_MINUTES:        "1440",
+	EnvPantahubProductName:                  "pantahub-personal",
+	EnvPantahubDemoAccountsPasswordService1: "O9i8HlpSc",
+	EnvGoogleCaptchaSecret:                  "YOU MUST CHANGE THIS",
+	EnvPantahubUseCaptcha:                   "true",
+	EnvPantahubJWTAuthSecret:                "YOU MUST CHANGE THIS",
+	EnvPantahubJWTAuthPub:                   "YOU MUST CHANGE THIS",
+	EnvPantahubJWESecret:                    "YOU MUST CHANGE THIS",
+	EnvPantahubJWEPub:                       "YOU MUST CHANGE THIS",
+	EnvPantahubScryptSecret:                 "YOU MUST CHANGE THIS",
+	EnvPantahubJWTObjectSecret:              "YOU MUST CHANGE THIS",
+	EnvPantahubJWTTimeoutMinutes:            "60",
+	EnvPantahubRecoverJWTTimeoutMinutes:     "60",
+	EnvPantahubJWTMaxRefreshMinutes:         "1440",
 
-	ENV_PANTAHUB_HOST:       "localhost",
-	ENV_PANTAHUB_HOST_WWW:   "localhost",
-	ENV_PANTAHUB_PORT:       "12365",
-	ENV_PANTAHUB_SCHEME:     "http",
-	ENV_PANTAHUB_APIVERSION: "", // XXX: needs to move to v0 at least for release
+	EnvPantahubHost:       "localhost",
+	EnvPantahubWWWHost:    "localhost",
+	EnvPantahubPort:       "12365",
+	EnvPantahubScheme:     "http",
+	EnvPantahubAPIVersion: "", // XXX: needs to move to v0 at least for release
 
-	ENV_PANTAHUB_PORT_INT:     "12365",
-	ENV_PANTAHUB_PORT_INT_TLS: "12366",
+	EnvPantahubPortInt:    "12365",
+	EnvPantahubPortIntTLS: "12366",
 
 	// K8S info
-	ENV_K8S_NAMESPACE: "NA",
+	EnvK8SNamespace: "NA",
 
 	// HOSTNAME
-	ENV_HOSTNAME: "localhost",
+	EnvHostName: "localhost",
 
 	// mailgun support for mail
-	ENV_MAILGUN_APIKEY:    "",
-	ENV_MAILGUN_DOMAIN:    "",
-	ENV_MAILGUN_PUBAPIKEY: "",
+	EnvMailgunAPIKey:    "",
+	EnvMailgunDomain:    "",
+	EnvMailgunPubAPIKey: "",
 
-	ENV_MONGO_HOST: "localhost",
-	ENV_MONGO_DB:   "pantabase-serv",
-	ENV_MONGO_USER: "",
-	ENV_MONGO_PASS: "",
-	ENV_MONGO_PORT: "27017",
-	ENV_MONGO_RS:   "", // replicaSet; needed if connecting to multiple hosts
+	EnvMongoHost:     "localhost",
+	EnvMongoDb:       "pantabase-serv",
+	EnvMongoUser:     "",
+	EnvMongoPassword: "",
+	EnvMongoPort:     "27017",
+	EnvMongoRs:       "", // replicaSet; needed if connecting to multiple hosts
 
 	// elastic search access
-	ENV_ELASTIC_URL:      "http://localhost:9200",
-	ENV_ELASTIC_USERNAME: "",
-	ENV_ELASTIC_PASSWORD: "",
-	ENV_ELASTIC_BEARER:   "",
+	EnvElasticURL:      "http://localhost:9200",
+	EnvElasticUsername: "",
+	EnvElasticPassword: "",
+	EnvElasticBearer:   "",
 
 	// fluent vars
-	ENV_FLUENT_PORT: "24224",
+	EnvFluentPort: "24224",
 
 	// disable by default; to enable set this env...
-	ENV_FLUENT_HOST: "",
+	EnvFluentHost: "",
 
 	// secrets - required!!
-	ENV_PANTAHUB_SA_ADMIN_SECRET: "",
-	ENV_PANTAHUB_ADMIN_SECRET:    "",
+	EnvPantahubSaAdminSecret: "",
+	EnvPantahubAdminSecret:   "",
 
 	// roles/admins
-	ENV_PANTAHUB_ADMINS:              "prn:pantahub.com:auth:/admin",
-	ENV_PANTAHUB_SUBSCRIPTION_ADMINS: "",
+	EnvPantahubAdmins:             "prn:pantahub.com:auth:/admin",
+	EnvPantahubSubscriptionAdmins: "",
 
 	// smtp config (we stopped supporting this in favour of mailgun for launch)
-	ENV_SMTP_HOST: "localhost",
-	ENV_SMTP_PORT: "25",
-	ENV_SMTP_USER: "XXX",
-	ENV_SMTP_PASS: "XXX",
-	ENV_REG_EMAIL: "Pantahub.com <team@pantacor.com>",
+	EnvSMTPHost: "localhost",
+	EnvSMTPPort: "25",
+	EnvSMTPUser: "XXX",
+	EnvSMTPPass: "XXX",
+	EnvRegEmail: "Pantahub.com <team@pantacor.com>",
 
 	// pantahub internal envs
-	ENV_PANTAHUB_AUTH: "http://localhost:12365/auth",
+	EnvPantahubAuth: "http://localhost:12365/auth",
 
 	// pantahub www signup path
-	ENV_PANTAHUB_SIGNUP_PATH: "/signup",
+	EnvPantahubSignupPath: "/signup",
 
 	// storage driver used to store objects
-	ENV_PANTAHUB_STORAGE_DRIVER: "local",
+	EnvPantahubStorageDriver: "local",
 
 	// access key of s3 storage credentials
-	ENV_PANTAHUB_S3_ACCESS_KEY_ID: "",
+	EnvPantahubS3AccessKeyID: "",
 
 	// secret access key of s3 storage credentials
-	ENV_PANTAHUB_S3_SECRET_ACCESS_KEY: "",
+	EnvPantahubS3SecretAccessKeyID: "",
 
 	// use anonymous credentials
-	ENV_PANTAHUB_S3_USE_ANONYMOUS_CREDENTIALS: "true",
+	EnvPantahubS3SAnonymousCredentials: "true",
 
 	// region where to store objects
-	ENV_PANTAHUB_S3_REGION: "us-east-1",
+	EnvPantahubS3Region: "us-east-1",
 
 	// bucket where to store objects
-	ENV_PANTAHUB_S3_BUCKET: "pantahub",
+	EnvPantahubS3Bucket: "pantahub",
 
 	// enpoint of s3 server
-	ENV_PANTAHUB_S3_ENDPOINT: "",
+	EnvPantahubS3Endpoint: "",
 
 	// object storage path (when using "local" driver)
-	ENV_PANTAHUB_STORAGE_PATH: "/",
+	EnvPantahubStoragePath: "/",
 
 	// object storage path (deprecated, please use PANTAHUB_STORAGE_PATH)
-	ENV_PANTAHUB_S3PATH: "../local-s3/",
+	EnvPantahubS3Path: "../local-s3/",
 
 	// resty REST client configs
-	ENV_RESTY_DEBUG: "",
+	EnvRestyDebug: "",
 
 	// Pantahub GC API end point
-	ENV_PANTAHUB_GC_API: "http://localhost:2000",
+	EnvPantahubGCAPI: "http://localhost:2000",
 
 	// Pantahub GC garbage removal flag
-	ENV_PANTAHUB_GC_REMOVE_GARBAGE: "false",
+	EnvPantahubGCRemoveGarbage: "false",
 
 	/* Pantahub GC UnClaimed expiry for device to mark it as garbage:
 	   If a device is unclaimed for 5 Days then it will be marked as garbage
 
 	   Format:ISO_8601: https://en.wikipedia.org/wiki/ISO_8601?oldformat=true#Durations
 	*/
-	ENV_PANTAHUB_GC_UNCLAIMED_EXPIRY: "P5D", // => 5 Days
+	EnvPantahubGCUnclaimedExpiry: "P5D", // => 5 Days
 
 	/* Pantahub GC garbage expiry time to remove it:
 	Once a device/trail/step/object is marked as
@@ -376,12 +380,13 @@ var defaultEnvs = map[string]string{
 
 	Format:ISO_8601: https://en.wikipedia.org/wiki/ISO_8601?oldformat=true#Durations
 	*/
-	ENV_PANTAHUB_GC_GARBAGE_EXPIRY: "P2D", // => 2 Days
+	EnvPantahubGCGarbageExpiry: "P2D", // => 2 Days
 
 	// log requests,responses parameters and bodies
-	ENV_PANTAHUB_LOG_BODY: "false",
+	EnvPantahubLogBody: "false",
 }
 
+// GetEnv get environment variable using variable key
 func GetEnv(key string) string {
 	v, f := os.LookupEnv(key)
 	if !f {

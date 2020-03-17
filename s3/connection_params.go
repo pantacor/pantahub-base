@@ -13,11 +13,13 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
 package s3
 
 import "log"
 
-type S3ConnectionParameters struct {
+// ConnectionParameters s3 connection parameters
+type ConnectionParameters struct {
 	AccessKey string
 	SecretKey string
 	Region    string
@@ -25,7 +27,8 @@ type S3ConnectionParameters struct {
 	Endpoint  string
 }
 
-func (s S3ConnectionParameters) IsValid() bool {
+// IsValid check connection parameters to be valid
+func (s ConnectionParameters) IsValid() bool {
 	if s.AccessKey == "" {
 		log.Println("Empty S3 AccessKey")
 		return false

@@ -12,6 +12,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
 package trails
 
 import (
@@ -25,7 +26,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-func (a *TrailsApp) isTrailPublic(trailID string) (bool, error) {
+func (a *App) isTrailPublic(trailID string) (bool, error) {
 
 	collTrails := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_trails")
 

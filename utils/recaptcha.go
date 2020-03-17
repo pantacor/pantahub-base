@@ -13,6 +13,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
 package utils
 
 import (
@@ -38,7 +39,7 @@ type verifyResponse struct {
 
 // VerifyReCaptchaToken validate a recaptcha token with google recaptcha API
 func VerifyReCaptchaToken(token string) (bool, error) {
-	resp, err := http.PostForm(apiURL, url.Values{"response": {token}, "secret": {GetEnv(ENV_GOOGLE_CAPTCHA_SECRET)}})
+	resp, err := http.PostForm(apiURL, url.Values{"response": {token}, "secret": {GetEnv(EnvGoogleCaptchaSecret)}})
 	if err != nil {
 		return false, err
 	}

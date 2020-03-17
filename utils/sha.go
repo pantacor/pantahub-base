@@ -8,6 +8,7 @@ import (
 	cjson "github.com/gibson042/canonicaljson-go"
 )
 
+// DecodeSha256HexString decode sha string
 func DecodeSha256HexString(shaString string) (sha []byte, err error) {
 	sha, err = hex.DecodeString(shaString)
 
@@ -17,6 +18,7 @@ func DecodeSha256HexString(shaString string) (sha []byte, err error) {
 	return
 }
 
+// StateSha get sha state from a obj
 func StateSha(obj interface{}) (string, error) {
 	json, err := cjson.Marshal(obj)
 

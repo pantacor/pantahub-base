@@ -13,6 +13,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
 package utils
 
 import (
@@ -27,19 +28,19 @@ import (
 )
 
 func getMailer() mailgun.Mailgun {
-	mgDomain := GetEnv(ENV_MAILGUN_DOMAIN)
-	mgAPIKey := GetEnv(ENV_MAILGUN_APIKEY)
-	mgPubAPIKey := GetEnv(ENV_MAILGUN_PUBAPIKEY)
+	mgDomain := GetEnv(EnvMailgunDomain)
+	mgAPIKey := GetEnv(EnvMailgunAPIKey)
+	mgPubAPIKey := GetEnv(EnvMailgunPubAPIKey)
 
 	log.Println("Sending Mail through MAILGUN: " + mgDomain)
 	return mailgun.NewMailgun(mgDomain, mgAPIKey, mgPubAPIKey)
 }
 
 func getURLPrefix() string {
-	urlPrefix := GetEnv(ENV_PANTAHUB_SCHEME) + "://" + GetEnv(ENV_PANTAHUB_HOST_WWW)
-	if GetEnv(ENV_PANTAHUB_PORT) != "" {
+	urlPrefix := GetEnv(EnvPantahubScheme) + "://" + GetEnv(EnvPantahubWWWHost)
+	if GetEnv(EnvPantahubPort) != "" {
 		urlPrefix += ":"
-		urlPrefix += GetEnv(ENV_PANTAHUB_PORT)
+		urlPrefix += GetEnv(EnvPantahubPort)
 	}
 
 	return urlPrefix
@@ -56,7 +57,7 @@ func SendResetPasswordEmail(email, nick, token string) error {
 	var bodyPlain bytes.Buffer
 	var bodyHTML bytes.Buffer
 
-	regEmail := GetEnv(ENV_REG_EMAIL)
+	regEmail := GetEnv(EnvRegEmail)
 	link := getURLPrefix() + "/reset_password#token=" + token
 	mg := getMailer()
 	textTemplatePath, _ := filepath.Abs("./tmpl/mails/password_recovery.text")
@@ -98,27 +99,27 @@ func SendResetPasswordEmail(email, nick, token string) error {
 	message.SetHtml(bodyHTML.String())
 	message.AddBCC(regEmail)
 
-	virusPng, err := base64.StdEncoding.DecodeString(IMAGE_VIRUS)
+	virusPng, err := base64.StdEncoding.DecodeString(ImageVirus)
 	if err != nil {
 		log.Println("error:", err)
 		return err
 	}
-	twitterPng, err := base64.StdEncoding.DecodeString(IMAGE_TWITTER)
+	twitterPng, err := base64.StdEncoding.DecodeString(ImageTwitter)
 	if err != nil {
 		log.Println("error:", err)
 		return err
 	}
-	linkedinPng, err := base64.StdEncoding.DecodeString(IMAGE_LINKEDIN)
+	linkedinPng, err := base64.StdEncoding.DecodeString(ImageLinkedin)
 	if err != nil {
 		log.Println("error:", err)
 		return err
 	}
-	rdPng, err := base64.StdEncoding.DecodeString(IMAGE_RD)
+	rdPng, err := base64.StdEncoding.DecodeString(ImageRd)
 	if err != nil {
 		log.Println("error:", err)
 		return err
 	}
-	ruPng, err := base64.StdEncoding.DecodeString(IMAGE_RU)
+	ruPng, err := base64.StdEncoding.DecodeString(ImageRu)
 	if err != nil {
 		log.Println("error:", err)
 		return err
@@ -140,13 +141,13 @@ func SendResetPasswordEmail(email, nick, token string) error {
 	return nil
 }
 
+// SendVerification send a verification email
 func SendVerification(email, nick, id, u string, urlPrefix string) bool {
-
 	link := urlPrefix + "/verify?id=" + id + "&challenge=" + u
 
 	bodyPlain := getVerificationMailPlain(email, nick, link)
-	bodyHtml := getVerificationMailHtml(email, nick, link)
-	regEmail := GetEnv(ENV_REG_EMAIL)
+	bodyHTML := getVerificationMailHTML(email, nick, link)
+	regEmail := GetEnv(EnvRegEmail)
 
 	mg := getMailer()
 	message := mg.NewMessage(
@@ -155,43 +156,46 @@ func SendVerification(email, nick, id, u string, urlPrefix string) bool {
 		bodyPlain,
 		email)
 
-	message.SetHtml(bodyHtml)
+	message.SetHtml(bodyHTML)
 	message.AddBCC(regEmail)
 
-	virus_png, err := base64.StdEncoding.DecodeString(IMAGE_VIRUS)
-	if err != nil {
-		log.Println("error:", err)
-		return false
-	}
-	twitter_png, err := base64.StdEncoding.DecodeString(IMAGE_TWITTER)
-	if err != nil {
-		log.Println("error:", err)
-		return false
-	}
-	linkedin_png, err := base64.StdEncoding.DecodeString(IMAGE_LINKEDIN)
-	if err != nil {
-		log.Println("error:", err)
-		return false
-	}
-	rd_png, err := base64.StdEncoding.DecodeString(IMAGE_RD)
-	if err != nil {
-		log.Println("error:", err)
-		return false
-	}
-	ru_png, err := base64.StdEncoding.DecodeString(IMAGE_RU)
+	virusPng, err := base64.StdEncoding.DecodeString(ImageVirus)
 	if err != nil {
 		log.Println("error:", err)
 		return false
 	}
 
-	message.AddReaderInline("virus.png", ioutil.NopCloser(bytes.NewReader(virus_png)))
-	message.AddReaderInline("twitter.png", ioutil.NopCloser(bytes.NewReader(twitter_png)))
-	message.AddReaderInline("linkedin.png", ioutil.NopCloser(bytes.NewReader(linkedin_png)))
-	message.AddReaderInline("rd.png", ioutil.NopCloser(bytes.NewReader(rd_png)))
-	message.AddReaderInline("ru.png", ioutil.NopCloser(bytes.NewReader(ru_png)))
+	twitterPng, err := base64.StdEncoding.DecodeString(ImageTwitter)
+	if err != nil {
+		log.Println("error:", err)
+		return false
+	}
+
+	linkedinPng, err := base64.StdEncoding.DecodeString(ImageLinkedin)
+	if err != nil {
+		log.Println("error:", err)
+		return false
+	}
+
+	rdPng, err := base64.StdEncoding.DecodeString(ImageRd)
+	if err != nil {
+		log.Println("error:", err)
+		return false
+	}
+
+	ruPng, err := base64.StdEncoding.DecodeString(ImageRu)
+	if err != nil {
+		log.Println("error:", err)
+		return false
+	}
+
+	message.AddReaderInline("virus.png", ioutil.NopCloser(bytes.NewReader(virusPng)))
+	message.AddReaderInline("twitter.png", ioutil.NopCloser(bytes.NewReader(twitterPng)))
+	message.AddReaderInline("linkedin.png", ioutil.NopCloser(bytes.NewReader(linkedinPng)))
+	message.AddReaderInline("rd.png", ioutil.NopCloser(bytes.NewReader(rdPng)))
+	message.AddReaderInline("ru.png", ioutil.NopCloser(bytes.NewReader(ruPng)))
 
 	resp, id, err := mg.Send(message)
-
 	if err != nil {
 		log.Print(err)
 		return false
@@ -232,8 +236,7 @@ Hope you enjoy your stay and if you need anything, feel free to reach out to tea
 	return body
 }
 
-func getVerificationMailHtml(email, nick, link string) string {
-
+func getVerificationMailHTML(email, nick, link string) string {
 	body := `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional //EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:v="urn:schemas-microsoft-com:vml">

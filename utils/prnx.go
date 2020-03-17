@@ -24,34 +24,40 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
+// Prn string to define Prn
 type Prn string
 
+// PrnParseError string to define Prn parse Error
 type PrnParseError string
 
 func (s PrnParseError) Error() string {
 	return string(s)
 }
 
+// PrnInfo Prn information
 type PrnInfo struct {
 	Domain   string
 	Service  string
 	Resource string
 }
 
-// XXX: make this a nice prn helper tool
-func PrnGetId(prn string) string {
+// PrnGetID make this a nice prn helper tool
+func PrnGetID(prn string) string {
 	idx := strings.Index(prn, "/")
 	return prn[idx+1:]
 }
 
-func IdGetPrn(id primitive.ObjectID, serviceName string) string {
+// IDGetPrn get prn ID
+func IDGetPrn(id primitive.ObjectID, serviceName string) string {
 	return "prn:::" + serviceName + ":/" + id.Hex()
 }
 
-func IdGetPrnLegacy(id bson.ObjectId, serviceName string) string {
+// IDGetPrnLegacy get prn legaccy information
+func IDGetPrnLegacy(id bson.ObjectId, serviceName string) string {
 	return "prn:::" + serviceName + ":/" + id.Hex()
 }
 
+// GetInfo get information
 func (p *Prn) GetInfo() (*PrnInfo, error) {
 	if !strings.HasPrefix(string(*p), "prn:") {
 		errstr := fmt.Sprintf("ERROR: prn parse prn: prefix missing - %s", *p)
@@ -94,6 +100,7 @@ func (p *Prn) GetInfo() (*PrnInfo, error) {
 	return &rs, nil
 }
 
+// Equals test if two PRN are equals
 func (p *PrnInfo) Equals(c *PrnInfo) bool {
 	return p.Domain == c.Domain &&
 		p.Service == c.Service &&

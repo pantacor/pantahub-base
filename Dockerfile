@@ -9,7 +9,9 @@ RUN apk add -U --no-cache \
 
 WORKDIR /app/
 COPY . .
+
 RUN go get -d -v ./... \
+    && go get github.com/swaggo/swag/cmd/swag && swag init \
     && go install -v ./...
 
 FROM alpine
