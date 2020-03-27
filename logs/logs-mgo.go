@@ -212,19 +212,29 @@ func (s *mgoLogger) getLogs(start int64, page int64, before *time.Time,
 		findFilter["own"] = query.Owner
 	}
 
-	if query.LogLevel != "" {
-		findFilter["lvl"] = bson.M{
-			"$in": strings.Split(query.LogLevel, ","),
-		}
-	}
 	if query.Device != "" {
 		findFilter["dev"] = bson.M{
 			"$in": strings.Split(query.Device, ","),
 		}
 	}
+	if query.LogRev != "" {
+		findFilter["rev"] = bson.M{
+			"$in": strings.Split(query.LogRev, ","),
+		}
+	}
+	if query.LogPlat != "" {
+		findFilter["plat"] = bson.M{
+			"$in": strings.Split(query.LogPlat, ","),
+		}
+	}
 	if query.LogSource != "" {
 		findFilter["src"] = bson.M{
 			"$in": strings.Split(query.LogSource, ","),
+		}
+	}
+	if query.LogLevel != "" {
+		findFilter["lvl"] = bson.M{
+			"$in": strings.Split(query.LogLevel, ","),
 		}
 	}
 
