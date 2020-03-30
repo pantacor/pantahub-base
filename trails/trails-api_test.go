@@ -21,16 +21,16 @@ var (
 	server          *httptest.Server
 	jwtMWA          *jwt.JWTMiddleware
 	jwtMWR          *jwt.JWTMiddleware
-	authUrl         *url.URL
-	serverUrl       *url.URL
-	devicesUrl      *url.URL
+	authURL         *url.URL
+	serverURL       *url.URL
+	devicesURL      *url.URL
 	device          *devices.Device
 	deviceAuthToken string
 	userAuthToken   string
 	step0Hash       string
 )
 
-func falseAuthenticator(userId string, password string) bool {
+func falseAuthenticator(userID string, password string) bool {
 	return false
 }
 
@@ -65,8 +65,8 @@ func setUp(t *testing.T) {
 
 	// auth app we need
 	authApp := auth.New(jwtMWA, mongoClient)
-	authServer := httptest.NewServer(authApp.Api.MakeHandler())
-	authUrl, err = url.Parse(authServer.URL)
+	authServer := httptest.NewServer(authApp.API.MakeHandler())
+	authURL, err = url.Parse(authServer.URL)
 	if err != nil {
 		t.Errorf("error parsing test server URL " + err.Error())
 		t.Fail()
@@ -74,8 +74,8 @@ func setUp(t *testing.T) {
 
 	// trails app we test
 	devicesApp := devices.New(jwtMWR, mongoClient)
-	devicesServer := httptest.NewServer(devicesApp.Api.MakeHandler())
-	devicesUrl, err = url.Parse(devicesServer.URL)
+	devicesServer := httptest.NewServer(devicesApp.API.MakeHandler())
+	devicesURL, err = url.Parse(devicesServer.URL)
 	if err != nil {
 		t.Errorf("error parsing test server URL " + err.Error())
 		t.Fail()
@@ -83,23 +83,23 @@ func setUp(t *testing.T) {
 
 	// trails app we test
 	trailsApp := New(jwtMWR, mongoClient)
-	server = httptest.NewServer(trailsApp.Api.MakeHandler())
-	serverUrl, err = url.Parse(server.URL)
+	server = httptest.NewServer(trailsApp.API.MakeHandler())
+	serverURL, err = url.Parse(server.URL)
 	if err != nil {
 		t.Errorf("error parsing test server URL " + err.Error())
 		t.Fail()
 	}
 
-	userAuthToken = testutils.DoLogin(t, authUrl, "user1", "user1")
-	device = testutils.CreateOwnedDevice(t, devicesUrl, userAuthToken, "nick1", "secret1")
-	deviceAuthToken = testutils.DoLogin(t, authUrl, device.Prn, "secret1")
+	userAuthToken = testutils.DoLogin(t, authURL, "user1", "user1")
+	device = testutils.CreateOwnedDevice(t, devicesURL, userAuthToken, "nick1", "secret1")
+	deviceAuthToken = testutils.DoLogin(t, authURL, device.Prn, "secret1")
 }
 
 func tearDown(t *testing.T) {
 }
 
 func postState(t *testing.T) {
-	u := *serverUrl
+	u := *serverURL
 	u.Path = ""
 
 	res, err := resty.R().SetAuthToken(deviceAuthToken).SetBody(map[string]string{"mystate": "mystate"}).Post(u.String())
@@ -120,8 +120,8 @@ func postState(t *testing.T) {
 
 func postStateHash(t *testing.T) {
 
-	s0 := *serverUrl
-	s0.Path = device.Id.Hex() + "/steps/0"
+	s0 := *serverURL
+	s0.Path = device.ID.Hex() + "/steps/0"
 
 	res, err := resty.R().SetAuthToken(userAuthToken).
 		Get(s0.String())
@@ -147,8 +147,8 @@ func postStateHash(t *testing.T) {
 }
 
 func postStep(t *testing.T) {
-	u := *serverUrl
-	u.Path = device.Id.Hex() + "/steps"
+	u := *serverURL
+	u.Path = device.ID.Hex() + "/steps"
 
 	res, err := resty.R().SetAuthToken(userAuthToken).
 		SetBody("{\"rev\": 1, \"state\": {\"mystate\":         \"mystate\"}}").
@@ -176,8 +176,8 @@ func postStep(t *testing.T) {
 
 func postStepsHash(t *testing.T) {
 
-	s1 := *serverUrl
-	s1.Path = device.Id.Hex() + "/steps/1"
+	s1 := *serverURL
+	s1.Path = device.ID.Hex() + "/steps/1"
 
 	res, err := resty.R().SetAuthToken(userAuthToken).
 		Get(s1.String())

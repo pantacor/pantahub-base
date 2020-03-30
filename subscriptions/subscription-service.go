@@ -21,6 +21,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
+// SubscriptionPage pagination for subscription
 type SubscriptionPage struct {
 	Start int
 	Page  int
@@ -302,7 +303,7 @@ func (i subscriptionService) ensureIndices() error {
 	return err
 }
 
-// New creates a new mongoClient backed subscription service
+// NewService creates a new mongoClient backed subscription service
 // Will use the default DB configured in mongoClient provided as arg.
 func NewService(mongoClient *mongo.Client,
 	servicePrn utils.Prn, admins []utils.Prn,

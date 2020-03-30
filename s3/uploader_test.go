@@ -13,6 +13,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
 package s3
 
 import (
@@ -56,7 +57,7 @@ func (suite S3UploaderTestSuite) TestUploadWithSuccessfullUpload() {
 	inputUploader := mockInputS3Uploader{}
 	inputUploader.On("Upload", expectedInput, mock.AnythingOfType("[]func(*s3manager.Uploader)")).Return(nil, nil)
 
-	params := S3ConnectionParameters{
+	params := ConnectionParameters{
 		Bucket: bucket,
 	}
 	uploader := &s3impl{
@@ -80,7 +81,7 @@ func (suite S3UploaderTestSuite) TestUploadWithError() {
 	inputUploader := mockInputS3Uploader{}
 	inputUploader.On("Upload", expectedInput, mock.AnythingOfType("[]func(*s3manager.Uploader)")).Return(nil, assert.AnError)
 
-	params := S3ConnectionParameters{
+	params := ConnectionParameters{
 		Bucket: bucket,
 	}
 	uploader := &s3impl{
@@ -104,7 +105,7 @@ func (suite S3UploaderTestSuite) TestUploadIncompleteData() {
 	inputUploader := mockInputS3Uploader{}
 	inputUploader.On("Upload", expectedInput, mock.AnythingOfType("[]func(*s3manager.Uploader)")).Return(nil, assert.AnError)
 
-	params := S3ConnectionParameters{
+	params := ConnectionParameters{
 		Bucket: testBucket,
 	}
 	uploader := &s3impl{

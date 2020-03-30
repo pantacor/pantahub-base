@@ -13,6 +13,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
 package utils
 
 import (
@@ -31,12 +32,12 @@ var MongoDb string
 
 // GetMongoClient : To Get Mongo Client Object
 func GetMongoClient() (*mongo.Client, error) {
-	MongoDb = GetEnv(ENV_MONGO_DB)
-	user := GetEnv(ENV_MONGO_USER)
-	pass := GetEnv(ENV_MONGO_PASS)
-	host := GetEnv(ENV_MONGO_HOST)
-	port := GetEnv(ENV_MONGO_PORT)
-	mongoRs := GetEnv(ENV_MONGO_RS)
+	MongoDb = GetEnv(EnvMongoDb)
+	user := GetEnv(EnvMongoUser)
+	pass := GetEnv(EnvMongoPassword)
+	host := GetEnv(EnvMongoHost)
+	port := GetEnv(EnvMongoPort)
+	mongoRs := GetEnv(EnvMongoRs)
 
 	//Setting Client Options
 	clientOptions := options.Client()
@@ -80,15 +81,15 @@ func GetMongoClient() (*mongo.Client, error) {
 	return client, err
 }
 
-// GetMongoClient : To Get Mongo Client Object
+// GetMongoClientTest : To Get Mongo Client Object
 func GetMongoClientTest() (*mongo.Client, error) {
-	MongoDb = GetEnv(ENV_MONGO_DB)
+	MongoDb = GetEnv(EnvMongoDb)
 	MongoDb = "testdb-" + MongoDb
-	user := GetEnv(ENV_MONGO_USER)
-	pass := GetEnv(ENV_MONGO_PASS)
-	host := GetEnv(ENV_MONGO_HOST)
-	port := GetEnv(ENV_MONGO_PORT)
-	mongoRs := GetEnv(ENV_MONGO_RS)
+	user := GetEnv(EnvMongoUser)
+	pass := GetEnv(EnvMongoPassword)
+	host := GetEnv(EnvMongoHost)
+	port := GetEnv(EnvMongoPort)
+	mongoRs := GetEnv(EnvMongoRs)
 
 	//Setting Client Options
 	clientOptions := options.Client()
@@ -126,12 +127,12 @@ func GetMongoClientTest() (*mongo.Client, error) {
 // GetMongoSession is the legacy util to access database through old mgo driver
 func GetMongoSession() (*mgo.Session, error) {
 	// XXX: make mongo host configurable through env
-	mongoDb := GetEnv(ENV_MONGO_DB)
-	mongoHost := GetEnv(ENV_MONGO_HOST)
-	mongoPort := GetEnv(ENV_MONGO_PORT)
-	mongoUser := GetEnv(ENV_MONGO_USER)
-	mongoPass := GetEnv(ENV_MONGO_PASS)
-	mongoRs := GetEnv(ENV_MONGO_RS)
+	mongoDb := GetEnv(EnvMongoDb)
+	mongoHost := GetEnv(EnvMongoHost)
+	mongoPort := GetEnv(EnvMongoPort)
+	mongoUser := GetEnv(EnvMongoUser)
+	mongoPass := GetEnv(EnvMongoPassword)
+	mongoRs := GetEnv(EnvMongoRs)
 
 	mongoCreds := ""
 	if mongoUser != "" {
@@ -148,14 +149,15 @@ func GetMongoSession() (*mgo.Session, error) {
 	return mgo.Dial(mongoConnect)
 }
 
+// GetMongoSessionTest get a test session of mongo
 func GetMongoSessionTest() (*mgo.Session, error) {
 	// XXX: make mongo host configurable through env
-	mongoDb := "testdb-" + GetEnv(ENV_MONGO_DB)
-	mongoHost := GetEnv(ENV_MONGO_HOST)
-	mongoPort := GetEnv(ENV_MONGO_PORT)
-	mongoUser := GetEnv(ENV_MONGO_USER)
-	mongoPass := GetEnv(ENV_MONGO_PASS)
-	mongoRs := GetEnv(ENV_MONGO_RS)
+	mongoDb := "testdb-" + GetEnv(EnvMongoDb)
+	mongoHost := GetEnv(EnvMongoHost)
+	mongoPort := GetEnv(EnvMongoPort)
+	mongoUser := GetEnv(EnvMongoUser)
+	mongoPass := GetEnv(EnvMongoPassword)
+	mongoRs := GetEnv(EnvMongoRs)
 
 	mongoCreds := ""
 	if mongoUser != "" {

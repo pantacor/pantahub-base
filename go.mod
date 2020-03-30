@@ -9,6 +9,7 @@ replace github.com/ant0ine/go-json-rest => github.com/asac/go-json-rest v3.3.3-0
 require (
 	github.com/ChannelMeter/iso8601duration v0.0.0-20150204201828-8da3af7a2a61 // indirect
 	github.com/DataDog/zstd v1.4.4 // indirect
+	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751
 	github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d
 	github.com/ant0ine/go-json-rest v3.3.2+incompatible
 	github.com/asac/go-json-rest v3.3.2+incompatible
@@ -26,12 +27,11 @@ require (
 	github.com/fatih/structs v1.1.0
 	github.com/fluent/fluent-logger-golang v1.4.0
 	github.com/gibson042/canonicaljson-go v1.0.3
+	github.com/go-chi/chi v4.0.2+incompatible
 	github.com/go-resty/resty v0.0.0-00010101000000-000000000000 // indirect
 	github.com/golang/snappy v0.0.1 // indirect
-	github.com/gorilla/mux v1.7.3 // indirect
 	github.com/gosimple/slug v1.9.0
 	github.com/jaswdr/faker v1.0.2
-	github.com/kr/pretty v0.1.0 // indirect
 	github.com/mailru/easyjson v0.7.0 // indirect
 	github.com/miolini/datacounter v1.0.1 // indirect
 	github.com/mongodb/mongo-go-driver v1.0.4
@@ -42,6 +42,9 @@ require (
 	github.com/prometheus/client_golang v1.3.0
 	github.com/rs/cors v1.7.0
 	github.com/stretchr/testify v1.4.0
+	github.com/swaggo/files v0.0.0-20190704085106-630677cd5c14
+	github.com/swaggo/http-swagger v0.0.0-20200103000832-0e9263c4b516
+	github.com/swaggo/swag v1.6.5
 	github.com/tidwall/pretty v1.0.0 // indirect
 	github.com/tinylib/msgp v1.1.1 // indirect
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c // indirect
@@ -53,8 +56,6 @@ require (
 	golang.org/x/lint v0.0.0-20191125180803-fdd1cda4f05f // indirect
 	golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553 // indirect
 	golang.org/x/sys v0.0.0-20200107162124-548cf772de50 // indirect
-	golang.org/x/text v0.3.2 // indirect
-	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
 	gopkg.in/mailgun/mailgun-go.v1 v1.1.1
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 	gopkg.in/olivere/elastic.v5 v5.0.84

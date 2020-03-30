@@ -43,9 +43,9 @@ func subRunSetupTeardownElastic(name string, t *testing.T, f func(t *testing.T))
 	teardownElastic(t)
 }
 
-func genLogs(proto LogsEntry, count int) []LogsEntry {
+func genLogs(proto Entry, count int) []Entry {
 
-	logs := []LogsEntry{}
+	logs := []Entry{}
 
 	for i := 0; i < count; i++ {
 		instance := proto

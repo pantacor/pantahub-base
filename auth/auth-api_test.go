@@ -13,6 +13,8 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
+// Package auth package to manage extensions of the oauth protocol
 package auth
 
 import (
@@ -35,7 +37,7 @@ var (
 	server           *httptest.Server
 	jwtMWA           *jwt.JWTMiddleware
 	jwtMWR           *jwt.JWTMiddleware
-	serverUrl        *url.URL
+	serverURL        *url.URL
 	authTokenUser1   string
 	authTokenClient1 string
 )
@@ -59,8 +61,8 @@ func setUp(t *testing.T) {
 	authApp := New(jwtMWA, mongoClient)
 
 	recorder = httptest.NewRecorder()
-	server = httptest.NewServer(authApp.Api.MakeHandler())
-	serverUrl, err = url.Parse(server.URL)
+	server = httptest.NewServer(authApp.API.MakeHandler())
+	serverURL, err = url.Parse(server.URL)
 
 	if err != nil {
 		t.Errorf("error parsing test server URL " + err.Error())
@@ -73,7 +75,7 @@ func tearDown(t *testing.T) {
 
 func testNoCredsLogin401(t *testing.T) {
 
-	u := *serverUrl
+	u := *serverURL
 	u.Path = "/login"
 
 	res, err := utils.R().SetBody(map[string]string{}).Post(u.String())
@@ -90,7 +92,7 @@ func testNoCredsLogin401(t *testing.T) {
 
 func testBadCredsLogin401(t *testing.T) {
 
-	u := *serverUrl
+	u := *serverURL
 	u.Path = "/login"
 
 	res, err := utils.R().SetBody(map[string]string{
@@ -110,7 +112,7 @@ func testBadCredsLogin401(t *testing.T) {
 
 func testGoodLogin(t *testing.T) {
 
-	u := serverUrl
+	u := serverURL
 	u.Path = "/login"
 
 	res, err := utils.R().SetBody(map[string]string{
@@ -129,7 +131,7 @@ func testGoodLogin(t *testing.T) {
 }
 
 func testRefreshToken(t *testing.T) {
-	u := *serverUrl
+	u := *serverURL
 	u.Path = "/login"
 
 	res, err := utils.R().SetAuthToken(authTokenUser1).Get(u.String())
@@ -168,14 +170,14 @@ func TestAuthLogin(t *testing.T) {
 	t.Run("Wrong credentials 401", testBadCredsLogin401)
 	t.Run("Good Login", testGoodLogin)
 
-	authTokenUser1 = testutils.DoLogin(t, serverUrl, "user1", "user1")
+	authTokenUser1 = testutils.DoLogin(t, serverURL, "user1", "user1")
 	t.Run("Refresh Token", testRefreshToken)
 
 	tearDown(t)
 }
 
 func testAuthAuthTokenGood(t *testing.T) {
-	u := *serverUrl
+	u := *serverURL
 	u.Path = "/authorize"
 
 	body := map[string]interface{}{}
@@ -253,7 +255,7 @@ func testAuthAuthTokenGood(t *testing.T) {
 }
 
 func testAuthAuthTokenBadURL(t *testing.T) {
-	u := *serverUrl
+	u := *serverURL
 	u.Path = "/authorize"
 
 	body := map[string]interface{}{}
@@ -275,7 +277,7 @@ func testAuthAuthTokenBadURL(t *testing.T) {
 }
 
 func testAuthAuthTokenBadClient(t *testing.T) {
-	u := *serverUrl
+	u := *serverURL
 	u.Path = "/authorize"
 
 	body := map[string]interface{}{}
@@ -297,7 +299,7 @@ func testAuthAuthTokenBadClient(t *testing.T) {
 }
 
 func testAuthAuthTokenPreservesState(t *testing.T) {
-	u := *serverUrl
+	u := *serverURL
 	u.Path = "/authorize"
 
 	body := map[string]interface{}{}
@@ -340,7 +342,7 @@ func testAuthAuthTokenPreservesState(t *testing.T) {
 }
 
 func testAuthAuthTokenClientUse(t *testing.T) {
-	u := *serverUrl
+	u := *serverURL
 	u.Path = "/auth_status"
 	res, err := utils.R().SetAuthToken(authTokenClient1).Get(u.String())
 
@@ -377,14 +379,14 @@ func testAuthAuthTokenClientUse(t *testing.T) {
 func TestOauth2Implicit(t *testing.T) {
 	setUp(t)
 
-	authTokenUser1 = testutils.DoLogin(t, serverUrl, "user1", "user1")
+	authTokenUser1 = testutils.DoLogin(t, serverURL, "user1", "user1")
 	t.Run("Get Authorize Token (Good) ", testAuthAuthTokenGood)
 	t.Run("Get Authorize Token (Bad URL) ", testAuthAuthTokenBadURL)
 	t.Run("Get Authorize Token (Bad Client) ", testAuthAuthTokenBadClient)
 	t.Run("Get Authorize Token (Preserve State) ", testAuthAuthTokenPreservesState)
 
-	authTokenClient1 = testutils.DoAuthorizeToken(t, serverUrl, authTokenUser1,
-		"prn:pantahub.com:auth:/client1", "*")
+	// authTokenClient1 = testutils.DoAuthorizeToken(t, serverUrl, authTokenUser1,
+	// 	"prn:pantahub.com:auth:/client1", "*")
 	t.Run("User Client 1 implicit auth token", testAuthAuthTokenClientUse)
 
 	tearDown(t)

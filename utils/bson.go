@@ -13,12 +13,14 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
 package utils
 
 import (
 	"strings"
 )
 
+// BsonQuoteMap create a new map of quotes with escaped indexes
 func BsonQuoteMap(m *map[string]interface{}) map[string]interface{} {
 	escapedMap := map[string]interface{}{}
 	for k, v := range *m {
@@ -28,6 +30,7 @@ func BsonQuoteMap(m *map[string]interface{}) map[string]interface{} {
 	return escapedMap
 }
 
+// BsonUnquoteMap create a new map of quotes with unescaped indexes
 func BsonUnquoteMap(m *map[string]interface{}) map[string]interface{} {
 	escapedMap := map[string]interface{}{}
 	for k, v := range *m {

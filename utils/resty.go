@@ -13,6 +13,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
 package utils
 
 import (
@@ -24,7 +25,7 @@ var (
 )
 
 func init() {
-	dbg := GetEnv(ENV_RESTY_DEBUG)
+	dbg := GetEnv(EnvRestyDebug)
 	if dbg != "" {
 		debugEnabled = true
 	} else {
@@ -32,7 +33,7 @@ func init() {
 	}
 }
 
-// create a *resty.Request honouring global client settings configurable
+// R create a *resty.Request honouring global client settings configurable
 // through environments.
 func R() *resty.Request {
 	return resty.SetDebug(debugEnabled).SetAllowGetMethodPayload(true).R()

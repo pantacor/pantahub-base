@@ -12,138 +12,70 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
+// Package auth package to manage extensions of the oauth protocol
 package auth
 
 import (
 	"context"
-	"errors"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/x/bsonx"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
-	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/accounts"
-	"gitlab.com/pantacor/pantahub-base/apps"
-	"gitlab.com/pantacor/pantahub-base/devices"
-	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func init() {
-	// if in production we disable all fixed accounts
-	if os.Getenv("PANTAHUB_PRODUCTION") == "" {
-		return
-	}
-
-	for k, v := range accounts.DefaultAccounts {
-		passwordOverwrite := os.Getenv("PANTAHUB_DEMOACCOUNTS_PASSWORD_" + v.Nick)
-		if passwordOverwrite == "" {
-			delete(accounts.DefaultAccounts, k)
-		} else {
-			log.Println("enabling default account: " + v.Nick)
-			v.Password = passwordOverwrite
-			accounts.DefaultAccounts[k] = v
-		}
-	}
+type accountClaims struct {
+	Exp     string `json:"exp"`
+	ID      string `json:"id"`
+	Nick    string `json:"nick"`
+	OrigIat string `json:"orig_iat"`
+	Prn     string `json:"prn"`
+	Roles   string `json:"roles"`
+	Scopes  string `json:"scopes"`
+	Type    string `json:"type"`
 }
 
-func AccountToPayload(account accounts.Account) map[string]interface{} {
-	result := map[string]interface{}{}
-
-	switch account.Type {
-	case accounts.ACCOUNT_TYPE_ADMIN:
-		result["roles"] = "admin"
-		result["type"] = "USER"
-		break
-	case accounts.ACCOUNT_TYPE_USER:
-		result["roles"] = "user"
-		result["type"] = "USER"
-		break
-	case accounts.ACCOUNT_TYPE_DEVICE:
-		result["roles"] = "device"
-		result["type"] = "DEVICE"
-		break
-	case accounts.ACCOUNT_TYPE_SERVICE:
-		result["roles"] = "service"
-		result["type"] = "SERVICE"
-		break
-	case accounts.ACCOUNT_TYPE_CLIENT:
-		result["roles"] = "service"
-		result["type"] = "SERVICE"
-		break
-	default:
-		log.Println("ERROR: AccountToPayload with invalid account type: " + account.Type)
-		return nil
-	}
-
-	result["id"] = account.Prn
-	result["nick"] = account.Nick
-	result["prn"] = account.Prn
-	result["scopes"] = "prn:pantahub.com:apis:/base/all"
-
-	return result
-}
-
-type AccountType string
-
-const (
-	ACCOUNT_TYPE_ADMIN          = AccountType("ADMIN")
-	ACCOUNT_TYPE_DEVICE         = AccountType("DEVICE")
-	ACCOUNT_TYPE_ORG            = AccountType("ORG")
-	ACCOUNT_TYPE_SERVICE        = AccountType("SERVICE")
-	ACCOUNT_TYPE_USER           = AccountType("USER")
-	exchangeTokenRequiredErr    = "Exchange token is needed"
-	passwordIsNeededErr         = "New password is needed"
-	tokenInvalidOrExpiredErr    = "Invalid or expired token"
-	emailRequiredForPasswordErr = "Email is required"
-	dbConnectionErr             = "Error with Database connectivity"
-	emailNotFoundErr            = "Email don't exist"
-	tokenCreationErr            = "Error creating token"
-	sendEmailErr                = "Error sending email"
-	restorePasswordTTLUnit      = time.Minute
-)
-
-func handle_auth(w rest.ResponseWriter, r *rest.Request) {
+// handleAuthStatus Get JWT claims from Authorization header
+// @Summary Get JWT claims from Authorization header
+// @Description Get JWT claims from Authorization header
+// @Accept  json
+// @Produce  json
+// @Tags auth
+// @Security ApiKeyAuth
+// @Success 200 {object} accountClaims
+// @Failure 400 {object} utils.RError "Invalid payload"
+// @Failure 404 {object} utils.RError "Account not found"
+// @Failure 500 {object} utils.RError "Error processing request"
+// @Router /auth/auth_status [get]
+func handleAuthStatus(w rest.ResponseWriter, r *rest.Request) {
 	jwtClaims := r.Env["JWT_PAYLOAD"]
 	w.WriteJson(jwtClaims)
 }
 
-type encryptedAccountToken struct {
-	Token       string `json:"token"`
-	RedirectURI string `json:"redirect-uri"`
-}
-
-func handle_get_encrypted_account(accountData *accountCreationPayload) (*encryptedAccountToken, error) {
-	encryptedAccountData, err := utils.CreateJWE(accountData)
-	if err != nil {
-		return nil, err
-	}
-
-	urlPrefix := utils.GetEnv(utils.ENV_PANTAHUB_SCHEME) + "://"
-	urlPrefix += utils.GetEnv(utils.ENV_PANTAHUB_HOST_WWW)
-	urlPrefix += utils.GetEnv(utils.ENV_PANTAHUB_SIGNUP_PATH)
-	urlPrefix += "#account=" + encryptedAccountData
-
-	response := &encryptedAccountToken{
-		Token:       encryptedAccountData,
-		RedirectURI: urlPrefix,
-	}
-
-	return response, nil
-}
-
-func (a *AuthApp) handle_getaccounts(w rest.ResponseWriter, r *rest.Request) {
+// handleGetAccounts Get list of accounts
+// @Summary Get list of accounts
+// @Description Get list of accounts
+// @Accept  json
+// @Produce  json
+// @Tags auth
+// @Security ApiKeyAuth
+// @Success 200 {array} accounts.Account
+// @Failure 400 {object} utils.RError "Invalid payload"
+// @Failure 403 {object} utils.RError "user has no admin role"
+// @Failure 404 {object} utils.RError "Account not found"
+// @Failure 500 {object} utils.RError "Error processing request"
+// @Router /auth/accounts [get]
+func (a *App) handleGetAccounts(w rest.ResponseWriter, r *rest.Request) {
 	var err error
 	var cur *mongo.Cursor
 
@@ -204,13 +136,20 @@ func (a *AuthApp) handle_getaccounts(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(&resultSet)
 }
 
-type accountCreationPayload struct {
-	accounts.Account
-	Captcha          string `json:"captcha"`
-	EncryptedAccount string `json:"encrypted-account"`
-}
-
-func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
+// handlePostAccount Create a new account
+// @Summary Create a new account
+// @Description Create a new account
+// @Accept  json
+// @Produce  json
+// @Tags auth
+// @Param body body accountCreationPayload true "Account Payload"
+// @Success 200 {object} accounts.Account
+// @Failure 400 {object} utils.RError "Invalid payload"
+// @Failure 412 {object} utils.RError "Invalid payload"
+// @Failure 404 {object} utils.RError "Account not found"
+// @Failure 500 {object} utils.RError "Error processing request"
+// @Router /auth/accounts [post]
+func (a *App) handlePostAccount(w rest.ResponseWriter, r *rest.Request) {
 	newAccount := accountCreationPayload{}
 
 	r.DecodeJsonPayload(&newAccount)
@@ -239,7 +178,7 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	if !newAccount.Id.IsZero() {
+	if !newAccount.ID.IsZero() {
 		utils.RestError(w, nil, "Accounts cannot have id before creation", http.StatusPreconditionFailed)
 		return
 	}
@@ -268,9 +207,9 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	// if account creation doesn't have captcha encrypt data and send a redirect link to finish the process
-	useCaptcha := utils.GetEnv(utils.ENV_PANTAHUB_USE_CAPTCHA) == "true"
+	useCaptcha := utils.GetEnv(utils.EnvPantahubUseCaptcha) == "true"
 	if newAccount.Captcha == "" && useCaptcha {
-		response, err := handle_get_encrypted_account(&newAccount)
+		response, err := handleGetEncryptedAccount(&newAccount)
 		if err != nil {
 			utils.RestError(w, err, err.Error(), http.StatusInternalServerError)
 		}
@@ -307,11 +246,11 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	newAccount.Id = ObjectID
-	newAccount.Prn = "prn:::accounts:/" + newAccount.Id.Hex()
+	newAccount.ID = ObjectID
+	newAccount.Prn = "prn:::accounts:/" + newAccount.ID.Hex()
 	newAccount.Challenge = utils.GenerateChallenge()
 	newAccount.TimeCreated = time.Now()
-	newAccount.Type = accounts.ACCOUNT_TYPE_USER // XXX: need org approach too
+	newAccount.Type = accounts.AccountTypeUser // XXX: need org approach too
 	newAccount.TimeModified = newAccount.TimeCreated
 
 	updateOptions := options.Update()
@@ -320,7 +259,7 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 	defer cancel()
 	_, err = collection.UpdateOne(
 		ctx,
-		bson.M{"_id": newAccount.Id},
+		bson.M{"_id": newAccount.ID},
 		bson.M{"$set": newAccount.Account},
 		updateOptions,
 	)
@@ -329,26 +268,39 @@ func (a *AuthApp) handle_postaccount(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	urlPrefix := utils.GetEnv(utils.ENV_PANTAHUB_SCHEME) + "://" + utils.GetEnv(utils.ENV_PANTAHUB_HOST_WWW)
-	if utils.GetEnv(utils.ENV_PANTAHUB_PORT) != "" {
+	urlPrefix := utils.GetEnv(utils.EnvPantahubScheme) + "://" + utils.GetEnv(utils.EnvPantahubWWWHost)
+	if utils.GetEnv(utils.EnvPantahubPort) != "" {
 		urlPrefix += ":"
-		urlPrefix += utils.GetEnv(utils.ENV_PANTAHUB_PORT)
+		urlPrefix += utils.GetEnv(utils.EnvPantahubPort)
 	}
 
-	utils.SendVerification(newAccount.Email, newAccount.Nick, newAccount.Id.Hex(), newAccount.Challenge, urlPrefix)
+	utils.SendVerification(newAccount.Email, newAccount.Nick, newAccount.ID.Hex(), newAccount.Challenge, urlPrefix)
 
 	newAccount.Password = ""
 	newAccount.Challenge = ""
 	w.WriteJson(newAccount)
 }
 
-func (a *AuthApp) handle_getprofile(w rest.ResponseWriter, r *rest.Request) {
+// handleGetProfile Get user profile
+// @Summary Get user profile
+// @Description Get user profile
+// @Accept  json
+// @Produce  json
+// @Tags auth
+// @Security ApiKeyAuth
+// @Param id path string true "ID|Nick|PRN"
+// @Success 200 {object} accounts.Account
+// @Failure 400 {object} utils.RError "Invalid payload"
+// @Failure 404 {object} utils.RError "Account not found"
+// @Failure 500 {object} utils.RError "Error processing request"
+// @Router /auth [get]
+func (a *App) handleGetProfile(w rest.ResponseWriter, r *rest.Request) {
 	jwtClaims := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)
 
 	accountPrn := jwtClaims["prn"].(string)
 
 	if accountPrn == "" {
-		rest.Error(w, "Not logged in", http.StatusPreconditionFailed)
+		utils.RestErrorWrapper(w, "Not logged in", http.StatusPreconditionFailed)
 		return
 	}
 
@@ -367,7 +319,7 @@ func (a *AuthApp) handle_getprofile(w rest.ResponseWriter, r *rest.Request) {
 		if err != nil {
 			switch err.(type) {
 			default:
-				rest.Error(w, "Account "+err.Error(), http.StatusInternalServerError)
+				utils.RestErrorWrapper(w, "Account "+err.Error(), http.StatusInternalServerError)
 				break
 			}
 		}
@@ -376,25 +328,36 @@ func (a *AuthApp) handle_getprofile(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(account)
 }
 
-func (a *AuthApp) handle_verify(w rest.ResponseWriter, r *rest.Request) {
+// handleVerify Verify account payload
+// @Summary Verify account payload
+// @Description Verify account payload
+// @Accept  json
+// @Produce  json
+// @Tags auth
+// @Success 200 {object} accounts.Account
+// @Failure 400 {object} utils.RError "Invalid payload"
+// @Failure 404 {object} utils.RError "Account not found"
+// @Failure 500 {object} utils.RError "Error processing request"
+// @Router /auth/verify [get]
+func (a *App) handleVerify(w rest.ResponseWriter, r *rest.Request) {
 
 	newAccount := accounts.Account{}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
 
 	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
 	r.ParseForm()
-	putId := r.FormValue("id")
+	putID := r.FormValue("id")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	ObjectID, err := primitive.ObjectIDFromHex(putId)
+	ObjectID, err := primitive.ObjectIDFromHex(putID)
 	if err != nil {
-		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	err = collection.FindOne(ctx,
@@ -403,7 +366,7 @@ func (a *AuthApp) handle_verify(w rest.ResponseWriter, r *rest.Request) {
 		}).
 		Decode(&newAccount)
 	if err != nil {
-		rest.Error(w, "Not Accessible Resource Id", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
 	}
 
@@ -415,11 +378,11 @@ func (a *AuthApp) handle_verify(w rest.ResponseWriter, r *rest.Request) {
 		if challenge == challengeVal {
 			newAccount.Challenge = ""
 		} else {
-			rest.Error(w, "Invalid Challenge (wrong, used or never existed)", http.StatusPreconditionFailed)
+			utils.RestErrorWrapper(w, "Invalid Challenge (wrong, used or never existed)", http.StatusPreconditionFailed)
 			return
 		}
 	} else {
-		rest.Error(w, "Invalid Challenge (wrong, used or never existed)", http.StatusPreconditionFailed)
+		utils.RestErrorWrapper(w, "Invalid Challenge (wrong, used or never existed)", http.StatusPreconditionFailed)
 		return
 	}
 
@@ -428,12 +391,12 @@ func (a *AuthApp) handle_verify(w rest.ResponseWriter, r *rest.Request) {
 	updateOptions.SetUpsert(true)
 	_, err = collection.UpdateOne(
 		ctx,
-		bson.M{"_id": newAccount.Id},
+		bson.M{"_id": newAccount.ID},
 		bson.M{"$set": newAccount},
 		updateOptions,
 	)
 	if err != nil {
-		rest.Error(w, "Error on Updating", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error on Updating", http.StatusInternalServerError)
 		return
 	}
 
@@ -443,19 +406,19 @@ func (a *AuthApp) handle_verify(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(newAccount)
 }
 
-type passwordReset struct {
-	Token    string `json:"token"`
-	Password string `json:"password"`
-}
-
-type resetPasswordClaims struct {
-	Email        string    `json:"email"`
-	TimeModified time.Time `json:"time-modified"`
-	jwtgo.StandardClaims
-}
-
-// handle_password_reset gets the recovery token and validate it in order to overwrite the user password
-func (app *AuthApp) handle_password_reset(writer rest.ResponseWriter, r *rest.Request) {
+// handlePasswordReset gets the recovery token and validate it in order to overwrite the user password
+// @Summary send email with token to user in order to reset password to given user
+// @Description send email with token to user in order to reset password to given user
+// @Accept  json
+// @Produce  json
+// @Tags auth
+// @Param body body passwordReset true "New password payload"
+// @Success 200 {object} accounts.Account
+// @Failure 400 {object} utils.RError "Invalid payload"
+// @Failure 404 {object} utils.RError "Account not found"
+// @Failure 500 {object} utils.RError "Error processing request"
+// @Router /auth/password [post]
+func (a *App) handlePasswordReset(writer rest.ResponseWriter, r *rest.Request) {
 	data := passwordReset{}
 
 	r.DecodeJsonPayload(&data)
@@ -471,7 +434,7 @@ func (app *AuthApp) handle_password_reset(writer rest.ResponseWriter, r *rest.Re
 	}
 
 	token, err := jwtgo.ParseWithClaims(data.Token, &resetPasswordClaims{}, func(token *jwtgo.Token) (interface{}, error) {
-		return app.jwt_middleware.Pub, nil
+		return a.jwtMiddleware.Pub, nil
 	})
 	if err != nil {
 		utils.RestError(writer, err, tokenInvalidOrExpiredErr, http.StatusInternalServerError)
@@ -485,7 +448,7 @@ func (app *AuthApp) handle_password_reset(writer rest.ResponseWriter, r *rest.Re
 		return
 	}
 
-	collection := app.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
 	if collection == nil {
 		utils.RestError(writer, nil, dbConnectionErr, http.StatusInternalServerError)
 		return
@@ -545,20 +508,19 @@ func (app *AuthApp) handle_password_reset(writer rest.ResponseWriter, r *rest.Re
 	writer.WriteJson(true)
 }
 
-type tokenResponse struct {
-	Token       string `json:"token"`
-	RedirectURI string `json:"redirect_uri"`
-	State       string `json:"state"`
-	TokenType   string `json:"token_type"`
-	Scopes      string `json:"scopes"`
-}
-
-type passwordResetRequest struct {
-	Email string `json:"email"`
-}
-
-// handle_password_recovery send email with token to user in order to reset password to given user
-func (app *AuthApp) handle_password_recovery(writer rest.ResponseWriter, r *rest.Request) {
+// handlePasswordRecovery send email with token to user in order to reset password to given user
+// @Summary send email with token to user in order to reset password to given user
+// @Description send email with token to user in order to reset password to given user
+// @Accept  json
+// @Produce  json
+// @Tags auth
+// @Param body body passwordResetRequest true "Account recovery payload"
+// @Success 200 {object} accounts.Account
+// @Failure 400 {object} utils.RError "Invalid payload"
+// @Failure 404 {object} utils.RError "Account not found"
+// @Failure 500 {object} utils.RError "Error processing request"
+// @Router /auth/recover [post]
+func (a *App) handlePasswordRecovery(writer rest.ResponseWriter, r *rest.Request) {
 	data := passwordResetRequest{}
 
 	r.DecodeJsonPayload(&data)
@@ -568,7 +530,7 @@ func (app *AuthApp) handle_password_recovery(writer rest.ResponseWriter, r *rest
 		return
 	}
 
-	collection := app.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
 	if collection == nil {
 		utils.RestError(writer, nil, dbConnectionErr, http.StatusInternalServerError)
 		return
@@ -589,7 +551,7 @@ func (app *AuthApp) handle_password_recovery(writer rest.ResponseWriter, r *rest
 		return
 	}
 
-	restorePasswordTTL, err := strconv.Atoi(utils.GetEnv(utils.ENV_PANTAHUB_RECOVER_JWT_TIMEOUT_MINUTES))
+	restorePasswordTTL, err := strconv.Atoi(utils.GetEnv(utils.EnvPantahubRecoverJWTTimeoutMinutes))
 	if err != nil {
 		utils.RestError(writer, err, err.Error(), http.StatusInternalServerError)
 	}
@@ -602,9 +564,9 @@ func (app *AuthApp) handle_password_recovery(writer rest.ResponseWriter, r *rest
 		},
 	}
 
-	token := jwtgo.NewWithClaims(jwtgo.GetSigningMethod(app.jwt_middleware.SigningAlgorithm), claims)
+	token := jwtgo.NewWithClaims(jwtgo.GetSigningMethod(a.jwtMiddleware.SigningAlgorithm), claims)
 
-	tokenString, err := token.SignedString(app.jwt_middleware.Key)
+	tokenString, err := token.SignedString(a.jwtMiddleware.Key)
 	if err != nil {
 		utils.RestError(writer, err, tokenCreationErr, http.StatusInternalServerError)
 		return
@@ -619,30 +581,28 @@ func (app *AuthApp) handle_password_recovery(writer rest.ResponseWriter, r *rest
 	writer.WriteJson(true)
 }
 
-// this requests to swap access code with accesstoken
-type tokenRequest struct {
-	Code    string `json:"access-code"`
-	Comment string `json:"comment"`
-}
-
-type tokenStore struct {
-	ID      primitive.ObjectID     `json:"id", bson:"_id"`
-	Client  string                 `json:"client"`
-	Owner   string                 `json:"owner"`
-	Comment string                 `json:"comment"`
-	Claims  map[string]interface{} `json:"jwt-claims"`
-}
-
-// handle_posttoken can be used by services to swap an accessCode to a long living accessToken.
+// handlePostToken can be used by services to swap an accessCode to a long living accessToken.
 // Payload is of type application/json and type TokenRequest
 // note that tokenhandler is supposed to be called authenticated by service that wants the access
 // token to be issued on his behalf
-func (app *AuthApp) handle_posttoken(writer rest.ResponseWriter, r *rest.Request) {
+// @Summary Get user profile
+// @Description Get user profile
+// @Accept  json
+// @Produce  json
+// @Tags auth
+// @Security ApiKeyAuth
+// @Param id path string true "ID|Nick|PRN"
+// @Success 200 {object} accounts.Account
+// @Failure 400 {object} utils.RError "Invalid payload"
+// @Failure 404 {object} utils.RError "Account not found"
+// @Failure 500 {object} utils.RError "Error processing request"
+// @Router /auth [get]
+func (a *App) handlePostToken(writer rest.ResponseWriter, r *rest.Request) {
 	tokenRequest := tokenRequest{}
 	err := r.DecodeJsonPayload(&tokenRequest)
 
 	if err != nil {
-		rest.Error(writer, "Failed to decode token Request", http.StatusBadRequest)
+		utils.RestErrorWrapper(writer, "Failed to decode token Request", http.StatusBadRequest)
 		return
 	}
 	// this is the claim of the service authenticating itself
@@ -651,19 +611,19 @@ func (app *AuthApp) handle_posttoken(writer rest.ResponseWriter, r *rest.Request
 	log.Println("Requesting code " + tokenRequest.Code)
 	// we parse the accessCode to see if we can swap it out.
 	tok, err := jwtgo.Parse(tokenRequest.Code, func(token *jwtgo.Token) (interface{}, error) {
-		return app.jwt_middleware.Pub, nil
+		return a.jwtMiddleware.Pub, nil
 	})
 
 	if err != nil {
 		log.Println("ERROR: Failed parsing the access Code " + err.Error())
-		rest.Error(writer, "Failed parsing the access Code", http.StatusUnauthorized)
+		utils.RestErrorWrapper(writer, "Failed parsing the access Code", http.StatusUnauthorized)
 		return
 	}
 
 	err = tok.Claims.Valid()
 	if err != nil {
 		log.Println("ERROR: Failed validating the access Code claims: " + err.Error())
-		rest.Error(writer, "Failed validating the access Code claims", http.StatusUnauthorized)
+		utils.RestErrorWrapper(writer, "Failed validating the access Code claims", http.StatusUnauthorized)
 		return
 	}
 
@@ -679,16 +639,16 @@ func (app *AuthApp) handle_posttoken(writer rest.ResponseWriter, r *rest.Request
 
 	if service != caller {
 		log.Println("WARNING: invalid service (" + service + " != " + caller + ") tries to swap an accesscode")
-		rest.Error(writer, "invalid service ("+service+" != "+caller+") tries to swap an accesscode", http.StatusUnauthorized)
+		utils.RestErrorWrapper(writer, "invalid service ("+service+" != "+caller+") tries to swap an accesscode", http.StatusUnauthorized)
 		return
 	}
 
-	token := jwtgo.New(jwtgo.GetSigningMethod(app.jwt_middleware.SigningAlgorithm))
+	token := jwtgo.New(jwtgo.GetSigningMethod(a.jwtMiddleware.SigningAlgorithm))
 	tokenClaims := token.Claims.(jwtgo.MapClaims)
 
 	// lets get the standard payload for a user and modify it so its a service accesstoken
-	if app.jwt_middleware.PayloadFunc != nil {
-		for key, value := range app.jwt_middleware.PayloadFunc(user) {
+	if a.jwtMiddleware.PayloadFunc != nil {
+		for key, value := range a.jwtMiddleware.PayloadFunc(user) {
 			tokenClaims[key] = value
 		}
 	}
@@ -703,18 +663,18 @@ func (app *AuthApp) handle_posttoken(writer rest.ResponseWriter, r *rest.Request
 	tokenClaims["roles"] = userRoles
 	tokenClaims["type"] = userType
 
-	tokenString, err := token.SignedString(app.jwt_middleware.Key)
+	tokenString, err := token.SignedString(a.jwtMiddleware.Key)
 
 	if err != nil {
 		log.Println("WARNING: invalid service (" + service + " != " + caller + ") tries to swap an accesscode")
-		rest.Error(writer, "invalid service ("+service+" != "+caller+") tries to swap an accesscode", http.StatusUnauthorized)
+		utils.RestErrorWrapper(writer, "invalid service ("+service+" != "+caller+") tries to swap an accesscode", http.StatusUnauthorized)
 		return
 	}
 
-	collection := app.mongoClient.Database(utils.MongoDb).Collection("pantahub_oauth_accesstokens")
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_oauth_accesstokens")
 
 	if collection == nil {
-		rest.Error(writer, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(writer, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -730,7 +690,7 @@ func (app *AuthApp) handle_posttoken(writer rest.ResponseWriter, r *rest.Request
 	defer cancel()
 	_, err = collection.InsertOne(ctx, &tokenStore)
 	if err != nil {
-		rest.Error(writer, "Error storing issued token in DB", http.StatusInternalServerError)
+		utils.RestErrorWrapper(writer, "Error storing issued token in DB", http.StatusInternalServerError)
 		return
 	}
 
@@ -741,441 +701,4 @@ func (app *AuthApp) handle_posttoken(writer rest.ResponseWriter, r *rest.Request
 	}
 
 	writer.WriteJson(tokenResult)
-}
-
-type AuthApp struct {
-	jwt_middleware *jwt.JWTMiddleware
-	Api            *rest.Api
-	mongoClient    *mongo.Client
-}
-
-func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *AuthApp {
-
-	app := new(AuthApp)
-	app.jwt_middleware = jwtMiddleware
-	app.mongoClient = mongoClient
-
-	//key := flag.String("nick", "", "The field you'd like to place an index on")
-	//unique := flag.Bool("unique", true, "Would you like the index to be unique?")
-	//value := flag.Int("type", 1, "would you like the index to be ascending (1) or descending (-1)?")
-	CreateIndexesOptions := options.CreateIndexesOptions{}
-	CreateIndexesOptions.SetMaxTime(10 * time.Second)
-
-	indexOptions := options.IndexOptions{}
-	indexOptions.SetUnique(true)
-	indexOptions.SetSparse(true)
-	indexOptions.SetBackground(true)
-
-	index := mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "nick", Value: bsonx.Int32(1)},
-		},
-		Options: &indexOptions,
-	}
-	collection := app.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
-	_, err := collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
-	if err != nil {
-		log.Fatalln("Error setting up index for pantahub_accounts: " + err.Error())
-		return nil
-	}
-
-	CreateIndexesOptions = options.CreateIndexesOptions{}
-	CreateIndexesOptions.SetMaxTime(10 * time.Second)
-
-	indexOptions = options.IndexOptions{}
-	indexOptions.SetUnique(false)
-	indexOptions.SetSparse(true)
-	indexOptions.SetBackground(true)
-
-	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "prn", Value: bsonx.Int32(1)},
-		},
-		Options: &indexOptions,
-	}
-	collection = app.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
-	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
-	if err != nil {
-		log.Fatalln("Error setting up index for pantahub_accounts: " + err.Error())
-		return nil
-	}
-
-	CreateIndexesOptions = options.CreateIndexesOptions{}
-	CreateIndexesOptions.SetMaxTime(10 * time.Second)
-
-	indexOptions = options.IndexOptions{}
-	indexOptions.SetUnique(true)
-	indexOptions.SetSparse(true)
-	indexOptions.SetBackground(true)
-
-	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "email", Value: bsonx.Int32(1)},
-		},
-		Options: &indexOptions,
-	}
-	collection = app.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
-	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
-	if err != nil {
-		log.Fatalln("Error setting up index for pantahub_accounts: " + err.Error())
-		return nil
-	}
-	jwtMiddleware.Authenticator = func(userId string, password string) bool {
-
-		var loginUser string
-
-		if userId == "" || password == "" {
-			return false
-		}
-
-		userTup := strings.SplitN(userId, "==>", 2)
-		if len(userTup) > 1 {
-			loginUser = userTup[0]
-		} else {
-			loginUser = userId
-		}
-
-		testUserID := loginUser
-		if !strings.HasPrefix(loginUser, "prn:") {
-			testUserID = "prn:pantahub.com:auth:/" + loginUser
-		}
-
-		if strings.HasPrefix(loginUser, utils.BaseServiceID) {
-			tpApp, err := apps.LoginAsApp(loginUser, password, app.mongoClient.Database(utils.MongoDb))
-			if err != nil || tpApp == nil {
-				return false
-			}
-			return true
-		}
-
-		plm, ok := accounts.DefaultAccounts[testUserID]
-		if !ok {
-			if strings.HasPrefix(loginUser, "prn:::devices:") {
-				return app.deviceAuth(loginUser, password)
-			}
-
-			return app.accountAuth(loginUser, password)
-		}
-
-		return plm.Password == password
-	}
-
-	jwtMiddleware.PayloadFunc = func(userId string) map[string]interface{} {
-
-		var loginUser, callUser string
-		var payload map[string]interface{}
-
-		userTup := strings.SplitN(userId, "==>", 2)
-		if len(userTup) > 1 {
-			loginUser = userTup[0]
-			callUser = userTup[1]
-		} else {
-			loginUser = userId
-		}
-
-		testUserID := loginUser
-		if !strings.HasPrefix(loginUser, "prn:") {
-			testUserID = "prn:pantahub.com:auth:/" + loginUser
-		}
-		if plm, ok := accounts.DefaultAccounts[testUserID]; !ok {
-			if strings.HasPrefix(userId, "prn:::devices:") {
-				payload = app.devicePayload(loginUser)
-			} else {
-				payload = app.accountPayload(loginUser)
-			}
-		} else {
-			payload = AccountToPayload(plm)
-		}
-
-		if payload == nil {
-			payload, err = apps.GetAppPayload(userId, app.mongoClient.Database(utils.MongoDb))
-			if err != nil {
-				return nil
-			}
-			return payload
-		}
-
-		if callUser != "" {
-			callPayload := jwtMiddleware.PayloadFunc(callUser)
-			callPayload["id"] = payload["id"].(string) + "==>" + callPayload["id"].(string)
-			payload["call-as"] = callPayload
-		}
-
-		return payload
-	}
-
-	app.Api = rest.NewApi()
-	app.Api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
-		"/auth:", log.Lshortfile)})
-	app.Api.Use(&utils.AccessLogFluentMiddleware{Prefix: "auth"})
-	app.Api.Use(&rest.StatusMiddleware{})
-	app.Api.Use(&rest.TimerMiddleware{})
-	app.Api.Use(&metrics.MetricsMiddleware{})
-	app.Api.Use(rest.DefaultDevStack...)
-	app.Api.Use(&rest.CorsMiddleware{
-		RejectNonCorsRequests: false,
-		OriginValidator: func(origin string, request *rest.Request) bool {
-			return true
-		},
-		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{
-			"Accept", "Content-Type", "X-Custom-Header", "Origin", "Authorization"},
-		AccessControlAllowCredentials: true,
-		AccessControlMaxAge:           3600,
-	})
-
-	// no authentication needed for /login
-	app.Api.Use(&rest.IfMiddleware{
-		Condition: func(request *rest.Request) bool {
-			return request.URL.Path != "/login" &&
-				!(request.URL.Path == "/accounts" && request.Method == "POST") &&
-				!(request.URL.Path == "/verify" && request.Method == "GET") &&
-				!(request.URL.Path == "/recover" && request.Method == "POST") &&
-				!(request.URL.Path == "/password" && request.Method == "POST")
-		},
-		IfTrue: app.jwt_middleware,
-	})
-
-	// no authentication needed for /login
-	app.Api.Use(&rest.IfMiddleware{
-		Condition: func(request *rest.Request) bool {
-			return request.URL.Path != "/login" &&
-				!(request.URL.Path == "/accounts" && request.Method == "POST") &&
-				!(request.URL.Path == "/verify" && request.Method == "GET") &&
-				!(request.URL.Path == "/recover" && request.Method == "POST") &&
-				!(request.URL.Path == "/password" && request.Method == "POST")
-		},
-		IfTrue: &utils.AuthMiddleware{},
-	})
-
-	// /login /auth_status and /refresh_token endpoints
-	api_router, _ := rest.MakeRouter(
-		rest.Get("/", app.handle_getprofile),
-		rest.Post("/login", app.jwt_middleware.LoginHandler),
-		rest.Post("/token", app.handle_posttoken),
-		rest.Get("/auth_status", handle_auth),
-		rest.Get("/login", app.jwt_middleware.RefreshHandler),
-		rest.Get("/accounts", app.handle_getaccounts),
-		rest.Post("/accounts", app.handle_postaccount),
-		rest.Get("/verify", app.handle_verify),
-		rest.Post("/recover", app.handle_password_recovery),
-		rest.Post("/password", app.handle_password_reset),
-		rest.Post("/authorize", app.handlePostAuthorizeToken),
-		rest.Post("/code", app.handlePostCode),
-	)
-	app.Api.SetApp(api_router)
-
-	return app
-}
-
-func (a *AuthApp) getAccount(prnEmailNick string) (accounts.Account, error) {
-
-	var (
-		err     error
-		account accounts.Account
-	)
-	if strings.HasPrefix(prnEmailNick, "prn:::devices:") {
-		return account, errors.New("getAccount does not serve device accounts")
-	}
-
-	var ok, ok2 bool
-	if account, ok = accounts.DefaultAccounts[prnEmailNick]; !ok {
-		fullprn := "prn:pantahub.com:auth:/" + prnEmailNick
-		account, ok2 = accounts.DefaultAccounts[fullprn]
-	}
-
-	if ok || ok2 {
-		return account, nil
-	}
-
-	c := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
-
-	// we accept three variants to identify the account:
-	//  - id (pure and with prn format
-	//  - email
-	//  - nick
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if utils.IsEmail(prnEmailNick) {
-		err = c.FindOne(ctx, bson.M{"email": prnEmailNick}).Decode(&account)
-	} else if utils.IsNick(prnEmailNick) {
-		err = c.FindOne(ctx, bson.M{"nick": prnEmailNick}).Decode(&account)
-	} else {
-		err = c.FindOne(ctx, bson.M{"prn": prnEmailNick}).Decode(&account)
-	}
-
-	return account, err
-}
-
-func (a *AuthApp) accountAuth(idEmailNick string, secret string) bool {
-
-	var (
-		err     error
-		account accounts.Account
-	)
-
-	account, err = a.getAccount(idEmailNick)
-
-	// error with db or not found -> log and fail
-	if err != nil {
-		return false
-	}
-
-	// account has still a challenge -> not activated -> fail to login
-	if account.Challenge != "" {
-		return false
-	}
-
-	// account has same password as the secret provided to func call -> success
-	if utils.CheckPasswordHash(secret, account.PasswordBcrypt, utils.CryptoMethods.BCrypt) {
-		return true
-	}
-	if account.Password != "" && secret == account.Password {
-		return true
-	}
-
-	// fail by default.
-	return false
-}
-
-func (a *AuthApp) getAccountPayload(idEmailNick string) map[string]interface{} {
-	var plm accounts.Account
-	var ok, ok2 bool
-
-	plm, ok = accounts.DefaultAccounts[idEmailNick]
-	if ok {
-		return AccountToPayload(plm)
-	}
-
-	fullprn := "prn:pantahub.com:auth:/" + idEmailNick
-	plm, ok2 = accounts.DefaultAccounts[fullprn]
-	if ok2 {
-		return AccountToPayload(plm)
-	}
-
-	if strings.HasPrefix(idEmailNick, "prn:::devices:") {
-		return a.devicePayload(idEmailNick)
-	}
-
-	acc := a.accountPayload(idEmailNick)
-	if acc != nil && acc["prn"] != nil {
-		return acc
-	}
-
-	return AccountToPayload(plm)
-}
-
-func (a *AuthApp) accessCodePayload(userIDEmailNick string, serviceIDEmailNick string, scopes string) map[string]interface{} {
-	var (
-		userAccountPayload    map[string]interface{}
-		serviceAccountPayload map[string]interface{}
-	)
-
-	serviceAccountPayload = a.getAccountPayload(serviceIDEmailNick)
-	userAccountPayload = a.getAccountPayload(userIDEmailNick)
-
-	// error with db or not found -> log and fail
-	if serviceAccountPayload == nil {
-		return nil
-	}
-
-	if userAccountPayload == nil {
-		return nil
-	}
-
-	accessCodePayload := map[string]interface{}{}
-	accessCodePayload["approver_prn"] = userAccountPayload["prn"]
-	accessCodePayload["approver_nick"] = userAccountPayload["nick"]
-	accessCodePayload["approver_roles"] = userAccountPayload["roles"]
-	accessCodePayload["approver_type"] = userAccountPayload["type"]
-	accessCodePayload["service"] = serviceAccountPayload["prn"]
-	accessCodePayload["scopes"] = scopes
-
-	return accessCodePayload
-}
-
-func (a *AuthApp) accountPayload(idEmailNick string) map[string]interface{} {
-	var (
-		err     error
-		account accounts.Account
-	)
-
-	account, err = a.getAccount(idEmailNick)
-	account.Password = ""
-	account.Challenge = ""
-
-	// error with db or not found -> log and fail
-	if err != nil {
-		return nil
-	}
-
-	return AccountToPayload(account)
-}
-
-func (a *AuthApp) deviceAuth(deviceId string, secret string) bool {
-
-	c := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
-
-	id := utils.PrnGetId(deviceId)
-	mgoId, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return false
-	}
-
-	device := devices.Device{}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	deviceID, err := primitive.ObjectIDFromHex(mgoId.Hex())
-	if err != nil {
-		return false
-	}
-	err = c.FindOne(ctx, bson.M{
-		"_id":     deviceID,
-		"garbage": bson.M{"$ne": true},
-	}).Decode(&device)
-	if err != nil {
-		return false
-	}
-	if secret == device.Secret {
-		return true
-	}
-	return false
-}
-
-func (a *AuthApp) devicePayload(deviceId string) map[string]interface{} {
-
-	c := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
-
-	id := utils.PrnGetId(deviceId)
-	mgoId, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return nil
-	}
-
-	device := devices.Device{}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	deviceID, err := primitive.ObjectIDFromHex(mgoId.Hex())
-	if err != nil {
-		return nil
-	}
-	err = c.FindOne(ctx, bson.M{
-		"_id":     deviceID,
-		"garbage": bson.M{"$ne": true},
-	}).Decode(&device)
-	if err != nil {
-		return nil
-	}
-
-	val := map[string]interface{}{
-		"id":     device.Prn,
-		"nick":   device.Nick,
-		"roles":  "device",
-		"type":   "DEVICE",
-		"prn":    device.Prn,
-		"owner":  device.Owner,
-		"scopes": "prn:pantahub.com:apis:/base/all",
-	}
-
-	return val
 }

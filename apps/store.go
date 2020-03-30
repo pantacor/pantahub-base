@@ -33,7 +33,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-// CreateOrUpdateApp a new thrid party app
+// CreateOrUpdateApp a new third party app
 func CreateOrUpdateApp(tpApp *TPApp, database *mongo.Database) (*TPApp, error) {
 	if tpApp.Nick == "" {
 		tpApp.Nick = petname.Generate(3, "-")
@@ -98,7 +98,7 @@ func LoginAsApp(serviceID, secret string, database *mongo.Database) (*TPApp, err
 	return tpApp, nil
 }
 
-// SearchApp search thrid party app by id or prn
+// SearchApp search third party app by id or prn
 func SearchApp(owner string, id string, database *mongo.Database) (*TPApp, int, error) {
 	apps, err := SearchApps(owner, id, database)
 	if err != nil {
@@ -114,7 +114,7 @@ func SearchApp(owner string, id string, database *mongo.Database) (*TPApp, int, 
 	return &tpApp, 0, nil
 }
 
-// SearchApps search all thrid party app by id or prn
+// SearchApps search all third party app by id or prn
 func SearchApps(owner string, id string, database *mongo.Database) ([]TPApp, error) {
 	apps := make([]TPApp, 0)
 
@@ -161,7 +161,7 @@ func SearchApps(owner string, id string, database *mongo.Database) ([]TPApp, err
 	return apps, nil
 }
 
-// SearchExposedScopes search all thrid party app by id or prn
+// SearchExposedScopes search all third party app by id or prn
 func SearchExposedScopes(database *mongo.Database) ([]utils.Scope, error) {
 	scopes := make([]utils.Scope, 0)
 

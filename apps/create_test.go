@@ -109,7 +109,7 @@ func TestApp_handleCreateApp(t *testing.T) {
 			name: "Pass with correct scopes",
 			app:  app,
 			args: args{
-				body: createAppPayload{
+				body: CreateAppPayload{
 					Type:         AppTypePublic,
 					RedirectURIs: []string{"redirect uri 1"},
 					Scopes: []utils.Scope{
@@ -133,7 +133,7 @@ func TestApp_handleCreateApp(t *testing.T) {
 			name: "Fail is redirect uris are empty",
 			app:  app,
 			args: args{
-				body: createAppPayload{
+				body: CreateAppPayload{
 					Type:         AppTypePublic,
 					RedirectURIs: []string{},
 					Scopes: []utils.Scope{
@@ -158,7 +158,7 @@ func TestApp_handleCreateApp(t *testing.T) {
 			name: "Only allow to use empty service or pantahub space",
 			app:  app,
 			args: args{
-				body: createAppPayload{
+				body: CreateAppPayload{
 					Type:         AppTypePublic,
 					RedirectURIs: []string{"redirect uri 1"},
 					Scopes: []utils.Scope{
@@ -183,7 +183,7 @@ func TestApp_handleCreateApp(t *testing.T) {
 			name: "Pass custom scopes",
 			app:  app,
 			args: args{
-				body: createAppPayload{
+				body: CreateAppPayload{
 					Type:         AppTypePublic,
 					RedirectURIs: []string{"redirect uri 1"},
 					Scopes: []utils.Scope{
@@ -213,7 +213,7 @@ func TestApp_handleCreateApp(t *testing.T) {
 			name: "Pass ph scopes",
 			app:  app,
 			args: args{
-				body: createAppPayload{
+				body: CreateAppPayload{
 					Type:         AppTypePublic,
 					RedirectURIs: []string{"redirect uri 1"},
 					Scopes:       []utils.Scope{utils.Scopes.API},
@@ -257,7 +257,7 @@ func TestApp_handleCreateApp(t *testing.T) {
 
 func Test_validatePayload(t *testing.T) {
 	type args struct {
-		app *createAppPayload
+		app *CreateAppPayload
 	}
 	tests := []struct {
 		name     string
@@ -268,7 +268,7 @@ func Test_validatePayload(t *testing.T) {
 		{
 			name: "t",
 			args: args{
-				app: &createAppPayload{
+				app: &CreateAppPayload{
 					Type: "",
 					Scopes: []utils.Scope{utils.Scope{
 						ID: "notvalid",
@@ -281,7 +281,7 @@ func Test_validatePayload(t *testing.T) {
 		{
 			name: "t",
 			args: args{
-				app: &createAppPayload{
+				app: &CreateAppPayload{
 					Type: string(AppTypeConfidential),
 					Scopes: []utils.Scope{utils.Scope{
 						ID: "notvalid",
@@ -294,7 +294,7 @@ func Test_validatePayload(t *testing.T) {
 		{
 			name: "t",
 			args: args{
-				app: &createAppPayload{
+				app: &CreateAppPayload{
 					Type:         string(AppTypeConfidential),
 					Scopes:       []utils.Scope{utils.Scopes.ReadUser},
 					RedirectURIs: []string{"something.com"},

@@ -13,16 +13,18 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
 package utils
 
 import (
+	"regexp"
 	"strings"
 )
 
 // GetAdmins parses PANTAHUB_ADMINS env configuration and returns a list of Prns for
 // users that shoudl have global admin powers
 func GetAdmins() []Prn {
-	adminsString := GetEnv(ENV_PANTAHUB_ADMINS)
+	adminsString := GetEnv(EnvPantahubAdmins)
 	adminsStringA := strings.Split(adminsString, ",")
 	prns := make([]Prn, len(adminsStringA))
 	for i, v := range adminsStringA {
@@ -37,7 +39,7 @@ func GetAdmins() []Prn {
 // requsts
 func GetSubscriptionAdmins() []Prn {
 
-	adminsString := GetEnv(ENV_PANTAHUB_SUBSCRIPTION_ADMINS)
+	adminsString := GetEnv(EnvPantahubSubscriptionAdmins)
 	adminsStringA := strings.Split(adminsString, ",")
 
 	admins := GetAdmins()
@@ -50,4 +52,9 @@ func GetSubscriptionAdmins() []Prn {
 		prns[i+offset] = Prn(v)
 	}
 	return prns
+}
+
+// ValidateUserPrn : Validate User Prn
+func ValidateUserPrn(prn string) (bool, error) {
+	return regexp.MatchString(`^prn:[a-zA-Z0-9.]*:[a-zA-Z0-9]*:[/]?[a-zA-Z0-9/._$-+!*'()@%,;:&?#[]]*`, prn)
 }

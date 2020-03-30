@@ -12,6 +12,7 @@
 //   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
 package s3
 
 import (
@@ -27,7 +28,8 @@ type inputS3Downloader interface {
 	Download(w io.WriterAt, input *s3.GetObjectInput, options ...func(*s3manager.Downloader)) (n int64, err error)
 }
 
-type S3Downloader interface {
+// Downloader Downloader application interface
+type Downloader interface {
 	DownloadURL(key string) (string, error)
 }
 

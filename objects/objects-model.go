@@ -9,9 +9,10 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
+// Object define a object structure
 type Object struct {
-	Id          string `json:"id" bson:"id"`
-	StorageId   string `json:"storage-id" bson:"_id"`
+	ID          string `json:"id" bson:"id"`
+	StorageID   string `json:"storage-id" bson:"_id"`
 	Owner       string `json:"owner"`
 	ObjectName  string `json:"objectname"`
 	Sha         string `json:"sha256sum"`
@@ -21,21 +22,24 @@ type Object struct {
 	initialized bool
 }
 
+// ObjectWithAccess extends object to add access information
 type ObjectWithAccess struct {
 	Object       `bson:",inline"`
-	SignedPutUrl string `json:"signed-puturl"`
-	SignedGetUrl string `json:"signed-geturl"`
+	SignedPutURL string `json:"signed-puturl"`
+	SignedGetURL string `json:"signed-geturl"`
 	Now          string `json:"now"`
 	ExpireTime   string `json:"expire-time"`
 }
 
+// DiskQuotaUsageResult payload for disk quota usage
 type DiskQuotaUsageResult struct {
-	Id    string  `json:"id" bson:"_id"`
+	ID    string  `json:"id" bson:"_id"`
 	Total float64 `json:"total"`
 }
 
+// CalcUsageAfterPost calculate usage after post new object
 func CalcUsageAfterPost(owner string, mongoClient *mongo.Client,
-	objectId string, newSize int64) (*DiskQuotaUsageResult, error) {
+	objectID string, newSize int64) (*DiskQuotaUsageResult, error) {
 
 	oCol := mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 	resp := DiskQuotaUsageResult{}
@@ -73,8 +77,9 @@ func CalcUsageAfterPost(owner string, mongoClient *mongo.Client,
 	return &resp, nil
 }
 
+// CalcUsageAfterPut calculate disk usage after update object
 func CalcUsageAfterPut(owner string, mongoClient *mongo.Client,
-	objectId string, newSize int64) (*DiskQuotaUsageResult, error) {
+	objectID string, newSize int64) (*DiskQuotaUsageResult, error) {
 
 	oCol := mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 	resp := DiskQuotaUsageResult{}
@@ -86,7 +91,7 @@ func CalcUsageAfterPut(owner string, mongoClient *mongo.Client,
 			"$match": bson.M{
 				"owner":   owner,
 				"garbage": bson.M{"$ne": true},
-				"_id":     bson.M{"$ne": objectId},
+				"_id":     bson.M{"$ne": objectID},
 			},
 		},
 		bson.M{

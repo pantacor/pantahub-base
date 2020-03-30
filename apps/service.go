@@ -40,7 +40,7 @@ const (
 	// AppTypePublic define a public client for oauth
 	AppTypePublic = "public"
 
-	// DBCollection db collection name for thridparty apps
+	// DBCollection db collection name for thirdparty apps
 	DBCollection = "pantahub_apps"
 
 	// Prn name convection for the prn
@@ -59,7 +59,7 @@ type TPApp struct {
 	RedirectURIs        []string           `json:"redirect_uris,omitempty" bson:"redirect_uris,omitempty"`
 	Scopes              []utils.Scope      `json:"scopes,omitempty" bson:"scopes,omitempty"`
 	ExposedScopes       []utils.Scope      `json:"exposed_scopes,omitempty" bson:"exposed_scopes,omitempty"`
-	ExposedScopesLength int                `bson:"exposed_scopes_length,omitempty"`
+	ExposedScopesLength int                `bson:"exposed_scopes_length,omit"`
 	TimeCreated         time.Time          `json:"time-created" bson:"time-created"`
 	TimeModified        time.Time          `json:"time-modified" bson:"time-modified"`
 	DeletedAt           *time.Time         `json:"deleted-at,omitempty" bson:"deleted-at,omitempty"`
@@ -113,7 +113,7 @@ func (app *App) setAPI() {
 	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "apps"})
 	app.API.Use(&rest.StatusMiddleware{})
 	app.API.Use(&rest.TimerMiddleware{})
-	app.API.Use(&metrics.MetricsMiddleware{})
+	app.API.Use(&metrics.Middleware{})
 	app.API.Use(rest.DefaultCommonStack...)
 	app.API.Use(&rest.CorsMiddleware{
 		RejectNonCorsRequests: false,

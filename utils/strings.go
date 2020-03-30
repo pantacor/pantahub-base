@@ -13,6 +13,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
 package utils
 
 import (
@@ -23,6 +24,7 @@ import (
 	"github.com/asaskevich/govalidator"
 )
 
+// IsNick check if a string is a nick
 func IsNick(nick string) bool {
 	l := len(nick)
 	if l > 3 && l < 24 {
@@ -31,12 +33,14 @@ func IsNick(nick string) bool {
 	return false
 }
 
+// IsEmail check if a string is an email
 func IsEmail(email string) bool {
 	return govalidator.IsEmail(email)
 }
 
 var r *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
 
+// GenerateChallenge create challenge string
 func GenerateChallenge() string {
 	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
 
@@ -48,6 +52,7 @@ func GenerateChallenge() string {
 	return string(result)
 }
 
+// GenerateSecret generate secret
 func GenerateSecret(length int) (string, error) {
 	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
 	key := make([]byte, length)

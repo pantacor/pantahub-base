@@ -29,7 +29,8 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-type createAppPayload struct {
+// CreateAppPayload create app json payload
+type CreateAppPayload struct {
 	Type          string        `json:"type"`
 	Nick          string        `json:"nick"`
 	RedirectURIs  []string      `json:"redirect_uris,omitempty"`
@@ -38,9 +39,21 @@ type createAppPayload struct {
 }
 
 // handleCreateApp create a new oauth client
+// @Summary Create a new third party application
+// @Description This define a new application to be used as OAuth client
+// @Accept  json
+// @Produce  json
+// @Tags apps
+// @Security ApiKeyAuth
+// @Param body body CreateAppPayload true "Create app body"
+// @Success 200 {object} TPApp
+// @Failure 400 {object} utils.RError
+// @Failure 404 {object} utils.RError
+// @Failure 500 {object} utils.RError
+// @Router /apps/ [post]
 func (app *App) handleCreateApp(w rest.ResponseWriter, r *rest.Request) {
 	newApp := &TPApp{}
-	payload := &createAppPayload{}
+	payload := &CreateAppPayload{}
 	r.DecodeJsonPayload(payload)
 
 	var owner interface{}
@@ -50,26 +63,26 @@ func (app *App) handleCreateApp(w rest.ResponseWriter, r *rest.Request) {
 		owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
 		ownerNick, ok = jwtPayload.(jwtgo.MapClaims)["nick"]
 	} else {
-		rest.Error(w, "Owner can't be defined", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Owner can't be defined", http.StatusInternalServerError)
 		return
 	}
 
 	err := validatePayload(payload)
 	if err != nil {
-		rest.Error(w, err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	mgoid := bson.NewObjectId()
 	ObjectID, err := primitive.ObjectIDFromHex(mgoid.Hex())
 	if err != nil {
-		rest.Error(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	apptype, err := parseType(payload.Type)
 	if err != nil {
-		rest.Error(w, err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -79,14 +92,14 @@ func (app *App) handleCreateApp(w rest.ResponseWriter, r *rest.Request) {
 
 	scopes, err := parseScopes(payload.Scopes, payload.Nick)
 	if err != nil {
-		rest.Error(w, err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	if apptype == AppTypeConfidential {
 		newApp.Secret, err = utils.GenerateSecret(30)
 		if err != nil {
-			rest.Error(w, "Error generating secret", http.StatusInternalServerError)
+			utils.RestErrorWrapper(w, "Error generating secret", http.StatusInternalServerError)
 			return
 		}
 	}
@@ -94,7 +107,7 @@ func (app *App) handleCreateApp(w rest.ResponseWriter, r *rest.Request) {
 	if apptype == AppTypeConfidential && len(payload.ExposedScopes) > 0 {
 		newApp.ExposedScopes, err = parseScopes(payload.ExposedScopes, payload.Nick)
 		if err != nil {
-			rest.Error(w, err.Error(), http.StatusBadRequest)
+			utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 	}
@@ -113,7 +126,7 @@ func (app *App) handleCreateApp(w rest.ResponseWriter, r *rest.Request) {
 
 	_, err = CreateOrUpdateApp(newApp, app.mongoClient.Database(utils.MongoDb))
 	if err != nil {
-		rest.Error(w, "Error creating third party application "+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error creating third party application "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -178,7 +191,7 @@ func isEmpty(scope utils.Scope) bool {
 	return scope.ID == ""
 }
 
-func validatePayload(app *createAppPayload) error {
+func validatePayload(app *CreateAppPayload) error {
 	if app.Type == "" {
 		return errors.New("App type must be defined")
 	}

@@ -13,6 +13,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
+
 package healthz
 
 import (
@@ -36,18 +37,33 @@ var (
 	lastResponseTime time.Time
 )
 
-type HealthzApp struct {
-	Api         *rest.Api
+// App health rest application
+type App struct {
+	API         *rest.Api
 	mongoClient *mongo.Client
 }
 
+// Response helth response
 type Response struct {
 	ErrorCode int           `json:"code"`
 	Duration  time.Duration `json:"duration"`
 	Start     time.Time     `json:"start-time"`
 }
 
-func (a *HealthzApp) handle_healthz(w rest.ResponseWriter, r *rest.Request) {
+// handleHealthz Get information of the health of the api services
+// @Summary Get information of the health of the api services
+// @Description Get information of the health of the api services
+// @Accept  json
+// @Produce  json
+// @Security BasicAuth
+// @Tags health
+// @Param id path string true "ID|PRN|NICK"
+// @Success 200 {object} Response
+// @Failure 400 {object} utils.RError
+// @Failure 404 {object} utils.RError
+// @Failure 500 {object} utils.RError
+// @Router /healthz [get]
+func (a *App) handleHealthz(w rest.ResponseWriter, r *rest.Request) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -63,14 +79,14 @@ func (a *HealthzApp) handle_healthz(w rest.ResponseWriter, r *rest.Request) {
 	user := r.Env["REMOTE_USER"].(string)
 
 	if user == "" {
-		rest.Error(w, "Not authorized", http.StatusUnauthorized)
+		utils.RestErrorWrapper(w, "Not authorized", http.StatusUnauthorized)
 		return
 	}
 
 	// check DB
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
-		rest.Error(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 	val := map[string]interface{}{}
@@ -78,7 +94,7 @@ func (a *HealthzApp) handle_healthz(w rest.ResponseWriter, r *rest.Request) {
 	defer cancel()
 	err := collection.FindOne(ctx, bson.M{}).Decode(&val)
 	if err != nil {
-		rest.Error(w, "Error with Database query:"+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error with Database query:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -91,36 +107,37 @@ func (a *HealthzApp) handle_healthz(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(response)
 }
 
-func New(mongoClient *mongo.Client) *HealthzApp {
+// New create a new rest application
+func New(mongoClient *mongo.Client) *App {
 
-	app := new(HealthzApp)
+	app := new(App)
 	app.mongoClient = mongoClient
 
-	app.Api = rest.NewApi()
+	app.API = rest.NewApi()
 	// we dont use default stack because we dont want content type enforcement
-	app.Api.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
+	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
 		"/health:", log.Lshortfile)})
-	app.Api.Use(&utils.AccessLogFluentMiddleware{Prefix: "health"})
+	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "health"})
 
-	app.Api.Use(rest.DefaultCommonStack...)
+	app.API.Use(rest.DefaultCommonStack...)
 
-	saAdminSecret := utils.GetEnv(utils.ENV_PANTAHUB_SA_ADMIN_SECRET)
+	saAdminSecret := utils.GetEnv(utils.EnvPantahubSaAdminSecret)
 
 	basicAuthMW := &rest.AuthBasicMiddleware{
-		Realm: "Pantahub Health @ " + utils.GetEnv(utils.ENV_PANTAHUB_AUTH),
+		Realm: "Pantahub Health @ " + utils.GetEnv(utils.EnvPantahubAuth),
 		Authenticator: func(userId string, password string) bool {
 			return saAdminSecret != "" && userId == "saadmin" && password == saAdminSecret
 		},
 	}
 
 	// no authentication needed for /login
-	app.Api.Use(basicAuthMW)
+	app.API.Use(basicAuthMW)
 
 	// /auth_status endpoints
-	api_router, _ := rest.MakeRouter(
-		rest.Get("/", app.handle_healthz),
+	apiRouter, _ := rest.MakeRouter(
+		rest.Get("/", app.handleHealthz),
 	)
-	app.Api.SetApp(api_router)
+	app.API.SetApp(apiRouter)
 
 	return app
 }

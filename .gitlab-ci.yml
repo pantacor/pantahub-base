@@ -42,7 +42,7 @@ build-devel:
     - docker push $CONTAINER_IMAGE:$CI_BUILD_REF_SLUG
     - test -n "$CI_BUILD_TAG" && docker push $CONTAINER_IMAGE:$CI_BUILD_TAG || true
   only:
-  - develop
+    - develop
 
 build-master:
   stage: build

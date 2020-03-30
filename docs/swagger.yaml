@@ -1,0 +1,2875 @@
+basePath: /
+definitions:
+  accounts.Account:
+    properties:
+      challenge:
+        type: string
+      email:
+        type: string
+      nick:
+        type: string
+      password:
+        type: string
+      password_bcrypt:
+        type: string
+      password_scrypt:
+        type: string
+      prn:
+        type: string
+      redirect_uris:
+        description: Oauth2RedirectURIs is limiting the prefix available for redirecting
+          users with oauth code and accesstoken to
+        items:
+          type: string
+        type: array
+      time-created:
+        type: string
+      time-modified:
+        type: string
+      type:
+        type: string
+    type: object
+  apps.CreateAppPayload:
+    properties:
+      exposed_scopes:
+        items:
+          $ref: '#/definitions/utils.Scope'
+        type: array
+      nick:
+        type: string
+      redirect_uris:
+        items:
+          type: string
+        type: array
+      scopes:
+        items:
+          $ref: '#/definitions/utils.Scope'
+        type: array
+      type:
+        type: string
+    type: object
+  apps.TPApp:
+    properties:
+      deleted-at:
+        type: string
+      exposed_scopes:
+        items:
+          $ref: '#/definitions/utils.Scope'
+        type: array
+      exposedScopesLength:
+        type: integer
+      id:
+        type: string
+      nick:
+        type: string
+      owner:
+        type: string
+      owner-nick:
+        type: string
+      prn:
+        type: string
+      redirect_uris:
+        items:
+          type: string
+        type: array
+      scopes:
+        items:
+          $ref: '#/definitions/utils.Scope'
+        type: array
+      secret:
+        type: string
+      time-created:
+        type: string
+      time-modified:
+        type: string
+      type:
+        type: string
+    type: object
+  auth.accountClaims:
+    properties:
+      exp:
+        type: string
+      id:
+        type: string
+      nick:
+        type: string
+      orig_iat:
+        type: string
+      prn:
+        type: string
+      roles:
+        type: string
+      scopes:
+        type: string
+      type:
+        type: string
+    type: object
+  auth.accountCreationPayload:
+    properties:
+      captcha:
+        type: string
+      challenge:
+        type: string
+      email:
+        type: string
+      encrypted-account:
+        type: string
+      nick:
+        type: string
+      password:
+        type: string
+      password_bcrypt:
+        type: string
+      password_scrypt:
+        type: string
+      prn:
+        type: string
+      redirect_uris:
+        description: Oauth2RedirectURIs is limiting the prefix available for redirecting
+          users with oauth code and accesstoken to
+        items:
+          type: string
+        type: array
+      time-created:
+        type: string
+      time-modified:
+        type: string
+      type:
+        type: string
+    type: object
+  auth.passwordReset:
+    properties:
+      password:
+        type: string
+      token:
+        type: string
+    type: object
+  auth.passwordResetRequest:
+    properties:
+      email:
+        type: string
+    type: object
+  dash.BillingInfo:
+    properties:
+      amountDue:
+        type: number
+      currency:
+        type: string
+      type:
+        type: string
+      vatRegion:
+        type: string
+    type: object
+  dash.DeviceInfo:
+    properties:
+      device-id:
+        type: string
+      last-activity:
+        type: string
+      message:
+        type: string
+      nick:
+        type: string
+      prn:
+        type: string
+      status:
+        type: string
+      type:
+        type: string
+    type: object
+  dash.Quota:
+    properties:
+      actual:
+        type: number
+      max:
+        type: number
+      name:
+        type: string
+      unit:
+        type: string
+    type: object
+  dash.SubscriptionInfo:
+    properties:
+      billing:
+        $ref: '#/definitions/dash.BillingInfo'
+        type: object
+      plan-id:
+        type: string
+      quota-stats:
+        additionalProperties:
+          $ref: '#/definitions/dash.Quota'
+        type: object
+    type: object
+  dash.Summary:
+    properties:
+      nick:
+        type: string
+      prn:
+        type: string
+      subscription:
+        $ref: '#/definitions/dash.SubscriptionInfo'
+        type: object
+      top-devices:
+        items:
+          $ref: '#/definitions/dash.DeviceInfo'
+        type: array
+    type: object
+  dash.accountClaims:
+    properties:
+      exp:
+        type: string
+      id:
+        type: string
+      nick:
+        type: string
+      orig_iat:
+        type: string
+      prn:
+        type: string
+      roles:
+        type: string
+      scopes:
+        type: string
+      type:
+        type: string
+    type: object
+  devices.Device:
+    properties:
+      challenge:
+        type: string
+      device-meta:
+        additionalProperties: true
+        type: object
+      garbage:
+        type: boolean
+      id:
+        type: string
+      nick:
+        type: string
+      owner:
+        type: string
+      owner-nick:
+        type: string
+      prn:
+        type: string
+      public:
+        type: boolean
+      secret:
+        type: string
+      time-created:
+        type: string
+      time-modified:
+        type: string
+      user-meta:
+        additionalProperties: true
+        type: object
+    type: object
+  devices.PantahubDevicesJoinToken:
+    properties:
+      default-user-meta:
+        additionalProperties: true
+        type: object
+      disabled:
+        type: boolean
+      id:
+        type: string
+      nick:
+        type: string
+      owner:
+        type: string
+      prn:
+        type: string
+      time-created:
+        type: string
+      time-modified:
+        type: string
+      token:
+        type: string
+      token-sha:
+        items:
+          type: integer
+        type: array
+    type: object
+  devices.challengePayload:
+    properties:
+      challenge:
+        type: string
+    type: object
+  devices.disableToken:
+    properties:
+      status:
+        type: string
+    type: object
+  devices.metaDataPayload:
+    additionalProperties: true
+    type: object
+  healthz.Response:
+    properties:
+      code:
+        type: integer
+      duration:
+        type: string
+      start-time:
+        type: string
+    type: object
+  logs.Entry:
+    properties:
+      dev:
+        type: string
+      id:
+        type: string
+      lvl:
+        type: string
+      msg:
+        type: string
+      own:
+        type: string
+      src:
+        type: string
+      time-created:
+        type: string
+      tnano:
+        type: integer
+      tsec:
+        type: integer
+    type: object
+  logs.Pager:
+    properties:
+      count:
+        type: integer
+      entries:
+        items:
+          $ref: '#/definitions/logs.Entry'
+        type: array
+      next-cursor:
+        type: string
+      page:
+        type: integer
+      start:
+        type: integer
+    type: object
+  objects.Object:
+    properties:
+      id:
+        type: string
+      initialized:
+        type: boolean
+      mime-type:
+        type: string
+      objectname:
+        type: string
+      owner:
+        type: string
+      sha256sum:
+        type: string
+      size:
+        type: string
+      sizeint:
+        type: integer
+      storage-id:
+        type: string
+    type: object
+  objects.ObjectWithAccess:
+    properties:
+      expire-time:
+        type: string
+      id:
+        type: string
+      initialized:
+        type: boolean
+      mime-type:
+        type: string
+      now:
+        type: string
+      objectname:
+        type: string
+      owner:
+        type: string
+      sha256sum:
+        type: string
+      signed-geturl:
+        type: string
+      signed-puturl:
+        type: string
+      size:
+        type: string
+      sizeint:
+        type: integer
+      storage-id:
+        type: string
+    type: object
+  subscriptions.SubscriptionReq:
+    properties:
+      attrs:
+        additionalProperties: true
+        type: object
+      plan:
+        type: string
+      subject:
+        type: string
+    type: object
+  trails.PvrRemote:
+    properties:
+      json-get-url:
+        description: where to pvr post stuff
+        type: string
+      json-key:
+        description: 'what key is to use in post json [default: json]'
+        type: string
+      objects-endpoint:
+        description: where to store/retrieve objects
+        type: string
+      post-fields:
+        description: what fields require input
+        items:
+          type: string
+        type: array
+      post-fields-opt:
+        description: 'what optional fields are available [default: <empty>]'
+        items:
+          type: string
+        type: array
+      post-url:
+        description: where to post/announce new revisions
+        type: string
+      pvr-spec:
+        description: the pvr remote protocol spec available
+        type: string
+    type: object
+  trails.Step:
+    properties:
+      commit-msg:
+        type: string
+      committer:
+        type: string
+      device:
+        type: string
+      id:
+        description: 'XXX: make type'
+        type: string
+      meta:
+        additionalProperties: true
+        description: json blurb
+        type: object
+      owner:
+        type: string
+      progress:
+        $ref: '#/definitions/trails.StepProgress'
+        type: object
+      progress-time:
+        type: string
+      rev:
+        type: integer
+      state:
+        additionalProperties: true
+        description: json blurb
+        type: object
+      state-sha:
+        type: string
+      step-time:
+        type: string
+      trail-id:
+        description: parent id
+        type: string
+      used_objects:
+        items:
+          type: string
+        type: array
+    type: object
+  trails.StepProgress:
+    properties:
+      log:
+        description: log if available
+        type: string
+      progress:
+        description: progress number. steps or 1-100
+        type: integer
+      status:
+        description: status code
+        type: string
+      status-msg:
+        description: message of progress status
+        type: string
+    type: object
+  trails.Trail:
+    properties:
+      device:
+        type: string
+      factory-state:
+        additionalProperties: true
+        type: object
+      id:
+        type: string
+      last-insync:
+        description: 'Admins   []string `json:"admins"`   // XXX: maybe this is best
+          way to do delegating device access....'
+        type: string
+      last-touched:
+        type: string
+      owner:
+        type: string
+      used_objects:
+        items:
+          type: string
+        type: array
+    type: object
+  trails.TrailSummary:
+    properties:
+      device:
+        type: string
+      device-nick:
+        type: string
+      deviceid:
+        type: string
+      fleet-group:
+        type: string
+      fleet-location:
+        type: string
+      fleet-model:
+        type: string
+      fleet-rev:
+        type: string
+      progress:
+        description: progress number. steps or 1-100
+        type: integer
+      progress-revision:
+        type: integer
+      progress-time:
+        type: string
+      public:
+        type: boolean
+      real-ip:
+        type: string
+      revision:
+        type: integer
+      state-sha:
+        type: string
+      status:
+        description: status code
+        type: string
+      status-msg:
+        description: message of progress status
+        type: string
+      step-time:
+        type: string
+      timestamp:
+        description: greater of last seen and last modified
+        type: string
+      trail-touched-time:
+        type: string
+    type: object
+  trails.meta:
+    additionalProperties: true
+    type: object
+  trails.state:
+    additionalProperties: true
+    type: object
+  utils.RError:
+    properties:
+      code:
+        type: integer
+      error:
+        type: string
+    type: object
+  utils.Scope:
+    properties:
+      description:
+        type: string
+      id:
+        type: string
+      required:
+        type: boolean
+      service:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: This is the pantahub API documentation to use our API.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  title: Pantahub API reference
+  version: "1.0"
+paths:
+  /apps:
+    get:
+      consumes:
+      - application/json
+      description: Get all applications owned by a user
+      parameters:
+      - description: App ID|Nick|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/apps.TPApp'
+            type: array
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: App not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get all applications owned by a user
+      tags:
+      - apps
+  /apps/:
+    post:
+      consumes:
+      - application/json
+      description: This define a new application to be used as OAuth client
+      parameters:
+      - description: Create app body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/apps.CreateAppPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/apps.TPApp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new third party application
+      tags:
+      - apps
+  /apps/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: delete an oauth client
+      parameters:
+      - description: App ID|Nick|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/apps.TPApp'
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: App not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: delete an oauth client
+      tags:
+      - apps
+    get:
+      consumes:
+      - application/json
+      description: Get an oauth application
+      parameters:
+      - description: App ID|Nick|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/apps.TPApp'
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: App not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get an oauth application
+      tags:
+      - apps
+    put:
+      consumes:
+      - application/json
+      description: Update a third party application
+      parameters:
+      - description: App ID|Nick|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update app body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/apps.CreateAppPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/apps.TPApp'
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: App not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Update a third party application
+      tags:
+      - apps
+  /apps/scopes:
+    get:
+      consumes:
+      - application/json
+      description: Get scopes for OAuth applications
+      parameters:
+      - description: ID|Nick|PRN
+        in: query
+        name: serviceID
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/utils.Scope'
+            type: array
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: App not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      summary: Get scopes for OAuth applications
+      tags:
+      - apps
+  /auth:
+    get:
+      consumes:
+      - application/json
+      description: Get user profile
+      parameters:
+      - description: ID|Nick|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/accounts.Account'
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Account not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get user profile
+      tags:
+      - auth
+  /auth/accounts:
+    get:
+      consumes:
+      - application/json
+      description: Get list of accounts
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/accounts.Account'
+            type: array
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "403":
+          description: user has no admin role
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Account not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get list of accounts
+      tags:
+      - auth
+    post:
+      consumes:
+      - application/json
+      description: Create a new account
+      parameters:
+      - description: Account Payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.accountCreationPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/accounts.Account'
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Account not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "412":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      summary: Create a new account
+      tags:
+      - auth
+  /auth/auth_status:
+    get:
+      consumes:
+      - application/json
+      description: Get JWT claims from Authorization header
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.accountClaims'
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Account not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get JWT claims from Authorization header
+      tags:
+      - auth
+  /auth/password:
+    post:
+      consumes:
+      - application/json
+      description: send email with token to user in order to reset password to given
+        user
+      parameters:
+      - description: New password payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.passwordReset'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/accounts.Account'
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Account not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      summary: send email with token to user in order to reset password to given user
+      tags:
+      - auth
+  /auth/recover:
+    post:
+      consumes:
+      - application/json
+      description: send email with token to user in order to reset password to given
+        user
+      parameters:
+      - description: Account recovery payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.passwordResetRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/accounts.Account'
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Account not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      summary: send email with token to user in order to reset password to given user
+      tags:
+      - auth
+  /auth/verify:
+    get:
+      consumes:
+      - application/json
+      description: Verify account payload
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/accounts.Account'
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Account not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      summary: Verify account payload
+      tags:
+      - auth
+  /dash/:
+    get:
+      consumes:
+      - application/json
+      description: The summary contains information about the necessary data need
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dash.Summary'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get summary information about an Account
+      tags:
+      - dash
+  /dash/auth_status:
+    get:
+      consumes:
+      - application/json
+      description: Get account JWT token claims payload
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dash.accountClaims'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get account JWT token payload
+      tags:
+      - dash
+  /devices:
+    get:
+      consumes:
+      - application/json
+      description: Get all accounts devices
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/devices.Device'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get all accounts devices
+      tags:
+      - devices
+    post:
+      consumes:
+      - application/json
+      description: Create a new device for an account
+      parameters:
+      - description: Device payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/devices.Device'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/devices.Device'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new device for an account
+      tags:
+      - devices
+  /devices/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Mark a device to be deleted by device garbage collector
+      parameters:
+      - description: ID|PRN|NICK
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/devices.Device'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Mark a device to be deleted by device garbage collector
+      tags:
+      - devices
+    get:
+      consumes:
+      - application/json
+      description: Get a device using the device ID or the PRN or the device Nick
+      parameters:
+      - description: ID|Nick|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/devices.Device'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get a device using the device ID or the PRN or the device Nick
+      tags:
+      - devices
+    patch:
+      consumes:
+      - application/json
+      description: update a device
+      parameters:
+      - description: ID|PRN|NICK
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Device payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/devices.Device'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/devices.Device'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: update a device
+      tags:
+      - devices
+    put:
+      consumes:
+      - application/json
+      description: Claim a device as a logged in user with TOKEN
+      parameters:
+      - description: ID|PRN|NICK
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Device payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/devices.challengePayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/devices.Device'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Claim a device by resolving challenge
+      tags:
+      - devices
+  /devices/{id}/device-meta:
+    patch:
+      consumes:
+      - application/json
+      description: 'Update device metadata using the user credentials:'
+      parameters:
+      - description: ID|PRN|NICK
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Device payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/devices.metaDataPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/devices.Device'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: 'Update device metadata using the user credentials:'
+      tags:
+      - devices
+    put:
+      consumes:
+      - application/json
+      description: 'Update device metadata using the device credentials:'
+      parameters:
+      - description: ID|PRN|NICK
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Device payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/devices.metaDataPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/devices.metaDataPayload'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: 'Update device metadata using the device credentials:'
+      tags:
+      - devices
+  /devices/{id}/public:
+    delete:
+      consumes:
+      - application/json
+      description: Make a device private
+      parameters:
+      - description: ID|PRN|NICK
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/devices.Device'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Make a device private
+      tags:
+      - devices
+    put:
+      consumes:
+      - application/json
+      description: Make a device public
+      parameters:
+      - description: ID|PRN|NICK
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/devices.Device'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Make a device public
+      tags:
+      - devices
+  /devices/{id}/user-meta:
+    patch:
+      consumes:
+      - application/json
+      description: 'Update user metadata using the user credentials:'
+      parameters:
+      - description: ID|PRN|NICK
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Device payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/devices.metaDataPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/devices.metaDataPayload'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: 'Update user metadata using the user credentials:'
+      tags:
+      - devices
+    put:
+      consumes:
+      - application/json
+      description: Update user metadata using the user credentials
+      parameters:
+      - description: ID|PRN|NICK
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Device payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/devices.metaDataPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/devices.Device'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Update user metadata using the user credentials
+      tags:
+      - devices
+  /devices/np/{usernick}/{devicenick}:
+    get:
+      consumes:
+      - application/json
+      description: get device by owner nick and device nick
+      parameters:
+      - description: NICK
+        in: path
+        name: usernick
+        required: true
+        type: string
+      - description: NICK
+        in: path
+        name: devicenick
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/devices.Device'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: get device by owner nick and device nick
+      tags:
+      - devices
+  /devices/tokens:
+    get:
+      consumes:
+      - application/json
+      description: Get all device tokens
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/devices.PantahubDevicesJoinToken'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get all device tokens
+      tags:
+      - devices
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Pantahub base offers a built in basic factory story in the sense that we offer the ability to auto assing devices to a specific owner.
+        For that right now we use a simple token based approach:
+        1. Owner uses ```/devices/tokens/``` end point to create a new token; optionally he can also provide a set of default user-meta information that the auto assign feature will put in place for every device joinig using such token.
+        2. Token is a one-time-visible secret that will only be displayed on reply of the token registration, but not afterwards. If user looses a token he can generate a new one. Old token can stay active if user does not believe the token has been compromised
+        3. User configures device at factory to use the produced token as its pantahub registration credential. Pantavisor will then use the token when registering itself for first time. It uses ```Pantahub-Devices-Auto-Token-V1``` to pass the token to pantahub when registering itself. With this pantahub will auto assign the device to the owner of the given token and will put UserMeta in place.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/devices.PantahubDevicesJoinToken'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new device token, used for authenticate as device
+      tags:
+      - devices
+  /devices/tokens/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Disable a device token in order to be unable to used as authetication
+      parameters:
+      - description: ID|Nick|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/devices.disableToken'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Disable a device token in order to be unable to used as authetication
+      tags:
+      - devices
+  /healthz:
+    get:
+      consumes:
+      - application/json
+      description: Get information of the health of the api services
+      parameters:
+      - description: ID|PRN|NICK
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/healthz.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - BasicAuth: []
+      summary: Get information of the health of the api services
+      tags:
+      - health
+  /logs:
+    get:
+      consumes:
+      - application/json
+      description: |-
+        Get one or many log entries as an error of LogEntry
+        Page through your logs.
+      parameters:
+      - description: list position to start page; either number or ID or '<tsec>.<tnano>'
+          of log entry
+        in: query
+        name: start
+        type: string
+      - description: length of page
+        in: query
+        name: page
+        type: string
+      - description: comma separated list of device prns  to include
+        in: query
+        name: dev
+        type: string
+      - description: comma separated list of log levels
+        in: query
+        name: lvl
+        type: string
+      - description: comma separated list of log levels
+        in: query
+        name: src
+        type: string
+      - description: common list of items of 'tsec,tnano,device,src,lvl,time-created'
+          you can use - on each individual item to reverse order
+        in: query
+        name: sort
+        type: string
+      - description: true in case you want us to return a cursor ID as well.
+        in: query
+        name: cursor
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/logs.Pager'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get one or many log entries as an error of LogEntry
+      tags:
+      - logs
+    post:
+      consumes:
+      - application/json
+      description: Post one or many log entries as an error of LogEntry
+      parameters:
+      - description: New logs body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/logs.Entry'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/logs.Entry'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Post one or many log entries as an error of LogEntry
+      tags:
+      - logs
+  /logs/cursor:
+    get:
+      consumes:
+      - application/json
+      description: Get or one or many log entries
+      parameters:
+      - description: next-cursor ID
+        in: formData
+        name: next-cursor
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/logs.Pager'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get or one or many log entries
+      tags:
+      - logs
+  /metrics:
+    get:
+      consumes:
+      - plain/text
+      description: Get API metrics
+      produces:
+      - plain/text
+      responses:
+        "200": {}
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      summary: Get API metrics
+      tags:
+      - metrics
+  /objects:
+    get:
+      consumes:
+      - application/json
+      description: Get all object of the token owner
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/objects.Object'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get all object of the token owner
+      tags:
+      - objects
+    post:
+      consumes:
+      - application/json
+      description: Create a new object for a owner token
+      parameters:
+      - description: Object payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/objects.Object'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/objects.ObjectWithAccess'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new object for a owner token
+      tags:
+      - objects
+  /objects/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Mark a object to be deleted
+      parameters:
+      - description: Object ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/objects.Object'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Mark a object to be deleted
+      tags:
+      - objects
+    get:
+      consumes:
+      - application/json
+      description: Retrive and object by ID
+      parameters:
+      - description: Object ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/objects.Object'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Retrive and object by ID
+      tags:
+      - objects
+    put:
+      consumes:
+      - application/json
+      description: Update a object content
+      parameters:
+      - description: Object ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Object payload
+        in: body
+        name: body
+        schema:
+          type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/objects.Object'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Update a object content
+      tags:
+      - objects
+  /objects/{id}/blog:
+    get:
+      consumes:
+      - application/json
+      description: Retrive and object content by Object ID
+      parameters:
+      - description: Object ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200": {}
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Retrive and object content by Object ID
+      tags:
+      - objects
+  /subscriptions:
+    get:
+      consumes:
+      - application/json
+      description: Add a new subscription as a admin
+      parameters:
+      - description: Subscription request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/subscriptions.SubscriptionReq'
+      produces:
+      - application/json
+      responses:
+        "200": {}
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Add a new subscription as a admin
+      tags:
+      - subscriptions
+  /trails:
+    get:
+      consumes:
+      - application/json
+      description: |-
+        devices get a list of one and only one trail. users get trails for all the
+        devices they have trail control over (right now simplified for owner)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/trails.Trail'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get a list of trails
+      tags:
+      - trails
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Create a new trails. usually done by device on first log in.
+        initiates the trail by using the reported state as stepwanted 0 and setting
+        the step 0 to be the POSTED JSON. Either device accounts or user accounts can
+        do this for devices owned, but there can always only be ONE trail per device.
+      parameters:
+      - description: initial state
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/trails.state'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/trails.Trail'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new trails
+      tags:
+      - trails
+  /trails/.pvrremote:
+    get:
+      consumes:
+      - application/json
+      description: Get last step pvr remote information for a trail revision
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/trails.PvrRemote'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get last step pvr remote information for a trail revision
+      tags:
+      - trails
+  /trails/{id}:
+    get:
+      consumes:
+      - application/json
+      description: |-
+        get one trail; owning devices and users with trail control for the device
+        can get a trail. If not found or if no access, NotFound status code is returned
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/trails.Trail'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get a trail by ID
+      tags:
+      - trails
+  /trails/{id}/steps:
+    get:
+      consumes:
+      - application/json
+      description: |-
+        Get steps of the the given trail.
+        For user accounts querying this will return the list of steps that are not
+        DONE or in error state.
+        For device accounts querying this will return the list of unconfirmed steps.
+        Devices confirm a step by posting a walk element matching the rev.
+        This conveyes that the devices knows about the step to go and will keep the
+        post updates to the walk elements as they go.
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/trails.Step'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get steps of the the given trail.
+      tags:
+      - trails
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Post a new step to the head of the trail. You must include the correct Rev
+        number that must exactly be one incremented from the previous rev numbers.
+        In case of conflict creation of steps one will get an error.
+        In the DB the ID will be composite of trails ID + Rev; this ensures that
+        it will be unique. Also no step will be added if the previous one does not
+        exist that. This will include completeness of the step rev sequence.
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Step Payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/trails.Step'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/trails.Trail'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Post a new step to the head of the trail.
+      tags:
+      - trails
+  /trails/{id}/steps/{rev}:
+    get:
+      consumes:
+      - application/json
+      description: |-
+        Get step revision of the the given trail.
+        Both user and device accounts can read the steps they own or who they are the
+        device of. devices can PUT progress to the /progress pseudo subnode. Besides
+        that steps are read only for the matter of the API
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: REV_ID
+        in: path
+        name: rev
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/trails.Step'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get step revision of the the given trail.
+      tags:
+      - trails
+  /trails/{id}/steps/{rev}/.prvremote:
+    get:
+      consumes:
+      - application/json
+      description: Get pvr remote information for a trail revision
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: REV_ID
+        in: path
+        name: rev
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/trails.PvrRemote'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get pvr remote information for a trail revision
+      tags:
+      - trails
+  /trails/{id}/steps/{rev}/meta:
+    get:
+      consumes:
+      - application/json
+      description: Get step meta just the raw data of a step without metainfo
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: REV_ID
+        in: path
+        name: rev
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/trails.meta'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get step meta just the raw data of a step without metainfo
+      tags:
+      - trails
+    put:
+      consumes:
+      - application/json
+      description: Put step meta just the raw data of a step without metainfo like
+        pvr put
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: REV_ID
+        in: path
+        name: rev
+        required: true
+        type: string
+      - description: payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/trails.meta'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/trails.meta'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Put step meta just the raw data of a step without metainfo like pvr
+        put
+      tags:
+      - trails
+  /trails/{id}/steps/{rev}/objects:
+    get:
+      consumes:
+      - application/json
+      description: Get trails step objects
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: REV_ID
+        in: path
+        name: rev
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/objects.ObjectWithAccess'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get trails step objects
+      tags:
+      - trails
+    post:
+      consumes:
+      - application/json
+      description: Create a new object for a trail revision
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: REV_ID
+        in: path
+        name: rev
+        required: true
+        type: string
+      - description: Object payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/objects.Object'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/objects.ObjectWithAccess'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new object for a trail revision
+      tags:
+      - trails
+  /trails/{id}/steps/{rev}/objects/{object_id}:
+    get:
+      consumes:
+      - application/json
+      description: Get trails step object content
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: REV_ID
+        in: path
+        name: rev
+        required: true
+        type: string
+      - description: OBJECT_ID
+        in: path
+        name: object_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200": {}
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get trails step object content
+      tags:
+      - trails
+  /trails/{id}/steps/{rev}/progress:
+    put:
+      consumes:
+      - application/json
+      description: |-
+        Post Step Progress information for a step.
+        Only device accounts can put status info. they are expected to provide at status field.
+        all input paramaters besides the device-progress one are ignored.
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: REV_ID
+        in: path
+        name: rev
+        required: true
+        type: string
+      - description: StepProgress payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/trails.StepProgress'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/trails.StepProgress'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Post Step Progress information for a step.
+      tags:
+      - trails
+  /trails/{id}/steps/{rev}/state:
+    get:
+      consumes:
+      - application/json
+      description: Get step state just the raw data of a step without metainfo
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: REV_ID
+        in: path
+        name: rev
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/trails.meta'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get step state just the raw data of a step without metainfo
+      tags:
+      - trails
+    post:
+      consumes:
+      - application/json
+      description: put step state (only if not yet consumed). just the raw data of
+        a step without metainfo like pvr pu
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: REV_ID
+        in: path
+        name: rev
+        required: true
+        type: string
+      - description: payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/trails.state'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/trails.state'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Put step state (only if not yet consumed)
+      tags:
+      - trails
+  /trails/{id}/summary:
+    get:
+      consumes:
+      - application/json
+      description: |-
+        Get steps summary of the the given trail.
+        For user accounts querying this will return the list of steps that are not
+        DONE or in error state.
+        For device accounts querying this will return the list of unconfirmed steps.
+        Devices confirm a step by posting a walk element matching the rev.
+        This conveyes that the devices knows about the step to go and will keep the
+        post updates to the walk elements as they go.
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/trails.TrailSummary'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get steps summary of the the given trail.
+      tags:
+      - trails
+  /trails/summary:
+    get:
+      consumes:
+      - application/json
+      description: get summary of all trails by the calling owner.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/trails.TrailSummary'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: get summary of all trails by the calling owner.
+      tags:
+      - trails
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+  BasicAuth:
+    type: basic
+  OAuth2AccessCode:
+    authorizationUrl: /auth/authorize
+    flow: accessCode
+    tokenUrl: /auth/token
+    type: oauth2
+  OAuth2Application:
+    flow: application
+    scopes:
+      admin: ' Grants read and write access to administrative information'
+      write: ' Grants write access'
+    tokenUrl: /auth/token
+    type: oauth2
+  OAuth2Implicit:
+    authorizationUrl: /auth/authorize
+    flow: implicit
+    scopes:
+      admin: ' Grants read and write access to administrative information'
+      write: ' Grants write access'
+    type: oauth2
+  OAuth2Password:
+    flow: password
+    scopes:
+      admin: ' Grants read and write access to administrative information'
+      read: ' Grants read access'
+      write: ' Grants write access'
+    tokenUrl: /auth/token
+    type: oauth2
+swagger: "2.0"

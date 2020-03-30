@@ -9,13 +9,11 @@ services:
       - mongo
       - fluentd
       - elasticsearch
+      - localstack
     volumes:
       - ${PWD}:/go/src/gitlab.com/pantacor/pantahub-base
     ports:
       - 12365:12365
-    links:
-      - localstack
-      - mongo
     env_file:
       - ./env.default 
       - ./.env.local
@@ -53,3 +51,14 @@ services:
       - HOSTNAME=localstack
     ports:
       - "5000:5000"
+
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - ./docker_confs/nginx-conf.d:/etc/nginx/conf.d:ro
+      - ./docker_confs/nginx-certs.d/:/etc/nginx/certs.d:ro
+    ports:
+      - "12375:80"
+      - "12376:443"
+    links:
+      - base
