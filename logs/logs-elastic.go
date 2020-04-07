@@ -185,6 +185,22 @@ func (s *elasticLogger) getLogs(start int64, page int64, before *time.Time,
 		}
 		q = q.Must(elastic.NewTermsQuery("dev", devices...))
 	}
+	if query.LogRev != "" {
+		components := strings.Split(query.LogRev, ",")
+		revs := []interface{}{}
+		for _, rev := range components {
+			revs = append(revs, rev)
+		}
+		q = q.Must(elastic.NewTermsQuery("rev", revs...))
+	}
+	if query.LogPlat != "" {
+		components := strings.Split(query.LogPlat, ",")
+		plats := []interface{}{}
+		for _, plat := range components {
+			plats = append(plats, plat)
+		}
+		q = q.Must(elastic.NewTermsQuery("plat", plats...))
+	}
 	if query.LogSource != "" {
 		components := strings.Split(query.LogSource, ",")
 		sources := []interface{}{}
