@@ -70,6 +70,8 @@ type Entry struct {
 	TimeCreated time.Time          `json:"time-created,omitempty" bson:"time-created"`
 	LogTSec     int64              `json:"tsec,omitempty" bson:"tsec"`
 	LogTNano    int64              `json:"tnano,omitempty" bson:"tnano"`
+	LogRev      string             `json:"rev,omitempty" bson:"rev"`
+	LogPlat     string             `json:"plat,omitempty" bson:"plat"`
 	LogSource   string             `json:"src,omitempty" bson:"src"`
 	LogLevel    string             `json:"lvl,omitempty" bson:"lvl"`
 	LogText     string             `json:"msg,omitempty" bson:"msg"`

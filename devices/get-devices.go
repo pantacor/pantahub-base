@@ -85,7 +85,10 @@ func (a *App) handleGetDevices(w rest.ResponseWriter, r *rest.Request) {
 			return
 		}
 		query["owner"] = ownerValue[0]
-		query["ispublic"] = true
+
+		if ownerValue[0] != owner {
+			query["ispublic"] = true
+		}
 
 	} else if ok2 {
 		//To get devices of any user who have public devices by using owner nick
@@ -96,7 +99,10 @@ func (a *App) handleGetDevices(w rest.ResponseWriter, r *rest.Request) {
 		}
 
 		query["owner"] = account.Prn
-		query["ispublic"] = true
+
+		if account.Prn != owner {
+			query["ispublic"] = true
+		}
 
 	} else {
 		query["owner"] = owner
