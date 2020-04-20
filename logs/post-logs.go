@@ -82,7 +82,7 @@ func (a *App) handlePostLogs(w rest.ResponseWriter, r *rest.Request) {
 	entries, err := unmarshalBody(body)
 
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error parsing logs body: "+err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error parsing logs body: "+err.Error()+" '"+string(body)+"'", http.StatusBadRequest)
 		return
 	}
 
