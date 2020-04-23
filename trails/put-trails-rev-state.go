@@ -110,6 +110,8 @@ func (a *App) handlePutStepState(w rest.ResponseWriter, r *rest.Request) {
 	step.UsedObjects = objectList
 	step.State = utils.BsonQuoteMap(&stateMap)
 
+	step.TimeModified = time.Now()
+
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	updateResult, err := coll.UpdateOne(

@@ -97,6 +97,8 @@ func (a *App) handlePutStepMeta(w rest.ResponseWriter, r *rest.Request) {
 
 	step.Meta = utils.BsonQuoteMap(&metaMap)
 
+	step.TimeModified = time.Now()
+
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	updateResult, err := coll.UpdateOne(

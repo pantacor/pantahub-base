@@ -46,6 +46,13 @@ type App struct {
 	mongoClient   *mongo.Client
 }
 
+// Build factory a new Device App only with mongoClient
+func Build(mongoClient *mongo.Client) *App {
+	return &App{
+		mongoClient: mongoClient,
+	}
+}
+
 // ModelError error type
 type ModelError struct {
 	Code    int    `json:"code"`
@@ -54,19 +61,20 @@ type ModelError struct {
 
 // Device device structure
 type Device struct {
-	ID           primitive.ObjectID     `json:"id" bson:"_id"`
-	Prn          string                 `json:"prn"`
-	Nick         string                 `json:"nick"`
-	Owner        string                 `json:"owner"`
-	OwnerNick    string                 `json:"owner-nick,omitempty" bson:"-"`
-	Secret       string                 `json:"secret,omitempty"`
-	TimeCreated  time.Time              `json:"time-created" bson:"timecreated"`
-	TimeModified time.Time              `json:"time-modified" bson:"timemodified"`
-	Challenge    string                 `json:"challenge,omitempty"`
-	IsPublic     bool                   `json:"public"`
-	UserMeta     map[string]interface{} `json:"user-meta" bson:"user-meta"`
-	DeviceMeta   map[string]interface{} `json:"device-meta" bson:"device-meta"`
-	Garbage      bool                   `json:"garbage" bson:"garbage"`
+	ID                  primitive.ObjectID     `json:"id" bson:"_id"`
+	Prn                 string                 `json:"prn"`
+	Nick                string                 `json:"nick"`
+	Owner               string                 `json:"owner"`
+	OwnerNick           string                 `json:"owner-nick,omitempty" bson:"-"`
+	Secret              string                 `json:"secret,omitempty"`
+	TimeCreated         time.Time              `json:"time-created" bson:"timecreated"`
+	TimeModified        time.Time              `json:"time-modified" bson:"timemodified"`
+	Challenge           string                 `json:"challenge,omitempty"`
+	IsPublic            bool                   `json:"public" bson:"ispublic"`
+	UserMeta            map[string]interface{} `json:"user-meta" bson:"user-meta"`
+	DeviceMeta          map[string]interface{} `json:"device-meta" bson:"device-meta"`
+	Garbage             bool                   `json:"garbage" bson:"garbage"`
+	MarkPublicProcessed bool                   `json:"mark_public_processed" bson:"mark_public_processed"`
 }
 
 // PantahubDevicesJoinToken devices join token payload
