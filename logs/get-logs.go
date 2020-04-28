@@ -121,7 +121,8 @@ func (a *App) handleGetLogs(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "Bad 'page' parameter", http.StatusBadRequest)
 		return
 	}
-
+	revParam := r.FormValue("rev")
+	platParam := r.FormValue("plat")
 	sourceParam := r.FormValue("src")
 	deviceParam := r.FormValue("dev")
 	deviceParam, err = a.ParseDeviceString(deviceParam)
@@ -135,6 +136,8 @@ func (a *App) handleGetLogs(w rest.ResponseWriter, r *rest.Request) {
 		Owner:     own.(string),
 		LogLevel:  levelParam,
 		LogSource: sourceParam,
+		LogRev:    revParam,
+		LogPlat:   platParam,
 		Device:    deviceParam,
 	}
 
@@ -144,9 +147,13 @@ func (a *App) handleGetLogs(w rest.ResponseWriter, r *rest.Request) {
 	sorts := strings.Split(sortParam, ",")
 	for _, v := range sorts {
 		switch v1 := strings.TrimPrefix(v, "-"); v1 {
-		case "lvl":
-			fallthrough
 		case "dev":
+			fallthrough
+		case "rev":
+			fallthrough
+		case "plat":
+			fallthrough
+		case "lvl":
 			fallthrough
 		case "tsec":
 			fallthrough
