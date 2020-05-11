@@ -35,14 +35,15 @@ import (
 
 // PublicStep is a structure of a public step
 type PublicStep struct {
-	StepID    string    `json:"step_id" bson:"step_id"`
-	Owner     string    `json:"owner"`
-	DeviceID  string    `json:"device_id" bson:"device_id"`
-	ObjectSha []string  `bson:"object_sha" json:"object_sha"`
-	IsPublic  bool      `json:"public" bson:"ispublic"`
-	Garbage   bool      `json:"garbage" bson:"garbage"`
-	CreatedAt time.Time `json:"created_at" bson:"created_at"`
-	UpdatedAt time.Time `json:"updated_at" bson:"updated_at"`
+	StepID       string    `json:"step_id" bson:"step_id"`
+	Owner        string    `json:"owner"`
+	DeviceID     string    `json:"device_id" bson:"device_id"`
+	ObjectSha    []string  `bson:"object_sha" json:"object_sha"`
+	IsPublic     bool      `json:"public" bson:"ispublic"`
+	Garbage      bool      `json:"garbage" bson:"garbage"`
+	TimeModified time.Time `json:"timemodified" bson:"timemodified"`
+	CreatedAt    time.Time `json:"created_at" bson:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at" bson:"updated_at"`
 }
 
 // handlePutStep Callback api for step changes
@@ -84,6 +85,17 @@ func (a *App) handlePutStep(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
+	var publicStep PublicStep
+	var hasPublicStep bool
+
+	err = a.FindPublicStep(step.ID, &publicStep)
+	if err == mongo.ErrNoDocuments {
+		hasPublicStep = true
+	} else if err != nil {
+		utils.RestErrorWrapper(w, err.Error(), http.StatusForbidden)
+		return
+	}
+
 	timeModifiedStr, ok := r.URL.Query()["timemodified"]
 	if ok {
 		timeModified, err := time.Parse(time.RFC3339Nano, timeModifiedStr[0])
@@ -91,18 +103,10 @@ func (a *App) handlePutStep(w rest.ResponseWriter, r *rest.Request) {
 			utils.RestErrorWrapper(w, "Error Parsing timemodified:"+err.Error(), http.StatusForbidden)
 			return
 		}
-		if step.TimeModified.After(timeModified) {
+		if hasPublicStep && !publicStep.TimeModified.After(timeModified) {
 			w.WriteHeader(http.StatusNotModified)
 			return
 		}
-	}
-
-	var publicStep PublicStep
-
-	err = a.FindPublicStep(step.ID, &publicStep)
-	if err != nil && err != mongo.ErrNoDocuments {
-		utils.RestErrorWrapper(w, err.Error(), http.StatusForbidden)
-		return
 	}
 
 	err = a.SavePublicStep(&step, &publicStep)
@@ -134,6 +138,7 @@ func (a *App) SavePublicStep(step *trails.Step, publicStep *PublicStep) error {
 	publicStep.Owner = step.Owner
 	publicStep.IsPublic = step.IsPublic
 	publicStep.Garbage = step.Garbage
+	publicStep.TimeModified = step.TimeModified
 	objectShaList, err := a.GetStepObjectShas(step)
 	if err != nil {
 		return err
