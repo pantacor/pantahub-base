@@ -158,11 +158,18 @@ func (a *App) MarkDeviceStepsPublicFlag(ID primitive.ObjectID, public bool) (int
 
 	updateResult, err := collection.UpdateMany(
 		ctx,
-		bson.M{"trail-id": ID},
-		bson.M{"$set": bson.M{
-			"ispublic":     public,
-			"timemodified": time.Now(),
-		}},
+		bson.M{
+			"trail-id": ID,
+			"ispublic": bson.M{
+				"$ne": public,
+			},
+		},
+		bson.M{
+			"$set": bson.M{
+				"ispublic":     public,
+				"timemodified": time.Now(),
+			},
+		},
 		nil,
 	)
 	if err != nil {

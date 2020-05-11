@@ -103,7 +103,7 @@ func (a *App) handlePutStep(w rest.ResponseWriter, r *rest.Request) {
 			utils.RestErrorWrapper(w, "Error Parsing timemodified:"+err.Error(), http.StatusForbidden)
 			return
 		}
-		if hasPublicStep && !publicStep.TimeModified.After(timeModified) {
+		if hasPublicStep && publicStep.TimeModified.After(timeModified) {
 			w.WriteHeader(http.StatusNotModified)
 			return
 		}
