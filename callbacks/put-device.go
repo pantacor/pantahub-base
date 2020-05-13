@@ -54,8 +54,7 @@ type ProcessDeviceResult struct {
 // @Router /callbacks/devices/{id} [put]
 func (a *App) handlePutDevice(w rest.ResponseWriter, r *rest.Request) {
 	var device devices.Device
-	deviceApp := devices.Build(a.mongoClient)
-	mgoid, err := deviceApp.ParseDeviceIDOrNick(r.PathParam("id"))
+	mgoid, err := primitive.ObjectIDFromHex(r.PathParam("id"))
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error Parsing Device ID or Nick:"+err.Error(), http.StatusBadRequest)
 		return

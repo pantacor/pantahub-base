@@ -120,8 +120,8 @@ func (a *App) handleGetUserDevice(w rest.ResponseWriter, r *rest.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	err := collDevices.FindOne(ctx, bson.M{
-		"nick":    devicenick,
 		"owner":   account.Prn,
+		"nick":    devicenick,
 		"garbage": bson.M{"$ne": true},
 	}).Decode(&device)
 

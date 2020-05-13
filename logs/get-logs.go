@@ -125,7 +125,7 @@ func (a *App) handleGetLogs(w rest.ResponseWriter, r *rest.Request) {
 	platParam := r.FormValue("plat")
 	sourceParam := r.FormValue("src")
 	deviceParam := r.FormValue("dev")
-	deviceParam, err = a.ParseDeviceString(deviceParam)
+	deviceParam, err = a.ParseDeviceString(own.(string), deviceParam)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error Parsing Device nicks:"+err.Error(), http.StatusBadRequest)
 		return

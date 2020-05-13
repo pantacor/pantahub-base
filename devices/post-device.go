@@ -104,6 +104,7 @@ func (a *App) handlePostDevice(w rest.ResponseWriter, r *rest.Request) {
 			if autoInfo.UserMeta != nil {
 				newDevice.UserMeta = autoInfo.UserMeta
 			}
+
 		} else {
 			newDevice.Challenge = petname.Generate(3, "-")
 		}
@@ -112,9 +113,14 @@ func (a *App) handlePostDevice(w rest.ResponseWriter, r *rest.Request) {
 	newDevice.TimeCreated = time.Now()
 	newDevice.TimeModified = newDevice.TimeCreated
 
-	// we invent a nick for user in case he didnt ask for a specfic one...
-	if newDevice.Nick == "" {
+	// wecreate a random name for unregistered devices;
+	// registry controllers are expected to change these when
+	// device gets associated with owner
+	// if we have an owner, we assign proper nick
+	if newDevice.Owner != "" && newDevice.Nick == "" {
 		newDevice.Nick = petname.Generate(3, "_")
+	} else if newDevice.Nick == "" {
+		newDevice.Nick = "__unregistered__" + petname.Generate(1, "_") + "_" + utils.RandStringLower(10)
 	}
 
 	isValidNick, err := regexp.MatchString(DeviceNickRule, newDevice.Nick)

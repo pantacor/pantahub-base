@@ -146,7 +146,7 @@ func (a *App) handleGetDevices(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(devices)
 }
 
-// handleDetDevice Get a device using the device ID or the PRN or the device Nick
+// handleGetDevice Get a device using the device ID or the PRN or the device Nick
 // @Summary Get a device using the device ID or the PRN or the device Nick
 // @Description Get a device using the device ID or the PRN or the device Nick
 // @Accept  json
@@ -159,18 +159,24 @@ func (a *App) handleGetDevices(w rest.ResponseWriter, r *rest.Request) {
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /devices/{id} [get]
-func (a *App) handleDetDevice(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetDevice(w rest.ResponseWriter, r *rest.Request) {
 	var device Device
-	mgoid, err := a.ParseDeviceIDOrNick(r.PathParam("id"))
-	if err != nil {
-		utils.RestErrorWrapper(w, "Error Parsing Device ID or Nick:"+err.Error(), http.StatusBadRequest)
-		return
-	}
 
 	authID, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
 		utils.RestErrorWrapper(w, "You need to be logged in.", http.StatusForbidden)
+		return
+	}
+
+	ownerPtr := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["owner"]
+	if ownerPtr == nil {
+		ownerPtr = authID
+	}
+
+	owner, ok := ownerPtr.(string)
+	if !ok {
+		utils.RestErrorWrapper(w, "Session has no owner info", http.StatusBadRequest)
 		return
 	}
 
@@ -204,6 +210,13 @@ func (a *App) handleDetDevice(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "Error with Database (accounts) connectivity", http.StatusInternalServerError)
 		return
 	}
+
+	mgoid, err := a.ResolveDeviceIDOrNick(owner, r.PathParam("id"))
+	if err != nil {
+		utils.RestErrorWrapper(w, "Error Parsing Device ID or Nick:"+err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	err = collection.FindOne(ctx,
