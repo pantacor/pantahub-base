@@ -35,6 +35,7 @@ import (
 
 // PantahubDevicesAutoTokenV1 device auto token name
 const PantahubDevicesAutoTokenV1 = "Pantahub-Devices-Auto-Token-V1"
+const CreateIndexTimeout = 600 * time.Second
 
 //DeviceNickRule : Device nick rule used to create/update a device nick
 const DeviceNickRule = `(?m)^[a-zA-Z0-9_\-+%]+$`
@@ -105,7 +106,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	collection := app.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
 	CreateIndexesOptions := options.CreateIndexesOptions{}
-	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+	CreateIndexesOptions.SetMaxTime(CreateIndexTimeout)
 
 	indexOptions := options.IndexOptions{}
 	indexOptions.SetUnique(true)
@@ -114,6 +115,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 
 	index := mongo.IndexModel{
 		Keys: bsonx.Doc{
+			{Key: "owner", Value: bsonx.Int32(1)},
 			{Key: "nick", Value: bsonx.Int32(1)},
 		},
 		Options: &indexOptions,
@@ -125,7 +127,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	}
 
 	CreateIndexesOptions = options.CreateIndexesOptions{}
-	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+	CreateIndexesOptions.SetMaxTime(CreateIndexTimeout)
 
 	indexOptions = options.IndexOptions{}
 	indexOptions.SetUnique(false)
@@ -146,7 +148,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	}
 
 	CreateIndexesOptions = options.CreateIndexesOptions{}
-	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+	CreateIndexesOptions.SetMaxTime(CreateIndexTimeout)
 
 	indexOptions = options.IndexOptions{}
 	indexOptions.SetUnique(false)
@@ -167,7 +169,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	}
 	// Indexing for the owner,garbage fields
 	CreateIndexesOptions = options.CreateIndexesOptions{}
-	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+	CreateIndexesOptions.SetMaxTime(CreateIndexTimeout)
 
 	indexOptions = options.IndexOptions{}
 	indexOptions.SetUnique(false)
@@ -189,7 +191,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	}
 	// Indexing for the device,garbage fields
 	CreateIndexesOptions = options.CreateIndexesOptions{}
-	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+	CreateIndexesOptions.SetMaxTime(CreateIndexTimeout)
 
 	indexOptions = options.IndexOptions{}
 	indexOptions.SetUnique(false)
@@ -294,7 +296,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		rest.Get("/auth_status", utils.ScopeFilter(readDevicesScopes, handleAuth)),
 		rest.Get("/", utils.ScopeFilter(readDevicesScopes, app.handleGetDevices)),
 		rest.Post("/", utils.ScopeFilter(writeDevicesScopes, app.handlePostDevice)),
-		rest.Get("/:id", utils.ScopeFilter(readDevicesScopes, app.handleDetDevice)),
+		rest.Get("/:id", utils.ScopeFilter(readDevicesScopes, app.handleGetDevice)),
 		rest.Put("/:id", utils.ScopeFilter(writeDevicesScopes, app.handlePutDevice)),
 		rest.Patch("/:id", utils.ScopeFilter(writeDevicesScopes, app.handlePatchDevice)),
 		rest.Put("/:id/public", utils.ScopeFilter(writeDevicesScopes, app.handlePutPublic)),

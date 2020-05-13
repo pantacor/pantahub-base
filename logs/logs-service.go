@@ -109,7 +109,7 @@ type CursorClaim struct {
 }
 
 // ParseDeviceString : Parse Device Nicks & Device Id's from a string and replace them with device Prn
-func (a *App) ParseDeviceString(devicesString string) (string, error) {
+func (a *App) ParseDeviceString(owner string, devicesString string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
@@ -134,6 +134,7 @@ func (a *App) ParseDeviceString(devicesString string) (string, error) {
 		if deviceNick != "" {
 			err = collection.FindOne(ctx,
 				bson.M{
+					"owner":   owner,
 					"nick":    deviceNick,
 					"garbage": bson.M{"$ne": true},
 				}).
@@ -142,6 +143,7 @@ func (a *App) ParseDeviceString(devicesString string) (string, error) {
 			err = collection.FindOne(ctx,
 				bson.M{
 					"_id":     deviceObjectID,
+					"owner":   owner,
 					"garbage": bson.M{"$ne": true},
 				}).
 				Decode(&deviceObject)
