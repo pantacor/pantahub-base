@@ -208,7 +208,7 @@ func (a *App) GetStepObjectShas(step *trails.Step) ([]string, error) {
 		if _, ok := objMap[sha]; !ok {
 			existsInDb, err := a.IsObjectExistsInDb(sha)
 			if err != nil {
-				return objectShaList, err
+				return nil, err
 			}
 			if existsInDb {
 				objectShaList = append(objectShaList, sha)
