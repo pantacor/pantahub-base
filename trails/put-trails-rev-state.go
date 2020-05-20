@@ -118,6 +118,13 @@ func (a *App) handlePutStepState(w rest.ResponseWriter, r *rest.Request) {
 
 	step.TimeModified = time.Now()
 
+	isDevicePublic, err := a.IsDevicePublic(step.TrailID)
+	if err != nil {
+		utils.RestErrorWrapper(w, "Error checking device is public or not:"+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	step.IsPublic = isDevicePublic
+
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	updateResult, err := coll.UpdateOne(

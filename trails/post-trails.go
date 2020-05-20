@@ -128,6 +128,13 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 	newStep.TimeModified = now
 	newStep.IsPublic = false
 
+	isDevicePublic, err := a.IsDevicePublic(newStep.TrailID)
+	if err != nil {
+		utils.RestErrorWrapper(w, "Error checking device is public or not:"+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	newStep.IsPublic = isDevicePublic
+
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_trails")
 
 	if collection == nil {

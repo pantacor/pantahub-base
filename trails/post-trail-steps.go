@@ -164,6 +164,13 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 	newStep.TimeModified = now
 	newStep.IsPublic = previousStep.IsPublic
 
+	isDevicePublic, err := a.IsDevicePublic(newStep.TrailID)
+	if err != nil {
+		utils.RestErrorWrapper(w, "Error checking device is public or not:"+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	newStep.IsPublic = isDevicePublic
+
 	// IMPORTANT: statesha has to be before state as that will be escaped
 	newStep.StateSha, err = utils.StateSha(&newStep.State)
 

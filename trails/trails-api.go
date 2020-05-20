@@ -56,6 +56,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
+	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -112,7 +113,7 @@ type Step struct {
 	ProgressTime        time.Time              `json:"progress-time" bson:"progress-time"`
 	Meta                map[string]interface{} `json:"meta"` // json blurb
 	UsedObjects         []string               `bson:"used_objects" json:"used_objects"`
-	IsPublic            bool                   `json:"public" bson:"ispublic"`
+	IsPublic            bool                   `json:"-" bson:"ispublic"`
 	MarkPublicProcessed bool                   `json:"mark_public_processed" bson:"mark_public_processed"`
 	Garbage             bool                   `json:"garbage" bson:"garbage"`
 	TimeCreated         time.Time              `json:"time-created" bson:"timecreated"`
@@ -489,4 +490,17 @@ func UnMarkObjectAsGarbage(ObjectID string, a *App) error {
 		return errors.New("unmark_object_as_garbage:Error updating object:" + err.Error())
 	}
 	return nil
+}
+
+// IsDevicePublic checks if a device is public or not
+func (a *App) IsDevicePublic(ID primitive.ObjectID) (bool, error) {
+
+	devicesApp := devices.Build(a.mongoClient)
+	device := devices.Device{}
+
+	err := devicesApp.FindDeviceByID(ID, &device)
+	if err != nil {
+		return false, err
+	}
+	return device.IsPublic, nil
 }
