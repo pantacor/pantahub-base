@@ -193,8 +193,8 @@ func (a *App) ResolveObjectWithLinks(owner string, sha string, autoLink bool) (*
 		return nil, errors.New("Error finding object by storage id: " + storageID + " - " + err.Error())
 	} else if err == mongo.ErrNoDocuments {
 		// Make a new object
-		if object == nil {
-			object, err = NewObject(sha, owner, "noname")
+		if object.Sha == "" {
+			object, err = NewObject(sha, owner, "/na/link-for-"+sha)
 			if err != nil {
 				return nil, errors.New("Error creating object:" + err.Error())
 			}
