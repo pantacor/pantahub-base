@@ -157,8 +157,11 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 		Status: "NEW",
 	}
 	newStep.TrailID = trail.ID
-	newStep.StepTime = time.Now()
+	now := time.Now()
+	newStep.StepTime = now
 	newStep.ProgressTime = time.Unix(0, 0)
+	newStep.TimeCreated = now
+	newStep.TimeModified = now
 
 	// IMPORTANT: statesha has to be before state as that will be escaped
 	newStep.StateSha, err = utils.StateSha(&newStep.State)

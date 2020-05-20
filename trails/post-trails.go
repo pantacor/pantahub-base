@@ -118,10 +118,14 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 	newStep.Owner = newTrail.Owner
 	newStep.Device = newTrail.Device
 	newStep.CommitMsg = "Factory State (rev 0)"
-	newStep.StepTime = time.Now() // XXX this should be factory time not now
-	newStep.ProgressTime = time.Now()
+
+	now := time.Now()
+	newStep.StepTime = now // XXX this should be factory time not now
+	newStep.ProgressTime = now
 	newStep.StepProgress.Status = "DONE"
 	newStep.Meta = map[string]interface{}{}
+	newStep.TimeCreated = now
+	newStep.TimeModified = now
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_trails")
 
