@@ -126,6 +126,7 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 	newStep.Meta = map[string]interface{}{}
 	newStep.TimeCreated = now
 	newStep.TimeModified = now
+	newStep.IsPublic = false
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_trails")
 

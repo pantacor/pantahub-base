@@ -162,6 +162,7 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 	newStep.ProgressTime = time.Unix(0, 0)
 	newStep.TimeCreated = now
 	newStep.TimeModified = now
+	newStep.IsPublic = previousStep.IsPublic
 
 	// IMPORTANT: statesha has to be before state as that will be escaped
 	newStep.StateSha, err = utils.StateSha(&newStep.State)
