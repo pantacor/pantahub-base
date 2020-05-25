@@ -50,7 +50,7 @@ import (
 // @Failure 500 {object} utils.RError
 // @Router /profiles [get]
 func (a *App) handleGetProfiles(w rest.ResponseWriter, r *rest.Request) {
-	_, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		err := devices.ModelError{}
 		err.Code = http.StatusInternalServerError
@@ -138,7 +138,7 @@ func (a *App) handleGetProfiles(w rest.ResponseWriter, r *rest.Request) {
 		}
 
 		profile := Profile{}
-		if havePublicDevices && result.Nick != "" {
+		if (havePublicDevices || result.Prn == owner.(string)) && result.Nick != "" {
 
 			profile.ID = result.ID
 			profile.Nick = result.Nick
