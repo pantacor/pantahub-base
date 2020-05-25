@@ -179,6 +179,8 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 		newStep.Meta = map[string]interface{}{}
 	}
 	newStep.Meta = utils.BsonQuoteMap(&newStep.Meta)
+	newStep.TimeModified = time.Now()
+	newStep.TimeCreated = time.Now()
 
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

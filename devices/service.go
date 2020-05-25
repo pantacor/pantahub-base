@@ -35,6 +35,7 @@ import (
 
 // PantahubDevicesAutoTokenV1 device auto token name
 const PantahubDevicesAutoTokenV1 = "Pantahub-Devices-Auto-Token-V1"
+const CreateIndexTimeout = 600 * time.Second
 
 //DeviceNickRule : Device nick rule used to create/update a device nick
 const DeviceNickRule = `(?m)^[a-zA-Z0-9_\-+%]+$`
@@ -46,6 +47,13 @@ type App struct {
 	mongoClient   *mongo.Client
 }
 
+// Build factory a new Device App only with mongoClient
+func Build(mongoClient *mongo.Client) *App {
+	return &App{
+		mongoClient: mongoClient,
+	}
+}
+
 // ModelError error type
 type ModelError struct {
 	Code    int    `json:"code"`
@@ -54,19 +62,20 @@ type ModelError struct {
 
 // Device device structure
 type Device struct {
-	ID           primitive.ObjectID     `json:"id" bson:"_id"`
-	Prn          string                 `json:"prn"`
-	Nick         string                 `json:"nick"`
-	Owner        string                 `json:"owner"`
-	OwnerNick    string                 `json:"owner-nick,omitempty" bson:"-"`
-	Secret       string                 `json:"secret,omitempty"`
-	TimeCreated  time.Time              `json:"time-created" bson:"timecreated"`
-	TimeModified time.Time              `json:"time-modified" bson:"timemodified"`
-	Challenge    string                 `json:"challenge,omitempty"`
-	IsPublic     bool                   `json:"public"`
-	UserMeta     map[string]interface{} `json:"user-meta" bson:"user-meta"`
-	DeviceMeta   map[string]interface{} `json:"device-meta" bson:"device-meta"`
-	Garbage      bool                   `json:"garbage" bson:"garbage"`
+	ID                  primitive.ObjectID     `json:"id" bson:"_id"`
+	Prn                 string                 `json:"prn"`
+	Nick                string                 `json:"nick"`
+	Owner               string                 `json:"owner"`
+	OwnerNick           string                 `json:"owner-nick,omitempty" bson:"-"`
+	Secret              string                 `json:"secret,omitempty"`
+	TimeCreated         time.Time              `json:"time-created" bson:"timecreated"`
+	TimeModified        time.Time              `json:"time-modified" bson:"timemodified"`
+	Challenge           string                 `json:"challenge,omitempty"`
+	IsPublic            bool                   `json:"public" bson:"ispublic"`
+	UserMeta            map[string]interface{} `json:"user-meta" bson:"user-meta"`
+	DeviceMeta          map[string]interface{} `json:"device-meta" bson:"device-meta"`
+	Garbage             bool                   `json:"garbage" bson:"garbage"`
+	MarkPublicProcessed bool                   `json:"mark_public_processed" bson:"mark_public_processed"`
 }
 
 // PantahubDevicesJoinToken devices join token payload
@@ -97,7 +106,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	collection := app.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
 	CreateIndexesOptions := options.CreateIndexesOptions{}
-	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+	CreateIndexesOptions.SetMaxTime(CreateIndexTimeout)
 
 	indexOptions := options.IndexOptions{}
 	indexOptions.SetUnique(true)
@@ -106,6 +115,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 
 	index := mongo.IndexModel{
 		Keys: bsonx.Doc{
+			{Key: "owner", Value: bsonx.Int32(1)},
 			{Key: "nick", Value: bsonx.Int32(1)},
 		},
 		Options: &indexOptions,
@@ -117,7 +127,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	}
 
 	CreateIndexesOptions = options.CreateIndexesOptions{}
-	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+	CreateIndexesOptions.SetMaxTime(CreateIndexTimeout)
 
 	indexOptions = options.IndexOptions{}
 	indexOptions.SetUnique(false)
@@ -138,7 +148,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	}
 
 	CreateIndexesOptions = options.CreateIndexesOptions{}
-	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+	CreateIndexesOptions.SetMaxTime(CreateIndexTimeout)
 
 	indexOptions = options.IndexOptions{}
 	indexOptions.SetUnique(false)
@@ -159,7 +169,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	}
 	// Indexing for the owner,garbage fields
 	CreateIndexesOptions = options.CreateIndexesOptions{}
-	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+	CreateIndexesOptions.SetMaxTime(CreateIndexTimeout)
 
 	indexOptions = options.IndexOptions{}
 	indexOptions.SetUnique(false)
@@ -181,7 +191,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	}
 	// Indexing for the device,garbage fields
 	CreateIndexesOptions = options.CreateIndexesOptions{}
-	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+	CreateIndexesOptions.SetMaxTime(CreateIndexTimeout)
 
 	indexOptions = options.IndexOptions{}
 	indexOptions.SetUnique(false)
@@ -286,7 +296,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		rest.Get("/auth_status", utils.ScopeFilter(readDevicesScopes, handleAuth)),
 		rest.Get("/", utils.ScopeFilter(readDevicesScopes, app.handleGetDevices)),
 		rest.Post("/", utils.ScopeFilter(writeDevicesScopes, app.handlePostDevice)),
-		rest.Get("/:id", utils.ScopeFilter(readDevicesScopes, app.handleDetDevice)),
+		rest.Get("/:id", utils.ScopeFilter(readDevicesScopes, app.handleGetDevice)),
 		rest.Put("/:id", utils.ScopeFilter(writeDevicesScopes, app.handlePutDevice)),
 		rest.Patch("/:id", utils.ScopeFilter(writeDevicesScopes, app.handlePatchDevice)),
 		rest.Put("/:id/public", utils.ScopeFilter(writeDevicesScopes, app.handlePutPublic)),

@@ -86,6 +86,7 @@ func (a *App) handlePutStepProgress(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	progressTime := time.Now()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	updateResult, err := coll.UpdateOne(
@@ -98,6 +99,7 @@ func (a *App) handlePutStepProgress(w rest.ResponseWriter, r *rest.Request) {
 		bson.M{"$set": bson.M{
 			"progress":      stepProgress,
 			"progress-time": progressTime,
+			"timemodified":  time.Now(),
 		}},
 	)
 	if updateResult.MatchedCount == 0 {

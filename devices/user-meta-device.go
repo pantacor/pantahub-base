@@ -68,7 +68,15 @@ func (a *App) handlePatchUserData(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "User data can only be updated by User", http.StatusBadRequest)
 		return
 	}
-	deviceID, err := a.ParseDeviceIDOrNick(r.PathParam("id"))
+
+	ownerStr, ok := owner.(string)
+
+	if !ok {
+		utils.RestErrorWrapper(w, "Session has no valid caller/owner info.", http.StatusBadRequest)
+		return
+	}
+
+	deviceID, err := a.ResolveDeviceIDOrNick(ownerStr, r.PathParam("id"))
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error Parsing Device ID or Nick:"+err.Error(), http.StatusBadRequest)
 		return

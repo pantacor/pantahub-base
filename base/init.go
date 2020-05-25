@@ -30,6 +30,8 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger"
 	"gitlab.com/pantacor/pantahub-base/apps"
 	"gitlab.com/pantacor/pantahub-base/auth"
+	"gitlab.com/pantacor/pantahub-base/callbacks"
+	"gitlab.com/pantacor/pantahub-base/cron"
 	"gitlab.com/pantacor/pantahub-base/dash"
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/healthz"
@@ -195,6 +197,30 @@ func DoInit() {
 			SigningAlgorithm: "RS256",
 		}, mongoClient)
 		http.Handle("/profiles/", http.StripPrefix("/profiles", app.API.MakeHandler()))
+	}
+	{
+		cronJobTimeout, err := strconv.Atoi(utils.GetEnv(utils.EnvCronJobTimeout))
+		if err != nil {
+			panic(fmt.Errorf("Error Parsing CRON_JOB_TIMEOUT: %s", err.Error()))
+		}
+
+		app := cron.New(&jwt.JWTMiddleware{
+			Pub:              jwtPub,
+			Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
+			Authenticator:    falseAuthenticator,
+			SigningAlgorithm: "RS256",
+		}, (time.Duration(cronJobTimeout) * time.Second),
+			mongoClient)
+		http.Handle("/cron/", http.StripPrefix("/cron", app.API.MakeHandler()))
+	}
+	{
+		app := callbacks.New(&jwt.JWTMiddleware{
+			Pub:              jwtPub,
+			Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
+			Authenticator:    falseAuthenticator,
+			SigningAlgorithm: "RS256",
+		}, mongoClient)
+		http.Handle("/callbacks/", http.StripPrefix("/callbacks", app.API.MakeHandler()))
 	}
 
 	var fservermux FileUploadServer

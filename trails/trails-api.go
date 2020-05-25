@@ -98,20 +98,25 @@ type Trail struct {
 // steps that were not reported can be deleted still. other steps
 // cannot be deleted until the device gets deleted as well.
 type Step struct {
-	ID           string                 `json:"id" bson:"_id"` // XXX: make type
-	Owner        string                 `json:"owner"`
-	Device       string                 `json:"device"`
-	Committer    string                 `json:"committer"`
-	TrailID      primitive.ObjectID     `json:"trail-id" bson:"trail-id"` //parent id
-	Rev          int                    `json:"rev"`
-	CommitMsg    string                 `json:"commit-msg" bson:"commit-msg"`
-	State        map[string]interface{} `json:"state"` // json blurb
-	StateSha     string                 `json:"state-sha" bson:"statesha"`
-	StepProgress StepProgress           `json:"progress" bson:"progress"`
-	StepTime     time.Time              `json:"step-time" bson:"step-time"`
-	ProgressTime time.Time              `json:"progress-time" bson:"progress-time"`
-	Meta         map[string]interface{} `json:"meta"` // json blurb
-	UsedObjects  []string               `bson:"used_objects" json:"used_objects"`
+	ID                  string                 `json:"id" bson:"_id"` // XXX: make type
+	Owner               string                 `json:"owner"`
+	Device              string                 `json:"device"`
+	Committer           string                 `json:"committer"`
+	TrailID             primitive.ObjectID     `json:"trail-id" bson:"trail-id"` //parent id
+	Rev                 int                    `json:"rev"`
+	CommitMsg           string                 `json:"commit-msg" bson:"commit-msg"`
+	State               map[string]interface{} `json:"state"` // json blurb
+	StateSha            string                 `json:"state-sha" bson:"statesha"`
+	StepProgress        StepProgress           `json:"progress" bson:"progress"`
+	StepTime            time.Time              `json:"step-time" bson:"step-time"`
+	ProgressTime        time.Time              `json:"progress-time" bson:"progress-time"`
+	Meta                map[string]interface{} `json:"meta"` // json blurb
+	UsedObjects         []string               `bson:"used_objects" json:"used_objects"`
+	IsPublic            bool                   `json:"public" bson:"ispublic"`
+	MarkPublicProcessed bool                   `json:"mark_public_processed" bson:"mark_public_processed"`
+	Garbage             bool                   `json:"garbage" bson:"garbage"`
+	TimeCreated         time.Time              `json:"time-created" bson:"timecreated"`
+	TimeModified        time.Time              `json:"time-modified" bson:"timemodified"`
 }
 
 // StepProgress progression of a step

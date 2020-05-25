@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -26,10 +27,15 @@ func RestError(w rest.ResponseWriter, err error, message string, statusCode int)
 }
 
 // RestErrorWrapper wrap the normal rest error in an struct
-func RestErrorWrapper(w rest.ResponseWriter, error string, code int) {
+func RestErrorWrapper(w rest.ResponseWriter, errorStr string, code int) {
+	incidentID := time.Now().UnixNano()
+
+	incidentStr := fmt.Sprintf("REST-ERR-ID-%d", incidentID)
+	log.Printf("ERROR| %s: %s", incidentStr, errorStr)
+
 	w.WriteHeader(code)
 	err := w.WriteJson(RError{
-		Error: error,
+		Error: incidentStr,
 		Code:  code,
 	})
 	if err != nil {

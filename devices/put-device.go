@@ -20,10 +20,12 @@ import (
 	"context"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
+	petname "github.com/dustinkirkland/golang-petname"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -163,6 +165,10 @@ func (a *App) handlePutDevice(w rest.ResponseWriter, r *rest.Request) {
 		if challenge == challengeVal {
 			newDevice.Owner = authID.(string)
 			newDevice.Challenge = ""
+			// if device had no proper nick, we assign one.
+			if strings.HasPrefix(newDevice.Nick, "__unregistered__") {
+				newDevice.Nick = petname.Generate(3, "_")
+			}
 		} else {
 			utils.RestErrorWrapper(w, "No Access to Device", http.StatusForbidden)
 			return

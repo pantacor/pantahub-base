@@ -42,11 +42,11 @@ func handleAuth(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(jwtClaims)
 }
 
-//ParseDeviceIDOrNick : Parse DeviceID Or Nick from the given string and return device objectID
-func (a *App) ParseDeviceIDOrNick(param string) (*primitive.ObjectID, error) {
+// ResolveDeviceIDOrNick : Parse DeviceID Or Nick from the given string and return device objectID
+func (a *App) ResolveDeviceIDOrNick(owner string, param string) (*primitive.ObjectID, error) {
 	mgoid, err := primitive.ObjectIDFromHex(param)
 	if err != nil {
-		return a.LookupDeviceNick(param)
+		return a.LookupDeviceNick(owner, param)
 	}
 	return &mgoid, nil
 }
@@ -70,34 +70,26 @@ func MarkDeviceAsGarbage(
 }
 
 // LookupDeviceNick : Lookup Device Nicks and return device id
-func (a *App) LookupDeviceNick(deviceID string) (*primitive.ObjectID, error) {
+func (a *App) LookupDeviceNick(owner string, deviceID string) (*primitive.ObjectID, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
 		return nil, errors.New("Error with Database connectivity")
 	}
-	count, err := collection.CountDocuments(ctx,
+	deviceObject := Device{}
+
+	dev := collection.FindOne(ctx,
 		bson.M{
+			"owner":   owner,
 			"nick":    deviceID,
 			"garbage": bson.M{"$ne": true},
-		})
-	if err != nil {
-		return nil, errors.New("Error finding device:" + deviceID + ",err:" + err.Error())
-	}
-	if count > 0 {
-		deviceObject := Device{}
-		err = collection.FindOne(ctx,
-			bson.M{
-				"nick":    deviceID,
-				"garbage": bson.M{"$ne": true},
-			}).
-			Decode(&deviceObject)
-		if err != nil {
-			return nil, errors.New("Error finding device:" + deviceID + ",err:" + err.Error())
-		}
-		return &deviceObject.ID, nil
+		},
+	)
 
+	err := dev.Decode(&deviceObject)
+	if err != nil {
+		return nil, err
 	}
-	return nil, errors.New("Device not found")
+	return &deviceObject.ID, nil
 }

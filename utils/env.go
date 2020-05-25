@@ -254,6 +254,9 @@ const (
 
 	// EnvPantahubLogBody enable log requests,responses parameters and bodies
 	EnvPantahubLogBody = "PANTAHUB_LOG_BODY"
+
+	// EnvCronJobTimeout is to set the cron job timeout(secs)
+	EnvCronJobTimeout = "CRON_JOB_TIMEOUT"
 )
 
 var defaultEnvs = map[string]string{
@@ -384,6 +387,9 @@ var defaultEnvs = map[string]string{
 
 	// log requests,responses parameters and bodies
 	EnvPantahubLogBody: "false",
+
+	// Cron job timeout(seconds)
+	EnvCronJobTimeout: "300",
 }
 
 // GetEnv get environment variable using variable key
