@@ -17,6 +17,8 @@
 package utils
 
 import (
+	"time"
+
 	"gopkg.in/resty.v1"
 )
 
@@ -36,5 +38,10 @@ func init() {
 // R create a *resty.Request honouring global client settings configurable
 // through environments.
 func R() *resty.Request {
-	return resty.SetDebug(debugEnabled).SetAllowGetMethodPayload(true).R()
+	return RT(60)
+}
+
+func RT(timeout int) *resty.Request {
+	return resty.SetTimeout(time.Duration(timeout) * time.Second).
+		SetDebug(debugEnabled).SetAllowGetMethodPayload(true).R()
 }
