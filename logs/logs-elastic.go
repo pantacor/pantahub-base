@@ -64,7 +64,7 @@ type elasticLogger struct {
 }
 
 func (s *elasticLogger) r() *resty.Request {
-	request := utils.R()
+	request := utils.RT(15)
 	if s.elasticBasicAuthUser != "" {
 		request.SetBasicAuth(s.elasticBasicAuthUser, s.elasticBasicAuthPass)
 	}
