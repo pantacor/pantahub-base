@@ -90,7 +90,14 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 	newTrail.Device = device.(string)
 	newTrail.LastInSync = time.Time{}
 	newTrail.LastTouched = newTrail.LastInSync
-	objectList, err := ProcessObjectsInState(newTrail.Owner, initialState, a)
+
+	autoLink := true
+	autolinkValue, ok := r.URL.Query()["autolink"]
+	if ok && autolinkValue[0] == "no" {
+		autoLink = false
+	}
+
+	objectList, err := ProcessObjectsInState(newTrail.Owner, initialState, autoLink, a)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error processing trail objects in factory-state:"+err.Error(), http.StatusInternalServerError)
 		return
@@ -122,7 +129,8 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
-	objectList, err = ProcessObjectsInState(newStep.Owner, initialState, a)
+
+	objectList, err = ProcessObjectsInState(newStep.Owner, initialState, autoLink, a)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error processing step objects in state"+err.Error(), http.StatusInternalServerError)
 		return

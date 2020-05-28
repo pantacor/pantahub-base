@@ -1,3 +1,4 @@
+//
 // Copyright 2020  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,18 +17,18 @@
 package objects
 
 import (
-	"context"
-	"log"
+	"errors"
 	"net/http"
-	"time"
 
 	jwtgo "github.com/dgrijalva/jwt-go"
+	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/ant0ine/go-json-rest/rest"
-	"gitlab.com/pantacor/pantahub-base/storagedriver"
 	"gitlab.com/pantacor/pantahub-base/utils"
-	"gopkg.in/mgo.v2/bson"
 )
+
+// ErrObjectS3PathAlreadyExists  erro variable for "local s3 file path for object is already exists"
+var ErrObjectS3PathAlreadyExists error = errors.New("local s3 file path for object is already exists")
 
 // handlePostObject Create a new object for a owner token
 // @Summary Create a new object for a owner token
@@ -87,95 +88,83 @@ func (a *App) handlePostObject(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	// check preconditions
-	var sha []byte
-	var err error
-
 	if newObject.Sha == "" {
 		utils.RestErrorWrapper(w, "Post New Object must set a sha", http.StatusBadRequest)
 		return
 	}
 
-	sha, err = utils.DecodeSha256HexString(newObject.Sha)
+	if newObject.ID == "" {
+		newObject.ID = newObject.Sha
+	}
 
-	if err != nil {
-		utils.RestErrorWrapper(w, "Post New Object sha must be a valid sha256", http.StatusBadRequest)
+	if newObject.ID != newObject.Sha {
+		utils.RestErrorWrapper(w, "Post New Object must not have conflicting id and sha field", http.StatusBadRequest)
 		return
 	}
 
-	storageID := MakeStorageID(ownerStr, sha)
-	newObject.StorageID = storageID
-	newObject.ID = newObject.Sha
+	autoLink := true
+	autolinkValue, ok := r.URL.Query()["autolink"]
+	if ok && autolinkValue[0] == "no" {
+		autoLink = false
+	}
 
-	SyncObjectSizes(&newObject)
-
-	result, err := CalcUsageAfterPost(ownerStr, a.mongoClient, newObject.ID, newObject.SizeInt)
-
+	shabyte, err := utils.DecodeSha256HexString(newObject.Sha)
 	if err != nil {
-		log.Printf("ERROR: CalcUsageAfterPost failed: %s\n", err.Error())
-		utils.RestErrorWrapper(w, "Error posting object", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Object sha must be a valid sha256:"+err.Error(), http.StatusBadRequest)
+		return
+	}
+	newObject.StorageID = MakeStorageID(ownerStr, shabyte)
+
+	resolvedObject, err := a.ResolveObjectWithBacking(ownerStr, newObject.Sha)
+
+	if err != nil && err != ErrNoBackingFile && err != mongo.ErrNoDocuments {
+		utils.RestErrorWrapper(w, "Error resolving Object "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	quota, err := a.GetDiskQuota(ownerStr)
-
-	if err != nil {
-		log.Println("Error to calc diskquota: " + err.Error())
-		utils.RestErrorWrapper(w, "Error to calc quota", http.StatusInternalServerError)
-		return
+	// if there was a backing file we have conflict
+	if resolvedObject != nil {
+		w.Header().Add(HttpHeaderPantahubObjectType, ObjectTypeObject)
+		w.WriteHeader(http.StatusConflict)
+		newObject = *resolvedObject
+		goto conflict
 	}
 
-	if result.Total > quota {
+	// here we had no backing file to link to and no object at all
+	// we will try to create a link to an object available in a public step
+	resolvedObject, err = a.ResolveObjectWithLinks(ownerStr, newObject.Sha, autoLink)
 
-		log.Println("Quota exceeded in post object.")
-		utils.RestErrorWrapper(w, "Quota exceeded; delete some objects or request a quota bump from team@pantahub.com",
-			http.StatusPreconditionFailed)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	_, err = collection.InsertOne(
-		ctx,
-		newObject,
-	)
-
-	if err != nil {
-		filePath, err := utils.MakeLocalS3PathForName(storageID)
-
+	// if this was possible, we use this object with adjusted Name from newObject
+	// and store it in our object collection
+	if err == nil {
+		resolvedObject.ObjectName = newObject.ObjectName
+		err = a.SaveObject(resolvedObject, false)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Header().Add("X-PH-Error", "Error Finding Path for Name"+err.Error())
+			utils.RestErrorWrapper(w, "Error saving our linkified object "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-
-		sd := storagedriver.FromEnv()
-		if sd.Exists(filePath) {
-			w.WriteHeader(http.StatusConflict)
-			w.Header().Add("X-PH-Error", "Cannot insert existing object into database")
-			goto conflict
-		}
-
-		ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		updatedResult, err := collection.UpdateOne(
-			ctx,
-			bson.M{"_id": newObject.StorageID},
-			bson.M{"$set": newObject},
-		)
-		if updatedResult.MatchedCount == 0 {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Header().Add("X-PH-Error", "Error updating previously failed object in database ")
-			return
-		}
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Header().Add("X-PH-Error", "Error updating previously failed object in database "+err.Error())
-			return
-		}
-		// we return anyway with the already available info about this object
+		// we have a gettable object in our db now so we conflict
+		w.Header().Add(HttpHeaderPantahubObjectType, ObjectTypeLink)
+		w.WriteHeader(http.StatusConflict)
+		newObject = *resolvedObject
+		goto conflict
+	} else if err != ErrNoLinkTargetAvail && err != mongo.ErrNoDocuments && err != ErrNoBackingFile {
+		utils.RestErrorWrapper(w, "Internal issue loading looking up object "+err.Error(), http.StatusInternalServerError)
+		return
 	}
+
+	err = a.SaveObject(&newObject, false)
+	if err != nil {
+		utils.RestErrorWrapper(w, "Error saving our linkified object "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if newObject.LinkedObject != "" {
+		w.Header().Add(HttpHeaderPantahubObjectType, ObjectTypeLink)
+	} else {
+		w.Header().Add(HttpHeaderPantahubObjectType, ObjectTypeObject)
+	}
+
 conflict:
-
-	issuerURL := utils.GetAPIEndpoint("/objects")
-	newObjectWithAccess := MakeObjAccessible(issuerURL, ownerStr, newObject, storageID)
-	w.WriteJson(newObjectWithAccess)
+	newObjectWithAccess := GetObjectWithAccess(newObject, "/objects")
+	w.WriteJson(&newObjectWithAccess)
 }
