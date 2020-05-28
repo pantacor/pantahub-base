@@ -93,3 +93,23 @@ func (a *App) LookupDeviceNick(owner string, deviceID string) (*primitive.Object
 	}
 	return &deviceObject.ID, nil
 }
+
+// FindDeviceByID finds the device by id
+func (a *App) FindDeviceByID(ID primitive.ObjectID, device *Device) error {
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
+	if collection == nil {
+		return errors.New("Error with Database connectivity")
+	}
+
+	err := collection.FindOne(ctx, bson.M{
+		"_id": ID,
+	}).Decode(&device)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

@@ -90,7 +90,14 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 	newTrail.Device = device.(string)
 	newTrail.LastInSync = time.Time{}
 	newTrail.LastTouched = newTrail.LastInSync
-	objectList, err := ProcessObjectsInState(newTrail.Owner, initialState, a)
+
+	autoLink := true
+	autolinkValue, ok := r.URL.Query()["autolink"]
+	if ok && autolinkValue[0] == "no" {
+		autoLink = false
+	}
+
+	objectList, err := ProcessObjectsInState(newTrail.Owner, initialState, autoLink, a)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error processing trail objects in factory-state:"+err.Error(), http.StatusInternalServerError)
 		return
@@ -111,10 +118,22 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 	newStep.Owner = newTrail.Owner
 	newStep.Device = newTrail.Device
 	newStep.CommitMsg = "Factory State (rev 0)"
-	newStep.StepTime = time.Now() // XXX this should be factory time not now
-	newStep.ProgressTime = time.Now()
+
+	now := time.Now()
+	newStep.StepTime = now // XXX this should be factory time not now
+	newStep.ProgressTime = now
 	newStep.StepProgress.Status = "DONE"
 	newStep.Meta = map[string]interface{}{}
+	newStep.TimeCreated = now
+	newStep.TimeModified = now
+	newStep.IsPublic = false
+
+	isDevicePublic, err := a.IsDevicePublic(newStep.TrailID)
+	if err != nil {
+		utils.RestErrorWrapper(w, "Error checking device is public or not:"+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	newStep.IsPublic = isDevicePublic
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_trails")
 
@@ -122,7 +141,8 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
-	objectList, err = ProcessObjectsInState(newStep.Owner, initialState, a)
+
+	objectList, err = ProcessObjectsInState(newStep.Owner, initialState, autoLink, a)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error processing step objects in state"+err.Error(), http.StatusInternalServerError)
 		return

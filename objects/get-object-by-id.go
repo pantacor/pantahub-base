@@ -100,5 +100,11 @@ func (a *App) handleGetObject(w rest.ResponseWriter, r *rest.Request) {
 	issuerURL := utils.GetAPIEndpoint("/objects")
 	filesObjWithAccess := MakeObjAccessible(issuerURL, ownerStr, filesObj, storageID)
 
+	if filesObj.LinkedObject != "" {
+		w.Header().Add(HttpHeaderPantahubObjectType, ObjectTypeLink)
+	} else {
+		w.Header().Add(HttpHeaderPantahubObjectType, ObjectTypeObject)
+	}
+
 	w.WriteJson(filesObjWithAccess)
 }

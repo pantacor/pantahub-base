@@ -1,3 +1,4 @@
+//
 // Copyright 2020  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,17 +17,12 @@
 package objects
 
 import (
-	"context"
-	"log"
 	"net/http"
-	"time"
 
 	jwtgo "github.com/dgrijalva/jwt-go"
-	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"gitlab.com/pantacor/pantahub-base/utils"
-	"gopkg.in/mgo.v2/bson"
 )
 
 // handlePutObject Update a object content
@@ -69,73 +65,84 @@ func (a *App) handlePutObject(w rest.ResponseWriter, r *rest.Request) {
 	}
 	putID := r.PathParam("id")
 
-	sha, err := utils.DecodeSha256HexString(putID)
-
+	// first validate that its a valid sha in hex format
+	_, err := utils.DecodeSha256HexString(putID)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Post New Object sha must be a valid sha256", http.StatusBadRequest)
 		return
 	}
 
-	storageID := MakeStorageID(ownerStr, sha)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	err = collection.FindOne(ctx, bson.M{
-		"_id":     storageID,
-		"garbage": bson.M{"$ne": true},
-	}).Decode(&newObject)
+	// now parse autolink flag from url query
+	autoLink := true
+	autolinkValue, ok := r.URL.Query()["autolink"]
+	if ok && autolinkValue[0] == "no" {
+		autoLink = false
+	}
 
-	if err != nil {
+	// find object owned by caller, but only if download is possible
+	object, err := a.ResolveObjectWithBacking(ownerStr, putID)
+
+	if err != nil && ErrNoBackingFile != err {
+		utils.RestErrorWrapper(w, "Object to update not found", http.StatusBadRequest)
+		return
+	}
+
+	if ErrNoBackingFile == err {
+		object, err = a.ResolveObjectWithLinks(ownerStr, putID, autoLink)
+		if err != nil {
+			utils.RestErrorWrapper(w, "No link found for object without backing file", http.StatusBadRequest)
+			return
+		}
+	}
+
+	if object == nil {
+		object, err = a.ResolveObjectWithLinks(ownerStr, putID, autoLink)
+		if err != nil {
+			utils.RestErrorWrapper(w, "No link found for not existing object", http.StatusBadRequest)
+			return
+		}
+	}
+
+	// here we have a downloadable object; make sure owner is calling...
+	if object.Owner != owner {
 		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
 	}
 
-	if newObject.Owner != owner {
-		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
+	// parse object structure from input
+	err = r.DecodeJsonPayload(&newObject)
+	if err != nil {
+		utils.RestErrorWrapper(w, "Cannot decode request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	r.DecodeJsonPayload(&newObject)
+	// here we have a downloadable object; owner must match input
+	if newObject.Owner != object.Owner {
+		utils.RestErrorWrapper(w, "Cannot modify object owner", http.StatusBadRequest)
+		return
+	}
 
-	newObject.Owner = owner.(string)
-	newObject.StorageID = storageID
-	newObject.ID = putID
+	// sha must match
+	if newObject.Sha != object.Sha {
+		utils.RestErrorWrapper(w, "Cannot modify object sha", http.StatusBadRequest)
+		return
+	}
 
-	SyncObjectSizes(&newObject)
-	result, err := CalcUsageAfterPut(ownerStr, a.mongoClient, newObject.ID, newObject.SizeInt)
+	if newObject.ObjectName != "" {
+		object.ObjectName = newObject.ObjectName
+	}
+	err = a.SaveObject(object, false)
 
 	if err != nil {
-		log.Println("Error to calc diskquota: " + err.Error())
-		utils.RestErrorWrapper(w, "Error posting object", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Failed to save object: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	quota, err := a.GetDiskQuota(ownerStr)
-
-	if err != nil {
-		log.Println("Error get diskquota setting: " + err.Error())
-		utils.RestErrorWrapper(w, "Error to calc quota", http.StatusInternalServerError)
-		return
+	if object.LinkedObject != "" {
+		w.Header().Add(HttpHeaderPantahubObjectType, ObjectTypeLink)
+	} else {
+		w.Header().Add(HttpHeaderPantahubObjectType, ObjectTypeObject)
 	}
 
-	if result.Total > quota {
-		utils.RestErrorWrapper(w, "Quota exceeded; delete some objects or request a quota bump from team@pantahub.com",
-			http.StatusPreconditionFailed)
-	}
-
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	updateOptions := options.Update()
-	updateOptions.SetUpsert(true)
-	_, err = collection.UpdateOne(
-		ctx,
-		bson.M{"_id": storageID},
-		bson.M{"$set": newObject},
-		updateOptions,
-	)
-	if err != nil {
-		utils.RestErrorWrapper(w, "Error updating device public state", http.StatusForbidden)
-		return
-	}
-
-	w.WriteJson(newObject)
+	w.WriteJson(object)
 }

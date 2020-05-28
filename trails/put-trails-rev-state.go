@@ -102,7 +102,13 @@ func (a *App) handlePutStepState(w rest.ResponseWriter, r *rest.Request) {
 	step.ProgressTime = time.Unix(0, 0)
 	step.ID = trailID + "-" + rev
 
-	objectList, err := ProcessObjectsInState(step.Owner, stateMap, a)
+	autoLink := true
+	autolinkValue, ok := r.URL.Query()["autolink"]
+	if ok && autolinkValue[0] == "no" {
+		autoLink = false
+	}
+
+	objectList, err := ProcessObjectsInState(step.Owner, stateMap, autoLink, a)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error processing step objects in state:"+err.Error(), http.StatusInternalServerError)
 		return
@@ -111,6 +117,13 @@ func (a *App) handlePutStepState(w rest.ResponseWriter, r *rest.Request) {
 	step.State = utils.BsonQuoteMap(&stateMap)
 
 	step.TimeModified = time.Now()
+
+	isDevicePublic, err := a.IsDevicePublic(step.TrailID)
+	if err != nil {
+		utils.RestErrorWrapper(w, "Error checking device is public or not:"+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	step.IsPublic = isDevicePublic
 
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

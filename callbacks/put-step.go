@@ -89,8 +89,10 @@ func (a *App) handlePutStep(w rest.ResponseWriter, r *rest.Request) {
 	var hasPublicStep bool
 
 	err = a.FindPublicStep(step.ID, &publicStep)
-	if err == mongo.ErrNoDocuments {
+	if err == nil {
 		hasPublicStep = true
+	} else if err == mongo.ErrNoDocuments {
+		hasPublicStep = false
 	} else if err != nil {
 		utils.RestErrorWrapper(w, err.Error(), http.StatusForbidden)
 		return
@@ -111,7 +113,7 @@ func (a *App) handlePutStep(w rest.ResponseWriter, r *rest.Request) {
 
 	err = a.SavePublicStep(&step, &publicStep)
 	if err != nil {
-		utils.RestErrorWrapper(w, err.Error(), http.StatusForbidden)
+		utils.RestErrorWrapper(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -208,7 +210,7 @@ func (a *App) GetStepObjectShas(step *trails.Step) ([]string, error) {
 		if _, ok := objMap[sha]; !ok {
 			existsInDb, err := a.IsObjectExistsInDb(sha)
 			if err != nil {
-				return objectShaList, err
+				return nil, err
 			}
 			if existsInDb {
 				objectShaList = append(objectShaList, sha)
@@ -240,8 +242,13 @@ func (a *App) IsObjectExistsInDb(Sha string) (bool, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
 	count, err := collection.CountDocuments(ctx, bson.M{
 		"id": Sha,
+		"$or": []bson.M{
+			bson.M{"linked_object": nil},
+			bson.M{"linked_object": ""},
+		},
 	})
 	return (count > 0), err
 }

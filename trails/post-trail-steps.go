@@ -144,7 +144,7 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 
 	if err != nil {
 		// XXX: figure how to be better on error cases here...
-		utils.RestErrorWrapper(w, "No access to resource or bad step rev", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "No access to resource or bad step "+stepID, http.StatusInternalServerError)
 		return
 	}
 
@@ -157,8 +157,19 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 		Status: "NEW",
 	}
 	newStep.TrailID = trail.ID
-	newStep.StepTime = time.Now()
+	now := time.Now()
+	newStep.StepTime = now
 	newStep.ProgressTime = time.Unix(0, 0)
+	newStep.TimeCreated = now
+	newStep.TimeModified = now
+	newStep.IsPublic = previousStep.IsPublic
+
+	isDevicePublic, err := a.IsDevicePublic(newStep.TrailID)
+	if err != nil {
+		utils.RestErrorWrapper(w, "Error checking device is public or not:"+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	newStep.IsPublic = isDevicePublic
 
 	// IMPORTANT: statesha has to be before state as that will be escaped
 	newStep.StateSha, err = utils.StateSha(&newStep.State)
@@ -168,9 +179,15 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	objectList, err := ProcessObjectsInState(newStep.Owner, newStep.State, a)
+	autoLink := true
+	autolinkValue, ok := r.URL.Query()["autolink"]
+	if ok && autolinkValue[0] == "no" {
+		autoLink = false
+	}
+
+	objectList, err := ProcessObjectsInState(newStep.Owner, newStep.State, autoLink, a)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error processing step objects in state:"+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error processing step objects in state: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	newStep.UsedObjects = objectList

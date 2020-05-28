@@ -20,7 +20,6 @@
 package trails
 
 import (
-	"log"
 	"net/http"
 	"time"
 
@@ -29,8 +28,8 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/objects"
-	"gitlab.com/pantacor/pantahub-base/storagedriver"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"go.mongodb.org/mongo-driver/mongo"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -96,9 +95,14 @@ func (a *App) handlePostStepsObject(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
+	autoLink := true
+	autolinkValue, ok := r.URL.Query()["autolink"]
+	if ok && autolinkValue[0] == "no" {
+		autoLink = false
+	}
+
 	newObject := objects.Object{}
 	r.DecodeJsonPayload(&newObject)
-
 	newObject.Owner = step.Owner
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
@@ -108,84 +112,76 @@ func (a *App) handlePostStepsObject(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	sha, err := utils.DecodeSha256HexString(newObject.Sha)
-
-	if err != nil {
-		utils.RestErrorWrapper(w, "Post Steps Object id must be a valid sha256", http.StatusBadRequest)
+	// check preconditions
+	if newObject.Sha == "" {
+		utils.RestErrorWrapper(w, "Post New Object must set a sha", http.StatusBadRequest)
 		return
 	}
 
-	storageID := objects.MakeStorageID(newObject.Owner, sha)
-	newObject.StorageID = storageID
-	newObject.ID = newObject.Sha
+	if newObject.ID == "" {
+		newObject.ID = newObject.Sha
+	}
 
-	objects.SyncObjectSizes(&newObject)
-
-	result, err := objects.CalcUsageAfterPost(newObject.Owner, a.mongoClient, newObject.ID, newObject.SizeInt)
-
-	if err != nil {
-		log.Println("Error to calc diskquota: " + err.Error())
-		utils.RestErrorWrapper(w, "Error posting object", http.StatusInternalServerError)
+	if newObject.ID != newObject.Sha {
+		utils.RestErrorWrapper(w, "Post New Object must not have conflicting id and sha field", http.StatusBadRequest)
 		return
 	}
 
-	quota, err := objects.GetDiskQuota(newObject.Owner)
-
+	shabyte, err := utils.DecodeSha256HexString(newObject.Sha)
 	if err != nil {
-		log.Println("Error get diskquota setting: " + err.Error())
-		utils.RestErrorWrapper(w, "Error to calc quota", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Object sha must be a valid sha256:"+err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if result.Total > quota {
-		utils.RestErrorWrapper(w, "Quota exceeded; delete some objects or request a quota bump from team@pantahub.com",
-			http.StatusPreconditionFailed)
+	newObject.StorageID = objects.MakeStorageID(owner.(string), shabyte)
+
+	objectsapp := objects.Build(a.mongoClient)
+
+	resolvedObject, err := objectsapp.ResolveObjectWithBacking(owner.(string), newObject.Sha)
+
+	if err != nil && err != objects.ErrNoBackingFile && err != mongo.ErrNoDocuments {
+		utils.RestErrorWrapper(w, "Error resolving Object "+err.Error(), http.StatusBadRequest)
+		return
 	}
 
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	_, err = collection.InsertOne(
-		ctx,
-		newObject,
-	)
+	// if there was a backing file we have a conflict
+	if resolvedObject != nil {
+		w.Header().Add(objects.HttpHeaderPantahubObjectType, objects.ObjectTypeObject)
+		w.WriteHeader(http.StatusConflict)
+		newObject = *resolvedObject
+		goto conflict
+	}
 
-	if err != nil {
-		filePath, err := utils.MakeLocalS3PathForName(storageID)
+	// here we had no backing file to link to and no object at all
+	// we will try to create a link to an object available in a public step
+	resolvedObject, err = objectsapp.ResolveObjectWithLinks(owner.(string), newObject.Sha, autoLink)
 
+	// if this was possible, we use this object with adjusted Name from newObject
+	// and store it in our object collection
+	if err == nil {
+		resolvedObject.ObjectName = newObject.ObjectName
+		err = objectsapp.SaveObject(resolvedObject, false)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Header().Add("X-PH-Error", "Error Finding Path for Name"+err.Error())
+			utils.RestErrorWrapper(w, "Error saving our linkified object "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-
-		sd := storagedriver.FromEnv()
-		if sd.Exists(filePath) {
-			w.WriteHeader(http.StatusConflict)
-			w.Header().Add("X-PH-Error", "Cannot insert existing object into database")
-			goto conflict
-		}
-
-		ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		updatedResult, err := collection.UpdateOne(
-			ctx,
-			bson.M{"_id": newObject.StorageID},
-			bson.M{"$set": newObject},
-		)
-		if updatedResult.MatchedCount == 0 {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Header().Add("X-PH-Error", "Error updating previously failed object in database ")
-			return
-		}
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Header().Add("X-PH-Error", "Error updating previously failed object in database "+err.Error())
-			return
-		}
-		// we return anyway with the already available info about this object
+		// we have a gettable object in our db now so we conflict
+		w.Header().Add(objects.HttpHeaderPantahubObjectType, objects.ObjectTypeLink)
+		w.WriteHeader(http.StatusConflict)
+		newObject = *resolvedObject
+		goto conflict
+	} else if err != objects.ErrNoLinkTargetAvail && err != mongo.ErrNoDocuments && err != objects.ErrNoBackingFile {
+		utils.RestErrorWrapper(w, "Internal issue loading looking up object "+err.Error(), http.StatusInternalServerError)
+		return
 	}
+
+	err = objectsapp.SaveObject(&newObject, false)
+	if err != nil {
+		utils.RestErrorWrapper(w, "Error saving our linkified object "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 conflict:
-	issuerURL := utils.GetAPIEndpoint("/trails")
-	newObjectWithAccess := objects.MakeObjAccessible(issuerURL, newObject.Owner, newObject, storageID)
+	newObjectWithAccess := objects.GetObjectWithAccess(newObject, "/trails")
 	w.WriteJson(newObjectWithAccess)
 }

@@ -112,6 +112,7 @@ func (a *App) handlePostDevice(w rest.ResponseWriter, r *rest.Request) {
 
 	newDevice.TimeCreated = time.Now()
 	newDevice.TimeModified = newDevice.TimeCreated
+	newDevice.IsPublic = false
 
 	// wecreate a random name for unregistered devices;
 	// registry controllers are expected to change these when

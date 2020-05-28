@@ -301,8 +301,16 @@ func (a *App) handleGetStepsObject(w rest.ResponseWriter, r *rest.Request) {
 		newObject.ObjectName = k
 
 		issuerURL := utils.GetAPIEndpoint("/trails")
+
 		tmp := objects.MakeObjAccessible(issuerURL, callingPrincipalStr, newObject, storageID)
 		objWithAccess = &tmp
+
+		if newObject.LinkedObject != "" {
+			w.Header().Add(objects.HttpHeaderPantahubObjectType, objects.ObjectTypeLink)
+		} else {
+			w.Header().Add(objects.HttpHeaderPantahubObjectType, objects.ObjectTypeObject)
+		}
+
 		break
 	}
 
@@ -453,6 +461,12 @@ func (a *App) handleGetStepsObjectFile(w rest.ResponseWriter, r *rest.Request) {
 		issuerURL := utils.GetAPIEndpoint("/trails")
 		tmp := objects.MakeObjAccessible(issuerURL, callingPrincipalStr, newObject, storageID)
 		objWithAccess = &tmp
+
+		if newObject.LinkedObject != "" {
+			w.Header().Add(objects.HttpHeaderPantahubObjectType, objects.ObjectTypeLink)
+		} else {
+			w.Header().Add(objects.HttpHeaderPantahubObjectType, objects.ObjectTypeObject)
+		}
 		break
 	}
 
