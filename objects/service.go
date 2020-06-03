@@ -1,5 +1,5 @@
 //
-// Copyright 2016-2018  Pantacor Ltd.
+// Copyright 2016-2020  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -40,6 +41,17 @@ import (
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
 
+// ErrNoBackingFile error signals that an object is not fully resolvable as
+// it has no backing file yet.
+var ErrNoBackingFile = errors.New("No backing file nor link")
+var ErrNoLinkTargetAvail = errors.New("No link target available")
+
+const (
+	HttpHeaderPantahubObjectType = "Pantahub-Object-Type"
+	ObjectTypeLink               = "link"
+	ObjectTypeObject             = "object"
+)
+
 // App objects rest application
 type App struct {
 	jwtMiddleware *jwt.JWTMiddleware
@@ -49,6 +61,21 @@ type App struct {
 
 	awsS3Bucket string
 	awsRegion   string
+}
+
+// Build factory a new Object App  with mongoClient
+func Build(mongoClient *mongo.Client) *App {
+
+	adminUsers := utils.GetSubscriptionAdmins()
+	subService := subscriptions.NewService(mongoClient, utils.Prn("prn::subscriptions:"), adminUsers, subscriptions.SubscriptionProperties)
+
+	return &App{
+		mongoClient: mongoClient,
+		subService:  subService,
+		awsS3Bucket: "systemcloud-001",
+		awsRegion:   "us-east-1",
+	}
+
 }
 
 var pantahubHTTPSURL string
@@ -149,7 +176,14 @@ func MakeObjAccessible(Issuer string, Subject string, obj Object, storageID stri
 		return filesObjWithAccess
 	}
 
-	objAccessTokGet := NewObjectAccessForSec(obj.ObjectName, http.MethodGet, size, filesObjWithAccess.Sha, Issuer, Subject, storageID, ObjectTokenValidSec)
+	// resolve a link if any...
+	realStorageID := storageID
+	if obj.LinkedObject != "" {
+		realStorageID = obj.LinkedObject
+	}
+
+	objAccessTokGet := NewObjectAccessForSec(obj.ObjectName, http.MethodGet, size, filesObjWithAccess.Sha, Issuer,
+		Subject, realStorageID, ObjectTokenValidSec)
 	tokGet, err := objAccessTokGet.Sign()
 	if err != nil {
 		log.Println("INTERNAL ERROR local-s3: " + err.Error())
@@ -158,8 +192,15 @@ func MakeObjAccessible(Issuer string, Subject string, obj Object, storageID stri
 		filesObjWithAccess.SignedGetURL = PantahubS3DevURL() + "/local-s3/" + tokGet
 	}
 
+	// Put URLs only allowed when going for
 	if Subject == obj.Owner {
-		objAccessTokPut := NewObjectAccessForSec(obj.ObjectName, http.MethodPut, size, filesObjWithAccess.Sha, Issuer, Subject, storageID, ObjectTokenValidSec)
+		if obj.LinkedObject == "" {
+			realStorageID = storageID
+		} else {
+			realStorageID = "SHAONLY"
+		}
+		objAccessTokPut := NewObjectAccessForSec(obj.ObjectName, http.MethodPut,
+			size, filesObjWithAccess.Sha, Issuer, Subject, realStorageID, ObjectTokenValidSec)
 		tokPut, err := objAccessTokPut.Sign()
 		if err != nil {
 			log.Println("INTERNAL ERROR local-s3: " + err.Error())
@@ -168,6 +209,7 @@ func MakeObjAccessible(Issuer string, Subject string, obj Object, storageID stri
 			filesObjWithAccess.SignedPutURL = PantahubS3DevURL() + "/local-s3/" + tokPut
 		}
 	}
+
 	return filesObjWithAccess
 }
 

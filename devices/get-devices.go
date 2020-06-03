@@ -211,21 +211,48 @@ func (a *App) handleGetDevice(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
+	value, useOtherOwnerPrn := r.URL.Query()["owner"]
+	if useOtherOwnerPrn {
+		ok, err := utils.ValidateUserPrn(value[0])
+		if err != nil || !ok {
+			utils.RestErrorWrapper(w, "Invalid owner prn", http.StatusForbidden)
+			return
+		}
+		owner = value[0]
+	}
+
+	value, useOtherOwnerNick := r.URL.Query()["owner-nick"]
+	if useOtherOwnerNick {
+		account, err := a.GetUserAccountByNick(value[0])
+		if err != nil {
+			utils.RestErrorWrapper(w, "Error finding owner user account by nick:"+err.Error(), http.StatusForbidden)
+			return
+		}
+		owner = account.Prn
+	}
+
 	mgoid, err := a.ResolveDeviceIDOrNick(owner, r.PathParam("id"))
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error Parsing Device ID or Nick:"+err.Error(), http.StatusBadRequest)
 		return
 	}
 
+	query := bson.M{
+		"_id":     mgoid,
+		"garbage": bson.M{"$ne": true},
+	}
+
+	// To fetch other user's public device
+	if useOtherOwnerPrn || useOtherOwnerNick {
+		query["owner"] = owner
+		if owner != ownerPtr.(string) { // only if requesting user!= custom owner param value
+			query["ispublic"] = true
+		}
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	err = collection.FindOne(ctx,
-		bson.M{
-			"_id":     mgoid,
-			"garbage": bson.M{"$ne": true},
-		}).
-		Decode(&device)
-
+	err = collection.FindOne(ctx, query).Decode(&device)
 	if err != nil {
 		utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
 		return
@@ -279,18 +306,22 @@ func (a *App) handleGetDevice(w rest.ResponseWriter, r *rest.Request) {
 // GetUserAccountByNick : Get User Account By Nick
 func (a *App) GetUserAccountByNick(nick string) (accounts.Account, error) {
 
-	collectionAccounts := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
-
 	var account accounts.Account
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	err := collectionAccounts.FindOne(ctx,
-		bson.M{"nick": nick}).
-		Decode(&account)
+	account, ok := accounts.DefaultAccounts["prn:pantahub.com:auth:/"+nick]
+	if !ok {
 
-	if err != nil {
-		return account, err
+		collectionAccounts := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		err := collectionAccounts.FindOne(ctx,
+			bson.M{"nick": nick}).
+			Decode(&account)
+
+		if err != nil {
+			return account, err
+		}
 	}
 	return account, nil
 }

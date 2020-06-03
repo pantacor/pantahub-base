@@ -122,42 +122,61 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	hasher := sha256.New()
 	s3Body := io.TeeReader(r.Body, hasher)
 
-	s3req, err := http.NewRequest(http.MethodPut, preSignedURL, s3Body)
-	if err != nil {
-		log.Printf("ERROR: failed to generate s3 request, %v\n", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	// storageID SHAONLY means that we only validate the sha for user
+	// we introduced this to keep old pvr clients backward compatible
+	// that dont understand about LINK semantic when doing a --force
+	// post... to ensure old behaviour persists we will do just sha
+	// validation, but not persist on disk, otherwise mimicking for
+	// consumer the same behaviour
+	if storageID == "SHAONLY" {
+		buf := make([]byte, 1024*64)
 
-	transport := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
-			Timeout:   60 * time.Minute,
-			KeepAlive: 30 * time.Second,
-			DualStack: true,
-		}).DialContext,
-		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   30 * time.Second,
-		ExpectContinueTimeout: 15 * time.Second,
-	}
-	httpClient := &http.Client{Transport: transport}
+		// lets read all to get sha through hasher ...
+		for {
+			_, err := s3Body.Read(buf)
+			if err != nil {
+				break
+			}
+		}
 
-	s3resp, err := httpClient.Do(s3req)
-	if err != nil {
-		defer s.s3.Delete(tempName)
-		log.Printf("ERROR: failed to upload to %s\n", preSignedURL)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	} else {
+		s3req, err := http.NewRequest(http.MethodPut, preSignedURL, s3Body)
+		if err != nil {
+			log.Printf("ERROR: failed to generate s3 request, %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 
-	s.s3.Rename(tempName, finalName)
-	defer s3resp.Body.Close()
+		transport := &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			DialContext: (&net.Dialer{
+				Timeout:   60 * time.Minute,
+				KeepAlive: 30 * time.Second,
+				DualStack: true,
+			}).DialContext,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   30 * time.Second,
+			ExpectContinueTimeout: 15 * time.Second,
+		}
+		httpClient := &http.Client{Transport: transport}
 
-	if s3resp.StatusCode != http.StatusOK {
-		log.Println("ERROR: unexpected response from remote S3 server")
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		s3resp, err := httpClient.Do(s3req)
+		if err != nil {
+			defer s.s3.Delete(tempName)
+			log.Printf("ERROR: failed to upload to %s\n", preSignedURL)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		s.s3.Rename(tempName, finalName)
+		defer s3resp.Body.Close()
+
+		if s3resp.StatusCode != http.StatusOK {
+			log.Println("ERROR: unexpected response from remote S3 server")
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 	}
 
 	sha := hasher.Sum(nil)

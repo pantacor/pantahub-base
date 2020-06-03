@@ -1,5 +1,5 @@
 //
-// Copyright 2016-2018  Pantacor Ltd.
+// Copyright 2016-2020  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -56,6 +56,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
+	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -112,7 +113,7 @@ type Step struct {
 	ProgressTime        time.Time              `json:"progress-time" bson:"progress-time"`
 	Meta                map[string]interface{} `json:"meta"` // json blurb
 	UsedObjects         []string               `bson:"used_objects" json:"used_objects"`
-	IsPublic            bool                   `json:"public" bson:"ispublic"`
+	IsPublic            bool                   `json:"-" bson:"ispublic"`
 	MarkPublicProcessed bool                   `json:"mark_public_processed" bson:"mark_public_processed"`
 	Garbage             bool                   `json:"garbage" bson:"garbage"`
 	TimeCreated         time.Time              `json:"time-created" bson:"timecreated"`
@@ -346,12 +347,13 @@ func (a *App) handlePutStepsObject(w rest.ResponseWriter, r *rest.Request) {
 func ProcessObjectsInState(
 	owner string,
 	state map[string]interface{},
+	autoLink bool,
 	a *App,
 ) (
 	objects []string,
 	err error,
 ) {
-	objectList, err := GetStateObjects(owner, state, a)
+	objectList, err := GetStateObjects(owner, state, autoLink, a)
 	if err != nil {
 		return objectList, err
 	}
@@ -366,6 +368,7 @@ func ProcessObjectsInState(
 func GetStateObjects(
 	owner string,
 	state map[string]interface{},
+	autoLink bool,
 	a *App,
 ) (
 	[]string,
@@ -379,18 +382,20 @@ func GetStateObjects(
 
 	spec, ok := state["#spec"]
 	if !ok {
-		return objectList, errors.New("state_object: Invalid state:#spec is missing")
+		return nil, errors.New("state_object: Invalid state:#spec is missing")
 	}
 
 	specValue, ok := spec.(string)
 	if !ok {
-		return objectList, errors.New("state_object: Invalid state:Value of #spec should be string")
+		return nil, errors.New("state_object: Invalid state:Value of #spec should be string")
 	}
 
 	if specValue != "pantavisor-multi-platform@1" &&
 		specValue != "pantavisor-service-system@1" {
-		return objectList, errors.New("state_object: Invalid state:Value of #spec should not be " + specValue)
+		return nil, errors.New("state_object: Invalid state:Value of #spec should not be " + specValue)
 	}
+
+	objectsApp := objects.Build(a.mongoClient)
 
 	for key, v := range state {
 		if strings.HasSuffix(key, ".json") ||
@@ -399,21 +404,23 @@ func GetStateObjects(
 		}
 		sha, found := v.(string)
 		if !found {
-			return objectList, errors.New("state_object:Object is not a string[sha:" + sha + "]")
+			return nil, errors.New("state_object: Object is not a string[sha:" + sha + "]")
 		}
-		shaBytes, err := utils.DecodeSha256HexString(sha)
+
+		object, err := objectsApp.ResolveObjectWithLinks(owner, sha, autoLink)
+
 		if err != nil {
-			return objectList, errors.New("state_object: Object sha that could not be decoded from hex:" + err.Error() + " [sha:" + sha + "]")
+			return nil, err
 		}
-		// lets use proper storage shas to reflect that fact that each
-		// owner has its own copy of the object instance on DB side
-		storageSha := objects.MakeStorageID(owner, shaBytes)
-		result, _ := IsObjectValid(storageSha, a)
-		if !result {
-			return objectList, errors.New("state_object: Object sha is not found in the db[storage-id(_id):" + storageSha + "]")
+
+		// Save object
+		err = objectsApp.SaveObject(object, false)
+		if err != nil {
+			return nil, errors.New("Error saving object:" + err.Error())
 		}
-		if _, ok := objMap[storageSha]; !ok {
-			objectList = append(objectList, storageSha)
+
+		if _, ok := objMap[object.StorageID]; !ok {
+			objectList = append(objectList, object.StorageID)
 		}
 	}
 	return objectList, nil
@@ -439,25 +446,6 @@ func RestoreObjects(
 		}
 	}
 	return nil
-}
-
-// IsObjectValid : to check if an object is valid or not
-func IsObjectValid(ObjectID string, a *App) (
-	result bool,
-	errs error,
-) {
-	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	objectCount, err := collection.CountDocuments(ctx,
-		bson.M{
-			"_id": ObjectID,
-		},
-	)
-	if err != nil {
-		return false, errors.New("Error Finding Object:" + err.Error())
-	}
-	return (objectCount == 1), nil
 }
 
 // IsObjectGarbage : to check if an object is garbage or not
@@ -502,4 +490,17 @@ func UnMarkObjectAsGarbage(ObjectID string, a *App) error {
 		return errors.New("unmark_object_as_garbage:Error updating object:" + err.Error())
 	}
 	return nil
+}
+
+// IsDevicePublic checks if a device is public or not
+func (a *App) IsDevicePublic(ID primitive.ObjectID) (bool, error) {
+
+	devicesApp := devices.Build(a.mongoClient)
+	device := devices.Device{}
+
+	err := devicesApp.FindDeviceByID(ID, &device)
+	if err != nil {
+		return false, err
+	}
+	return device.IsPublic, nil
 }

@@ -102,6 +102,12 @@ func (a *App) handleGetObjectFile(w rest.ResponseWriter, r *rest.Request) {
 
 	url := filesObjWithAccess.SignedGetURL
 
+	if filesObj.LinkedObject != "" {
+		w.Header().Add(HttpHeaderPantahubObjectType, ObjectTypeLink)
+	} else {
+		w.Header().Add(HttpHeaderPantahubObjectType, ObjectTypeObject)
+	}
+
 	w.Header().Add("Location", url)
 	w.WriteHeader(http.StatusFound)
 }
