@@ -184,27 +184,30 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	app.jwtMiddleware = jwtMiddleware
 	app.mongoClient = mongoClient
 
+	loggerType := "elastic"
+
 	app.backend, err = NewElasticLogger()
 
-	if err == nil {
-		err = app.backend.register()
-	}
 	if err != nil {
-		log.Println("INFO: Elastic Logger failed to start: " + err.Error())
-		log.Println("INFO: Elastic Logger not available; trying other options ...")
+		log.Fatalf("INFO: Elastic Logger failed to start '%s'; misconfiguration -> exiting\n", err.Error())
+	}
+
+	if app.backend == nil {
+		log.Println("INFO: Elastic Logger not configured; trying other options ...")
 
 		app.backend, err = NewMgoLogger(mongoClient)
-		if err == nil {
-			err = app.backend.register()
+		loggerType = "mongo"
+		if err != nil {
+			log.Fatalf("INFO: Mongo Logger failed to start '%s'; misconfiguration -> exiting\n", err.Error())
 		}
-	} else {
-		log.Println("INFO: Elastic Logger started.")
 	}
 
+	err = app.backend.register()
 	if err != nil {
-		log.Println("ERROR: Final Logger also failed to start: " + err.Error())
-		log.Println("INFO: will log to stdout now ...")
+		log.Fatalf("INFO: Logger failed to register '%s'; misconfiguration -> exiting\n", err.Error())
 	}
+
+	log.Printf("INFO: %s Logger started\n", loggerType)
 
 	app.API = rest.NewApi()
 
