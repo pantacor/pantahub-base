@@ -85,6 +85,15 @@ definitions:
       type:
         type: string
     type: object
+  auth.TokenPayload:
+    properties:
+      scopes:
+        type: string
+      token:
+        type: string
+      token_type:
+        type: string
+    type: object
   auth.accountClaims:
     properties:
       exp:
@@ -147,6 +156,38 @@ definitions:
   auth.passwordResetRequest:
     properties:
       email:
+        type: string
+    type: object
+  callbacks.ProcessDeviceResult:
+    properties:
+      device_id:
+        type: string
+      steps_marked_as_non_public:
+        type: integer
+      steps_marked_as_public:
+        type: integer
+    type: object
+  callbacks.PublicStep:
+    properties:
+      created_at:
+        type: string
+      device_id:
+        type: string
+      garbage:
+        type: boolean
+      object_sha:
+        items:
+          type: string
+        type: array
+      owner:
+        type: string
+      public:
+        type: boolean
+      step_id:
+        type: string
+      timemodified:
+        type: string
+      updated_at:
         type: string
     type: object
   dash.BillingInfo:
@@ -244,6 +285,8 @@ definitions:
         type: boolean
       id:
         type: string
+      mark_public_processed:
+        type: boolean
       nick:
         type: string
       owner:
@@ -324,6 +367,10 @@ definitions:
         type: string
       own:
         type: string
+      plat:
+        type: string
+      rev:
+        type: string
       src:
         type: string
       time-created:
@@ -398,6 +445,21 @@ definitions:
       storage-id:
         type: string
     type: object
+  profiles.Profile:
+    properties:
+      bio:
+        type: string
+      garbage:
+        type: boolean
+      nick:
+        type: string
+      public:
+        type: boolean
+      time-created:
+        type: string
+      time-modified:
+        type: string
+    type: object
   subscriptions.SubscriptionReq:
     properties:
       attrs:
@@ -444,9 +506,13 @@ definitions:
         type: string
       device:
         type: string
+      garbage:
+        type: boolean
       id:
         description: 'XXX: make type'
         type: string
+      mark_public_processed:
+        type: boolean
       meta:
         additionalProperties: true
         description: json blurb
@@ -468,6 +534,10 @@ definitions:
         type: string
       step-time:
         type: string
+      time-created:
+        type: string
+      time-modified:
+        type: string
       trail-id:
         description: parent id
         type: string
@@ -478,6 +548,9 @@ definitions:
     type: object
   trails.StepProgress:
     properties:
+      data:
+        description: data field that can hold things the device wants to remember
+        type: object
       log:
         description: log if available
         type: string
@@ -591,6 +664,43 @@ info:
   title: Pantahub API reference
   version: "1.0"
 paths:
+  /{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get a user profile by user ID
+      parameters:
+      - description: ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/profiles.Profile'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get a user profile by user ID
+      tags:
+      - user
   /apps:
     get:
       consumes:
@@ -1013,6 +1123,86 @@ paths:
       summary: send email with token to user in order to reset password to given user
       tags:
       - auth
+  /auth/thirdparty/{service}/callback:
+    get:
+      consumes:
+      - application/json
+      description: login or register user using thirdparty integration
+      parameters:
+      - description: External oAuth service
+        in: path
+        name: service
+        type: string
+      - description: Return to with implicit token
+        in: query
+        name: returnto
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.TokenPayload'
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "403":
+          description: user has no admin role
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Account not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: login or register user using thirdparty integration
+      tags:
+      - auth
+  /auth/thirdparty/{service}/login:
+    get:
+      consumes:
+      - application/json
+      description: login or register user using thirdparty integration
+      parameters:
+      - description: External oAuth service
+        in: path
+        name: service
+        type: string
+      - description: Return to with implicit token
+        in: query
+        name: returnto
+        type: string
+      produces:
+      - application/json
+      responses:
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "403":
+          description: user has no admin role
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Account not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: login or register user using thirdparty integration
+      tags:
+      - auth
   /auth/verify:
     get:
       consumes:
@@ -1040,6 +1230,144 @@ paths:
       summary: Verify account payload
       tags:
       - auth
+  /callbacks/devices/{id}:
+    put:
+      consumes:
+      - application/json
+      description: Callback api for device changes
+      parameters:
+      - description: ID|Nick
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/callbacks.ProcessDeviceResult'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Callback api for device changes
+      tags:
+      - devices
+  /callbacks/steps/{id}:
+    put:
+      consumes:
+      - application/json
+      description: Callback api for step changes
+      parameters:
+      - description: ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/callbacks.PublicStep'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Callback api for step changes
+      tags:
+      - devices
+  /cron/devices:
+    put:
+      consumes:
+      - application/json
+      description: Api to process steps of a public device
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/devices.Device'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Api to process steps of a public device
+      tags:
+      - devices
+  /cron/steps:
+    put:
+      consumes:
+      - application/json
+      description: Api to process all public steps
+      parameters:
+      - description: ID|Nick|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/callbacks.PublicStep'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Api to process all public steps
+      tags:
+      - steps
   /dash/:
     get:
       consumes:
@@ -1311,14 +1639,14 @@ paths:
     patch:
       consumes:
       - application/json
-      description: 'Update device metadata using the user credentials:'
+      description: 'Update device metadata using the device credentials:'
       parameters:
-      - description: ID|PRN|NICK
+      - description: ID
         in: path
         name: id
         required: true
         type: string
-      - description: Device payload
+      - description: Device meta payload
         in: body
         name: body
         required: true
@@ -1347,7 +1675,7 @@ paths:
             $ref: '#/definitions/utils.RError'
       security:
       - ApiKeyAuth: []
-      summary: 'Update device metadata using the user credentials:'
+      summary: 'Update device metadata using the device credentials:'
       tags:
       - devices
     put:
@@ -2073,6 +2401,37 @@ paths:
       summary: Retrive and object content by Object ID
       tags:
       - objects
+  /profiles:
+    get:
+      consumes:
+      - application/json
+      description: Get all user profiles
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/profiles.Profile'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get all user profiles
+      tags:
+      - profile
   /subscriptions:
     get:
       consumes:

@@ -302,28 +302,16 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		AccessControlMaxAge:           3600,
 	})
 
-	// no authentication needed for /login
+	// no authentication needed for
 	app.API.Use(&rest.IfMiddleware{
-		Condition: func(request *rest.Request) bool {
-			return request.URL.Path != "/login" &&
-				!(request.URL.Path == "/accounts" && request.Method == "POST") &&
-				!(request.URL.Path == "/verify" && request.Method == "GET") &&
-				!(request.URL.Path == "/recover" && request.Method == "POST") &&
-				!(request.URL.Path == "/password" && request.Method == "POST")
-		},
-		IfTrue: app.jwtMiddleware,
+		Condition: isWhiteListedForAuthentication,
+		IfTrue:    app.jwtMiddleware,
 	})
 
-	// no authentication needed for /login
+	// no authentication needed for
 	app.API.Use(&rest.IfMiddleware{
-		Condition: func(request *rest.Request) bool {
-			return request.URL.Path != "/login" &&
-				!(request.URL.Path == "/accounts" && request.Method == "POST") &&
-				!(request.URL.Path == "/verify" && request.Method == "GET") &&
-				!(request.URL.Path == "/recover" && request.Method == "POST") &&
-				!(request.URL.Path == "/password" && request.Method == "POST")
-		},
-		IfTrue: &utils.AuthMiddleware{},
+		Condition: isWhiteListedForAuthentication,
+		IfTrue:    &utils.AuthMiddleware{},
 	})
 
 	// /login /auth_status and /refresh_token endpoints
@@ -340,6 +328,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		rest.Post("/password", app.handlePasswordReset),
 		rest.Post("/authorize", app.handlePostAuthorizeToken),
 		rest.Post("/code", app.handlePostCode),
+		rest.Get("/oauth/login/:service", app.HandlethirdPartyLogin),
+		rest.Get("/oauth/callback/:service", app.HandlethirdPartyCallback),
 	)
 	app.API.SetApp(apiRouter)
 
@@ -612,4 +602,14 @@ func (a *App) devicePayload(deviceID string) map[string]interface{} {
 	}
 
 	return val
+}
+
+func isWhiteListedForAuthentication(request *rest.Request) bool {
+	return request.URL.Path != "/login" &&
+		!(request.URL.Path == "/accounts" && request.Method == "POST") &&
+		!(request.URL.Path == "/verify" && request.Method == "GET") &&
+		!(request.URL.Path == "/recover" && request.Method == "POST") &&
+		!(request.URL.Path == "/password" && request.Method == "POST") &&
+		!(strings.HasPrefix(request.URL.Path, "/oauth/login/") && request.Method == "GET") &&
+		!(strings.HasPrefix(request.URL.Path, "/oauth/callback/") && request.Method == "GET")
 }

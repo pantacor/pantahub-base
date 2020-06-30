@@ -665,6 +665,132 @@
                 }
             }
         },
+        "/auth/thirdparty/{service}/callback": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "login or register user using thirdparty integration",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "login or register user using thirdparty integration",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "External oAuth service",
+                        "name": "service",
+                        "in": "path"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Return to with implicit token",
+                        "name": "returnto",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/auth.TokenPayload"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid payload",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "403": {
+                        "description": "user has no admin role",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Error processing request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/thirdparty/{service}/login": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "login or register user using thirdparty integration",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "login or register user using thirdparty integration",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "External oAuth service",
+                        "name": "service",
+                        "in": "path"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Return to with implicit token",
+                        "name": "returnto",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "400": {
+                        "description": "Invalid payload",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "403": {
+                        "description": "user has no admin role",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Error processing request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/verify": {
             "get": {
                 "description": "Verify account payload",
@@ -699,6 +825,223 @@
                     },
                     "500": {
                         "description": "Error processing request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/callbacks/devices/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Callback api for device changes",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "devices"
+                ],
+                "summary": "Callback api for device changes",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID|Nick",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/callbacks.ProcessDeviceResult"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/callbacks/steps/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Callback api for step changes",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "devices"
+                ],
+                "summary": "Callback api for step changes",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/callbacks.PublicStep"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/cron/devices": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Api to process steps of a public device",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "devices"
+                ],
+                "summary": "Api to process steps of a public device",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/devices.Device"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/cron/steps": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Api to process all public steps",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "steps"
+                ],
+                "summary": "Api to process all public steps",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID|Nick|PRN",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/callbacks.PublicStep"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/utils.RError"
                         }
@@ -1392,7 +1735,7 @@
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Update device metadata using the user credentials:",
+                "description": "Update device metadata using the device credentials:",
                 "consumes": [
                     "application/json"
                 ],
@@ -1402,17 +1745,17 @@
                 "tags": [
                     "devices"
                 ],
-                "summary": "Update device metadata using the user credentials:",
+                "summary": "Update device metadata using the device credentials:",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "ID|PRN|NICK",
+                        "description": "ID",
                         "name": "id",
                         "in": "path",
                         "required": true
                     },
                     {
-                        "description": "Device payload",
+                        "description": "Device meta payload",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -2287,6 +2630,55 @@
                 ],
                 "responses": {
                     "200": {},
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/profiles": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get all user profiles",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "profile"
+                ],
+                "summary": "Get all user profiles",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/profiles.Profile"
+                            }
+                        }
+                    },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
@@ -3437,6 +3829,64 @@
                     }
                 }
             }
+        },
+        "/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get a user profile by user ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user"
+                ],
+                "summary": "Get a user profile by user ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/profiles.Profile"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -3567,6 +4017,20 @@
                 }
             }
         },
+        "auth.TokenPayload": {
+            "type": "object",
+            "properties": {
+                "scopes": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                },
+                "token_type": {
+                    "type": "string"
+                }
+            }
+        },
         "auth.accountClaims": {
             "type": "object",
             "properties": {
@@ -3659,6 +4123,55 @@
             "type": "object",
             "properties": {
                 "email": {
+                    "type": "string"
+                }
+            }
+        },
+        "callbacks.ProcessDeviceResult": {
+            "type": "object",
+            "properties": {
+                "device_id": {
+                    "type": "string"
+                },
+                "steps_marked_as_non_public": {
+                    "type": "integer"
+                },
+                "steps_marked_as_public": {
+                    "type": "integer"
+                }
+            }
+        },
+        "callbacks.PublicStep": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "device_id": {
+                    "type": "string"
+                },
+                "garbage": {
+                    "type": "boolean"
+                },
+                "object_sha": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "owner": {
+                    "type": "string"
+                },
+                "public": {
+                    "type": "boolean"
+                },
+                "step_id": {
+                    "type": "string"
+                },
+                "timemodified": {
+                    "type": "string"
+                },
+                "updated_at": {
                     "type": "string"
                 }
             }
@@ -3807,6 +4320,9 @@
                 "id": {
                     "type": "string"
                 },
+                "mark_public_processed": {
+                    "type": "boolean"
+                },
                 "nick": {
                     "type": "string"
                 },
@@ -3928,6 +4444,12 @@
                 "own": {
                     "type": "string"
                 },
+                "plat": {
+                    "type": "string"
+                },
+                "rev": {
+                    "type": "string"
+                },
                 "src": {
                     "type": "string"
                 },
@@ -4041,6 +4563,29 @@
                 }
             }
         },
+        "profiles.Profile": {
+            "type": "object",
+            "properties": {
+                "bio": {
+                    "type": "string"
+                },
+                "garbage": {
+                    "type": "boolean"
+                },
+                "nick": {
+                    "type": "string"
+                },
+                "public": {
+                    "type": "boolean"
+                },
+                "time-created": {
+                    "type": "string"
+                },
+                "time-modified": {
+                    "type": "string"
+                }
+            }
+        },
         "subscriptions.SubscriptionReq": {
             "type": "object",
             "properties": {
@@ -4107,9 +4652,15 @@
                 "device": {
                     "type": "string"
                 },
+                "garbage": {
+                    "type": "boolean"
+                },
                 "id": {
                     "description": "XXX: make type",
                     "type": "string"
+                },
+                "mark_public_processed": {
+                    "type": "boolean"
                 },
                 "meta": {
                     "description": "json blurb",
@@ -4140,6 +4691,12 @@
                 "step-time": {
                     "type": "string"
                 },
+                "time-created": {
+                    "type": "string"
+                },
+                "time-modified": {
+                    "type": "string"
+                },
                 "trail-id": {
                     "description": "parent id",
                     "type": "string"
@@ -4155,6 +4712,10 @@
         "trails.StepProgress": {
             "type": "object",
             "properties": {
+                "data": {
+                    "description": "data field that can hold things the device wants to remember",
+                    "type": "object"
+                },
                 "log": {
                     "description": "log if available",
                     "type": "string"
