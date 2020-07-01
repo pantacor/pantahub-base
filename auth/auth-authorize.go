@@ -53,6 +53,21 @@ type implicitTokenRequest struct {
 	RedirectURI string `json:"redirect_uri"`
 }
 
+// handlePostAuthorizeToken authorize a thridparty application using OAuth 2.0
+// @Summary authorize a thridparty application using OAuth 2.0
+// @Description authorize a thridparty application using OAuth 2.0
+// @Accept  json
+// @Produce  json
+// @Tags auth
+// @Security ApiKeyAuth
+// @Param client_id query string false "OAuth Client ID"
+// @Param scope query string false "List of required scopes"
+// @Param redirect_uri query string false "URL for redirection when process finished"
+// @Param response_type query string false "Type of response could be "code|token""
+// @Success 302
+// @Failure 400 {object} utils.RError "Invalid payload"
+// @Failure 500 {object} utils.RError "Error processing request"
+// @Router /auth/authorize [get]
 func (app *App) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Request) {
 	var err error
 
@@ -157,6 +172,21 @@ func (app *App) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Request)
 	w.WriteJson(response)
 }
 
+// handlePostCode Gets authentication code using OAuth 2.0
+// @Summary Gets authentication code using OAuth 2.0
+// @Description Gets authentication code using OAuth 2.0
+// @Accept  json
+// @Produce  json
+// @Tags auth
+// @Security ApiKeyAuth
+// @Param client_id query string false "OAuth Client ID"
+// @Param scope query string false "List of required scopes"
+// @Param redirect_uri query string false "URL for redirection when process finished"
+// @Param response_type query string false "Type of response could be "code|token""
+// @Success 302
+// @Failure 400 {object} utils.RError "Invalid payload"
+// @Failure 500 {object} utils.RError "Error processing request"
+// @Router /auth/code [get]
 func (app *App) handlePostCode(w rest.ResponseWriter, r *rest.Request) {
 	var err error
 

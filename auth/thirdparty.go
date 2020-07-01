@@ -56,7 +56,7 @@ type TokenPayload struct {
 // @Failure 403 {object} utils.RError "user has no admin role"
 // @Failure 404 {object} utils.RError "Account not found"
 // @Failure 500 {object} utils.RError "Error processing request"
-// @Router /auth/thirdparty/{service}/login [get]
+// @Router /auth/oauth/login/{service} [get]
 func (a *App) HandlethirdPartyLogin(w rest.ResponseWriter, r *rest.Request) {
 	oauth.AuthorizeByService(w, r)
 }
@@ -75,7 +75,7 @@ func (a *App) HandlethirdPartyLogin(w rest.ResponseWriter, r *rest.Request) {
 // @Failure 403 {object} utils.RError "user has no admin role"
 // @Failure 404 {object} utils.RError "Account not found"
 // @Failure 500 {object} utils.RError "Error processing request"
-// @Router /auth/thirdparty/{service}/callback [get]
+// @Router /auth/oauth/callback/{service} [get]
 func (a *App) HandlethirdPartyCallback(w rest.ResponseWriter, r *rest.Request) {
 	payload, err := oauth.CbByService(r)
 	if err != nil {
