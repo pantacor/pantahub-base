@@ -257,6 +257,24 @@ const (
 
 	// EnvCronJobTimeout is to set the cron job timeout(secs)
 	EnvCronJobTimeout = "CRON_JOB_TIMEOUT"
+
+	// EnvGoogleOAuthClientID GOOGLE_OAUTH_CLIENT_ID
+	EnvGoogleOAuthClientID = "GOOGLE_OAUTH_CLIENT_ID"
+
+	// EnvGoogleOAuthClientSecret GOOGLE_OAUTH_CLIENT_SECRET
+	EnvGoogleOAuthClientSecret = "GOOGLE_OAUTH_CLIENT_SECRET"
+
+	// EnvGithubOAuthClientID GITHUB_OAUTH_CLIENT_ID
+	EnvGithubOAuthClientID = "GITHUB_OAUTH_CLIENT_ID"
+
+	// EnvGithubOAuthClientSecret GITHUB_OAUTH_CLIENT_SECRET
+	EnvGithubOAuthClientSecret = "GITHUB_OAUTH_CLIENT_SECRET"
+
+	// EnvGitlabOAuthClientID GITLAB_OAUTH_CLIENT_ID
+	EnvGitlabOAuthClientID = "GITLAB_OAUTH_CLIENT_ID"
+
+	// EnvGitlabOAuthClientSecret GITLAB_OAUTH_CLIENT_SECRET
+	EnvGitlabOAuthClientSecret = "GITLAB_OAUTH_CLIENT_SECRET"
 )
 
 var defaultEnvs = map[string]string{
@@ -390,6 +408,14 @@ var defaultEnvs = map[string]string{
 
 	// Cron job timeout(seconds)
 	EnvCronJobTimeout: "300",
+
+	// Oauth CONFIGURATION
+	EnvGoogleOAuthClientID:     "CHANGE THIS",
+	EnvGoogleOAuthClientSecret: "CHANGE THIS",
+	EnvGithubOAuthClientID:     "CHANGE THIS",
+	EnvGithubOAuthClientSecret: "CHANGE THIS",
+	EnvGitlabOAuthClientID:     "CHANGE THIS",
+	EnvGitlabOAuthClientSecret: "CHANGE THIS",
 }
 
 // GetEnv get environment variable using variable key

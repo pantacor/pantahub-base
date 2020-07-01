@@ -473,7 +473,7 @@ func newElasticLogger() (*elasticLogger, error) {
 	if defaultLogger.elasticBaseURL == "" {
 		defaultLogger.works = false
 		log.Println("Elasic Logging disabled.")
-		return nil, errors.New("cannot initiated logger without baseurl")
+		return nil, nil
 	}
 
 	defaultLogger.elasticURL, err = url.Parse(defaultLogger.elasticBaseURL)

@@ -34,7 +34,6 @@ require (
 	github.com/jaswdr/faker v1.0.2
 	github.com/mailru/easyjson v0.7.0 // indirect
 	github.com/miolini/datacounter v1.0.1 // indirect
-	github.com/mongodb/mongo-go-driver v1.0.4
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/onsi/gomega v1.5.0 // indirect
 	github.com/pantacor/go-json-rest-middleware-jwt v0.0.0-20190329235955-213479ac018c
@@ -55,6 +54,7 @@ require (
 	golang.org/x/crypto v0.0.0-20200109152110-61a87790db17
 	golang.org/x/lint v0.0.0-20191125180803-fdd1cda4f05f // indirect
 	golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553 // indirect
+	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	golang.org/x/sys v0.0.0-20200107162124-548cf772de50 // indirect
 	gopkg.in/mailgun/mailgun-go.v1 v1.1.1
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22

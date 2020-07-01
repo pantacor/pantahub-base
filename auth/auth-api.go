@@ -202,7 +202,7 @@ func (a *App) handlePostAccount(w rest.ResponseWriter, r *rest.Request) {
 		},
 	)
 	if usersCount > 0 {
-		utils.RestError(w, nil, "Email or Nick already in use", http.StatusPreconditionFailed)
+		utils.RestErrorUser(w, nil, "Email or Nick already in use", http.StatusPreconditionFailed)
 		return
 	}
 
