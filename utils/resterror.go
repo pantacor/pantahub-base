@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // RError rest error struct
@@ -17,14 +16,21 @@ type RError struct {
 }
 
 // RestError Create a rest error with id and log
+func RestErrorUser(w rest.ResponseWriter, err error, message string, statusCode int) {
+	errStr := "<nil>"
+	if err != nil {
+		errStr = err.Error()
+	}
+	RestErrorWrapperUser(w, message+" "+errStr, statusCode)
+}
+
+// RestError Create a rest error with id and log
 func RestError(w rest.ResponseWriter, err error, message string, statusCode int) {
 	errStr := "<nil>"
 	if err != nil {
 		errStr = err.Error()
 	}
-	errID := primitive.NewObjectID()
-	log.Println("ERROR: " + message + " -- " + errStr + " -- statuscode: " + fmt.Sprintf("%d", statusCode) + " -- sid: " + errID.Hex())
-	RestErrorWrapper(w, message+" (sid: "+errID.Hex()+")", statusCode)
+	RestErrorWrapper(w, message+" "+errStr, statusCode)
 }
 
 func restErrorWrapperInternal(w rest.ResponseWriter, errorStr string, userMsg string, code int) {
