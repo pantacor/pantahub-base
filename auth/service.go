@@ -273,7 +273,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 			return payload
 		}
 
-		if callUser != "" {
+		if callUser != "" && payload["roles"] == "admin" {
 			callPayload := jwtMiddleware.PayloadFunc(callUser)
 			callPayload["id"] = payload["id"].(string) + "==>" + callPayload["id"].(string)
 			payload["call-as"] = callPayload
