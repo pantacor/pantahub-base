@@ -67,7 +67,7 @@ type implicitTokenRequest struct {
 // @Success 302
 // @Failure 400 {object} utils.RError "Invalid payload"
 // @Failure 500 {object} utils.RError "Error processing request"
-// @Router /auth/authorize [get]
+// @Router /auth/authorize [post]
 func (app *App) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Request) {
 	var err error
 
@@ -186,7 +186,7 @@ func (app *App) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Request)
 // @Success 302
 // @Failure 400 {object} utils.RError "Invalid payload"
 // @Failure 500 {object} utils.RError "Error processing request"
-// @Router /auth/code [get]
+// @Router /auth/code [post]
 func (app *App) handlePostCode(w rest.ResponseWriter, r *rest.Request) {
 	var err error
 
