@@ -329,8 +329,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		rest.Post("/password", app.handlePasswordReset),
 		rest.Post("/authorize", app.handlePostAuthorizeToken),
 		rest.Post("/code", app.handlePostCode),
-		rest.Get("/oauth/login/:service", app.HandlethirdPartyLogin),
-		rest.Get("/oauth/callback/:service", app.HandlethirdPartyCallback),
+		rest.Get("/oauth/login/:service", app.HandleGetThirdPartyLogin),
+		rest.Get("/oauth/callback/:service", app.HandleGetThirdPartyCallback),
 	)
 	app.API.SetApp(apiRouter)
 
