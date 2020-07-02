@@ -100,7 +100,7 @@ func (a *App) handleGetSteps(w rest.ResponseWriter, r *rest.Request) {
 			"progress.status": "NEW",
 			"garbage":         bson.M{"$ne": true},
 		}
-	} else if authType == "USER" {
+	} else if authType == "USER" || authType == "SESSION" {
 		query = bson.M{
 			"trail-id":        trailObjectID,
 			"owner":           owner,
@@ -123,7 +123,7 @@ func (a *App) handleGetSteps(w rest.ResponseWriter, r *rest.Request) {
 
 	findOptions := options.Find()
 	findOptions.SetNoCursorTimeout(true)
-	if authType == "DEVICE" {
+	if authType == "DEVICE" && progressStatus == "" {
 		findOptions.SetLimit(1)
 	}
 	findOptions.SetSort(bson.M{"rev": 1}) //order by rev asc

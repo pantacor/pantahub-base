@@ -58,15 +58,8 @@ func (app *App) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Request)
 
 	// this is the claim of the service authenticating itself
 	caller := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"].(string)
-	callerType := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"].(string)
-
 	if caller == "" {
 		utils.RestErrorWrapper(w, "must be authenticated as user", http.StatusUnauthorized)
-		return
-	}
-
-	if callerType != "USER" {
-		utils.RestErrorWrapper(w, "only USER's can request implicit access tokens", http.StatusForbidden)
 		return
 	}
 

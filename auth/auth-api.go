@@ -136,6 +136,71 @@ func (a *App) handleGetAccounts(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(&resultSet)
 }
 
+// handlePostSession Create an anonymous "session" account without password
+// @Summary Create a new (anon) session account
+// @Description Create a new (anon) session account
+// @Accept  json
+// @Produce  json
+// @Tags auth
+// @Success 200 {object} accounts.Account
+// @Failure 500 {object} utils.RError "Error processing request"
+// @Router /auth/sessions [post]
+func (a *App) handlePostSession(w rest.ResponseWriter, r *rest.Request) {
+
+	sessionAccount := accounts.Account{}
+	sessionAccount.ID = primitive.NewObjectID()
+	sessionAccount.Type = accounts.AccountTypeSessionUser
+	sessionAccount.Nick = "__SESSION__" + sessionAccount.ID.Hex()
+	sessionAccount.Email = sessionAccount.Nick + "@sessions.mail.pantahub.com"
+	sessionAccount.Password = ""
+	sessionAccount.Prn = "prn:::sessions:/" + sessionAccount.ID.Hex()
+	sessionAccount.Challenge = ""
+	sessionAccount.TimeCreated = time.Now()
+	sessionAccount.TimeModified = sessionAccount.TimeCreated
+
+	opts := options.InsertOneOptions{}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
+	_, err := collection.InsertOne(
+		ctx,
+		sessionAccount,
+		&opts,
+	)
+	if err != nil {
+		utils.RestError(w, err, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	token := jwtgo.New(jwtgo.GetSigningMethod(a.jwtMiddleware.SigningAlgorithm))
+	tokenClaims := token.Claims.(jwtgo.MapClaims)
+
+	// lets get the standard payload for a user and modify it so its a service accesstoken
+	if a.jwtMiddleware.PayloadFunc != nil {
+		for key, value := range a.jwtMiddleware.PayloadFunc(sessionAccount.Prn) {
+			tokenClaims[key] = value
+		}
+	}
+
+	tokenClaims["id"] = sessionAccount.Nick
+	tokenClaims["exp"] = time.Now().Add(a.jwtMiddleware.Timeout).Unix()
+	if a.jwtMiddleware.MaxRefresh != 0 {
+		tokenClaims["orig_iat"] = time.Now().Unix()
+	}
+
+	tokenString, err := token.SignedString(a.jwtMiddleware.Key)
+
+	if err != nil {
+		utils.RestErrorWrapper(w, "error creating one time token "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	sessionAccount.Password = ""
+	sessionAccount.Challenge = ""
+
+	w.WriteJson(bson.M{"token": tokenString})
+}
+
 // handlePostAccount Create a new account
 // @Summary Create a new account
 // @Description Create a new account

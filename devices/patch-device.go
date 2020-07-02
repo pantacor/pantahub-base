@@ -20,6 +20,7 @@ import (
 	"context"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
@@ -62,8 +63,8 @@ func (a *App) handlePatchDevice(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	if authType == "DEVICE" {
-		utils.RestErrorWrapper(w, "Devices cannot change their own public state.", http.StatusForbidden)
+	if authType != "USER" && authType != "SESSION" && !strings.HasSuffix(authID.(string), "/"+patchID) {
+		utils.RestErrorWrapper(w, "Devices can only change their own nick.", http.StatusForbidden)
 		return
 	}
 
@@ -90,8 +91,9 @@ func (a *App) handlePatchDevice(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	if newDevice.Owner == "" || newDevice.Owner != authID {
-		utils.RestErrorWrapper(w, "Not User Accessible Resource Id", http.StatusForbidden)
+	if newDevice.Owner == "" || (authType == "USER" && newDevice.Owner != authID) ||
+		(authType == "SESSION" && newDevice.Owner != authID) {
+		utils.RestErrorWrapper(w, "Not User/Device Accessible Resource Id", http.StatusForbidden)
 		return
 	}
 

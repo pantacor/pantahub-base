@@ -19,6 +19,7 @@ package devices
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
@@ -167,12 +168,11 @@ func (a *App) handlePutUserData(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	if authType != "USER" {
-		utils.RestErrorWrapper(w, "User data can only be updated by User", http.StatusBadRequest)
+	deviceID := r.PathParam("id")
+	if (authType != "USER" && authType != "SESSION") && !strings.HasSuffix(owner.(string), "/"+deviceID) {
+		utils.RestErrorWrapper(w, "User data can only be updated by User or the device itself", http.StatusBadRequest)
 		return
 	}
-
-	deviceID := r.PathParam("id")
 
 	data := map[string]interface{}{}
 	err := r.DecodeJsonPayload(&data)
@@ -194,12 +194,18 @@ func (a *App) handlePutUserData(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	query := bson.M{
+		"_id": deviceObjectID,
+	}
+
+	if authType != "DEVICE" {
+		query["owner"] = owner.(string)
+	}
+
 	updateResult, err := collection.UpdateOne(
 		ctx,
-		bson.M{
-			"_id":   deviceObjectID,
-			"owner": owner.(string),
-		},
+		query,
 		bson.M{"$set": bson.M{
 			"user-meta":    data,
 			"timemodified": time.Now(),

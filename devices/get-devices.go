@@ -52,7 +52,18 @@ func (a *App) handleGetDevices(w rest.ResponseWriter, r *rest.Request) {
 	if !ok {
 		err := ModelError{}
 		err.Code = http.StatusInternalServerError
-		err.Message = "You need to be logged in as a USER"
+		err.Message = "You need to be logged in as a USER or DEVICE"
+
+		w.WriteHeader(int(err.Code))
+		w.WriteJson(err)
+		return
+	}
+
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+	if !ok {
+		err := ModelError{}
+		err.Code = http.StatusInternalServerError
+		err.Message = "You need to be logged in as a USER or DEVICE"
 
 		w.WriteHeader(int(err.Code))
 		w.WriteJson(err)
@@ -78,7 +89,7 @@ func (a *App) handleGetDevices(w rest.ResponseWriter, r *rest.Request) {
 	ownerValue, ok1 := r.URL.Query()["owner"]
 	ownerNickvalue, ok2 := r.URL.Query()["owner-nick"]
 	if ok1 {
-		//To get devices of any user who have public devices
+		// To get devices of any user who have public devices
 		ok, err := utils.ValidateUserPrn(ownerValue[0])
 		if err != nil || !ok {
 			utils.RestErrorWrapper(w, "Invalid owner prn", http.StatusForbidden)
@@ -105,7 +116,11 @@ func (a *App) handleGetDevices(w rest.ResponseWriter, r *rest.Request) {
 		}
 
 	} else {
-		query["owner"] = owner
+		if authType == "USER" || authType == "SESSION" {
+			query["owner"] = owner
+		} else {
+			query["prn"] = owner
+		}
 	}
 
 	for k, v := range r.URL.Query() {

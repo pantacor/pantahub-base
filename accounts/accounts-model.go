@@ -41,6 +41,9 @@ const (
 	// AccountTypeUser define account type USER
 	AccountTypeUser = AccountType("USER")
 
+	// AccountTypeUser define account type SESSION
+	AccountTypeSessionUser = AccountType("SESSION")
+
 	// AccountTypeClient define account type CLIENT
 	AccountTypeClient = AccountType("CLIENT")
 )
