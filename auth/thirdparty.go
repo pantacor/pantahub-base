@@ -42,7 +42,7 @@ type TokenPayload struct {
 	Scopes    string `json:"scopes"`
 }
 
-// HandlethirdPartyLogin login or register user using thirdparty integration
+// HandleGetThirdPartyLogin login or register user using thirdparty integration
 // @Summary login or register user using thirdparty integration
 // @Description login or register user using thirdparty integration
 // @Accept  json
@@ -56,12 +56,12 @@ type TokenPayload struct {
 // @Failure 403 {object} utils.RError "user has no admin role"
 // @Failure 404 {object} utils.RError "Account not found"
 // @Failure 500 {object} utils.RError "Error processing request"
-// @Router /auth/thirdparty/{service}/login [get]
-func (a *App) HandlethirdPartyLogin(w rest.ResponseWriter, r *rest.Request) {
+// @Router /auth/oauth/login/{service} [get]
+func (a *App) HandleGetThirdPartyLogin(w rest.ResponseWriter, r *rest.Request) {
 	oauth.AuthorizeByService(w, r)
 }
 
-// HandlethirdPartyCallback login or register user using thirdparty integration
+// HandleGetThirdPartyCallback login or register user using thirdparty integration
 // @Summary login or register user using thirdparty integration
 // @Description login or register user using thirdparty integration
 // @Accept  json
@@ -75,8 +75,8 @@ func (a *App) HandlethirdPartyLogin(w rest.ResponseWriter, r *rest.Request) {
 // @Failure 403 {object} utils.RError "user has no admin role"
 // @Failure 404 {object} utils.RError "Account not found"
 // @Failure 500 {object} utils.RError "Error processing request"
-// @Router /auth/thirdparty/{service}/callback [get]
-func (a *App) HandlethirdPartyCallback(w rest.ResponseWriter, r *rest.Request) {
+// @Router /auth/oauth/callback/{service} [get]
+func (a *App) HandleGetThirdPartyCallback(w rest.ResponseWriter, r *rest.Request) {
 	payload, err := oauth.CbByService(r)
 	if err != nil {
 		utils.RestError(w, err, "Unable to connect to thirdparty service", http.StatusForbidden)

@@ -323,13 +323,14 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		rest.Get("/login", app.jwtMiddleware.RefreshHandler),
 		rest.Get("/accounts", app.handleGetAccounts),
 		rest.Post("/accounts", app.handlePostAccount),
+		rest.Post("/sessions", app.handlePostSession),
 		rest.Get("/verify", app.handleVerify),
 		rest.Post("/recover", app.handlePasswordRecovery),
 		rest.Post("/password", app.handlePasswordReset),
 		rest.Post("/authorize", app.handlePostAuthorizeToken),
 		rest.Post("/code", app.handlePostCode),
-		rest.Get("/oauth/login/:service", app.HandlethirdPartyLogin),
-		rest.Get("/oauth/callback/:service", app.HandlethirdPartyCallback),
+		rest.Get("/oauth/login/:service", app.HandleGetThirdPartyLogin),
+		rest.Get("/oauth/callback/:service", app.HandleGetThirdPartyCallback),
 	)
 	app.API.SetApp(apiRouter)
 
@@ -348,6 +349,10 @@ func AccountToPayload(account accounts.Account) map[string]interface{} {
 	case accounts.AccountTypeUser:
 		result["roles"] = "user"
 		result["type"] = "USER"
+		break
+	case accounts.AccountTypeSessionUser:
+		result["roles"] = "session"
+		result["type"] = "SESSION"
 		break
 	case accounts.AccountTypeDevice:
 		result["roles"] = "device"
@@ -607,6 +612,7 @@ func (a *App) devicePayload(deviceID string) map[string]interface{} {
 func isWhiteListedForAuthentication(request *rest.Request) bool {
 	return request.URL.Path != "/login" &&
 		!(request.URL.Path == "/accounts" && request.Method == "POST") &&
+		!(request.URL.Path == "/sessions" && request.Method == "POST") &&
 		!(request.URL.Path == "/verify" && request.Method == "GET") &&
 		!(request.URL.Path == "/recover" && request.Method == "POST") &&
 		!(request.URL.Path == "/password" && request.Method == "POST") &&

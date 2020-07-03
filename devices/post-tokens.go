@@ -68,8 +68,8 @@ func (a *App) handlePostTokens(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	if authType != "USER" {
-		utils.RestErrorWrapper(w, "Can only be updated by User: handle_posttoken", http.StatusBadRequest)
+	if authType != "USER" && authType != "SESSION" {
+		utils.RestErrorWrapper(w, "Can only be updated by User or Session: handle_posttoken", http.StatusBadRequest)
 		return
 
 	}

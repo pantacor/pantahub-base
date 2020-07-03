@@ -88,7 +88,7 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	if authType == "USER" || authType == "DEVICE" {
+	if authType == "USER" || authType == "DEVICE" || authType == "SESSION" {
 		err = collTrails.FindOne(ctx, bson.M{
 			"_id":     trailObjectID,
 			"garbage": bson.M{"$ne": true},
