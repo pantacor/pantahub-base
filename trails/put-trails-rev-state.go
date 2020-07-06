@@ -67,8 +67,8 @@ func (a *App) handlePutStepState(w rest.ResponseWriter, r *rest.Request) {
 	trailID := r.PathParam("id")
 	rev := r.PathParam("rev")
 
-	if authType != "USER" {
-		utils.RestErrorWrapper(w, "Need to be logged in as USER to put step state", http.StatusForbidden)
+	if authType != "USER" && authType != "SESSION" {
+		utils.RestErrorWrapper(w, "Need to be logged in as USER/SESSION user to put step state", http.StatusForbidden)
 		return
 	}
 

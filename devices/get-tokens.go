@@ -63,7 +63,7 @@ func (a *App) handleGetTokens(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	if authType != "USER" {
+	if authType != "USER" && authType != "SESSION" {
 		utils.RestErrorWrapper(w, "Can only be updated by Device: handle_posttoken", http.StatusBadRequest)
 		return
 	}
