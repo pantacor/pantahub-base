@@ -70,7 +70,7 @@ func (a *App) handleGetTrails(w rest.ResponseWriter, r *rest.Request) {
 	ownerField := ""
 	if authType == "DEVICE" {
 		ownerField = "device"
-	} else if authType == "USER" {
+	} else if authType == "USER" || authType == "SESSION" {
 		ownerField = "owner"
 	}
 

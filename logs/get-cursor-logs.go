@@ -49,8 +49,8 @@ func (a *App) handleGetLogsCursor(w rest.ResponseWriter, r *rest.Request) {
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 
-	if authType != "USER" {
-		utils.RestErrorWrapper(w, "Need to be logged in as USER to get logs", http.StatusForbidden)
+	if authType != "USER" && authType != "SESSION" {
+		utils.RestErrorWrapper(w, "Need to be logged in as USER/SESSION user to get logs", http.StatusForbidden)
 		return
 	}
 

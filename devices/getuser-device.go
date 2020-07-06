@@ -71,7 +71,7 @@ func (a *App) handleGetUserDevice(w rest.ResponseWriter, r *rest.Request) {
 
 	if authType == "DEVICE" {
 		callerIsDevice = true
-	} else if authType == "USER" {
+	} else if authType == "USER" || authType == "SESSION" {
 		callerIsUser = true
 	} else {
 		utils.RestErrorWrapper(w, "You need to be logged in with either USER or DEVICE account type.", http.StatusForbidden)

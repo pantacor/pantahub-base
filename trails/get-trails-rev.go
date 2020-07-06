@@ -90,7 +90,7 @@ func (a *App) handleGetStep(w rest.ResponseWriter, r *rest.Request) {
 	} else if authType == "DEVICE" {
 		query["device"] = owner
 		err = coll.FindOne(ctx, query).Decode(&step)
-	} else if authType == "USER" {
+	} else if authType == "USER" || authType == "SESSION" {
 		query["owner"] = owner
 		err = coll.FindOne(ctx, bson.M{
 			"_id":     trailID + "-" + rev,

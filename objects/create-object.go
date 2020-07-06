@@ -60,7 +60,7 @@ func (a *App) handlePostObject(w rest.ResponseWriter, r *rest.Request) {
 	callerStr, ok := caller.(string)
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
-	if authType.(string) == "USER" {
+	if authType.(string) == "USER" || authType.(string) == "SESSION" {
 		ownerStr = callerStr
 	} else {
 		owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["owner"]
