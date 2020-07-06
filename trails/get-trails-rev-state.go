@@ -91,7 +91,7 @@ func (a *App) handleGetStepState(w rest.ResponseWriter, r *rest.Request) {
 			"device":  owner,
 			"garbage": bson.M{"$ne": true},
 		}).Decode(&step)
-	} else if authType == "USER" {
+	} else if authType == "USER" || authType == "SESSION" {
 		err = coll.FindOne(ctx, bson.M{
 			"_id":     trailID + "-" + rev,
 			"owner":   owner,
