@@ -8,11 +8,28 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 )
 
+type UserError struct {
+	Msg string
+}
+
 // RError rest error struct
 type RError struct {
 	Error string `json:"error"`
 	Msg   string `json:"msg",omitempty`
 	Code  int    `json:"code,omitempty"`
+}
+
+func (userError *UserError) Error() string {
+	return userError.Msg
+}
+
+func IsUserError(err error) bool {
+	_, ok := err.(*UserError)
+	return ok
+}
+
+func UserErrorNew(msg string) *UserError {
+	return &UserError{Msg: msg}
 }
 
 // RestError Create a rest error with id and log
