@@ -62,6 +62,30 @@ const (
 	// default: 24 * 60
 	EnvPantahubJWTMaxRefreshMinutes = "PANTAHUB_JWT_MAX_REFRESH_MINUTES"
 
+	// EnvPantahubCaCert ca certificate
+	EnvPantahubCaCert = "PANTAHUB_CA_CERT"
+
+	// EnvProxyTLSUnlockAuthToken tls authentication secret token
+	EnvProxyTLSUnlockAuthToken = "PANTAHUB_PROXY_TLS_AUTH_TOKEN"
+
+	// EnvPantahubCaHost Ca host URL
+	EnvPantahubCaHost = "PANTAHUB_CA_HOST"
+
+	// EnvPantahubCaRaUser Ca RA user
+	EnvPantahubCaRaUser = "PANTAHUB_CA_RA_USER"
+
+	// EnvPantahubCaRaPass CA RA password
+	EnvPantahubCaRaPass = "PANTAHUB_CA_RA_PASS"
+
+	// EnvPantahubCaP12Cert P12 certificate
+	EnvPantahubCaP12Cert = "PANTAHUB_CA_P12_CERT"
+
+	// EnvPantahubCaP12Key P12 key
+	EnvPantahubCaP12Key = "PANTAHUB_CA_P12_KEY"
+
+	// EnvPantahubCaServiceURL  Ca service URL
+	EnvPantahubCaServiceURL = "PANTAHUB_CA_SERVICE_URL"
+
 	// EnvPantahubHost Host you want clients to reach this server under
 	// default: localhost
 	EnvPantahubHost = "PANTAHUB_HOST"
@@ -291,6 +315,15 @@ var defaultEnvs = map[string]string{
 	EnvPantahubJWTTimeoutMinutes:            "60",
 	EnvPantahubRecoverJWTTimeoutMinutes:     "60",
 	EnvPantahubJWTMaxRefreshMinutes:         "1440",
+
+	EnvPantahubCaCert:          "YOU MUST CHANGE THIS",
+	EnvPantahubCaRaUser:        "pantahub",
+	EnvPantahubCaRaPass:        "password",
+	EnvPantahubCaHost:          "localhost:8080",
+	EnvPantahubCaP12Cert:       "YOU MUST CHANGE THIS",
+	EnvPantahubCaP12Key:        "YOU MUST CHANGE THIS",
+	EnvPantahubCaServiceURL:    "",
+	EnvProxyTLSUnlockAuthToken: "YOU MUST CHANGE THIS",
 
 	EnvPantahubHost:       "localhost",
 	EnvPantahubWWWHost:    "localhost",
