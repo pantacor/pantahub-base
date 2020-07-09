@@ -329,6 +329,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		rest.Post("/password", app.handlePasswordReset),
 		rest.Post("/authorize", app.handlePostAuthorizeToken),
 		rest.Post("/code", app.handlePostCode),
+		rest.Post("/signature/verify", app.verifyToken),
+		rest.Post("/x509/login", app.handleAuthUsingDeviceCert),
 		rest.Get("/oauth/login/:service", app.HandleGetThirdPartyLogin),
 		rest.Get("/oauth/callback/:service", app.HandleGetThirdPartyCallback),
 	)
@@ -543,9 +545,10 @@ func (a *App) accountPayload(idEmailNick string) map[string]interface{} {
 }
 
 func (a *App) deviceAuth(deviceID string, secret string) bool {
+	id := utils.PrnGetID(deviceID)
+
 	c := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
-	id := utils.PrnGetID(deviceID)
 	mgoID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return false
@@ -616,6 +619,8 @@ func isWhiteListedForAuthentication(request *rest.Request) bool {
 		!(request.URL.Path == "/verify" && request.Method == "GET") &&
 		!(request.URL.Path == "/recover" && request.Method == "POST") &&
 		!(request.URL.Path == "/password" && request.Method == "POST") &&
+		!(request.URL.Path == "/signature/verify" && request.Method == "POST") &&
+		!(request.URL.Path == "/x509/login" && request.Method == "POST") &&
 		!(strings.HasPrefix(request.URL.Path, "/oauth/login/") && request.Method == "GET") &&
 		!(strings.HasPrefix(request.URL.Path, "/oauth/callback/") && request.Method == "GET")
 }

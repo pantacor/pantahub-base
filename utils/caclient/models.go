@@ -1,5 +1,4 @@
-//
-// Copyright 2016-2020  Pantacor Ltd.
+// Copyright (c) 2019  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,13 +11,28 @@
 //   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
-//
 
-package gcapi
+package caclient
 
-// MarkDeviceGarbage : GC Mark Device Garbage API response
-type MarkDeviceGarbage struct {
-	Status  int                    `json:"status"`
-	Device  map[string]interface{} `json:"device"`
-	Message string                 `json:"message"`
+import (
+	"crypto/x509"
+)
+
+// TPType transport protocol type
+type TPType string
+
+// TPProtocol transport protocol
+type TPProtocol interface{}
+
+// TCom methods for the transport comunication protocol
+type TCom interface {
+	RequestCertificate(*x509.CertificateRequest) ([]byte, error)
 }
+
+const (
+	// TPCmp transport protocol CMP
+	TPCmp TPType = "cmp"
+
+	// TPWsdl transport protocol Web service
+	TPWsdl TPType = "wsdl"
+)

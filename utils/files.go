@@ -1,5 +1,4 @@
-//
-// Copyright 2016-2020  Pantacor Ltd.
+// Copyright 2017,2018  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,11 +13,26 @@
 //   limitations under the License.
 //
 
-package gcapi
+package utils
 
-// MarkDeviceGarbage : GC Mark Device Garbage API response
-type MarkDeviceGarbage struct {
-	Status  int                    `json:"status"`
-	Device  map[string]interface{} `json:"device"`
-	Message string                 `json:"message"`
+import (
+	"io/ioutil"
+)
+
+// CreateTmpFile create a temporal file with a content, return and string with the path
+func CreateTmpFile(content []byte, name string, dir string) (string, error) {
+	tmpfile, err := ioutil.TempFile(dir, name)
+	if err != nil {
+		return "", err
+	}
+
+	if _, err := tmpfile.Write(content); err != nil {
+		return "", err
+	}
+
+	if err := tmpfile.Close(); err != nil {
+		return "", err
+	}
+
+	return tmpfile.Name(), nil
 }
