@@ -6,8 +6,6 @@ replace github.com/go-resty/resty => gopkg.in/resty.v1 v1.11.0
 
 replace github.com/ant0ine/go-json-rest => github.com/asac/go-json-rest v3.3.3-0.20191004094541-40429adaafcb+incompatible
 
-replace github.com/tiaguinho/gosoap => github.com/highercomve/gosoap v1.3.0-a747454
-
 require (
 	github.com/ChannelMeter/iso8601duration v0.0.0-20150204201828-8da3af7a2a61 // indirect
 	github.com/DataDog/zstd v1.4.4 // indirect
@@ -67,7 +65,7 @@ require (
 	github.com/swaggo/files v0.0.0-20190704085106-630677cd5c14
 	github.com/swaggo/http-swagger v0.0.0-20200308142732-58ac5e232fba
 	github.com/swaggo/swag v1.6.5
-	github.com/tiaguinho/gosoap v1.2.0
+	github.com/tiaguinho/gosoap v1.4.3
 	github.com/tinylib/msgp v1.1.2 // indirect
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20200122045848-3419fae592fc // indirect
 	github.com/tommy-muehle/go-mnd v1.3.0 // indirect
