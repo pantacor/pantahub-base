@@ -93,7 +93,7 @@ func (a *App) handleHealthz(w rest.ResponseWriter, r *rest.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	err := collection.FindOne(ctx, bson.M{}).Decode(&val)
-	if err != nil {
+	if err != nil && err != mongo.ErrNoDocuments {
 		utils.RestErrorWrapper(w, "Error with Database query:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
