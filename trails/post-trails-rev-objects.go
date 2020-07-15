@@ -71,7 +71,7 @@ func (a *App) handlePostStepsObject(w rest.ResponseWriter, r *rest.Request) {
 	trailID := r.PathParam("id")
 	rev := r.PathParam("rev")
 
-	if authType != "DEVICE" && authType != "USER" {
+	if authType != "DEVICE" && authType != "USER" && authType != "SESSION" {
 		utils.RestErrorWrapper(w, "Unknown AuthType", http.StatusBadRequest)
 		return
 	}
@@ -90,8 +90,8 @@ func (a *App) handlePostStepsObject(w rest.ResponseWriter, r *rest.Request) {
 	if authType == "DEVICE" && step.Device != owner {
 		utils.RestErrorWrapper(w, "No access for device", http.StatusForbidden)
 		return
-	} else if authType == "USER" && step.Owner != owner {
-		utils.RestErrorWrapper(w, "No access for user", http.StatusForbidden)
+	} else if ( authType == "USER" || authType == "SESSION" ) && step.Owner != owner {
+		utils.RestErrorWrapper(w, "No access for 'foreign' user/session", http.StatusForbidden)
 		return
 	}
 

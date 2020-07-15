@@ -63,10 +63,16 @@ func (a *App) SaveObject(object *Object, localS3Check bool) (err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	err = collection.FindOne(ctx, bson.M{"_id": object.StorageID}).Err()
+	oldObject := Object{}
 
+	err = collection.FindOne(ctx, bson.M{"_id": object.StorageID}).Decode(&oldObject)
 	if err == mongo.ErrNoDocuments {
 		post = true
+		object.TimeCreated = time.Now()
+		object.TimeModified = object.TimeCreated
+	} else if err == nil {
+		object.TimeCreated = oldObject.TimeCreated
+		object.TimeModified = time.Now()
 	} else if err != nil {
 		return err
 	}
@@ -93,7 +99,8 @@ func (a *App) SaveObject(object *Object, localS3Check bool) (err error) {
 
 	if result.Total > quota {
 		log.Println("Quota exceeded in post object.")
-		return errors.New("Quota exceeded; delete some objects or request a quota bump from team@pantahub.com")
+		userError := utils.UserErrorNew("Quota exceeded; delete some objects or request a quota bump from team@pantahub.com")
+		return userError
 	}
 
 	filePath, err := utils.MakeLocalS3PathForName(object.StorageID)

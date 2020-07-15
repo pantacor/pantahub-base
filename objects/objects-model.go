@@ -36,7 +36,9 @@ type Object struct {
 	SizeInt      int64  `json:"sizeint"`
 	MimeType     string `json:"mime-type"`
 	initialized  bool
-	LinkedObject string `json:"-" bson:"linked_object"`
+	LinkedObject string    `json:"-" bson:"linked_object"`
+	TimeCreated  time.Time `json:"time-created" bson:"timecreated"`
+	TimeModified time.Time `json:"time-modified" bson:"timemodified"`
 }
 
 // ObjectWithAccess extends object to add access information

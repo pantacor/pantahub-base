@@ -216,7 +216,7 @@ func (a *App) handlePutStepsObject(w rest.ResponseWriter, r *rest.Request) {
 	rev := r.PathParam("rev")
 	putID := r.PathParam("obj")
 
-	if authType != "DEVICE" && authType != "USER" {
+	if authType != "DEVICE" && authType != "USER" && authType != "SESSION" {
 		utils.RestErrorWrapper(w, "Unknown AuthType", http.StatusBadRequest)
 		return
 	}
@@ -235,8 +235,8 @@ func (a *App) handlePutStepsObject(w rest.ResponseWriter, r *rest.Request) {
 	if authType == "DEVICE" && step.Device != owner {
 		utils.RestErrorWrapper(w, "No access for device", http.StatusForbidden)
 		return
-	} else if authType == "USER" && step.Owner != owner {
-		utils.RestErrorWrapper(w, "No access for user", http.StatusForbidden)
+	} else if ( authType == "USER" || authType == "SESSION" ) && step.Owner != owner {
+		utils.RestErrorWrapper(w, "No access for user/session", http.StatusForbidden)
 		return
 	}
 

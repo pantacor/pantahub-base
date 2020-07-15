@@ -561,6 +561,254 @@
                 }
             }
         },
+        "/auth/authorize": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "authorize a thridparty application using OAuth 2.0",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "authorize a thridparty application using OAuth 2.0",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "OAuth Client ID",
+                        "name": "client_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "List of required scopes",
+                        "name": "scope",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "URL for redirection when process finished",
+                        "name": "redirect_uri",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Type of response could be ",
+                        "name": "response_type",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "302": {},
+                    "400": {
+                        "description": "Invalid payload",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Error processing request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/code": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Gets authentication code using OAuth 2.0",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Gets authentication code using OAuth 2.0",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "OAuth Client ID",
+                        "name": "client_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "List of required scopes",
+                        "name": "scope",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "URL for redirection when process finished",
+                        "name": "redirect_uri",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Type of response could be ",
+                        "name": "response_type",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "302": {},
+                    "400": {
+                        "description": "Invalid payload",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Error processing request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/oauth/callback/{service}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "login or register user using thirdparty integration",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "login or register user using thirdparty integration",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "External oAuth service",
+                        "name": "service",
+                        "in": "path"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Return to with implicit token",
+                        "name": "returnto",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/auth.TokenPayload"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid payload",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "403": {
+                        "description": "user has no admin role",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Error processing request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/oauth/login/{service}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "login or register user using thirdparty integration",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "login or register user using thirdparty integration",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "External oAuth service",
+                        "name": "service",
+                        "in": "path"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Return to with implicit token",
+                        "name": "returnto",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "400": {
+                        "description": "Invalid payload",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "403": {
+                        "description": "user has no admin role",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Error processing request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/password": {
             "post": {
                 "description": "send email with token to user in order to reset password to given user",
@@ -665,14 +913,9 @@
                 }
             }
         },
-        "/auth/thirdparty/{service}/callback": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "login or register user using thirdparty integration",
+        "/auth/sessions": {
+            "post": {
+                "description": "Create a new (anon) session account",
                 "consumes": [
                     "application/json"
                 ],
@@ -682,104 +925,12 @@
                 "tags": [
                     "auth"
                 ],
-                "summary": "login or register user using thirdparty integration",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "External oAuth service",
-                        "name": "service",
-                        "in": "path"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Return to with implicit token",
-                        "name": "returnto",
-                        "in": "query"
-                    }
-                ],
+                "summary": "Create a new (anon) session account",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/auth.TokenPayload"
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid payload",
-                        "schema": {
-                            "$ref": "#/definitions/utils.RError"
-                        }
-                    },
-                    "403": {
-                        "description": "user has no admin role",
-                        "schema": {
-                            "$ref": "#/definitions/utils.RError"
-                        }
-                    },
-                    "404": {
-                        "description": "Account not found",
-                        "schema": {
-                            "$ref": "#/definitions/utils.RError"
-                        }
-                    },
-                    "500": {
-                        "description": "Error processing request",
-                        "schema": {
-                            "$ref": "#/definitions/utils.RError"
-                        }
-                    }
-                }
-            }
-        },
-        "/auth/thirdparty/{service}/login": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "login or register user using thirdparty integration",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "auth"
-                ],
-                "summary": "login or register user using thirdparty integration",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "External oAuth service",
-                        "name": "service",
-                        "in": "path"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Return to with implicit token",
-                        "name": "returnto",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "400": {
-                        "description": "Invalid payload",
-                        "schema": {
-                            "$ref": "#/definitions/utils.RError"
-                        }
-                    },
-                    "403": {
-                        "description": "user has no admin role",
-                        "schema": {
-                            "$ref": "#/definitions/utils.RError"
-                        }
-                    },
-                    "404": {
-                        "description": "Account not found",
-                        "schema": {
-                            "$ref": "#/definitions/utils.RError"
+                            "$ref": "#/definitions/accounts.Account"
                         }
                     },
                     "500": {
@@ -825,6 +976,61 @@
                     },
                     "500": {
                         "description": "Error processing request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/x509/login": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get login token using device certificate via tls",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Get login token using device certificate via tls",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "IDEVID certificate",
+                        "name": "PhClientCertificate",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/auth.TokenPayload"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/utils.RError"
                         }
@@ -1298,6 +1504,58 @@
                 }
             }
         },
+        "/devices/register": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Verify device token from TPM device validation",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "devices"
+                ],
+                "summary": "Verify device token from TPM device validation",
+                "parameters": [
+                    {
+                        "description": "Token payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/auth.requestPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {},
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
         "/devices/tokens": {
             "get": {
                 "security": [
@@ -1320,7 +1578,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/devices.PantahubDevicesJoinToken"
+                            "$ref": "#/definitions/utils.PantahubDevicesJoinToken"
                         }
                     },
                     "400": {
@@ -1364,7 +1622,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/devices.PantahubDevicesJoinToken"
+                            "$ref": "#/definitions/utils.PantahubDevicesJoinToken"
                         }
                     },
                     "400": {
@@ -4020,13 +4278,7 @@
         "auth.TokenPayload": {
             "type": "object",
             "properties": {
-                "scopes": {
-                    "type": "string"
-                },
                 "token": {
-                    "type": "string"
-                },
-                "token_type": {
                     "type": "string"
                 }
             }
@@ -4123,6 +4375,26 @@
             "type": "object",
             "properties": {
                 "email": {
+                    "type": "string"
+                }
+            }
+        },
+        "auth.requestPayload": {
+            "type": "object",
+            "properties": {
+                "idevid-name": {
+                    "type": "string"
+                },
+                "owner": {
+                    "type": "string"
+                },
+                "service": {
+                    "type": "string"
+                },
+                "signature": {
+                    "type": "string"
+                },
+                "token-id": {
                     "type": "string"
                 }
             }
@@ -4353,45 +4625,6 @@
                 }
             }
         },
-        "devices.PantahubDevicesJoinToken": {
-            "type": "object",
-            "properties": {
-                "default-user-meta": {
-                    "type": "object",
-                    "additionalProperties": true
-                },
-                "disabled": {
-                    "type": "boolean"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "nick": {
-                    "type": "string"
-                },
-                "owner": {
-                    "type": "string"
-                },
-                "prn": {
-                    "type": "string"
-                },
-                "time-created": {
-                    "type": "string"
-                },
-                "time-modified": {
-                    "type": "string"
-                },
-                "token": {
-                    "type": "string"
-                },
-                "token-sha": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                }
-            }
-        },
         "devices.challengePayload": {
             "type": "object",
             "properties": {
@@ -4411,6 +4644,20 @@
         "devices.metaDataPayload": {
             "type": "object",
             "additionalProperties": true
+        },
+        "devices.registerReq": {
+            "type": "object",
+            "properties": {
+                "csr": {
+                    "type": "string"
+                },
+                "device-name": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
         },
         "healthz.Response": {
             "type": "object",
@@ -4839,6 +5086,45 @@
             "type": "object",
             "additionalProperties": true
         },
+        "utils.PantahubDevicesJoinToken": {
+            "type": "object",
+            "properties": {
+                "default-user-meta": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "disabled": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "nick": {
+                    "type": "string"
+                },
+                "owner": {
+                    "type": "string"
+                },
+                "prn": {
+                    "type": "string"
+                },
+                "time-created": {
+                    "type": "string"
+                },
+                "time-modified": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                },
+                "token-sha": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
         "utils.RError": {
             "type": "object",
             "properties": {
@@ -4846,6 +5132,9 @@
                     "type": "integer"
                 },
                 "error": {
+                    "type": "string"
+                },
+                "msg": {
                     "type": "string"
                 }
             }

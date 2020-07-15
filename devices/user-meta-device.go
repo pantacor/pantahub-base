@@ -65,13 +65,7 @@ func (a *App) handlePatchUserData(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	if authType != "USER" {
-		utils.RestErrorWrapper(w, "User data can only be updated by User", http.StatusBadRequest)
-		return
-	}
-
 	ownerStr, ok := owner.(string)
-
 	if !ok {
 		utils.RestErrorWrapper(w, "Session has no valid caller/owner info.", http.StatusBadRequest)
 		return
@@ -82,6 +76,13 @@ func (a *App) handlePatchUserData(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "Error Parsing Device ID or Nick:"+err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	// allow write by USER and SESSION owner, and for the device itself
+	if (authType != "USER" && authType != "SESSION") && !strings.HasSuffix(owner.(string), "/"+deviceID.Hex()) {
+		utils.RestErrorWrapper(w, "User Meta data can only be patched by owning user/session or the device itself", http.StatusBadRequest)
+		return
+	}
+
 	data := map[string]interface{}{}
 	err = r.DecodeJsonPayload(&data)
 	if err != nil {

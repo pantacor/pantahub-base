@@ -17,11 +17,23 @@
 package utils
 
 import (
+	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/pem"
+	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"gopkg.in/mgo.v2/bson"
 )
 
 // AuthMiddleware authentication default middleware
@@ -125,4 +137,110 @@ func (s *AuthMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFu
 		r.Env = env
 		handler(w, r)
 	}
+}
+
+// ValidateOwnerSig valdiate a owner signature
+func ValidateOwnerSig(sig, tokenID, owner, name string, col *mongo.Collection) error {
+	signature, err := base64.StdEncoding.DecodeString(sig)
+	if err != nil {
+		return errors.New("decode signature: " + err.Error())
+	}
+
+	token, err := getToken(tokenID, owner, col)
+	if err != nil {
+		return errors.New("Token not found or you are not the owner: " + err.Error())
+	}
+
+	// Validate signature
+	tokenSha := token.TokenSha[32:] // remove the first 32 bytes padding on the token sha in database
+	nameBytes := []byte(name)
+	idevidNameHex := make([]byte, hex.EncodedLen(len(nameBytes)))
+	_ = hex.Encode(idevidNameHex, nameBytes)
+
+	validSignature := validMAC(idevidNameHex, signature, tokenSha)
+	if !validSignature {
+		return errors.New("Invalid ownership signature signature")
+	}
+
+	return nil
+}
+
+// ValidMAC reports whether messageMAC is a valid HMAC tag for message.
+func validMAC(message, messageMAC, key []byte) bool {
+	mac := hmac.New(sha256.New, key)
+	mac.Write(message)
+	expectedMAC := mac.Sum(nil)
+
+	return hmac.Equal(messageMAC, expectedMAC)
+}
+
+func getToken(tokenID, owner string, col *mongo.Collection) (*PantahubDevicesJoinToken, error) {
+	res := &PantahubDevicesJoinToken{}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cleanToken := strings.TrimSuffix(tokenID, "\n")
+	id, err := primitive.ObjectIDFromHex(cleanToken)
+	if err != nil {
+		return nil, err
+	}
+
+	err = col.FindOne(ctx, bson.M{
+		"_id":      id,
+		"owner":    owner,
+		"disabled": bson.M{"$ne": true},
+	}).Decode(res)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+// ParseBase64PemCert parse der certificate to x590 certificate
+func ParseBase64PemCert(certPemBase64 string) (*x509.Certificate, error) {
+	certPEM, err := base64.StdEncoding.DecodeString(certPemBase64)
+	if err != nil {
+		return nil, err
+	}
+
+	block, _ := pem.Decode([]byte(certPEM))
+	if block == nil {
+		return nil, errors.New("failed to parse certificate PEM")
+	}
+
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return cert, nil
+}
+
+// ValidateCaSigned validate a certificate that has been signed by pantahub CA
+func ValidateCaSigned(cert *x509.Certificate) error {
+	caCertPem, err := base64.StdEncoding.DecodeString(GetEnv(EnvPantahubCaCert))
+	if err != nil {
+		return err
+	}
+
+	block, _ := pem.Decode([]byte(caCertPem))
+	if block == nil {
+		return errors.New("failed to parse certificate PEM")
+	}
+
+	caCert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return err
+	}
+
+	rootPool := x509.NewCertPool()
+	rootPool.AddCert(caCert)
+
+	_, err = cert.Verify(x509.VerifyOptions{
+		Roots: rootPool,
+	})
+
+	return err
 }

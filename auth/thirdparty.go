@@ -38,8 +38,8 @@ const dubKeyErrCode = 11000
 // TokenPayload login token payload
 type TokenPayload struct {
 	Token     string `json:"token"`
-	TokenType string `json:"token_type"`
-	Scopes    string `json:"scopes"`
+	TokenType string `json:"token_type,omitempty"`
+	Scopes    string `json:"scopes,omitempty"`
 }
 
 // HandleGetThirdPartyLogin login or register user using thirdparty integration

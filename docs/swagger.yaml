@@ -87,11 +87,7 @@ definitions:
     type: object
   auth.TokenPayload:
     properties:
-      scopes:
-        type: string
       token:
-        type: string
-      token_type:
         type: string
     type: object
   auth.accountClaims:
@@ -156,6 +152,19 @@ definitions:
   auth.passwordResetRequest:
     properties:
       email:
+        type: string
+    type: object
+  auth.requestPayload:
+    properties:
+      idevid-name:
+        type: string
+      owner:
+        type: string
+      service:
+        type: string
+      signature:
+        type: string
+      token-id:
         type: string
     type: object
   callbacks.ProcessDeviceResult:
@@ -307,32 +316,6 @@ definitions:
         additionalProperties: true
         type: object
     type: object
-  devices.PantahubDevicesJoinToken:
-    properties:
-      default-user-meta:
-        additionalProperties: true
-        type: object
-      disabled:
-        type: boolean
-      id:
-        type: string
-      nick:
-        type: string
-      owner:
-        type: string
-      prn:
-        type: string
-      time-created:
-        type: string
-      time-modified:
-        type: string
-      token:
-        type: string
-      token-sha:
-        items:
-          type: integer
-        type: array
-    type: object
   devices.challengePayload:
     properties:
       challenge:
@@ -345,6 +328,15 @@ definitions:
     type: object
   devices.metaDataPayload:
     additionalProperties: true
+    type: object
+  devices.registerReq:
+    properties:
+      csr:
+        type: string
+      device-name:
+        type: string
+      name:
+        type: string
     type: object
   healthz.Response:
     properties:
@@ -637,11 +629,39 @@ definitions:
   trails.state:
     additionalProperties: true
     type: object
+  utils.PantahubDevicesJoinToken:
+    properties:
+      default-user-meta:
+        additionalProperties: true
+        type: object
+      disabled:
+        type: boolean
+      id:
+        type: string
+      nick:
+        type: string
+      owner:
+        type: string
+      prn:
+        type: string
+      time-created:
+        type: string
+      time-modified:
+        type: string
+      token:
+        type: string
+      token-sha:
+        items:
+          type: integer
+        type: array
+    type: object
   utils.RError:
     properties:
       code:
         type: integer
       error:
+        type: string
+      msg:
         type: string
     type: object
   utils.Scope:
@@ -1053,6 +1073,164 @@ paths:
       summary: Get JWT claims from Authorization header
       tags:
       - auth
+  /auth/authorize:
+    post:
+      consumes:
+      - application/json
+      description: authorize a thridparty application using OAuth 2.0
+      parameters:
+      - description: OAuth Client ID
+        in: query
+        name: client_id
+        type: string
+      - description: List of required scopes
+        in: query
+        name: scope
+        type: string
+      - description: URL for redirection when process finished
+        in: query
+        name: redirect_uri
+        type: string
+      - description: 'Type of response could be '
+        in: query
+        name: response_type
+        type: string
+      produces:
+      - application/json
+      responses:
+        "302": {}
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: authorize a thridparty application using OAuth 2.0
+      tags:
+      - auth
+  /auth/code:
+    post:
+      consumes:
+      - application/json
+      description: Gets authentication code using OAuth 2.0
+      parameters:
+      - description: OAuth Client ID
+        in: query
+        name: client_id
+        type: string
+      - description: List of required scopes
+        in: query
+        name: scope
+        type: string
+      - description: URL for redirection when process finished
+        in: query
+        name: redirect_uri
+        type: string
+      - description: 'Type of response could be '
+        in: query
+        name: response_type
+        type: string
+      produces:
+      - application/json
+      responses:
+        "302": {}
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Gets authentication code using OAuth 2.0
+      tags:
+      - auth
+  /auth/oauth/callback/{service}:
+    get:
+      consumes:
+      - application/json
+      description: login or register user using thirdparty integration
+      parameters:
+      - description: External oAuth service
+        in: path
+        name: service
+        type: string
+      - description: Return to with implicit token
+        in: query
+        name: returnto
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.TokenPayload'
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "403":
+          description: user has no admin role
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Account not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: login or register user using thirdparty integration
+      tags:
+      - auth
+  /auth/oauth/login/{service}:
+    get:
+      consumes:
+      - application/json
+      description: login or register user using thirdparty integration
+      parameters:
+      - description: External oAuth service
+        in: path
+        name: service
+        type: string
+      - description: Return to with implicit token
+        in: query
+        name: returnto
+        type: string
+      produces:
+      - application/json
+      responses:
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "403":
+          description: user has no admin role
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Account not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: login or register user using thirdparty integration
+      tags:
+      - auth
   /auth/password:
     post:
       consumes:
@@ -1123,84 +1301,23 @@ paths:
       summary: send email with token to user in order to reset password to given user
       tags:
       - auth
-  /auth/thirdparty/{service}/callback:
-    get:
+  /auth/sessions:
+    post:
       consumes:
       - application/json
-      description: login or register user using thirdparty integration
-      parameters:
-      - description: External oAuth service
-        in: path
-        name: service
-        type: string
-      - description: Return to with implicit token
-        in: query
-        name: returnto
-        type: string
+      description: Create a new (anon) session account
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/auth.TokenPayload'
-        "400":
-          description: Invalid payload
-          schema:
-            $ref: '#/definitions/utils.RError'
-        "403":
-          description: user has no admin role
-          schema:
-            $ref: '#/definitions/utils.RError'
-        "404":
-          description: Account not found
-          schema:
-            $ref: '#/definitions/utils.RError'
+            $ref: '#/definitions/accounts.Account'
         "500":
           description: Error processing request
           schema:
             $ref: '#/definitions/utils.RError'
-      security:
-      - ApiKeyAuth: []
-      summary: login or register user using thirdparty integration
-      tags:
-      - auth
-  /auth/thirdparty/{service}/login:
-    get:
-      consumes:
-      - application/json
-      description: login or register user using thirdparty integration
-      parameters:
-      - description: External oAuth service
-        in: path
-        name: service
-        type: string
-      - description: Return to with implicit token
-        in: query
-        name: returnto
-        type: string
-      produces:
-      - application/json
-      responses:
-        "400":
-          description: Invalid payload
-          schema:
-            $ref: '#/definitions/utils.RError'
-        "403":
-          description: user has no admin role
-          schema:
-            $ref: '#/definitions/utils.RError'
-        "404":
-          description: Account not found
-          schema:
-            $ref: '#/definitions/utils.RError'
-        "500":
-          description: Error processing request
-          schema:
-            $ref: '#/definitions/utils.RError'
-      security:
-      - ApiKeyAuth: []
-      summary: login or register user using thirdparty integration
+      summary: Create a new (anon) session account
       tags:
       - auth
   /auth/verify:
@@ -1228,6 +1345,41 @@ paths:
           schema:
             $ref: '#/definitions/utils.RError'
       summary: Verify account payload
+      tags:
+      - auth
+  /auth/x509/login:
+    post:
+      consumes:
+      - application/json
+      description: Get login token using device certificate via tls
+      parameters:
+      - description: IDEVID certificate
+        in: header
+        name: PhClientCertificate
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.TokenPayload'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get login token using device certificate via tls
       tags:
       - auth
   /callbacks/devices/{id}:
@@ -1914,6 +2066,39 @@ paths:
       summary: get device by owner nick and device nick
       tags:
       - devices
+  /devices/register:
+    post:
+      consumes:
+      - application/json
+      description: Verify device token from TPM device validation
+      parameters:
+      - description: Token payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.requestPayload'
+      produces:
+      - application/json
+      responses:
+        "200": {}
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Verify device token from TPM device validation
+      tags:
+      - devices
   /devices/tokens:
     get:
       consumes:
@@ -1925,7 +2110,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/devices.PantahubDevicesJoinToken'
+            $ref: '#/definitions/utils.PantahubDevicesJoinToken'
         "400":
           description: Bad Request
           schema:
@@ -1958,7 +2143,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/devices.PantahubDevicesJoinToken'
+            $ref: '#/definitions/utils.PantahubDevicesJoinToken'
         "400":
           description: Bad Request
           schema:

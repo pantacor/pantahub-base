@@ -1,5 +1,4 @@
-//
-// Copyright 2016-2020  Pantacor Ltd.
+// Copyright 2020  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,11 +13,25 @@
 //   limitations under the License.
 //
 
-package gcapi
+package utils
 
-// MarkDeviceGarbage : GC Mark Device Garbage API response
-type MarkDeviceGarbage struct {
-	Status  int                    `json:"status"`
-	Device  map[string]interface{} `json:"device"`
-	Message string                 `json:"message"`
+import (
+	"crypto/x509"
+	"encoding/pem"
+	"errors"
+)
+
+// ParsePEMCertString parse a pem certificate
+func ParsePEMCertString(pemCert []byte) (*x509.Certificate, error) {
+	block, _ := pem.Decode(pemCert)
+	if block == nil {
+		return nil, errors.New("no valid pem")
+	}
+
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return cert, nil
 }
