@@ -27,6 +27,7 @@ import (
 	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/caclient"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -89,6 +90,16 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	app.jwtMiddleware = jwtMiddleware
 	app.mongoClient = mongoClient
 
+	_, err := caclient.GetDefaultCAClient()
+	if err != nil {
+		if err, ok := err.(*caclient.ClientError); ok {
+			if err.Code != caclient.ErrorNotConfig {
+				log.Fatalf("Error loading caclient. Error Code: %d -- %s", err.Code, err.Error())
+				return nil
+			}
+		}
+	}
+
 	collection := app.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
 	CreateIndexesOptions := options.CreateIndexesOptions{}
@@ -106,7 +117,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		},
 		Options: &indexOptions,
 	}
-	_, err := collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
+	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
 	if err != nil {
 		log.Fatalln("Error setting up index for pantahub_devices: " + err.Error())
 		return nil
