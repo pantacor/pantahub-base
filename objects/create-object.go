@@ -155,7 +155,11 @@ func (a *App) handlePostObject(w rest.ResponseWriter, r *rest.Request) {
 
 	err = a.SaveObject(&newObject, false)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error saving our linkified object "+err.Error(), http.StatusInternalServerError)
+		if utils.IsUserError(err) {
+			utils.RestErrorWrapperUser(w, err.Error(), http.StatusInternalServerError)
+		} else {
+			utils.RestErrorWrapper(w, "Error saving our linkified object "+err.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 	if newObject.LinkedObject != "" {

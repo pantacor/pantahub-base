@@ -99,7 +99,8 @@ func (a *App) SaveObject(object *Object, localS3Check bool) (err error) {
 
 	if result.Total > quota {
 		log.Println("Quota exceeded in post object.")
-		return errors.New("Quota exceeded; delete some objects or request a quota bump from team@pantahub.com")
+		userError := utils.UserErrorNew("Quota exceeded; delete some objects or request a quota bump from team@pantahub.com")
+		return userError
 	}
 
 	filePath, err := utils.MakeLocalS3PathForName(object.StorageID)
