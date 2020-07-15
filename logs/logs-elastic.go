@@ -32,6 +32,7 @@ import (
 	"net/url"
 	"reflect"
 	"strings"
+	"strconv"
 	"time"
 
 	"gitlab.com/pantacor/pantahub-base/utils"
@@ -58,6 +59,8 @@ type elasticLogger struct {
 	elasticBasicAuthPass string
 	elasticBearerToken   string
 	elasticIndexPrefix   string
+	elasticIndexShards   int
+	elasticIndexReplicas int
 	works                bool
 	template             bson.M
 	syncWrites           bool
@@ -470,6 +473,16 @@ func newElasticLogger() (*elasticLogger, error) {
 	defaultLogger.elasticBearerToken = utils.GetEnv(utils.EnvElasticBearer)
 	defaultLogger.elasticIndexPrefix = utils.GetEnv(utils.EnvPantahubProductName)
 
+	defaultLogger.elasticIndexShards, err = strconv.Atoi(utils.GetEnv(utils.EnvPantahubElasticShards))
+	if err != nil {
+		log.Fatal("Elastic logger failed; bad config (must be integer) for "+utils.EnvPantahubElasticShards)
+	}
+
+	defaultLogger.elasticIndexReplicas, err = strconv.Atoi(utils.GetEnv(utils.EnvPantahubElasticReplicas))
+	if err != nil {
+		log.Fatal("Elastic logger failed; bad config (must be integer) for "+utils.EnvPantahubElasticReplicas)
+	}
+
 	if defaultLogger.elasticBaseURL == "" {
 		defaultLogger.works = false
 		log.Println("Elasic Logging disabled.")
@@ -484,8 +497,8 @@ func newElasticLogger() (*elasticLogger, error) {
 	defaultLogger.template = bson.M{
 		"index_patterns": defaultLogger.elasticIndexPrefix + "-*",
 		"settings": bson.M{
-			"number_of_shards":   5,
-			"number_of_replicas": 1,
+			"number_of_shards":   defaultLogger.elasticIndexShards,
+			"number_of_replicas": defaultLogger.elasticIndexReplicas,
 		},
 		"mappings": bson.M{
 			"pv": bson.M{
