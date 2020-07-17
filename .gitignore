@@ -10,3 +10,4 @@ tmp
 data
 vendor/
 .env.*
+.vscode
