@@ -1,4 +1,4 @@
-// Copyright (c) 2019  Pantacor Ltd.
+// Copyright (c) 2020  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -44,28 +44,39 @@ type returnXML struct {
 
 // WSDL create new WSDL transport protocol
 func WSDL(URL string) (*WsdlTP, error) {
-	caCert, err := base64.StdEncoding.DecodeString(utils.GetEnv(utils.EnvPantahubCaCert))
-	if err != nil {
-		return nil, err
+	base64CaCert := utils.GetEnv(utils.EnvPantahubCaCert)
+	base64p12Cert := utils.GetEnv(utils.EnvPantahubCaP12Cert)
+	base64p12Key := utils.GetEnv(utils.EnvPantahubCaP12Key)
+
+	if URL == "" && base64CaCert == "" && base64p12Cert == "" && base64p12Key == "" {
+		return nil, NewError("Ca URL, certificate, p12 certficate and p12 key is empty", ErrorNotConfig)
 	}
 
-	p12Cert, err := base64.StdEncoding.DecodeString(utils.GetEnv(utils.EnvPantahubCaP12Cert))
+	caCert, err := base64.StdEncoding.DecodeString(base64CaCert)
 	if err != nil {
-		return nil, err
+		return nil, NewError(err.Error(), ErrorParsingCaCert)
 	}
 
-	p12Key, err := base64.StdEncoding.DecodeString(utils.GetEnv(utils.EnvPantahubCaP12Key))
+	p12Cert, err := base64.StdEncoding.DecodeString(base64p12Cert)
 	if err != nil {
-		return nil, err
+		return nil, NewError(err.Error(), ErrorParsingP12)
+	}
+
+	p12Key, err := base64.StdEncoding.DecodeString(base64p12Key)
+	if err != nil {
+		return nil, NewError(err.Error(), ErrorParsingP12)
 	}
 
 	clientCert, err := tls.X509KeyPair(p12Cert, p12Key)
 	if err != nil {
-		return nil, err
+		return nil, NewError(err.Error(), ErrorLoadingP12)
 	}
 
 	pool := x509.NewCertPool()
-	pool.AppendCertsFromPEM(caCert)
+	ok := pool.AppendCertsFromPEM(caCert)
+	if !ok {
+		return nil, NewError("Can't load ca certificate", ErrorLoadingCaCert)
+	}
 
 	httpClient := &http.Client{
 		Transport: &http.Transport{
@@ -76,9 +87,10 @@ func WSDL(URL string) (*WsdlTP, error) {
 			},
 		},
 	}
+
 	client, err := gosoap.SoapClient(URL, httpClient)
 	if err != nil {
-		return nil, err
+		return nil, NewError(err.Error(), ErrorLoadingSoap)
 	}
 
 	return &WsdlTP{

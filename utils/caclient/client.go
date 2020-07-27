@@ -1,4 +1,4 @@
-// Copyright (c) 2019  Pantacor Ltd.
+// Copyright (c) 2020  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,27 +17,58 @@ package caclient
 import (
 	"crypto/x509"
 	"fmt"
+
+	"gitlab.com/pantacor/pantahub-base/utils"
 )
 
-// CertRequest send a certificate request to and CA
-func CertRequest(csr *x509.CertificateRequest, username, password, caURL string, protocol TPType) ([]byte, error) {
-	var err error = nil
-	var cert []byte
+// CAClient CA client
+type CAClient struct {
+	Protocol TPType
+	URL      string
+	Client   TCom
+}
 
+var caclient *CAClient = nil
+
+// GetDefaultCAClient get singleton for caclient
+func GetDefaultCAClient() (*CAClient, error) {
+	if caclient != nil {
+		return caclient, nil
+	}
+
+	var err error
+	caclient, err = New(utils.GetEnv(utils.EnvPantahubCaServiceURL), TPWsdl)
+	return caclient, err
+}
+
+// New get or create CAClient
+func New(URL string, protocol TPType) (*CAClient, error) {
+	client, err := getClient(URL, protocol)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CAClient{
+		Protocol: protocol,
+		URL:      URL,
+		Client:   client,
+	}, nil
+}
+
+func getClient(URL string, protocol TPType) (TCom, error) {
 	switch protocol {
 	case TPWsdl:
-		client, err := WSDL(caURL)
+		client, err := WSDL(URL)
 		if err != nil {
 			return nil, err
 		}
-
-		cert, err = client.RequestCertificate(csr, username, password)
-		if err != nil {
-			return nil, err
-		}
+		return client, nil
 	default:
 		return nil, fmt.Errorf("Protocol not implmented: %s", protocol)
 	}
+}
 
-	return cert, err
+// CertRequest send a certificate request to and CA
+func (ca *CAClient) CertRequest(csr *x509.CertificateRequest, username, password string) ([]byte, error) {
+	return ca.Client.RequestCertificate(csr, username, password)
 }

@@ -95,28 +95,34 @@ var phCertExtensionIDs = &PHCertExtensions{
 // @Failure 500 {object} utils.RError
 // @Router /devices/register [post]
 func (a *App) handleRegister(w rest.ResponseWriter, r *rest.Request) {
-	reqPayload := &registerReq{}
-	err := r.DecodeJsonPayload(reqPayload)
+	ca, err := caclient.GetDefaultCAClient()
 	if err != nil {
-		rest.Error(w, err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "This feature is not available: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	reqPayload := &registerReq{}
+	err = r.DecodeJsonPayload(reqPayload)
+	if err != nil {
+		utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	certRaw, err := base64.StdEncoding.DecodeString(reqPayload.Cert)
 	if err != nil {
-		rest.Error(w, err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	cert, err := x509.ParseCertificateRequest(certRaw)
 	if err != nil {
-		rest.Error(w, err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	err = cert.CheckSignature()
 	if err != nil {
-		rest.Error(w, err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -131,21 +137,20 @@ func (a *App) handleRegister(w rest.ResponseWriter, r *rest.Request) {
 		col,
 	)
 	if err != nil {
-		rest.Error(w, "Invalid signature: "+err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Invalid signature: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	secret := base64.RawStdEncoding.EncodeToString([]byte(extensions.NameSigByOwner))
 	device, err := createDevice(reqPayload.DeviceName, secret, extensions.Owner)
 	if err != nil {
-		rest.Error(w, "Error creating device: "+err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error creating device: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	caURL := utils.GetEnv(utils.EnvPantahubCaServiceURL)
-	finalCert, err := caclient.CertRequest(cert, device.ID.Hex(), secret, caURL, caclient.TPWsdl)
+	finalCert, err := ca.CertRequest(cert, device.ID.Hex(), secret)
 	if err != nil {
-		rest.Error(w, "Failed to generate certificate on CA:"+err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Failed to generate certificate on CA:"+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -153,7 +158,7 @@ func (a *App) handleRegister(w rest.ResponseWriter, r *rest.Request) {
 	device.DeviceMeta["idevid"] = finalCert
 	_, err = device.save(a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices"))
 	if err != nil {
-		rest.Error(w, "Failed to save device:"+err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Failed to save device:"+err.Error(), http.StatusBadRequest)
 		return
 	}
 

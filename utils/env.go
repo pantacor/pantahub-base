@@ -299,12 +299,6 @@ const (
 
 	// EnvGitlabOAuthClientSecret GITLAB_OAUTH_CLIENT_SECRET
 	EnvGitlabOAuthClientSecret = "GITLAB_OAUTH_CLIENT_SECRET"
-
-	// EnvPantahubElasticShards PANTAHUB_ELASTIC_SHARDS
-	EnvPantahubElasticShards = "PANTAHUB_ELASTIC_SHARDS"
-
-	// EnvPantahubElasticReplicas PANTAHUB_ELASTIC_REPLICAS
-	EnvPantahubElasticReplicas = "PANTAHUB_ELASTIC_REPLICAS"
 )
 
 var defaultEnvs = map[string]string{
@@ -322,14 +316,14 @@ var defaultEnvs = map[string]string{
 	EnvPantahubRecoverJWTTimeoutMinutes:     "60",
 	EnvPantahubJWTMaxRefreshMinutes:         "1440",
 
-	EnvPantahubCaCert:          "YOU MUST CHANGE THIS",
-	EnvPantahubCaRaUser:        "pantahub",
-	EnvPantahubCaRaPass:        "password",
-	EnvPantahubCaHost:          "localhost:8080",
-	EnvPantahubCaP12Cert:       "YOU MUST CHANGE THIS",
-	EnvPantahubCaP12Key:        "YOU MUST CHANGE THIS",
+	EnvPantahubCaCert:          "",
+	EnvPantahubCaRaUser:        "",
+	EnvPantahubCaRaPass:        "",
+	EnvPantahubCaHost:          "",
+	EnvPantahubCaP12Cert:       "",
+	EnvPantahubCaP12Key:        "",
 	EnvPantahubCaServiceURL:    "",
-	EnvProxyTLSUnlockAuthToken: "YOU MUST CHANGE THIS",
+	EnvProxyTLSUnlockAuthToken: "",
 
 	EnvPantahubHost:       "localhost",
 	EnvPantahubWWWHost:    "localhost",
@@ -363,10 +357,6 @@ var defaultEnvs = map[string]string{
 	EnvElasticUsername: "",
 	EnvElasticPassword: "",
 	EnvElasticBearer:   "",
-
-	// elastic performance tuning
-	EnvPantahubElasticReplicas:	"1",
-	EnvPantahubElasticShards:	"5",
 
 	// fluent vars
 	EnvFluentPort: "24224",

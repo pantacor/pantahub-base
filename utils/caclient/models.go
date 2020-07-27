@@ -1,4 +1,4 @@
-// Copyright (c) 2019  Pantacor Ltd.
+// Copyright (c) 2020  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ type TPProtocol interface{}
 
 // TCom methods for the transport comunication protocol
 type TCom interface {
-	RequestCertificate(*x509.CertificateRequest) ([]byte, error)
+	RequestCertificate(cert *x509.CertificateRequest, deviceID string, secret string) ([]byte, error)
 }
 
 const (
