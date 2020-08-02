@@ -99,7 +99,7 @@ func SendResetPasswordEmail(email, nick, token string) error {
 	message.SetHtml(bodyHTML.String())
 	message.AddBCC(regEmail)
 
-	virusPng, err := base64.StdEncoding.DecodeString(ImageVirus)
+	logoPng, err := base64.StdEncoding.DecodeString(ImageLogo)
 	if err != nil {
 		log.Println("error:", err)
 		return err
@@ -125,7 +125,7 @@ func SendResetPasswordEmail(email, nick, token string) error {
 		return err
 	}
 
-	message.AddReaderInline("virus.png", ioutil.NopCloser(bytes.NewReader(virusPng)))
+	message.AddReaderInline("logo.png", ioutil.NopCloser(bytes.NewReader(logoPng)))
 	message.AddReaderInline("twitter.png", ioutil.NopCloser(bytes.NewReader(twitterPng)))
 	message.AddReaderInline("linkedin.png", ioutil.NopCloser(bytes.NewReader(linkedinPng)))
 	message.AddReaderInline("rd.png", ioutil.NopCloser(bytes.NewReader(rdPng)))
@@ -159,7 +159,7 @@ func SendVerification(email, nick, id, u string, urlPrefix string) bool {
 	message.SetHtml(bodyHTML)
 	message.AddBCC(regEmail)
 
-	virusPng, err := base64.StdEncoding.DecodeString(ImageVirus)
+	logoPng, err := base64.StdEncoding.DecodeString(ImageLogo)
 	if err != nil {
 		log.Println("error:", err)
 		return false
@@ -189,7 +189,7 @@ func SendVerification(email, nick, id, u string, urlPrefix string) bool {
 		return false
 	}
 
-	message.AddReaderInline("virus.png", ioutil.NopCloser(bytes.NewReader(virusPng)))
+	message.AddReaderInline("logo.png", ioutil.NopCloser(bytes.NewReader(logoPng)))
 	message.AddReaderInline("twitter.png", ioutil.NopCloser(bytes.NewReader(twitterPng)))
 	message.AddReaderInline("linkedin.png", ioutil.NopCloser(bytes.NewReader(linkedinPng)))
 	message.AddReaderInline("rd.png", ioutil.NopCloser(bytes.NewReader(rdPng)))
@@ -606,7 +606,7 @@ func getVerificationMailHTML(email, nick, link string) string {
 <!--<![endif]-->
 <div align="center" class="img-container center fixedwidth" style="padding-right: 0px;padding-left: 0px;">
 <!--[if mso]><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr style="line-height:0px"><td style="padding-right: 0px;padding-left: 0px;" align="center"><![endif]-->
-<div style="font-size:1px;line-height:15px"> </div><img align="center" alt="Image" border="0" class="center fixedwidth" src="cid:virus.png" style="outline: none; text-decoration: none; -ms-interpolation-mode: bicubic; clear: both; border: 0; height: auto; float: none; width: 100%; max-width: 120px; display: block;" title="Image" width="120"/>
+<div style="font-size:1px;line-height:15px"> </div><img align="center" alt="Image" border="0" class="center fixedwidth" src="cid:logo.png" style="outline: none; text-decoration: none; -ms-interpolation-mode: bicubic; clear: both; border: 0; height: auto; float: none; width: 100%; max-width: 120px; display: block;" title="Image" width="120"/>
 <!--[if mso]></td></tr></table><![endif]-->
 </div>
 <!--[if mso]><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="padding-right: 5px; padding-left: 5px; padding-top: 5px; padding-bottom: 5px; font-family: 'Trebuchet MS', Tahoma, sans-serif"><![endif]-->
