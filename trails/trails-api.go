@@ -122,11 +122,28 @@ type Step struct {
 
 // StepProgress progression of a step
 type StepProgress struct {
-	Progress  int         `json:"progress"`                    // progress number. steps or 1-100
-	StatusMsg string      `json:"status-msg" bson:"statusmsg"` // message of progress status
-	Data      interface{} `json:"data,omitempty" bson:"data"`  // data field that can hold things the device wants to remember
-	Status    string      `json:"status"`                      // status code
-	Log       string      `json:"log"`                         // log if available
+	Progress  int              `json:"progress"`                    // progress number. steps or 1-100
+	Downloads DownloadProgress `json:"downloads" bson:"downloads"`  // progress number. steps or 1-100
+	StatusMsg string           `json:"status-msg" bson:"statusmsg"` // message of progress status
+	Data      interface{}      `json:"data,omitempty" bson:"data"`  // data field that can hold things the device wants to remember
+	Status    string           `json:"status"`                      // status code
+	Log       string           `json:"log"`                         // log if available
+}
+
+// DownloadProgress holds info about total and individual download progress
+type DownloadProgress struct {
+	Total   ObjectProgress   `json:"total" bson:"total"`
+	Objects []ObjectProgress `json:"objects" bson:"objects"`
+}
+
+// ObjectProgress holds info object download progress
+type ObjectProgress struct {
+	ObjectName      string `json:"object_name,omitempty" bson:"object_name,omitempty"`
+	ObjectID        string `json:"object_id,omitempty" bson:"object_id,omitempty"`
+	TotalSize       int64  `json:"total_size" bson:"total_size"`
+	StartTime       int64  `json:"start_time" bson:"start_time"`
+	CurrentTime     int64  `json:"current_time" bson:"currentb_time"`
+	TotalDownloaded int64  `json:"total_downloaded" bson:"total_downloaded"`
 }
 
 // TrailSummary details about a trail
@@ -235,7 +252,7 @@ func (a *App) handlePutStepsObject(w rest.ResponseWriter, r *rest.Request) {
 	if authType == "DEVICE" && step.Device != owner {
 		utils.RestErrorWrapper(w, "No access for device", http.StatusForbidden)
 		return
-	} else if ( authType == "USER" || authType == "SESSION" ) && step.Owner != owner {
+	} else if (authType == "USER" || authType == "SESSION") && step.Owner != owner {
 		utils.RestErrorWrapper(w, "No access for user/session", http.StatusForbidden)
 		return
 	}
