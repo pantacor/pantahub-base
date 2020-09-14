@@ -243,6 +243,11 @@ func (a *App) handlePostAccount(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
+	if !utils.IsNick(newAccount.Nick) {
+		utils.RestError(w, nil, "Accounts must have a a valid nick", http.StatusPreconditionFailed)
+		return
+	}
+
 	if !newAccount.ID.IsZero() {
 		utils.RestError(w, nil, "Accounts cannot have id before creation", http.StatusPreconditionFailed)
 		return

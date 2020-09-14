@@ -27,7 +27,7 @@ import (
 // IsNick check if a string is a nick
 func IsNick(nick string) bool {
 	l := len(nick)
-	if l > 3 && l < 24 {
+	if l >= 3 && l < 24 {
 		return true
 	}
 	return false
