@@ -1353,6 +1353,20 @@
                     "devices"
                 ],
                 "summary": "Get all accounts devices",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Owner nick",
+                        "name": "owner-nick",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Owner PRN",
+                        "name": "owner",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -1511,7 +1525,7 @@
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Verify device token from TPM device validation",
+                "description": "Register a new device using the IDevID csr",
                 "consumes": [
                     "application/json"
                 ],
@@ -1521,20 +1535,25 @@
                 "tags": [
                     "devices"
                 ],
-                "summary": "Verify device token from TPM device validation",
+                "summary": "Register a new device using the IDevID csr",
                 "parameters": [
                     {
-                        "description": "Token payload",
+                        "description": "Register Request",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/auth.requestPayload"
+                            "$ref": "#/definitions/devices.registerReq"
                         }
                     }
                 ],
                 "responses": {
-                    "200": {},
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/devices.Device"
+                        }
+                    },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
@@ -4278,7 +4297,13 @@
         "auth.TokenPayload": {
             "type": "object",
             "properties": {
+                "scopes": {
+                    "type": "string"
+                },
                 "token": {
+                    "type": "string"
+                },
+                "token_type": {
                     "type": "string"
                 }
             }
@@ -4763,6 +4788,12 @@
                 },
                 "storage-id": {
                     "type": "string"
+                },
+                "time-created": {
+                    "type": "string"
+                },
+                "time-modified": {
+                    "type": "string"
                 }
             }
         },
@@ -4807,6 +4838,12 @@
                 },
                 "storage-id": {
                     "type": "string"
+                },
+                "time-created": {
+                    "type": "string"
+                },
+                "time-modified": {
+                    "type": "string"
                 }
             }
         },
@@ -4845,6 +4882,44 @@
                 },
                 "subject": {
                     "type": "string"
+                }
+            }
+        },
+        "trails.DownloadProgress": {
+            "type": "object",
+            "properties": {
+                "objects": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/trails.ObjectProgress"
+                    }
+                },
+                "total": {
+                    "type": "object",
+                    "$ref": "#/definitions/trails.ObjectProgress"
+                }
+            }
+        },
+        "trails.ObjectProgress": {
+            "type": "object",
+            "properties": {
+                "current_time": {
+                    "type": "integer"
+                },
+                "object_id": {
+                    "type": "string"
+                },
+                "object_name": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "integer"
+                },
+                "total_downloaded": {
+                    "type": "integer"
+                },
+                "total_size": {
+                    "type": "integer"
                 }
             }
         },
@@ -4962,6 +5037,11 @@
                 "data": {
                     "description": "data field that can hold things the device wants to remember",
                     "type": "object"
+                },
+                "downloads": {
+                    "description": "progress number. steps or 1-100",
+                    "type": "object",
+                    "$ref": "#/definitions/trails.DownloadProgress"
                 },
                 "log": {
                     "description": "log if available",

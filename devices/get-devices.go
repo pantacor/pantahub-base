@@ -42,6 +42,8 @@ import (
 // @Produce  json
 // @Security ApiKeyAuth
 // @Tags devices
+// @Param owner-nick query string false "Owner nick"
+// @Param owner query string false "Owner PRN"
 // @Success 200 {array} Device
 // @Failure 400 {object} utils.RError
 // @Failure 404 {object} utils.RError
