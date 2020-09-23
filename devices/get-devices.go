@@ -42,6 +42,8 @@ import (
 // @Produce  json
 // @Security ApiKeyAuth
 // @Tags devices
+// @Param owner-nick query string false "Owner nick"
+// @Param owner query string false "Owner PRN"
 // @Success 200 {array} Device
 // @Failure 400 {object} utils.RError
 // @Failure 404 {object} utils.RError
@@ -153,8 +155,19 @@ func (a *App) handleGetDevices(w rest.ResponseWriter, r *rest.Request) {
 			utils.RestErrorWrapper(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
 			return
 		}
+
 		result.UserMeta = utils.BsonUnquoteMap(&result.UserMeta)
 		result.DeviceMeta = utils.BsonUnquoteMap(&result.DeviceMeta)
+
+		// If token owner (device token or account token)
+		// is not the same as Owner in account token case
+		// or is not the same as Prn in device token case
+		if owner != result.Owner && owner != result.Prn {
+			result.Challenge = ""
+			result.Secret = ""
+			result.UserMeta = map[string]interface{}{}
+			result.DeviceMeta = map[string]interface{}{}
+		}
 		devices = append(devices, result)
 	}
 

@@ -87,7 +87,11 @@ definitions:
     type: object
   auth.TokenPayload:
     properties:
+      scopes:
+        type: string
       token:
+        type: string
+      token_type:
         type: string
     type: object
   auth.accountClaims:
@@ -407,6 +411,10 @@ definitions:
         type: integer
       storage-id:
         type: string
+      time-created:
+        type: string
+      time-modified:
+        type: string
     type: object
   objects.ObjectWithAccess:
     properties:
@@ -436,6 +444,10 @@ definitions:
         type: integer
       storage-id:
         type: string
+      time-created:
+        type: string
+      time-modified:
+        type: string
     type: object
   profiles.Profile:
     properties:
@@ -461,6 +473,31 @@ definitions:
         type: string
       subject:
         type: string
+    type: object
+  trails.DownloadProgress:
+    properties:
+      objects:
+        items:
+          $ref: '#/definitions/trails.ObjectProgress'
+        type: array
+      total:
+        $ref: '#/definitions/trails.ObjectProgress'
+        type: object
+    type: object
+  trails.ObjectProgress:
+    properties:
+      current_time:
+        type: integer
+      object_id:
+        type: string
+      object_name:
+        type: string
+      start_time:
+        type: integer
+      total_downloaded:
+        type: integer
+      total_size:
+        type: integer
     type: object
   trails.PvrRemote:
     properties:
@@ -542,6 +579,10 @@ definitions:
     properties:
       data:
         description: data field that can hold things the device wants to remember
+        type: object
+      downloads:
+        $ref: '#/definitions/trails.DownloadProgress'
+        description: progress number. steps or 1-100
         type: object
       log:
         description: log if available
@@ -1575,6 +1616,15 @@ paths:
       consumes:
       - application/json
       description: Get all accounts devices
+      parameters:
+      - description: Owner nick
+        in: query
+        name: owner-nick
+        type: string
+      - description: Owner PRN
+        in: query
+        name: owner
+        type: string
       produces:
       - application/json
       responses:
@@ -2070,18 +2120,21 @@ paths:
     post:
       consumes:
       - application/json
-      description: Verify device token from TPM device validation
+      description: Register a new device using the IDevID csr
       parameters:
-      - description: Token payload
+      - description: Register Request
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/auth.requestPayload'
+          $ref: '#/definitions/devices.registerReq'
       produces:
       - application/json
       responses:
-        "200": {}
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/devices.Device'
         "400":
           description: Bad Request
           schema:
@@ -2096,7 +2149,7 @@ paths:
             $ref: '#/definitions/utils.RError'
       security:
       - ApiKeyAuth: []
-      summary: Verify device token from TPM device validation
+      summary: Register a new device using the IDevID csr
       tags:
       - devices
   /devices/tokens:
