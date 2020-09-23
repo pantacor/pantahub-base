@@ -14,9 +14,7 @@ RUN wget https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSI
     && rm dockerize-alpine-linux-amd64-$DOCKERIZE_VERSION.tar.gz
 
 # install air
-RUN curl -fLo /usr/local/bin/air \
-    https://raw.githubusercontent.com/cosmtrek/air/master/bin/linux/air \
-    && chmod +x /usr/local/bin/air
+RUN go get -u github.com/cosmtrek/air
 
 WORKDIR /go/src/gitlab.com/pantacor/pantahub-base
 
