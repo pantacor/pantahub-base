@@ -163,7 +163,8 @@ func (a *App) handleGetDevices(w rest.ResponseWriter, r *rest.Request) {
 		if owner != result.Owner && owner != result.Prn {
 			result.Challenge = ""
 			result.Secret = ""
-			result.UserMeta = make(map[string]interface{})
+			result.UserMeta = map[string]interface{}{}
+			result.DeviceMeta = map[string]interface{}{}
 		}
 		devices = append(devices, result)
 	}
