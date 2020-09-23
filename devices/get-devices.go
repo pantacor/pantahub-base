@@ -153,8 +153,18 @@ func (a *App) handleGetDevices(w rest.ResponseWriter, r *rest.Request) {
 			utils.RestErrorWrapper(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
 			return
 		}
+
 		result.UserMeta = utils.BsonUnquoteMap(&result.UserMeta)
 		result.DeviceMeta = utils.BsonUnquoteMap(&result.DeviceMeta)
+
+		// If token owner (device token or account token)
+		// is not the same as Owner in account token case
+		// or is not the same as Prn in device token case
+		if owner != result.Owner && owner != result.Prn {
+			result.Challenge = ""
+			result.Secret = ""
+			result.UserMeta = make(map[string]interface{})
+		}
 		devices = append(devices, result)
 	}
 
