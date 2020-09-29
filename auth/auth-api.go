@@ -470,6 +470,14 @@ func (a *App) handleVerify(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
+	urlPrefix := utils.GetEnv(utils.EnvPantahubScheme) + "://" + utils.GetEnv(utils.EnvPantahubWWWHost)
+	if utils.GetEnv(utils.EnvPantahubPort) != "" {
+		urlPrefix += ":"
+		urlPrefix += utils.GetEnv(utils.EnvPantahubPort)
+	}
+
+	utils.SendWelcome(newAccount.Email, newAccount.Nick, urlPrefix)
+
 	// always wipe secrets before sending over wire
 	newAccount.Password = ""
 	newAccount.Challenge = ""

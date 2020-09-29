@@ -1,4 +1,4 @@
-// Copyright 2017,2018  Pantacor Ltd.
+// Copyright 2017-2020  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -365,8 +365,8 @@ var defaultEnvs = map[string]string{
 	EnvElasticBearer:   "",
 
 	// elastic performance tuning
-	EnvPantahubElasticReplicas:	"1",
-	EnvPantahubElasticShards:	"5",
+	EnvPantahubElasticReplicas: "1",
+	EnvPantahubElasticShards:   "5",
 
 	// fluent vars
 	EnvFluentPort: "24224",
