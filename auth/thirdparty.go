@@ -96,6 +96,14 @@ func (a *App) HandleGetThirdPartyCallback(w rest.ResponseWriter, r *rest.Request
 			scopeNick := payload.Nick + "_" + string(payload.Service)
 			account, err = createUser(payload.Email, scopeNick, "", "", collection)
 		}
+
+		urlPrefix := utils.GetEnv(utils.EnvPantahubScheme) + "://" + utils.GetEnv(utils.EnvPantahubWWWHost)
+		if utils.GetEnv(utils.EnvPantahubPort) != "" {
+			urlPrefix += ":"
+			urlPrefix += utils.GetEnv(utils.EnvPantahubPort)
+		}
+
+		utils.SendWelcome(account.Email, account.Nick, urlPrefix)
 	}
 	if err != nil {
 		utils.RestError(w, err, "Error with Database connectivity", http.StatusInternalServerError)
