@@ -50,6 +50,8 @@ const (
 // TPApp OAuth App Type
 type TPApp struct {
 	ID                  primitive.ObjectID `json:"id" bson:"_id"`
+	Name                string             `json:"name" bson:"name"`
+	Logo                string             `json:"logo" bson:"logo"`
 	Type                string             `json:"type" bson:"type"`
 	Nick                string             `json:"nick" bson:"nick"`
 	Prn                 string             `json:"prn" bson:"prn"`

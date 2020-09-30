@@ -18,10 +18,12 @@ package apps
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // handleGetApp get an oauth client
@@ -44,12 +46,16 @@ func (app *App) handleGetApp(w rest.ResponseWriter, r *rest.Request) {
 	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
 	if ok {
 		owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"].(string)
+		if !ok {
+			utils.RestErrorWrapper(w, "Owner can't be defined", http.StatusInternalServerError)
+			return
+		}
 	} else {
 		utils.RestErrorWrapper(w, "Owner can't be defined", http.StatusInternalServerError)
 		return
 	}
 
-	tpApp, httpCode, err := SearchApp(owner, id, app.mongoClient.Database(utils.MongoDb))
+	tpApp, httpCode, err := SearchApp("", id, app.mongoClient.Database(utils.MongoDb))
 	if err != nil {
 		utils.RestErrorWrapper(w, err.Error(), httpCode)
 		return
@@ -58,6 +64,21 @@ func (app *App) handleGetApp(w rest.ResponseWriter, r *rest.Request) {
 	if tpApp == nil {
 		utils.RestErrorWrapper(w, "App not found", http.StatusNotFound)
 		return
+	}
+
+	if tpApp.Owner != owner {
+		now := time.Now()
+		tpApp.Type = ""
+		tpApp.Secret = ""
+		tpApp.ID = primitive.NilObjectID
+		tpApp.DeletedAt = &now
+		tpApp.TimeModified = time.Now()
+		tpApp.TimeCreated = time.Now()
+		tpApp.ExposedScopes = []utils.Scope{}
+		tpApp.ExposedScopesLength = 0
+		tpApp.RedirectURIs = []string{}
+		tpApp.Owner = ""
+		tpApp.OwnerNick = ""
 	}
 
 	w.WriteJson(tpApp)
@@ -70,26 +91,55 @@ func (app *App) handleGetApp(w rest.ResponseWriter, r *rest.Request) {
 // @Produce  json
 // @Tags apps
 // @Security ApiKeyAuth
-// @Param id path string true "App ID|Nick|PRN"
+// @Param serviceID query string true "App ID|Nick|PRN"
 // @Success 200 {array} TPApp
 // @Failure 400 {object} utils.RError "Invalid payload"
 // @Failure 404 {object} utils.RError "App not found"
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /apps [get]
 func (app *App) handleGetApps(w rest.ResponseWriter, r *rest.Request) {
-	var owner string
+	id := r.Request.URL.Query().Get("serviceID")
+
+	owner := ""
+	var sessionOwner string
 	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
 	if ok {
-		owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"].(string)
+		sessionOwner, ok = jwtPayload.(jwtgo.MapClaims)["prn"].(string)
+		if !ok {
+			utils.RestErrorWrapper(w, "Owner can't be defined", http.StatusInternalServerError)
+			return
+		}
 	} else {
 		utils.RestErrorWrapper(w, "Owner can't be defined", http.StatusInternalServerError)
 		return
 	}
 
-	apps, err := SearchApps(owner, "", app.mongoClient.Database(utils.MongoDb))
+	if id != "" {
+		owner = ""
+	} else {
+		owner = sessionOwner
+	}
+	apps, err := SearchApps(owner, id, app.mongoClient.Database(utils.MongoDb))
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error reading third party application "+err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	for i, app := range apps {
+		if app.Owner != sessionOwner {
+			now := time.Now()
+			apps[i].Type = ""
+			apps[i].Secret = ""
+			apps[i].ID = primitive.NilObjectID
+			apps[i].DeletedAt = &now
+			apps[i].TimeModified = time.Now()
+			apps[i].TimeCreated = time.Now()
+			apps[i].ExposedScopes = []utils.Scope{}
+			apps[i].ExposedScopesLength = 0
+			apps[i].RedirectURIs = []string{}
+			apps[i].Owner = ""
+			apps[i].OwnerNick = ""
+		}
 	}
 
 	w.WriteJson(apps)

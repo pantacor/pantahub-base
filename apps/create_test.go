@@ -113,7 +113,7 @@ func TestApp_handleCreateApp(t *testing.T) {
 					Type:         AppTypePublic,
 					RedirectURIs: []string{"redirect uri 1"},
 					Scopes: []utils.Scope{
-						utils.Scope{
+						{
 							ID:      "all",
 							Service: "",
 						},
@@ -137,7 +137,7 @@ func TestApp_handleCreateApp(t *testing.T) {
 					Type:         AppTypePublic,
 					RedirectURIs: []string{},
 					Scopes: []utils.Scope{
-						utils.Scope{
+						{
 							ID:      "all",
 							Service: "self",
 						},
@@ -162,7 +162,7 @@ func TestApp_handleCreateApp(t *testing.T) {
 					Type:         AppTypePublic,
 					RedirectURIs: []string{"redirect uri 1"},
 					Scopes: []utils.Scope{
-						utils.Scope{
+						{
 							ID:      "all",
 							Service: "self",
 						},
@@ -187,7 +187,7 @@ func TestApp_handleCreateApp(t *testing.T) {
 					Type:         AppTypePublic,
 					RedirectURIs: []string{"redirect uri 1"},
 					Scopes: []utils.Scope{
-						utils.Scope{
+						{
 							ID:      "all",
 							Service: "",
 						},
@@ -270,9 +270,11 @@ func Test_validatePayload(t *testing.T) {
 			args: args{
 				app: &CreateAppPayload{
 					Type: "",
-					Scopes: []utils.Scope{utils.Scope{
-						ID: "notvalid",
-					}},
+					Scopes: []utils.Scope{
+						{
+							ID: "notvalid",
+						},
+					},
 					RedirectURIs: []string{"something.com"},
 				},
 			},
@@ -283,9 +285,11 @@ func Test_validatePayload(t *testing.T) {
 			args: args{
 				app: &CreateAppPayload{
 					Type: string(AppTypeConfidential),
-					Scopes: []utils.Scope{utils.Scope{
-						ID: "notvalid",
-					}},
+					Scopes: []utils.Scope{
+						{
+							ID: "notvalid",
+						},
+					},
 					RedirectURIs: []string{"something.com"},
 				},
 			},
@@ -298,6 +302,30 @@ func Test_validatePayload(t *testing.T) {
 					Type:         string(AppTypeConfidential),
 					Scopes:       []utils.Scope{utils.Scopes.ReadUser},
 					RedirectURIs: []string{"something.com"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "t",
+			args: args{
+				app: &CreateAppPayload{
+					Type:         string(AppTypeConfidential),
+					Scopes:       []utils.Scope{utils.Scopes.ReadUser},
+					RedirectURIs: []string{"something.com"},
+					Logo:         utils.ImageLogo,
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "t",
+			args: args{
+				app: &CreateAppPayload{
+					Type:         string(AppTypeConfidential),
+					Scopes:       []utils.Scope{utils.Scopes.ReadUser},
+					RedirectURIs: []string{"something.com"},
+					Logo:         utils.ImageLinkedin,
 				},
 			},
 			wantErr: false,

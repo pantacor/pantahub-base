@@ -18,6 +18,7 @@ package apps
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
@@ -111,6 +112,9 @@ func (app *App) handleUpdateApp(w rest.ResponseWriter, r *rest.Request) {
 	tpApp.RedirectURIs = payload.RedirectURIs
 	tpApp.Scopes = scopes
 	tpApp.Type = apptype
+	tpApp.Name = payload.Name
+	tpApp.Logo = payload.Logo
+	tpApp.TimeModified = time.Now()
 
 	_, err = CreateOrUpdateApp(tpApp, database)
 	if err != nil {
