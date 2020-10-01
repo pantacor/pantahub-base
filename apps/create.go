@@ -19,6 +19,7 @@ package apps
 import (
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
@@ -33,6 +34,8 @@ import (
 type CreateAppPayload struct {
 	Type          string        `json:"type"`
 	Nick          string        `json:"nick"`
+	Name          string        `json:"name"`
+	Logo          string        `json:"logo"`
 	RedirectURIs  []string      `json:"redirect_uris,omitempty"`
 	Scopes        []utils.Scope `json:"scopes,omitempty"`
 	ExposedScopes []utils.Scope `json:"exposed_scopes,omitempty" bson:"exposed_scopes,omitempty"`
@@ -53,7 +56,7 @@ type CreateAppPayload struct {
 // @Router /apps/ [post]
 func (app *App) handleCreateApp(w rest.ResponseWriter, r *rest.Request) {
 	newApp := &TPApp{}
-	payload := &CreateAppPayload{}
+	payload := &CreateAppPayload{Logo: ""}
 	r.DecodeJsonPayload(payload)
 
 	var owner interface{}
@@ -63,7 +66,7 @@ func (app *App) handleCreateApp(w rest.ResponseWriter, r *rest.Request) {
 		owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
 		ownerNick, ok = jwtPayload.(jwtgo.MapClaims)["nick"]
 	} else {
-		utils.RestErrorWrapper(w, "Owner can't be defined", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Owner can't be defined", http.StatusBadRequest)
 		return
 	}
 
@@ -115,6 +118,8 @@ func (app *App) handleCreateApp(w rest.ResponseWriter, r *rest.Request) {
 	newApp.ID = ObjectID
 	newApp.Type = apptype
 	newApp.Scopes = scopes
+	newApp.Name = payload.Name
+	newApp.Logo = payload.Logo
 	newApp.Prn = utils.BuildScopePrn(payload.Nick)
 	newApp.Nick = payload.Nick
 	newApp.RedirectURIs = payload.RedirectURIs
@@ -200,6 +205,16 @@ func validatePayload(app *CreateAppPayload) error {
 	}
 	if len(app.RedirectURIs) == 0 {
 		return errors.New("A new app need to have at least one redirect URI")
+	}
+
+	logoSize := utils.CalcBinarySize(app.Logo)
+	logoMaxSize, err := strconv.Atoi(utils.GetEnv(utils.EnvPantahub3rdAppLogoMaxSizeKb))
+	if err != nil {
+		return err
+	}
+
+	if logoSize >= (logoMaxSize * 1024) {
+		return errors.New("Application logo can't be greater than 15Kb")
 	}
 
 	return nil
