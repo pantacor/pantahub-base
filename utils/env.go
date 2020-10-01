@@ -305,6 +305,9 @@ const (
 
 	// EnvPantahubElasticReplicas PANTAHUB_ELASTIC_REPLICAS
 	EnvPantahubElasticReplicas = "PANTAHUB_ELASTIC_REPLICAS"
+
+	// EnvPantahub3rdAppLogoMaxSizeKb max size for 3rd party apps logo
+	EnvPantahub3rdAppLogoMaxSizeKb = "PANTAHUB_3RD_APP_LOGO_MAX_SIZE_KB"
 )
 
 var defaultEnvs = map[string]string{
@@ -453,12 +456,13 @@ var defaultEnvs = map[string]string{
 	EnvCronJobTimeout: "300",
 
 	// Oauth CONFIGURATION
-	EnvGoogleOAuthClientID:     "CHANGE THIS",
-	EnvGoogleOAuthClientSecret: "CHANGE THIS",
-	EnvGithubOAuthClientID:     "CHANGE THIS",
-	EnvGithubOAuthClientSecret: "CHANGE THIS",
-	EnvGitlabOAuthClientID:     "CHANGE THIS",
-	EnvGitlabOAuthClientSecret: "CHANGE THIS",
+	EnvGoogleOAuthClientID:         "CHANGE THIS",
+	EnvGoogleOAuthClientSecret:     "CHANGE THIS",
+	EnvGithubOAuthClientID:         "CHANGE THIS",
+	EnvGithubOAuthClientSecret:     "CHANGE THIS",
+	EnvGitlabOAuthClientID:         "CHANGE THIS",
+	EnvGitlabOAuthClientSecret:     "CHANGE THIS",
+	EnvPantahub3rdAppLogoMaxSizeKb: "15",
 }
 
 // GetEnv get environment variable using variable key

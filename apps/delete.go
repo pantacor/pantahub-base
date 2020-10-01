@@ -59,6 +59,7 @@ func (app *App) handleDeleteApp(w rest.ResponseWriter, r *rest.Request) {
 
 	now := time.Now()
 	tpApp.DeletedAt = &now
+	tpApp.TimeModified = time.Now()
 	_, err = CreateOrUpdateApp(tpApp, database)
 	if err != nil {
 		utils.RestErrorWrapper(w, err.Error(), httpCode)

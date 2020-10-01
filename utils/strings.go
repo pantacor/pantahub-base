@@ -69,3 +69,22 @@ func GenerateSecret(length int) (string, error) {
 
 	return string(result), nil
 }
+
+// CalcBinarySize calculate binary size from a string
+func CalcBinarySize(data string) int {
+	l := len(data)
+
+	eq := 0
+	if l >= 2 {
+		if data[l-1] == '=' {
+			eq++
+		}
+		if data[l-2] == '=' {
+			eq++
+		}
+
+		l -= eq
+	}
+
+	return (l*3 - eq) / 4
+}
