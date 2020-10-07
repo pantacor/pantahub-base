@@ -191,7 +191,7 @@ step. In this case our device wants to confirms that it has seen the newly
 requested step and that it is acting on it.
 
 ```
-http PUT localhost:12365/trails/57c20e6fc094f6729b000001/steps/progress Authorization:"Bearer $DTOKEN" \
+http PUT localhost:12365/trails/57c20e6fc094f6729b000001/steps/1/progress Authorization:"Bearer $DTOKEN" \
 	log = "" \
 	progress = 0 \
 	status = "QUEUE" \
