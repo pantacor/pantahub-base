@@ -407,7 +407,7 @@ func GetStateObjects(
 		return nil, errors.New("state_object: Invalid state:Value of #spec should be string")
 	}
 
-	if specValue != "pantavisor-multi-platform@1" &&
+	if specValue != "pantavisor-multi-platform@1" && specValue != "pantavisor-service-embed@1" &&
 		specValue != "pantavisor-service-system@1" {
 		return nil, errors.New("state_object: Invalid state:Value of #spec should not be " + specValue)
 	}
