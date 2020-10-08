@@ -64,7 +64,7 @@ func SendResetPasswordEmail(email, nick, token string) error {
 		return err
 	}
 
-	bodyHTML, err := execTemplate("./tmpl/mails/password_recovery.md", email, nick, link)
+	bodyHTML, err := execTemplate("./tmpl/mails/password_recovery.html", email, nick, link)
 	if err != nil {
 		log.Println("error:", err)
 		return err
