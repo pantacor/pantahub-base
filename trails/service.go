@@ -151,6 +151,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	app.API.Use(&rest.StatusMiddleware{})
 	app.API.Use(&rest.TimerMiddleware{})
 	app.API.Use(&metrics.Middleware{})
+	app.API.Use(&utils.CanonicalJSONMiddleware{})
 
 	app.API.Use(rest.DefaultCommonStack...)
 	app.API.Use(&rest.CorsMiddleware{
