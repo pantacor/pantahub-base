@@ -25,6 +25,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/accounts"
+	"gitlab.com/pantacor/pantahub-base/accounts/accountsdata"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -80,7 +81,7 @@ func (a *App) handleGetUserDevice(w rest.ResponseWriter, r *rest.Request) {
 
 	// first check if we refer to a default accoutn
 	isDefaultAccount := false
-	for _, v := range accounts.DefaultAccounts {
+	for _, v := range accountsdata.DefaultAccounts {
 		if v.Nick == usernick {
 			account = v
 			isDefaultAccount = true

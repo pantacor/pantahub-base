@@ -208,13 +208,14 @@ func validatePayload(app *CreateAppPayload) error {
 	}
 
 	logoSize := utils.CalcBinarySize(app.Logo)
-	logoMaxSize, err := strconv.Atoi(utils.GetEnv(utils.EnvPantahub3rdAppLogoMaxSizeKb))
+	logoMaxSizeStr := utils.GetEnv(utils.EnvPantahub3rdAppLogoMaxSizeKb)
+	logoMaxSize, err := strconv.Atoi(logoMaxSizeStr)
 	if err != nil {
 		return err
 	}
 
 	if logoSize >= (logoMaxSize * 1024) {
-		return errors.New("Application logo can't be greater than 15Kb")
+		return errors.New("Application logo can't be greater than " + logoMaxSizeStr + "Kb")
 	}
 
 	return nil

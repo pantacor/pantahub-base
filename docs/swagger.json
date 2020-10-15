@@ -34,8 +34,8 @@
                     {
                         "type": "string",
                         "description": "App ID|Nick|PRN",
-                        "name": "id",
-                        "in": "path",
+                        "name": "serviceID",
+                        "in": "query",
                         "required": true
                     }
                 ],
@@ -1525,7 +1525,7 @@
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Register a new device using the IDevID csr",
+                "description": "Verify device token from TPM device validation",
                 "consumes": [
                     "application/json"
                 ],
@@ -1535,25 +1535,20 @@
                 "tags": [
                     "devices"
                 ],
-                "summary": "Register a new device using the IDevID csr",
+                "summary": "Verify device token from TPM device validation",
                 "parameters": [
                     {
-                        "description": "Register Request",
+                        "description": "Token payload",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/devices.registerReq"
+                            "$ref": "#/definitions/auth.requestPayload"
                         }
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/devices.Device"
-                        }
-                    },
+                    "200": {},
                     "400": {
                         "description": "Bad Request",
                         "schema": {
@@ -2343,7 +2338,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/healthz.Response"
+                            "$ref": "#/definitions/healthz.responseDoc"
                         }
                     },
                     "400": {
@@ -2928,7 +2923,7 @@
                 }
             }
         },
-        "/profiles": {
+        "/profiles/": {
             "get": {
                 "security": [
                     {
@@ -2946,6 +2941,119 @@
                     "profile"
                 ],
                 "summary": "Get all user profiles",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/profiles.Profile"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "update profile information for user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "update profile information for user",
+                "parameters": [
+                    {
+                        "description": "Profile payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/profiles.Profile"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/profiles.Profile"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid payload",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Error processing request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/profiles/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get a user profile by user ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user"
+                ],
+                "summary": "Get a user profile by user ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -4106,64 +4214,6 @@
                     }
                 }
             }
-        },
-        "/{id}": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Get a user profile by user ID",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "user"
-                ],
-                "summary": "Get a user profile by user ID",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/profiles.Profile"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/utils.RError"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/utils.RError"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/utils.RError"
-                        }
-                    }
-                }
-            }
         }
     },
     "definitions": {
@@ -4218,6 +4268,12 @@
                         "$ref": "#/definitions/utils.Scope"
                     }
                 },
+                "logo": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
                 "nick": {
                     "type": "string"
                 },
@@ -4254,6 +4310,12 @@
                     }
                 },
                 "id": {
+                    "type": "string"
+                },
+                "logo": {
+                    "type": "string"
+                },
+                "name": {
                     "type": "string"
                 },
                 "nick": {
@@ -4537,7 +4599,6 @@
             "type": "object",
             "properties": {
                 "billing": {
-                    "type": "object",
                     "$ref": "#/definitions/dash.BillingInfo"
                 },
                 "plan-id": {
@@ -4561,7 +4622,6 @@
                     "type": "string"
                 },
                 "subscription": {
-                    "type": "object",
                     "$ref": "#/definitions/dash.SubscriptionInfo"
                 },
                 "top-devices": {
@@ -4684,14 +4744,14 @@
                 }
             }
         },
-        "healthz.Response": {
+        "healthz.responseDoc": {
             "type": "object",
             "properties": {
                 "code": {
                     "type": "integer"
                 },
                 "duration": {
-                    "type": "string"
+                    "type": "integer"
                 },
                 "start-time": {
                     "type": "string"
@@ -4765,9 +4825,6 @@
                 "id": {
                     "type": "string"
                 },
-                "initialized": {
-                    "type": "boolean"
-                },
                 "mime-type": {
                     "type": "string"
                 },
@@ -4805,9 +4862,6 @@
                 },
                 "id": {
                     "type": "string"
-                },
-                "initialized": {
-                    "type": "boolean"
                 },
                 "mime-type": {
                     "type": "string"
@@ -4853,19 +4907,37 @@
                 "bio": {
                     "type": "string"
                 },
-                "garbage": {
-                    "type": "boolean"
+                "company": {
+                    "type": "string"
+                },
+                "fullName": {
+                    "type": "string"
+                },
+                "github": {
+                    "type": "string"
+                },
+                "gitlab": {
+                    "type": "string"
+                },
+                "location": {
+                    "type": "string"
                 },
                 "nick": {
                     "type": "string"
                 },
-                "public": {
-                    "type": "boolean"
+                "picture": {
+                    "type": "string"
                 },
                 "time-created": {
                     "type": "string"
                 },
                 "time-modified": {
+                    "type": "string"
+                },
+                "twitter": {
+                    "type": "string"
+                },
+                "website": {
                     "type": "string"
                 }
             }
@@ -4895,7 +4967,6 @@
                     }
                 },
                 "total": {
-                    "type": "object",
                     "$ref": "#/definitions/trails.ObjectProgress"
                 }
             }
@@ -4993,7 +5064,6 @@
                     "type": "string"
                 },
                 "progress": {
-                    "type": "object",
                     "$ref": "#/definitions/trails.StepProgress"
                 },
                 "progress-time": {
@@ -5040,7 +5110,6 @@
                 },
                 "downloads": {
                     "description": "progress number. steps or 1-100",
-                    "type": "object",
                     "$ref": "#/definitions/trails.DownloadProgress"
                 },
                 "log": {
@@ -5208,7 +5277,7 @@
         "utils.RError": {
             "type": "object",
             "properties": {
-                "code": {
+                "cod": {
                     "type": "integer"
                 },
                 "error": {
