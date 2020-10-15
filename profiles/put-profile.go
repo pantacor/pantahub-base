@@ -53,7 +53,9 @@ func (a *App) handlePostProfile(w rest.ResponseWriter, r *rest.Request) {
 	content, _ := ioutil.ReadAll(r.Body)
 	r.Body.Close()
 
-	payload := &UpdateableProfile{}
+	payload := &UpdateableProfile{
+		Picture: "",
+	}
 	err := json.Unmarshal(content, payload)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Update: "+err.Error(), http.StatusInternalServerError)
@@ -79,7 +81,7 @@ func (a *App) handlePostProfile(w rest.ResponseWriter, r *rest.Request) {
 }
 
 func validatePicture(picture string) (bool, string, string, int) {
-	if picture != "" {
+	if picture == "" {
 		return true, "", "", 0
 	}
 
