@@ -25,6 +25,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/accounts"
+	"gitlab.com/pantacor/pantahub-base/accounts/accountsdata"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
@@ -309,7 +310,7 @@ func (a *App) handleGetDevice(w rest.ResponseWriter, r *rest.Request) {
 		var ownerAccount accounts.Account
 
 		// first check default accounts like user1, user2, etc...
-		ownerAccount, ok := accounts.DefaultAccounts[device.Owner]
+		ownerAccount, ok := accountsdata.DefaultAccounts[device.Owner]
 		if !ok {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
@@ -336,7 +337,7 @@ func (a *App) GetUserAccountByNick(nick string) (accounts.Account, error) {
 
 	var account accounts.Account
 
-	account, ok := accounts.DefaultAccounts["prn:pantahub.com:auth:/"+nick]
+	account, ok := accountsdata.DefaultAccounts["prn:pantahub.com:auth:/"+nick]
 	if !ok {
 
 		collectionAccounts := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")

@@ -50,6 +50,12 @@ type Response struct {
 	Start     time.Time     `json:"start-time"`
 }
 
+type responseDoc struct {
+	ErrorCode int       `json:"code"`
+	Duration  int64     `json:"duration"`
+	Start     time.Time `json:"start-time"`
+}
+
 // handleHealthz Get information of the health of the api services
 // @Summary Get information of the health of the api services
 // @Description Get information of the health of the api services
@@ -58,7 +64,7 @@ type Response struct {
 // @Security BasicAuth
 // @Tags health
 // @Param id path string true "ID|PRN|NICK"
-// @Success 200 {object} Response
+// @Success 200 {object} responseDoc
 // @Failure 400 {object} utils.RError
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError

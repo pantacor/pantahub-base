@@ -48,7 +48,7 @@ import (
 // @Failure 400 {object} utils.RError
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
-// @Router /profiles [get]
+// @Router /profiles/ [get]
 func (a *App) handleGetProfiles(w rest.ResponseWriter, r *rest.Request) {
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
@@ -68,7 +68,7 @@ func (a *App) handleGetProfiles(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	profiles := make([]Profile, 0)
+	profiles := make([]*Profile, 0)
 
 	findOptions := options.Find()
 	findOptions.SetNoCursorTimeout(true)
@@ -131,18 +131,15 @@ func (a *App) handleGetProfiles(w rest.ResponseWriter, r *rest.Request) {
 			return
 		}
 
-		havePublicDevices, err := a.HavePublicDevices(result.ID)
+		havePublicDevices, err := a.HavePublicDevices(result.Prn)
 		if err != nil {
 			utils.RestErrorWrapper(w, err.Error(), http.StatusForbidden)
 			return
 		}
 
-		profile := Profile{}
+		profile, _ := a.getProfile(result.Prn)
 		if (havePublicDevices || result.Prn == owner.(string)) && result.Nick != "" {
-
-			profile.ID = result.ID
 			profile.Nick = result.Nick
-
 			profiles = append(profiles, profile)
 		}
 	}

@@ -28,6 +28,7 @@ import (
 	jwtgo "github.com/dgrijalva/jwt-go"
 	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/accounts"
+	"gitlab.com/pantacor/pantahub-base/accounts/accountsdata"
 	"gitlab.com/pantacor/pantahub-base/apps"
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/metrics"
@@ -115,14 +116,14 @@ func init() {
 		return
 	}
 
-	for k, v := range accounts.DefaultAccounts {
+	for k, v := range accountsdata.DefaultAccounts {
 		passwordOverwrite := os.Getenv("PANTAHUB_DEMOACCOUNTS_PASSWORD_" + v.Nick)
 		if passwordOverwrite == "" {
-			delete(accounts.DefaultAccounts, k)
+			delete(accountsdata.DefaultAccounts, k)
 		} else {
 			log.Println("enabling default account: " + v.Nick)
 			v.Password = passwordOverwrite
-			accounts.DefaultAccounts[k] = v
+			accountsdata.DefaultAccounts[k] = v
 		}
 	}
 }
@@ -226,7 +227,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 			return true
 		}
 
-		plm, ok := accounts.DefaultAccounts[testUserID]
+		plm, ok := accountsdata.DefaultAccounts[testUserID]
 		if !ok {
 			if strings.HasPrefix(loginUser, "prn:::devices:") {
 				return app.deviceAuth(loginUser, password)
@@ -255,7 +256,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		if !strings.HasPrefix(loginUser, "prn:") {
 			testUserID = "prn:pantahub.com:auth:/" + loginUser
 		}
-		if plm, ok := accounts.DefaultAccounts[testUserID]; !ok {
+		if plm, ok := accountsdata.DefaultAccounts[testUserID]; !ok {
 			if strings.HasPrefix(userId, "prn:::devices:") {
 				payload = app.devicePayload(loginUser)
 			} else {
@@ -411,9 +412,9 @@ func (a *App) getAccount(prnEmailNick string) (accounts.Account, error) {
 	}
 
 	var ok, ok2 bool
-	if account, ok = accounts.DefaultAccounts[prnEmailNick]; !ok {
+	if account, ok = accountsdata.DefaultAccounts[prnEmailNick]; !ok {
 		fullprn := "prn:pantahub.com:auth:/" + prnEmailNick
-		account, ok2 = accounts.DefaultAccounts[fullprn]
+		account, ok2 = accountsdata.DefaultAccounts[fullprn]
 	}
 
 	if ok || ok2 {
@@ -474,13 +475,13 @@ func (a *App) getAccountPayload(idEmailNick string) map[string]interface{} {
 	var plm accounts.Account
 	var ok, ok2 bool
 
-	plm, ok = accounts.DefaultAccounts[idEmailNick]
+	plm, ok = accountsdata.DefaultAccounts[idEmailNick]
 	if ok {
 		return AccountToPayload(plm)
 	}
 
 	fullprn := "prn:pantahub.com:auth:/" + idEmailNick
-	plm, ok2 = accounts.DefaultAccounts[fullprn]
+	plm, ok2 = accountsdata.DefaultAccounts[fullprn]
 	if ok2 {
 		return AccountToPayload(plm)
 	}

@@ -22,6 +22,8 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
+	"gitlab.com/pantacor/pantahub-base/accounts"
+	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -46,14 +48,16 @@ func New(jwtMiddleware *jwt.JWTMiddleware,
 	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
 		"/profiles:", log.Lshortfile)})
 	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "profiles"})
-
+	app.API.Use(&rest.StatusMiddleware{})
+	app.API.Use(&rest.TimerMiddleware{})
+	app.API.Use(&metrics.Middleware{})
 	app.API.Use(rest.DefaultCommonStack...)
 	app.API.Use(&rest.CorsMiddleware{
 		RejectNonCorsRequests: false,
 		OriginValidator: func(origin string, request *rest.Request) bool {
 			return true
 		},
-		AllowedMethods: []string{"GET"},
+		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{
 			"Accept", "Content-Type", "X-Custom-Header", "Origin", "Authorization"},
 		AccessControlAllowCredentials: true,
@@ -75,10 +79,53 @@ func New(jwtMiddleware *jwt.JWTMiddleware,
 		},
 		IfTrue: &utils.AuthMiddleware{},
 	})
-	// end points
+
+	readProfileScopes := []utils.Scope{
+		utils.Scopes.API,
+		utils.Scopes.Profile,
+		utils.Scopes.ReadProfile,
+	}
+
+	writeProfileScopes := []utils.Scope{
+		utils.Scopes.API,
+		utils.Scopes.Profile,
+	}
+
+	onlyUserFilter := []accounts.AccountType{
+		accounts.AccountTypeUser,
+	}
+
 	apiRouter, _ := rest.MakeRouter(
-		rest.Get("/", app.handleGetProfiles),
-		rest.Get("/:id", app.handleGetProfile),
+		rest.Get(
+			"/",
+			rest.WrapMiddlewares(
+				[]rest.Middleware{
+					utils.InitUserTypeFilterMiddleware(onlyUserFilter),
+					utils.InitScopeFilterMiddleware(readProfileScopes),
+				},
+				app.handleGetProfiles,
+			),
+		),
+		rest.Put(
+			"/",
+			rest.WrapMiddlewares(
+				[]rest.Middleware{
+					utils.InitUserTypeFilterMiddleware(onlyUserFilter),
+					utils.InitScopeFilterMiddleware(writeProfileScopes),
+				},
+				app.handlePostProfile,
+			),
+		),
+		rest.Get(
+			"/:nick",
+			rest.WrapMiddlewares(
+				[]rest.Middleware{
+					utils.InitUserTypeFilterMiddleware(onlyUserFilter),
+					utils.InitScopeFilterMiddleware(readProfileScopes),
+				},
+				app.handleGetProfile,
+			),
+		),
 	)
 	app.API.SetApp(apiRouter)
 

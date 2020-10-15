@@ -45,6 +45,8 @@ type Scope struct {
 // IScopes define every possible scope type
 type IScopes struct {
 	API           Scope
+	Profile       Scope
+	ReadProfile   Scope
 	ReadUser      Scope
 	WriteUser     Scope
 	Devices       Scope
@@ -71,6 +73,16 @@ var Scopes = &IScopes{
 		ID:          "all",
 		Service:     PantahubServiceID,
 		Description: "Complete Access",
+	},
+	Profile: Scope{
+		ID:          "profile",
+		Service:     PantahubServiceID,
+		Description: "Read/Write Profile",
+	},
+	ReadProfile: Scope{
+		ID:          "profile.readonly",
+		Service:     PantahubServiceID,
+		Description: "Read only Profile",
 	},
 	Devices: Scope{
 		ID:          "devices",
@@ -182,6 +194,20 @@ func InitScopes() {
 		PhScopeNames = append(PhScopeNames, PantahubServiceID+"/"+id)
 		PhScopeArray = append(PhScopeArray, scope)
 		PhScopesMap[id] = scope
+	}
+}
+
+type ScopeFilterMiddleware struct {
+	filterTypes []Scope
+}
+
+func (m *ScopeFilterMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFunc {
+	return ScopeFilter(m.filterTypes, handler)
+}
+
+func InitScopeFilterMiddleware(filterTypes []Scope) *ScopeFilterMiddleware {
+	return &ScopeFilterMiddleware{
+		filterTypes,
 	}
 }
 

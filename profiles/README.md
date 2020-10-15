@@ -2,7 +2,27 @@
 
 PANTAHUB User profile
 
-NOTE: Profiles are implicitly created for user accounts who have public devices
+NOTE: Profiles are implicitly created for all accounts
+
+```bash
+curl --request PUT \
+  --url http://localhost:12365/apps/ \
+  --header 'authorization: Bearer $TOKEN' \
+  --header 'content-type: application/json' \
+  --data '{
+  "fullName": "Sergio Marin",
+  "bio": "Pantacor developer",
+  "location": "Santiago, Chile",
+  "picture": "base64 encode Image 200x200px",
+  "website": "https://highercomve.github.io",
+  "github": "https://github.com/highercomve",
+  "gitlab": "https://gitlab.com/highercomve",
+  "company": "Pantacor",
+  "twitter": "https://twitter.com/pantahub",
+  "time-created": "2020-10-08T15:29:27.045Z",
+  "time-modified": "2020-10-08T15:30:23.489Z"
+}'
+```
 
 ## Get All profiles
 
@@ -63,7 +83,7 @@ X-Powered-By: go-json-rest
 ## Get a profiles by user ID
 
 ```
-http GET localhost:12365/profiles/5e5931dd20fe0687327d7973  Authorization:"Bearer $TOKEN"
+http GET localhost:12365/profiles/pantahub-ci  Authorization:"Bearer $TOKEN"
 
 HTTP/1.1 200 OK
 Content-Length: 331
