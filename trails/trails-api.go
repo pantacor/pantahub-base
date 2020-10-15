@@ -327,7 +327,10 @@ func (a *App) handlePutStepsObject(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if result.Total > quota {
-		utils.RestErrorWrapperUser(w, "Quota exceeded; delete some objects or request a quota bump from team@pantahub.com",
+		utils.RestErrorWrapperUser(
+			w,
+			err.Error(),
+			"Quota exceeded; delete some objects or request a quota bump from team@pantahub.com",
 			http.StatusPreconditionFailed)
 	}
 

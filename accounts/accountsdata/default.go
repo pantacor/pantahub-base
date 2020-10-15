@@ -1,5 +1,5 @@
 //
-// Copyright 2018  Pantacor Ltd.
+// Copyright 2020  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,11 +14,12 @@
 //   limitations under the License.
 //
 
-package accounts
+package accountsdata
 
 import (
 	"time"
 
+	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -51,10 +52,10 @@ func SetAccountIDs() {
 }
 
 // DefaultAccounts all hardcoded accounts for admins, devices and services
-var DefaultAccounts = map[string]Account{
-	"prn:pantahub.com:auth:/admin": Account{
+var DefaultAccounts = map[string]accounts.Account{
+	"prn:pantahub.com:auth:/admin": {
 		ID:           adminObjectID,
-		Type:         AccountTypeAdmin,
+		Type:         accounts.AccountTypeAdmin,
 		Prn:          "prn:pantahub.com:auth:/admin",
 		Nick:         "admin",
 		Email:        "no-reply-admin@accounts.pantahub.com",
@@ -62,9 +63,9 @@ var DefaultAccounts = map[string]Account{
 		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
 		Password:     "admin",
 	},
-	"prn:pantahub.com:auth:/user1": Account{
+	"prn:pantahub.com:auth:/user1": {
 		ID:           user1ObjectID,
-		Type:         AccountTypeUser,
+		Type:         accounts.AccountTypeUser,
 		Prn:          "prn:pantahub.com:auth:/user1",
 		Nick:         "user1",
 		Email:        "no-reply-user1@accounts.pantahub.com",
@@ -72,9 +73,9 @@ var DefaultAccounts = map[string]Account{
 		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
 		Password:     "user1",
 	},
-	"prn:pantahub.com:auth:/user2": Account{
+	"prn:pantahub.com:auth:/user2": {
 		ID:           user2ObjectID,
-		Type:         AccountTypeUser,
+		Type:         accounts.AccountTypeUser,
 		Prn:          "prn:pantahub.com:auth:/user2",
 		Nick:         "user2",
 		Email:        "no-reply-user2@accounts.pantahub.com",
@@ -82,9 +83,9 @@ var DefaultAccounts = map[string]Account{
 		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
 		Password:     "user2",
 	},
-	"prn:pantahub.com:auth:/user3": Account{
+	"prn:pantahub.com:auth:/user3": {
 		ID:           user3ObjectID,
-		Type:         AccountTypeUser,
+		Type:         accounts.AccountTypeUser,
 		Prn:          "prn:pantahub.com:auth:/user3",
 		Nick:         "user3",
 		Email:        "no-reply-user3@accounts.pantahub.com",
@@ -92,9 +93,9 @@ var DefaultAccounts = map[string]Account{
 		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
 		Password:     "user3",
 	},
-	"prn:pantahub.com:auth:/examples": Account{
+	"prn:pantahub.com:auth:/examples": {
 		ID:           examplesObjectID,
-		Type:         AccountTypeUser,
+		Type:         accounts.AccountTypeUser,
 		Prn:          "prn:pantahub.com:auth:/examples",
 		Nick:         "examples",
 		Email:        "no-reply-examples@accounts.pantahub.com",
@@ -102,9 +103,9 @@ var DefaultAccounts = map[string]Account{
 		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
 		Password:     "examples",
 	},
-	"prn:pantahub.com:auth:/device1": Account{
+	"prn:pantahub.com:auth:/device1": {
 		ID:           device1ObjectID,
-		Type:         AccountTypeDevice,
+		Type:         accounts.AccountTypeDevice,
 		Prn:          "prn:pantahub.com:auth:/device1",
 		Nick:         "device1",
 		Email:        "no-reply-device1@accounts.pantahub.com",
@@ -112,9 +113,9 @@ var DefaultAccounts = map[string]Account{
 		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
 		Password:     "device1",
 	},
-	"prn:pantahub.com:auth:/device2": Account{
+	"prn:pantahub.com:auth:/device2": {
 		ID:           device2ObjectID,
-		Type:         AccountTypeDevice,
+		Type:         accounts.AccountTypeDevice,
 		Prn:          "prn:pantahub.com:auth:/device2",
 		Nick:         "device2",
 		Email:        "no-reply-device2@accounts.pantahub.com",
@@ -122,9 +123,9 @@ var DefaultAccounts = map[string]Account{
 		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
 		Password:     "device2",
 	},
-	"prn:pantahub.com:auth:/service1": Account{
+	"prn:pantahub.com:auth:/service1": {
 		ID:                 service1ObjectID,
-		Type:               AccountTypeService,
+		Type:               accounts.AccountTypeService,
 		Prn:                "prn:pantahub.com:auth:/service1",
 		Nick:               "service1",
 		Email:              "no-reply-service1@accounts.pantahub.com",
@@ -133,9 +134,9 @@ var DefaultAccounts = map[string]Account{
 		Password:           utils.GetEnv("PANTAHUB_DEMOACCOUNTS_PASSWORD_service1"),
 		Oauth2RedirectURIs: []string{"https://api.fleet.pantahub.com", "https://api.fleet2.pantahub.com", "http://localhost"},
 	},
-	"prn:pantahub.com:auth:/service2": Account{
+	"prn:pantahub.com:auth:/service2": {
 		ID:           service2ObjectID,
-		Type:         AccountTypeService,
+		Type:         accounts.AccountTypeService,
 		Prn:          "prn:pantahub.com:auth:/service2",
 		Nick:         "service2",
 		Email:        "no-reply-service2@accounts.pantahub.com",
@@ -143,9 +144,9 @@ var DefaultAccounts = map[string]Account{
 		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
 		Password:     "service2",
 	},
-	"prn:pantahub.com:auth:/service3": Account{
+	"prn:pantahub.com:auth:/service3": {
 		ID:           service3ObjectID,
-		Type:         AccountTypeService,
+		Type:         accounts.AccountTypeService,
 		Prn:          "prn:pantahub.com:auth:/service3",
 		Nick:         "service3",
 		Email:        "no-reply-service3@accounts.pantahub.com",
@@ -153,9 +154,9 @@ var DefaultAccounts = map[string]Account{
 		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
 		Password:     "service3",
 	},
-	"prn:pantahub.com:auth:/client1": Account{
+	"prn:pantahub.com:auth:/client1": {
 		ID:                 client1ObjectID,
-		Type:               AccountTypeClient,
+		Type:               accounts.AccountTypeClient,
 		Prn:                "prn:pantahub.com:auth:/client1",
 		Nick:               "client1",
 		Email:              "no-reply-service3@accounts.pantahub.com",

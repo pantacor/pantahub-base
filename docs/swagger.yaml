@@ -35,6 +35,10 @@ definitions:
         items:
           $ref: '#/definitions/utils.Scope'
         type: array
+      logo:
+        type: string
+      name:
+        type: string
       nick:
         type: string
       redirect_uris:
@@ -59,6 +63,10 @@ definitions:
       exposedScopesLength:
         type: integer
       id:
+        type: string
+      logo:
+        type: string
+      name:
         type: string
       nick:
         type: string
@@ -246,7 +254,6 @@ definitions:
     properties:
       billing:
         $ref: '#/definitions/dash.BillingInfo'
-        type: object
       plan-id:
         type: string
       quota-stats:
@@ -262,7 +269,6 @@ definitions:
         type: string
       subscription:
         $ref: '#/definitions/dash.SubscriptionInfo'
-        type: object
       top-devices:
         items:
           $ref: '#/definitions/dash.DeviceInfo'
@@ -342,12 +348,12 @@ definitions:
       name:
         type: string
     type: object
-  healthz.Response:
+  healthz.responseDoc:
     properties:
       code:
         type: integer
       duration:
-        type: string
+        type: integer
       start-time:
         type: string
     type: object
@@ -395,8 +401,6 @@ definitions:
     properties:
       id:
         type: string
-      initialized:
-        type: boolean
       mime-type:
         type: string
       objectname:
@@ -422,8 +426,6 @@ definitions:
         type: string
       id:
         type: string
-      initialized:
-        type: boolean
       mime-type:
         type: string
       now:
@@ -453,15 +455,27 @@ definitions:
     properties:
       bio:
         type: string
-      garbage:
-        type: boolean
+      company:
+        type: string
+      fullName:
+        type: string
+      github:
+        type: string
+      gitlab:
+        type: string
+      location:
+        type: string
       nick:
         type: string
-      public:
-        type: boolean
+      picture:
+        type: string
       time-created:
         type: string
       time-modified:
+        type: string
+      twitter:
+        type: string
+      website:
         type: string
     type: object
   subscriptions.SubscriptionReq:
@@ -482,7 +496,6 @@ definitions:
         type: array
       total:
         $ref: '#/definitions/trails.ObjectProgress'
-        type: object
     type: object
   trails.ObjectProgress:
     properties:
@@ -550,7 +563,6 @@ definitions:
         type: string
       progress:
         $ref: '#/definitions/trails.StepProgress'
-        type: object
       progress-time:
         type: string
       rev:
@@ -583,7 +595,6 @@ definitions:
       downloads:
         $ref: '#/definitions/trails.DownloadProgress'
         description: progress number. steps or 1-100
-        type: object
       log:
         description: log if available
         type: string
@@ -698,7 +709,7 @@ definitions:
     type: object
   utils.RError:
     properties:
-      code:
+      cod:
         type: integer
       error:
         type: string
@@ -725,43 +736,6 @@ info:
   title: Pantahub API reference
   version: "1.0"
 paths:
-  /{id}:
-    get:
-      consumes:
-      - application/json
-      description: Get a user profile by user ID
-      parameters:
-      - description: ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/profiles.Profile'
-            type: array
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/utils.RError'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/utils.RError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/utils.RError'
-      security:
-      - ApiKeyAuth: []
-      summary: Get a user profile by user ID
-      tags:
-      - user
   /apps:
     get:
       consumes:
@@ -769,8 +743,8 @@ paths:
       description: Get all applications owned by a user
       parameters:
       - description: App ID|Nick|PRN
-        in: path
-        name: id
+        in: query
+        name: serviceID
         required: true
         type: string
       produces:
@@ -2120,21 +2094,18 @@ paths:
     post:
       consumes:
       - application/json
-      description: Register a new device using the IDevID csr
+      description: Verify device token from TPM device validation
       parameters:
-      - description: Register Request
+      - description: Token payload
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/devices.registerReq'
+          $ref: '#/definitions/auth.requestPayload'
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/devices.Device'
+        "200": {}
         "400":
           description: Bad Request
           schema:
@@ -2149,7 +2120,7 @@ paths:
             $ref: '#/definitions/utils.RError'
       security:
       - ApiKeyAuth: []
-      summary: Register a new device using the IDevID csr
+      summary: Verify device token from TPM device validation
       tags:
       - devices
   /devices/tokens:
@@ -2258,7 +2229,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/healthz.Response'
+            $ref: '#/definitions/healthz.responseDoc'
         "400":
           description: Bad Request
           schema:
@@ -2639,7 +2610,7 @@ paths:
       summary: Retrive and object content by Object ID
       tags:
       - objects
-  /profiles:
+  /profiles/:
     get:
       consumes:
       - application/json
@@ -2670,6 +2641,78 @@ paths:
       summary: Get all user profiles
       tags:
       - profile
+    put:
+      consumes:
+      - application/json
+      description: update profile information for user
+      parameters:
+      - description: Profile payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/profiles.Profile'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/profiles.Profile'
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Account not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: update profile information for user
+      tags:
+      - auth
+  /profiles/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get a user profile by user ID
+      parameters:
+      - description: ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/profiles.Profile'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get a user profile by user ID
+      tags:
+      - user
   /subscriptions:
     get:
       consumes:

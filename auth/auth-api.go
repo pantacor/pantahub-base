@@ -30,6 +30,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/accounts"
+	"gitlab.com/pantacor/pantahub-base/accounts/accountsdata"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -377,20 +378,22 @@ func (a *App) handleGetProfile(w rest.ResponseWriter, r *rest.Request) {
 	var account accounts.Account
 	var ok bool
 
-	if account, ok = accounts.DefaultAccounts[accountPrn]; !ok {
+	if account, ok = accountsdata.DefaultAccounts[accountPrn]; !ok {
 		col := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		cancel()
+		defer cancel()
 		err := col.FindOne(ctx, bson.M{"prn": accountPrn}).Decode(&account)
 		// always unset credentials so we dont end up sending them out
 		account.Password = ""
+		account.PasswordBcrypt = ""
+		account.PasswordScrypt = ""
 		account.Challenge = ""
 
 		if err != nil {
 			switch err.(type) {
 			default:
 				utils.RestErrorWrapper(w, "Account "+err.Error(), http.StatusInternalServerError)
-				break
+				return
 			}
 		}
 	}
