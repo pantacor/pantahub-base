@@ -117,7 +117,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware,
 			),
 		),
 		rest.Get(
-			"/:nick",
+			"/#nick",
 			rest.WrapMiddlewares(
 				[]rest.Middleware{
 					utils.InitUserTypeFilterMiddleware(onlyUserFilter),
