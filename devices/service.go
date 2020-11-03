@@ -291,23 +291,23 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 
 		// token api
 		rest.Post("/tokens", utils.ScopeFilter(readDevicesScopes, app.handlePostTokens)),
-		rest.Delete("/tokens/:id", utils.ScopeFilter(updateDevicesScopes, app.handleDisableTokens)),
+		rest.Delete("/tokens/#id", utils.ScopeFilter(updateDevicesScopes, app.handleDisableTokens)),
 		rest.Get("/tokens", utils.ScopeFilter(readDevicesScopes, app.handleGetTokens)),
 
 		// default api
 		rest.Get("/auth_status", utils.ScopeFilter(readDevicesScopes, handleAuth)),
 		rest.Get("/", utils.ScopeFilter(readDevicesScopes, app.handleGetDevices)),
 		rest.Post("/", utils.ScopeFilter(writeDevicesScopes, app.handlePostDevice)),
-		rest.Get("/:id", utils.ScopeFilter(readDevicesScopes, app.handleGetDevice)),
-		rest.Put("/:id", utils.ScopeFilter(writeDevicesScopes, app.handlePutDevice)),
-		rest.Patch("/:id", utils.ScopeFilter(writeDevicesScopes, app.handlePatchDevice)),
-		rest.Put("/:id/public", utils.ScopeFilter(writeDevicesScopes, app.handlePutPublic)),
-		rest.Delete("/:id/public", utils.ScopeFilter(writeDevicesScopes, app.handleDeletePublic)),
-		rest.Put("/:id/user-meta", utils.ScopeFilter(writeDevicesScopes, app.handlePutUserData)),
-		rest.Patch("/:id/user-meta", utils.ScopeFilter(writeDevicesScopes, app.handlePatchUserData)),
-		rest.Put("/:id/device-meta", utils.ScopeFilter(writeDevicesScopes, app.handlePutDeviceData)),
-		rest.Patch("/:id/device-meta", utils.ScopeFilter(writeDevicesScopes, app.handlePatchDeviceData)),
-		rest.Delete("/:id", utils.ScopeFilter(writeDevicesScopes, app.handleDeleteDevice)),
+		rest.Get("/#id", utils.ScopeFilter(readDevicesScopes, app.handleGetDevice)),
+		rest.Put("/#id", utils.ScopeFilter(writeDevicesScopes, app.handlePutDevice)),
+		rest.Patch("/#id", utils.ScopeFilter(writeDevicesScopes, app.handlePatchDevice)),
+		rest.Put("/#id/public", utils.ScopeFilter(writeDevicesScopes, app.handlePutPublic)),
+		rest.Delete("/#id/public", utils.ScopeFilter(writeDevicesScopes, app.handleDeletePublic)),
+		rest.Put("/#id/user-meta", utils.ScopeFilter(writeDevicesScopes, app.handlePutUserData)),
+		rest.Patch("/#id/user-meta", utils.ScopeFilter(writeDevicesScopes, app.handlePatchUserData)),
+		rest.Put("/#id/device-meta", utils.ScopeFilter(writeDevicesScopes, app.handlePutDeviceData)),
+		rest.Patch("/#id/device-meta", utils.ScopeFilter(writeDevicesScopes, app.handlePatchDeviceData)),
+		rest.Delete("/#id", utils.ScopeFilter(writeDevicesScopes, app.handleDeleteDevice)),
 		// lookup by nick-path (np)
 		rest.Get("/np/#usernick/#devicenick", utils.ScopeFilter(readDevicesScopes, app.handleGetUserDevice)),
 	)

@@ -81,8 +81,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware,
 
 	// end points
 	apiRouter, _ := rest.MakeRouter(
-		rest.Put("/devices/:id", app.handlePutDevice),
-		rest.Put("/steps/:id", app.handlePutStep),
+		rest.Put("/devices/#id", app.handlePutDevice),
+		rest.Put("/steps/#id", app.handlePutStep),
 	)
 	app.API.SetApp(apiRouter)
 

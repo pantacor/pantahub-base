@@ -93,9 +93,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		rest.Get("/scopes", app.handleGetPhScopes),
 		rest.Post("/", app.handleCreateApp),
 		rest.Get("/", app.handleGetApps),
-		rest.Get("/:id", app.handleGetApp),
-		rest.Put("/:id", app.handleUpdateApp),
-		rest.Delete("/:id", app.handleDeleteApp),
+		rest.Get("/#id", app.handleGetApp),
+		rest.Put("/#id", app.handleUpdateApp),
+		rest.Delete("/#id", app.handleDeleteApp),
 	)
 	app.API.SetApp(apiRouter)
 

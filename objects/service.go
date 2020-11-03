@@ -306,10 +306,10 @@ func New(jwtMiddleware *jwt.JWTMiddleware, subService subscriptions.Subscription
 		rest.Get("/auth_status", utils.ScopeFilter(readObjectsScopes, handleAuth)),
 		rest.Get("/", utils.ScopeFilter(readObjectsScopes, app.handleGetObjects)),
 		rest.Post("/", utils.ScopeFilter(writeObjectScopes, app.handlePostObject)),
-		rest.Get("/:id", utils.ScopeFilter(readObjectsScopes, app.handleGetObject)),
-		rest.Get("/:id/blob", utils.ScopeFilter(readObjectsScopes, app.handleGetObjectFile)),
-		rest.Put("/:id", utils.ScopeFilter(writeObjectScopes, app.handlePutObject)),
-		rest.Delete("/:id", utils.ScopeFilter(writeObjectScopes, app.handleDeleteObject)),
+		rest.Get("/#id", utils.ScopeFilter(readObjectsScopes, app.handleGetObject)),
+		rest.Get("/#id/blob", utils.ScopeFilter(readObjectsScopes, app.handleGetObjectFile)),
+		rest.Put("/#id", utils.ScopeFilter(writeObjectScopes, app.handlePutObject)),
+		rest.Delete("/#id", utils.ScopeFilter(writeObjectScopes, app.handleDeleteObject)),
 	)
 	app.API.SetApp(apiRouter)
 
