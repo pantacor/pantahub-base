@@ -309,7 +309,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		rest.Patch("/:id/device-meta", utils.ScopeFilter(writeDevicesScopes, app.handlePatchDeviceData)),
 		rest.Delete("/:id", utils.ScopeFilter(writeDevicesScopes, app.handleDeleteDevice)),
 		// lookup by nick-path (np)
-		rest.Get("/np/:usernick/:devicenick", utils.ScopeFilter(readDevicesScopes, app.handleGetUserDevice)),
+		rest.Get("/np/#usernick/#devicenick", utils.ScopeFilter(readDevicesScopes, app.handleGetUserDevice)),
 	)
 	app.API.SetApp(apiRouter)
 
