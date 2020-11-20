@@ -19,6 +19,7 @@ import (
 	"net/http"
 
 	"github.com/ant0ine/go-json-rest/rest"
+	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
 
@@ -45,6 +46,17 @@ import (
 // @Router /profiles/{id} [get]
 func (a *App) handleGetProfile(w rest.ResponseWriter, r *rest.Request) {
 	accountNick := r.PathParam("nick")
+	var tokenOwner string
+	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
+	if !ok {
+		utils.RestErrorWrapper(w, "Owner can't be defined", http.StatusInternalServerError)
+		return
+	}
+	tokenOwner, ok = jwtPayload.(jwtgo.MapClaims)["prn"].(string)
+	if !ok {
+		utils.RestErrorWrapper(w, "Owner can't be defined", http.StatusInternalServerError)
+		return
+	}
 
 	account, err := a.getUserAccount(accountNick, "")
 	if err != nil {
@@ -75,6 +87,16 @@ func (a *App) handleGetProfile(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
 		return
 	}
+
+	if !profile.Public && account.Prn != tokenOwner {
+		utils.RestErrorWrapperUser(w, err.Error(), "Profile is not public", http.StatusForbidden)
+		return
+	}
+
+	if account.Prn == tokenOwner {
+		profile.Email = account.Email
+	}
+
 	profile.Nick = account.Nick
 
 	w.WriteJson(profile)

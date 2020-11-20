@@ -23,9 +23,10 @@ import (
 
 // Profile : Public information for one account
 type Profile struct {
-	ID   primitive.ObjectID `json:"-" bson:"_id"`
-	Prn  string             `json:"-" bson:"prn"`
-	Nick string             `json:"nick" bson:"-"`
+	ID    primitive.ObjectID `json:"-" bson:"_id"`
+	Prn   string             `json:"-" bson:"prn"`
+	Nick  string             `json:"nick" bson:"-"`
+	Email string             `json:"email" bson:"-"`
 
 	*UpdateableProfile `json:",inline" bson:",inline"`
 
