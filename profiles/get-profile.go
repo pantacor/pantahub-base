@@ -49,12 +49,12 @@ func (a *App) handleGetProfile(w rest.ResponseWriter, r *rest.Request) {
 	var tokenOwner string
 	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
 	if !ok {
-		utils.RestErrorWrapper(w, "Owner can't be defined", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Token owner can't be defined", http.StatusInternalServerError)
 		return
 	}
 	tokenOwner, ok = jwtPayload.(jwtgo.MapClaims)["prn"].(string)
 	if !ok {
-		utils.RestErrorWrapper(w, "Owner can't be defined", http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Token owner can't be defined", http.StatusInternalServerError)
 		return
 	}
 
