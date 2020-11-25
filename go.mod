@@ -36,3 +36,5 @@ require (
 )
 
 replace github.com/ant0ine/go-json-rest => github.com/asac/go-json-rest v3.3.3-0.20191004094541-40429adaafcb+incompatible
+
+replace github.com/tiaguinho/gosoap => github.com/highercomve/gosoap v1.3.0-a747454
