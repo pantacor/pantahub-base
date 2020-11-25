@@ -23,7 +23,6 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
@@ -457,17 +456,15 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 
 	app.API.Use(&rest.IfMiddleware{
 		Condition: func(request *rest.Request) bool {
-			// if call is coming with authorization attempt, ensure JWT middleware
-			// is used... otherwise let through anonymous POST for registration
-			auth := request.Header.Get("Authorization")
-			if auth != "" && strings.HasPrefix(strings.ToLower(strings.TrimSpace(auth)), "bearer ") {
-				return true
-			}
-
-			// not authorized is a fail...
-			return false
+			return true
 		},
 		IfTrue: app.jwtMiddleware,
+	})
+	app.API.Use(&rest.IfMiddleware{
+		Condition: func(request *rest.Request) bool {
+			return true
+		},
+		IfTrue: &utils.AuthMiddleware{},
 	})
 
 	readDevicesScopes := []utils.Scope{
