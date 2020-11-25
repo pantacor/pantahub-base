@@ -472,13 +472,24 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		utils.Scopes.Devices,
 		utils.Scopes.ReadDevices,
 	}
+	readTrailsScopes := []utils.Scope{
+		utils.Scopes.API,
+		utils.Scopes.Trails,
+		utils.Scopes.ReadTrails,
+	}
+
+	readStepsScopes := []utils.Scope{
+		utils.Scopes.API,
+		utils.Scopes.Trails,
+		utils.Scopes.ReadTrails,
+	}
 
 	// /auth_status endpoints
 	apiRouter, _ := rest.MakeRouter(
 		// TPM auto enroll register
 		rest.Get("/devices", utils.ScopeFilter(readDevicesScopes, app.handleGetChangesDevices)),
-		rest.Get("/steps", utils.ScopeFilter(readDevicesScopes, app.handleGetChangesSteps)),
-		rest.Get("/trails", utils.ScopeFilter(readDevicesScopes, app.handleGetChangesTrail)),
+		rest.Get("/steps", utils.ScopeFilter(readStepsScopes, app.handleGetChangesSteps)),
+		rest.Get("/trails", utils.ScopeFilter(readTrailsScopes, app.handleGetChangesTrail)),
 	)
 
 	app.API.SetApp(apiRouter)
