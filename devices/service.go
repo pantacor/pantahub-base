@@ -19,6 +19,7 @@ package devices
 import (
 	"context"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -297,7 +298,15 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		// default api
 		rest.Get("/auth_status", utils.ScopeFilter(readDevicesScopes, handleAuth)),
 		rest.Get("/", utils.ScopeFilter(readDevicesScopes, app.handleGetDevices)),
-		rest.Post("/", utils.ScopeFilter(writeDevicesScopes, app.handlePostDevice)),
+		rest.Post("/", utils.ScopeFilter(writeDevicesScopes,
+			func(writer rest.ResponseWriter, request *rest.Request) {
+				userAgent := request.Header.Get("User-Agent")
+				if userAgent == "" {
+					utils.RestErrorWrapperUser(writer, "No Access (DOS) - no UserAgent", "Incompatible Client; upgrade pantavisor", http.StatusForbidden)
+					return
+				}
+				app.handlePostDevice(writer, request)
+			})),
 		rest.Get("/#id", utils.ScopeFilter(readDevicesScopes, app.handleGetDevice)),
 		rest.Put("/#id", utils.ScopeFilter(writeDevicesScopes, app.handlePutDevice)),
 		rest.Patch("/#id", utils.ScopeFilter(writeDevicesScopes, app.handlePatchDevice)),
