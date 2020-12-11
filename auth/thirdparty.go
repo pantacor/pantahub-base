@@ -84,7 +84,8 @@ func (a *App) HandleGetThirdPartyCallback(w rest.ResponseWriter, r *rest.Request
 	}
 
 	if payload.Email == "" {
-		utils.RestError(w, err, "Thirdparty service doesn't have email", http.StatusForbidden)
+		errMg := fmt.Sprintf("You need to validate your email or make it public on %s", payload.Service)
+		utils.RestErrorUser(w, err, errMg, http.StatusForbidden)
 		return
 	}
 
