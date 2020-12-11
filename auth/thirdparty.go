@@ -83,6 +83,11 @@ func (a *App) HandleGetThirdPartyCallback(w rest.ResponseWriter, r *rest.Request
 		return
 	}
 
+	if payload.Email == "" {
+		utils.RestError(w, err, "Thirdparty service doesn't have email", http.StatusForbidden)
+		return
+	}
+
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
 	account, err := getUserByEmail(payload.Email, collection)
 	if err != nil && err != mongo.ErrNoDocuments {
