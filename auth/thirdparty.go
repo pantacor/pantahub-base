@@ -79,20 +79,20 @@ func (a *App) HandleGetThirdPartyLogin(w rest.ResponseWriter, r *rest.Request) {
 func (a *App) HandleGetThirdPartyCallback(w rest.ResponseWriter, r *rest.Request) {
 	payload, err := oauth.CbByService(r)
 	if err != nil {
-		utils.RestError(w, err, "Unable to connect to thirdparty service", http.StatusForbidden)
+		processErr(w, r.Request, err, "Unable to connect to thirdparty service", http.StatusForbidden, payload.RedirectTo)
 		return
 	}
 
 	if payload.Email == "" {
 		errMg := fmt.Sprintf("You need to validate your email or make it public on %s", payload.Service)
-		utils.RestErrorUser(w, err, errMg, http.StatusForbidden)
+		processErr(w, r.Request, err, errMg, http.StatusForbidden, payload.RedirectTo)
 		return
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
 	account, err := getUserByEmail(payload.Email, collection)
 	if err != nil && err != mongo.ErrNoDocuments {
-		utils.RestError(w, err, "Error with Database connectivity", http.StatusInternalServerError)
+		processErr(w, r.Request, err, "Error with Database connectivity", http.StatusInternalServerError, payload.RedirectTo)
 		return
 	}
 
@@ -112,13 +112,13 @@ func (a *App) HandleGetThirdPartyCallback(w rest.ResponseWriter, r *rest.Request
 		utils.SendWelcome(account.Email, account.Nick, urlPrefix)
 	}
 	if err != nil {
-		utils.RestError(w, err, "Error with Database connectivity", http.StatusInternalServerError)
+		processErr(w, r.Request, err, "Error with Database connectivity", http.StatusInternalServerError, payload.RedirectTo)
 		return
 	}
 
 	token, err := createAccountToken(account)
 	if err != nil {
-		utils.RestError(w, err, err.Error(), http.StatusInternalServerError)
+		processErr(w, r.Request, err, err.Error(), http.StatusInternalServerError, payload.RedirectTo)
 		return
 	}
 
@@ -128,6 +128,15 @@ func (a *App) HandleGetThirdPartyCallback(w rest.ResponseWriter, r *rest.Request
 	}
 
 	w.WriteJson(token)
+}
+
+func processErr(w rest.ResponseWriter, r *http.Request, err error, msg string, code int, redirectTo string) {
+	if redirectTo != "" {
+		redirectURI := fmt.Sprintf("%s?error=%s", redirectTo, url.QueryEscape(msg))
+		http.Redirect(w, r, redirectURI, http.StatusTemporaryRedirect)
+	}
+
+	utils.RestError(w, err, msg, code)
 }
 
 func createAccountToken(account *accounts.Account) (*TokenPayload, error) {
