@@ -622,7 +622,9 @@ var doc = `{
                     }
                 ],
                 "responses": {
-                    "302": {},
+                    "302": {
+                        "description": ""
+                    },
                     "400": {
                         "description": "Invalid payload",
                         "schema": {
@@ -683,7 +685,9 @@ var doc = `{
                     }
                 ],
                 "responses": {
-                    "302": {},
+                    "302": {
+                        "description": ""
+                    },
                     "400": {
                         "description": "Invalid payload",
                         "schema": {
@@ -958,6 +962,61 @@ var doc = `{
                 }
             }
         },
+        "/auth/token": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get user profile",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Get user profile",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID|Nick|PRN",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/accounts.Account"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid payload",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Error processing request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/verify": {
             "get": {
                 "description": "Verify account payload",
@@ -1141,6 +1200,144 @@ var doc = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/callbacks.PublicStep"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/changes/devices": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get all devices after or before the cursor passed in as argument.\nResult will be sorted inverse order for before and natural order for after\nThe page[after] flag takes precedence in case it is provided with page[before]\nTries to follow https://jsonapi.org/profiles/ethanresnick/cursor-pagination/",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "devices"
+                ],
+                "summary": "Get all devices that have changed after or before a given point in time",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/changes.ChangePage"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/changes/steps": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get all steps after or before a cursor passed in as argument.\nfollowing https://jsonapi.org/profiles/ethanresnick/cursor-pagination/",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "devices"
+                ],
+                "summary": "Get all steps that have changed after or before a given point in time",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/changes.ChangePage"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/changes/trails": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get all devices after or before the cursor passed in as argument.\nResult will be sorted inverse order for before and natural order for after\nThe page[after] flag takes precedence in case it is provided with page[before]\nTries to follow https://jsonapi.org/profiles/ethanresnick/cursor-pagination/",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "devices"
+                ],
+                "summary": "Get all devices that have changed after or before a given point in time",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/changes.ChangePage"
                         }
                     },
                     "400": {
@@ -1564,7 +1761,9 @@ var doc = `{
                     }
                 ],
                 "responses": {
-                    "200": {},
+                    "200": {
+                        "description": ""
+                    },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
@@ -2594,7 +2793,9 @@ var doc = `{
                 ],
                 "summary": "Get API metrics",
                 "responses": {
-                    "200": {},
+                    "200": {
+                        "description": ""
+                    },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
@@ -2917,7 +3118,9 @@ var doc = `{
                     }
                 ],
                 "responses": {
-                    "200": {},
+                    "200": {
+                        "description": ""
+                    },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
@@ -3131,7 +3334,9 @@ var doc = `{
                     }
                 ],
                 "responses": {
-                    "200": {},
+                    "200": {
+                        "description": ""
+                    },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
@@ -3952,7 +4157,9 @@ var doc = `{
                     }
                 ],
                 "responses": {
-                    "200": {},
+                    "200": {
+                        "description": ""
+                    },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
@@ -4551,6 +4758,31 @@ var doc = `{
                 }
             }
         },
+        "changes.ChangePage": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    }
+                },
+                "links": {
+                    "$ref": "#/definitions/changes.ChangePageCursor"
+                }
+            }
+        },
+        "changes.ChangePageCursor": {
+            "type": "object",
+            "properties": {
+                "next": {
+                    "type": "string"
+                },
+                "prev": {
+                    "type": "string"
+                }
+            }
+        },
         "dash.BillingInfo": {
             "type": "object",
             "properties": {
@@ -4924,6 +5156,9 @@ var doc = `{
                     "type": "string"
                 },
                 "company": {
+                    "type": "string"
+                },
+                "email": {
                     "type": "string"
                 },
                 "fullName": {
@@ -5340,6 +5575,7 @@ var doc = `{
         "OAuth2Application": {
             "type": "oauth2",
             "flow": "application",
+            "authorizationUrl": "",
             "tokenUrl": "/auth/token",
             "scopes": {
                 "admin": " Grants read and write access to administrative information",
@@ -5358,6 +5594,7 @@ var doc = `{
         "OAuth2Password": {
             "type": "oauth2",
             "flow": "password",
+            "authorizationUrl": "",
             "tokenUrl": "/auth/token",
             "scopes": {
                 "admin": " Grants read and write access to administrative information",
