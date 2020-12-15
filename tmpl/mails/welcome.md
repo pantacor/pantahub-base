@@ -1,6 +1,6 @@
 Hello {{.Email}}
 
-# Welcome to Pantahub
+# Welcome to Pantacor Hub
 
 Thanks so much for joining our platform, your username is: {{.Nick}}
 
@@ -18,4 +18,4 @@ as well as our getting started guides:
 
 	https://gitlab.com/pantacor/docs/blob/master/get-started-malta.md
 
-Hope you enjoy your stay and if you need anything, feel free to reach out to team@pantahub.com.
+Hope you enjoy your stay and if you need anything, feel free to reach out to team@pantacor.com.

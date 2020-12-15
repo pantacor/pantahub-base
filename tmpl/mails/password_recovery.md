@@ -1,4 +1,4 @@
-# Your Pantahub password is almost reset
+# Your Pantacor Hub password is almost reset
 
 Hello {{.Nick}}! 
 
@@ -8,4 +8,4 @@ Click the button below and restore your password.
 
 {{.Link}}
 
-Hope you enjoy your stay and if you need anything, feel free to reach out to team@pantahub.com.
+Hope you enjoy your stay and if you need anything, feel free to reach out to team@pantacor.com.
