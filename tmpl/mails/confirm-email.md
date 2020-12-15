@@ -8,4 +8,4 @@ To get started you need to activate your account:
 
 	{{.Link}}
 
-Hope you enjoy your stay and if you need anything, feel free to reach out to team@pantahub.com.
+Hope you enjoy your stay and if you need anything, feel free to reach out to team@pantacor.com.
