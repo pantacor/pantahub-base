@@ -114,7 +114,7 @@ func SendWelcome(email, nick, urlPrefix string) error {
 	mg := getMailer()
 	message := mg.NewMessage(
 		regEmail,
-		"Welcome to Pantahub",
+		"Welcome to Pantacor Hub",
 		bodyPlain,
 		email)
 
@@ -158,7 +158,7 @@ func SendVerification(email, nick, id, u string, urlPrefix string) bool {
 	mg := getMailer()
 	message := mg.NewMessage(
 		regEmail,
-		"Activate your Pantahub account",
+		"Activate your Pantacor Hub account",
 		bodyPlain,
 		email)
 

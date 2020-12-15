@@ -17,8 +17,7 @@ definitions:
       prn:
         type: string
       redirect_uris:
-        description: Oauth2RedirectURIs is limiting the prefix available for redirecting
-          users with oauth code and accesstoken to
+        description: Oauth2RedirectURIs is limiting the prefix available for redirecting users with oauth code and accesstoken to
         items:
           type: string
         type: array
@@ -142,8 +141,7 @@ definitions:
       prn:
         type: string
       redirect_uris:
-        description: Oauth2RedirectURIs is limiting the prefix available for redirecting
-          users with oauth code and accesstoken to
+        description: Oauth2RedirectURIs is limiting the prefix available for redirecting users with oauth code and accesstoken to
         items:
           type: string
         type: array
@@ -209,6 +207,22 @@ definitions:
       timemodified:
         type: string
       updated_at:
+        type: string
+    type: object
+  changes.ChangePage:
+    properties:
+      data:
+        items:
+          type: object
+        type: array
+      links:
+        $ref: '#/definitions/changes.ChangePageCursor'
+    type: object
+  changes.ChangePageCursor:
+    properties:
+      next:
+        type: string
+      prev:
         type: string
     type: object
   dash.BillingInfo:
@@ -457,6 +471,8 @@ definitions:
         type: string
       company:
         type: string
+      email:
+        type: string
       fullName:
         type: string
       github:
@@ -618,8 +634,7 @@ definitions:
       id:
         type: string
       last-insync:
-        description: 'Admins   []string `json:"admins"`   // XXX: maybe this is best
-          way to do delegating device access....'
+        description: 'Admins   []string `json:"admins"`   // XXX: maybe this is best way to do delegating device access....'
         type: string
       last-touched:
         type: string
@@ -1113,7 +1128,8 @@ paths:
       produces:
       - application/json
       responses:
-        "302": {}
+        "302":
+          description: ""
         "400":
           description: Invalid payload
           schema:
@@ -1152,7 +1168,8 @@ paths:
       produces:
       - application/json
       responses:
-        "302": {}
+        "302":
+          description: ""
         "400":
           description: Invalid payload
           schema:
@@ -1250,8 +1267,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: send email with token to user in order to reset password to given
-        user
+      description: send email with token to user in order to reset password to given user
       parameters:
       - description: New password payload
         in: body
@@ -1285,8 +1301,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: send email with token to user in order to reset password to given
-        user
+      description: send email with token to user in order to reset password to given user
       parameters:
       - description: Account recovery payload
         in: body
@@ -1333,6 +1348,41 @@ paths:
           schema:
             $ref: '#/definitions/utils.RError'
       summary: Create a new (anon) session account
+      tags:
+      - auth
+  /auth/token:
+    post:
+      consumes:
+      - application/json
+      description: Get user profile
+      parameters:
+      - description: ID|Nick|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/accounts.Account'
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Account not found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Error processing request
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get user profile
       tags:
       - auth
   /auth/verify:
@@ -1465,6 +1515,103 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Callback api for step changes
+      tags:
+      - devices
+  /changes/devices:
+    get:
+      consumes:
+      - application/json
+      description: |-
+        Get all devices after or before the cursor passed in as argument.
+        Result will be sorted inverse order for before and natural order for after
+        The page[after] flag takes precedence in case it is provided with page[before]
+        Tries to follow https://jsonapi.org/profiles/ethanresnick/cursor-pagination/
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/changes.ChangePage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get all devices that have changed after or before a given point in time
+      tags:
+      - devices
+  /changes/steps:
+    get:
+      consumes:
+      - application/json
+      description: |-
+        Get all steps after or before a cursor passed in as argument.
+        following https://jsonapi.org/profiles/ethanresnick/cursor-pagination/
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/changes.ChangePage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get all steps that have changed after or before a given point in time
+      tags:
+      - devices
+  /changes/trails:
+    get:
+      consumes:
+      - application/json
+      description: |-
+        Get all devices after or before the cursor passed in as argument.
+        Result will be sorted inverse order for before and natural order for after
+        The page[after] flag takes precedence in case it is provided with page[before]
+        Tries to follow https://jsonapi.org/profiles/ethanresnick/cursor-pagination/
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/changes.ChangePage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get all devices that have changed after or before a given point in time
       tags:
       - devices
   /cron/devices:
@@ -2105,7 +2252,8 @@ paths:
       produces:
       - application/json
       responses:
-        "200": {}
+        "200":
+          description: ""
         "400":
           description: Bad Request
           schema:
@@ -2255,8 +2403,7 @@ paths:
         Get one or many log entries as an error of LogEntry
         Page through your logs.
       parameters:
-      - description: list position to start page; either number or ID or '<tsec>.<tnano>'
-          of log entry
+      - description: list position to start page; either number or ID or '<tsec>.<tnano>' of log entry
         in: query
         name: start
         type: string
@@ -2276,8 +2423,7 @@ paths:
         in: query
         name: src
         type: string
-      - description: common list of items of 'tsec,tnano,device,src,lvl,time-created'
-          you can use - on each individual item to reverse order
+      - description: common list of items of 'tsec,tnano,device,src,lvl,time-created' you can use - on each individual item to reverse order
         in: query
         name: sort
         type: string
@@ -2388,7 +2534,8 @@ paths:
       produces:
       - plain/text
       responses:
-        "200": {}
+        "200":
+          description: ""
         "400":
           description: Bad Request
           schema:
@@ -2592,7 +2739,8 @@ paths:
       produces:
       - application/json
       responses:
-        "200": {}
+        "200":
+          description: ""
         "400":
           description: Bad Request
           schema:
@@ -2728,7 +2876,8 @@ paths:
       produces:
       - application/json
       responses:
-        "200": {}
+        "200":
+          description: ""
         "400":
           description: Bad Request
           schema:
@@ -3101,8 +3250,7 @@ paths:
     put:
       consumes:
       - application/json
-      description: Put step meta just the raw data of a step without metainfo like
-        pvr put
+      description: Put step meta just the raw data of a step without metainfo like pvr put
       parameters:
       - description: ID|NICK|PRN
         in: path
@@ -3141,8 +3289,7 @@ paths:
             $ref: '#/definitions/utils.RError'
       security:
       - ApiKeyAuth: []
-      summary: Put step meta just the raw data of a step without metainfo like pvr
-        put
+      summary: Put step meta just the raw data of a step without metainfo like pvr put
       tags:
       - trails
   /trails/{id}/steps/{rev}/objects:
@@ -3254,7 +3401,8 @@ paths:
       produces:
       - application/json
       responses:
-        "200": {}
+        "200":
+          description: ""
         "400":
           description: Bad Request
           schema:
@@ -3364,8 +3512,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: put step state (only if not yet consumed). just the raw data of
-        a step without metainfo like pvr pu
+      description: put step state (only if not yet consumed). just the raw data of a step without metainfo like pvr pu
       parameters:
       - description: ID|NICK|PRN
         in: path
@@ -3491,6 +3638,7 @@ securityDefinitions:
     tokenUrl: /auth/token
     type: oauth2
   OAuth2Application:
+    authorizationUrl: ""
     flow: application
     scopes:
       admin: ' Grants read and write access to administrative information'
@@ -3505,6 +3653,7 @@ securityDefinitions:
       write: ' Grants write access'
     type: oauth2
   OAuth2Password:
+    authorizationUrl: ""
     flow: password
     scopes:
       admin: ' Grants read and write access to administrative information'
