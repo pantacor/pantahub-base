@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -318,7 +319,14 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	// /login /auth_status and /refresh_token endpoints
 	apiRouter, _ := rest.MakeRouter(
 		rest.Get("/", app.handleGetProfile),
-		rest.Post("/login", app.jwtMiddleware.LoginHandler),
+		rest.Post("/login", func(writer rest.ResponseWriter, request *rest.Request) {
+			userAgent := request.Header.Get("User-Agent")
+			if userAgent == "" {
+				utils.RestErrorWrapperUser(writer, "No Access (DOS) - no UserAgent", "Incompatible Client; upgrade pantavisor", http.StatusForbidden)
+				return
+			}
+			app.jwtMiddleware.LoginHandler(writer, request)
+		}),
 		rest.Post("/token", app.handlePostToken),
 		rest.Get("/auth_status", handleAuthStatus),
 		rest.Get("/login", app.jwtMiddleware.RefreshHandler),
