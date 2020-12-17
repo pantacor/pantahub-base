@@ -677,7 +677,7 @@ func (a *App) handlePasswordRecovery(writer rest.ResponseWriter, r *rest.Request
 // @Failure 400 {object} utils.RError "Invalid payload"
 // @Failure 404 {object} utils.RError "Account not found"
 // @Failure 500 {object} utils.RError "Error processing request"
-// @Router /auth [get]
+// @Router /auth/token [post]
 func (a *App) handlePostToken(writer rest.ResponseWriter, r *rest.Request) {
 	tokenRequest := tokenRequest{}
 	err := r.DecodeJsonPayload(&tokenRequest)

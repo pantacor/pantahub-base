@@ -31,6 +31,7 @@ import (
 	"gitlab.com/pantacor/pantahub-base/apps"
 	"gitlab.com/pantacor/pantahub-base/auth"
 	"gitlab.com/pantacor/pantahub-base/callbacks"
+	"gitlab.com/pantacor/pantahub-base/changes"
 	"gitlab.com/pantacor/pantahub-base/cron"
 	"gitlab.com/pantacor/pantahub-base/dash"
 	"gitlab.com/pantacor/pantahub-base/devices"
@@ -110,6 +111,15 @@ func DoInit() {
 			SigningAlgorithm: "RS256",
 		}, subService, mongoClient)
 		http.Handle("/objects/", http.StripPrefix("/objects", app.API.MakeHandler()))
+	}
+	{
+		app := changes.New(&jwt.JWTMiddleware{
+			Pub:              jwtPub,
+			Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
+			Authenticator:    falseAuthenticator,
+			SigningAlgorithm: "RS256",
+		}, mongoClient)
+		http.Handle("/changes/", http.StripPrefix("/changes", app.API.MakeHandler()))
 	}
 	{
 		app := devices.New(&jwt.JWTMiddleware{
