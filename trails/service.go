@@ -215,6 +215,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		rest.Put("/#id/steps/#rev/meta", utils.ScopeFilter(writeTrailsScopes, app.handlePutStepMeta)),
 		rest.Put("/#id/steps/#rev/state", utils.ScopeFilter(writeTrailsScopes, app.handlePutStepState)),
 		rest.Put("/#id/steps/#rev/progress", utils.ScopeFilter(writeTrailsScopes, app.handlePutStepProgress)),
+		rest.Put("/#id/steps/#rev/cancel", utils.ScopeFilter(writeTrailsScopes, app.handlePutStepProgressCancel)),
 		rest.Get("/#id/summary", utils.ScopeFilter(readTrailsScopes, app.handleGetTrailStepSummary)),
 	)
 	app.API.SetApp(apiRouter)
