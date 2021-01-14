@@ -44,12 +44,13 @@ func (app *App) handleGetApp(w rest.ResponseWriter, r *rest.Request) {
 
 	var owner string
 	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
-	if !ok {
-		utils.RestErrorWrapper(w, "Owner can't be defined", http.StatusInternalServerError)
-		return
-	}
-	owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"].(string)
-	if !ok {
+	if ok {
+		owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"].(string)
+		if !ok {
+			utils.RestErrorWrapper(w, "Owner can't be defined", http.StatusInternalServerError)
+			return
+		}
+	} else {
 		utils.RestErrorWrapper(w, "Owner can't be defined", http.StatusInternalServerError)
 		return
 	}
