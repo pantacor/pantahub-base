@@ -308,6 +308,9 @@ const (
 
 	// EnvPantahub3rdAppLogoMaxSizeKb max size for 3rd party apps logo
 	EnvPantahub3rdAppLogoMaxSizeKb = "PANTAHUB_3RD_APP_LOGO_MAX_SIZE_KB"
+
+	// EnvAnonJWTTimeoutMinutes anonimous token timeout
+	EnvAnonJWTTimeoutMinutes = "PANTAHUB_ANON_JWT_TIMEOUT"
 )
 
 var defaultEnvs = map[string]string{
@@ -324,6 +327,7 @@ var defaultEnvs = map[string]string{
 	EnvPantahubJWTTimeoutMinutes:            "60",
 	EnvPantahubRecoverJWTTimeoutMinutes:     "60",
 	EnvPantahubJWTMaxRefreshMinutes:         "1440",
+	EnvAnonJWTTimeoutMinutes:                "5",
 
 	EnvPantahubCaCert:          "",
 	EnvPantahubCaRaUser:        "",

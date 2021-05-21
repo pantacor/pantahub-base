@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"log"
-	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -99,8 +98,14 @@ type resetPasswordClaims struct {
 
 // this requests to swap access code with accesstoken
 type tokenRequest struct {
-	Code    string `json:"access-code"`
-	Comment string `json:"comment"`
+	GrantType    string `json:"grant_type"`
+	Username     string `json:"username"`
+	Password     string `json:"password"`
+	ClientID     string `json:"client_id"`
+	ClientSecret string `json:"client_secret"`
+	Scope        string `json:"scope"`
+	Code         string `json:"access-code"`
+	Comment      string `json:"comment"`
 }
 
 type tokenStore struct {
@@ -126,6 +131,94 @@ func init() {
 			v.Password = passwordOverwrite
 			accountsdata.DefaultAccounts[k] = v
 		}
+	}
+}
+
+func AuthenticateWithUserPassword(app *App) func(string, string) bool {
+	return func(userId string, password string) bool {
+		var loginUser string
+
+		if userId == "" || password == "" {
+			return false
+		}
+
+		userTup := strings.SplitN(userId, "==>", 2)
+		if len(userTup) > 1 {
+			loginUser = userTup[0]
+		} else {
+			loginUser = userId
+		}
+
+		testUserID := loginUser
+		if !strings.HasPrefix(loginUser, "prn:") {
+			testUserID = "prn:pantahub.com:auth:/" + loginUser
+		}
+
+		if strings.HasPrefix(loginUser, utils.BaseServiceID) {
+			tpApp, err := apps.LoginAsApp(loginUser, password, app.mongoClient.Database(utils.MongoDb))
+			if err != nil || tpApp == nil {
+				return false
+			}
+			return true
+		}
+
+		plm, ok := accountsdata.DefaultAccounts[testUserID]
+		if !ok {
+			if strings.HasPrefix(loginUser, "prn:::devices:") {
+				return app.deviceAuth(loginUser, password)
+			}
+
+			return app.accountAuth(loginUser, password)
+		}
+
+		return plm.Password == password
+	}
+}
+
+func AuthenticatePayload(app *App, jwtMiddleware *jwt.JWTMiddleware) func(string) map[string]interface{} {
+	return func(userId string) map[string]interface{} {
+		var loginUser, callUser string
+		var payload map[string]interface{}
+
+		userTup := strings.SplitN(userId, "==>", 2)
+		if len(userTup) > 1 {
+			loginUser = userTup[0]
+			callUser = userTup[1]
+		} else {
+			loginUser = userId
+		}
+
+		testUserID := loginUser
+		if !strings.HasPrefix(loginUser, "prn:") {
+			testUserID = "prn:pantahub.com:auth:/" + loginUser
+		}
+		if plm, ok := accountsdata.DefaultAccounts[testUserID]; !ok {
+			if loginUser == accountsdata.AnonAccountDefaultUsername {
+				payload = AccountToPayload(accounts.CreateAnonAccount())
+			} else if strings.HasPrefix(userId, "prn:::devices:") {
+				payload = app.devicePayload(loginUser)
+			} else {
+				payload = app.accountPayload(loginUser)
+			}
+		} else {
+			payload = AccountToPayload(plm)
+		}
+
+		if payload == nil {
+			payload, err := apps.GetAppPayload(userId, app.mongoClient.Database(utils.MongoDb))
+			if err != nil {
+				return nil
+			}
+			return payload
+		}
+
+		if callUser != "" && payload["roles"] == "admin" {
+			callPayload := jwtMiddleware.PayloadFunc(callUser)
+			callPayload["id"] = payload["id"].(string) + "==>" + callPayload["id"].(string)
+			payload["call-as"] = callPayload
+		}
+
+		return payload
 	}
 }
 
@@ -200,89 +293,10 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		log.Fatalln("Error setting up index for pantahub_accounts: " + err.Error())
 		return nil
 	}
-	jwtMiddleware.Authenticator = func(userId string, password string) bool {
 
-		var loginUser string
-
-		if userId == "" || password == "" {
-			return false
-		}
-
-		userTup := strings.SplitN(userId, "==>", 2)
-		if len(userTup) > 1 {
-			loginUser = userTup[0]
-		} else {
-			loginUser = userId
-		}
-
-		testUserID := loginUser
-		if !strings.HasPrefix(loginUser, "prn:") {
-			testUserID = "prn:pantahub.com:auth:/" + loginUser
-		}
-
-		if strings.HasPrefix(loginUser, utils.BaseServiceID) {
-			tpApp, err := apps.LoginAsApp(loginUser, password, app.mongoClient.Database(utils.MongoDb))
-			if err != nil || tpApp == nil {
-				return false
-			}
-			return true
-		}
-
-		plm, ok := accountsdata.DefaultAccounts[testUserID]
-		if !ok {
-			if strings.HasPrefix(loginUser, "prn:::devices:") {
-				return app.deviceAuth(loginUser, password)
-			}
-
-			return app.accountAuth(loginUser, password)
-		}
-
-		return plm.Password == password
-	}
-
-	jwtMiddleware.PayloadFunc = func(userId string) map[string]interface{} {
-
-		var loginUser, callUser string
-		var payload map[string]interface{}
-
-		userTup := strings.SplitN(userId, "==>", 2)
-		if len(userTup) > 1 {
-			loginUser = userTup[0]
-			callUser = userTup[1]
-		} else {
-			loginUser = userId
-		}
-
-		testUserID := loginUser
-		if !strings.HasPrefix(loginUser, "prn:") {
-			testUserID = "prn:pantahub.com:auth:/" + loginUser
-		}
-		if plm, ok := accountsdata.DefaultAccounts[testUserID]; !ok {
-			if strings.HasPrefix(userId, "prn:::devices:") {
-				payload = app.devicePayload(loginUser)
-			} else {
-				payload = app.accountPayload(loginUser)
-			}
-		} else {
-			payload = AccountToPayload(plm)
-		}
-
-		if payload == nil {
-			payload, err = apps.GetAppPayload(userId, app.mongoClient.Database(utils.MongoDb))
-			if err != nil {
-				return nil
-			}
-			return payload
-		}
-
-		if callUser != "" && payload["roles"] == "admin" {
-			callPayload := jwtMiddleware.PayloadFunc(callUser)
-			callPayload["id"] = payload["id"].(string) + "==>" + callPayload["id"].(string)
-			payload["call-as"] = callPayload
-		}
-
-		return payload
-	}
+	// Set Authenticate with user password and generate payload
+	jwtMiddleware.Authenticator = AuthenticateWithUserPassword(app)
+	jwtMiddleware.PayloadFunc = AuthenticatePayload(app, jwtMiddleware)
 
 	app.API = rest.NewApi()
 	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
@@ -319,14 +333,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	// /login /auth_status and /refresh_token endpoints
 	apiRouter, _ := rest.MakeRouter(
 		rest.Get("/", app.handleGetProfile),
-		rest.Post("/login", func(writer rest.ResponseWriter, request *rest.Request) {
-			userAgent := request.Header.Get("User-Agent")
-			if userAgent == "" {
-				utils.RestErrorWrapperUser(writer, "No Access (DOS) - no UserAgent", "Incompatible Client; upgrade pantavisor", http.StatusForbidden)
-				return
-			}
-			app.jwtMiddleware.LoginHandler(writer, request)
-		}),
+		rest.Post("/login", app.getTokenUsingPassword),
 		rest.Post("/token", app.handlePostToken),
 		rest.Get("/auth_status", handleAuthStatus),
 		rest.Get("/login", app.jwtMiddleware.RefreshHandler),
@@ -356,27 +363,21 @@ func AccountToPayload(account accounts.Account) map[string]interface{} {
 	case accounts.AccountTypeAdmin:
 		result["roles"] = "admin"
 		result["type"] = "USER"
-		break
 	case accounts.AccountTypeUser:
 		result["roles"] = "user"
 		result["type"] = "USER"
-		break
 	case accounts.AccountTypeSessionUser:
 		result["roles"] = "session"
 		result["type"] = "SESSION"
-		break
 	case accounts.AccountTypeDevice:
 		result["roles"] = "device"
 		result["type"] = "DEVICE"
-		break
 	case accounts.AccountTypeService:
 		result["roles"] = "service"
 		result["type"] = "SERVICE"
-		break
 	case accounts.AccountTypeClient:
 		result["roles"] = "service"
 		result["type"] = "SERVICE"
-		break
 	default:
 		log.Println("ERROR: AccountToPayload with invalid account type: " + account.Type)
 		return nil

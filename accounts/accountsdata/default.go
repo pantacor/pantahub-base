@@ -24,6 +24,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+var AnonAccountDefaultUsername = "prn:pantahub.com:auth:/anon"
+
 var adminObjectID primitive.ObjectID
 var user1ObjectID primitive.ObjectID
 var user2ObjectID primitive.ObjectID
