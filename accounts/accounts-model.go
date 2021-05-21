@@ -17,6 +17,7 @@
 package accounts
 
 import (
+	"fmt"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -79,4 +80,20 @@ type AccountPublic struct {
 
 	TimeCreated  time.Time `json:"time-created" bson:"time-created"`
 	TimeModified time.Time `json:"time-modified" bson:"time-modified"`
+}
+
+func CreateAnonAccount() Account {
+	id := primitive.NewObjectID()
+	prn := fmt.Sprintf("prn:pantahub.com:auth:/anon-%s", id.Hex())
+	nick := fmt.Sprintf("anon-%s", id.Hex())
+	return Account{
+		ID:           id,
+		Type:         AccountTypeUser,
+		Prn:          prn,
+		Nick:         nick,
+		Email:        "anon@accounts.pantahub.com",
+		TimeCreated:  time.Now(),
+		TimeModified: time.Now(),
+		Password:     nick,
+	}
 }
