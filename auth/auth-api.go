@@ -301,6 +301,11 @@ func (a *App) handlePostAccount(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	passwordBcrypt, err := utils.HashPassword(newAccount.Password, utils.CryptoMethods.BCrypt)
+	if err != nil {
+		utils.RestError(w, err, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	passwordScrypt, err := utils.HashPassword(newAccount.Password, utils.CryptoMethods.SCrypt)
 	if err != nil {
 		utils.RestError(w, err, err.Error(), http.StatusInternalServerError)
@@ -556,6 +561,10 @@ func (a *App) handlePasswordReset(writer rest.ResponseWriter, r *rest.Request) {
 	}
 
 	passwordBcrypt, err := utils.HashPassword(data.Password, utils.CryptoMethods.BCrypt)
+	if err != nil {
+		utils.RestError(writer, err, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	passwordScrypt, err := utils.HashPassword(data.Password, utils.CryptoMethods.SCrypt)
 	if err != nil {
 		utils.RestError(writer, err, err.Error(), http.StatusInternalServerError)
@@ -681,11 +690,11 @@ func (a *App) handlePasswordRecovery(writer rest.ResponseWriter, r *rest.Request
 func (a *App) handlePostToken(writer rest.ResponseWriter, r *rest.Request) {
 	tokenRequest := tokenRequest{}
 	err := r.DecodeJsonPayload(&tokenRequest)
-
 	if err != nil {
 		utils.RestErrorWrapper(writer, "Failed to decode token Request", http.StatusBadRequest)
 		return
 	}
+
 	// this is the claim of the service authenticating itself
 	caller := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"].(string)
 

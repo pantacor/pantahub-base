@@ -290,3 +290,27 @@ func ScopeFilterBy(scopes []Scope, f func(scope *Scope, i int) bool) []Scope {
 	}
 	return fapps
 }
+
+func ScopeStringFilterBy(s []string, filter, prefix string) []string {
+	if prefix == "" {
+		prefix = "prn:pantahub.com:apis:/base/"
+	}
+	scopes := make([]string, 0)
+	for _, scope := range s {
+		if filter != "" {
+			if strings.Contains(scope, filter) {
+				if hasPrefix := strings.Contains(scope, prefix); !hasPrefix {
+					scope = prefix + scope
+				}
+				scopes = append(scopes, scope)
+			}
+		} else {
+			if hasPrefix := strings.Contains(scope, prefix); !hasPrefix {
+				scope = prefix + scope
+			}
+			scopes = append(scopes, scope)
+		}
+	}
+
+	return scopes
+}
