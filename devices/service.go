@@ -248,7 +248,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 			}
 
 			// post new device means to register... allow this unauthenticated
-			return !(request.Method == "POST" && request.URL.Path == "/register")
+			return !((request.Method == "POST" && request.URL.Path == "/") ||
+				(request.Method == "POST" && request.URL.Path == "/register"))
 		},
 		IfTrue: app.jwtMiddleware,
 	})
@@ -262,7 +263,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 			}
 
 			// post new device means to register... allow this unauthenticated
-			return !(request.Method == "POST" && request.URL.Path == "/register")
+			return !((request.Method == "POST" && request.URL.Path == "/") ||
+				(request.Method == "POST" && request.URL.Path == "/register"))
 		},
 		IfTrue: &utils.AuthMiddleware{},
 	})
