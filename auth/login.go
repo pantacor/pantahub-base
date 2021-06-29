@@ -98,9 +98,7 @@ func (a *App) getTokenUsingPassword(writer rest.ResponseWriter, r *rest.Request)
 	}
 
 	writer.WriteJson(tokenResponse{
-		Token:     tokenString,
-		TokenType: "bearer",
-		Scopes:    claims["scopes"].(string),
+		Token: tokenString,
 	})
 
 }
