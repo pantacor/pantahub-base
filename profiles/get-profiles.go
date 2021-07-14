@@ -1,5 +1,5 @@
 //
-// Copyright 2020  Pantacor Ltd.
+// Copyright 2021  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ package profiles
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -27,12 +26,17 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/accounts"
-	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"gopkg.in/mgo.v2/bson"
 )
+
+// ModelError error type
+type ModelError struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
 
 // handleGetProfiles Get all user profiles
 // @Summary Get all user profiles
@@ -44,7 +48,7 @@ import (
 // @Produce  json
 // @Security ApiKeyAuth
 // @Tags profile
-// @Success 200 {array} Profile
+// @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} utils.RError
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
@@ -52,7 +56,7 @@ import (
 func (a *App) handleGetProfiles(w rest.ResponseWriter, r *rest.Request) {
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
-		err := devices.ModelError{}
+		err := ModelError{}
 		err.Code = http.StatusInternalServerError
 		err.Message = "You need to be logged in as a USER"
 
@@ -79,10 +83,9 @@ func (a *App) handleGetProfiles(w rest.ResponseWriter, r *rest.Request) {
 	limit := int64(20) //Default page size=20
 	skip := int64(0)
 
-	err := errors.New("")
-
 	value, ok := r.URL.Query()["limit"]
 	if ok {
+		var err error
 		limit, err = strconv.ParseInt(value[0], 10, 64)
 		if err != nil {
 			panic(err)
@@ -137,7 +140,7 @@ func (a *App) handleGetProfiles(w rest.ResponseWriter, r *rest.Request) {
 			return
 		}
 
-		profile, _ := a.getProfile(result.Prn)
+		profile, _ := a.getProfile(result.Prn, nil)
 		if (havePublicDevices || result.Prn == owner.(string)) && result.Nick != "" {
 			profile.Nick = result.Nick
 			profiles = append(profiles, profile)

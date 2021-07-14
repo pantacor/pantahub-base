@@ -29,12 +29,13 @@ type Profile struct {
 	Email string             `json:"email" bson:"-"`
 
 	*UpdateableProfile `json:",inline" bson:",inline"`
+	Meta               map[string]interface{} `json:"meta" bson:"meta"`
 
 	Public  bool `json:"-" bson:"public"`
 	Garbage bool `json:"-" bson:"garbage"`
 
-	TimeCreated  time.Time `json:"time-created,omit" bson:"time-created"`
-	TimeModified time.Time `json:"time-modified,omit" bson:"time-modified"`
+	TimeCreated  time.Time `json:"time-created,omitempty" bson:"time-created"`
+	TimeModified time.Time `json:"time-modified,omitempty" bson:"time-modified"`
 }
 
 // UpdateableProfile updateable part of a Profile

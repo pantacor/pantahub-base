@@ -24,6 +24,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // ExistsInProfiles : Check if a user details exists in profiles or not
@@ -41,14 +42,18 @@ func (a *App) ExistsInProfiles(ID primitive.ObjectID) (bool, error) {
 	return count > 0, err
 }
 
-func (a *App) getProfile(prn string) (*Profile, error) {
+func (a *App) getProfile(prn string, projection map[string]interface{}) (*Profile, error) {
 	profile := &Profile{}
+	queryOptions := options.FindOneOptions{}
+	if projection != nil {
+		queryOptions.Projection = utils.MergeDefaultProjection(projection)
+	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_profiles")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	err := collection.FindOne(ctx, bson.M{"prn": prn}).Decode(profile)
+	err := collection.FindOne(ctx, bson.M{"prn": prn}, &queryOptions).Decode(profile)
 	return profile, err
 }
 
@@ -157,6 +162,45 @@ func (a *App) updateProfile(accountPrn string, newProfile *Profile) (*Profile, e
 		bson.M{"$set": newProfile.UpdateableProfile},
 		nil,
 	)
+	if err != nil {
+		return nil, err
+	}
 
-	return newProfile, err
+	newProfile.Email = account.Email
+
+	return newProfile, nil
+}
+
+func (a *App) updateProfileMeta(accountPrn string, metas map[string]interface{}) (*Profile, error) {
+	profile := &Profile{}
+	_, err := a.getUserAccount(accountPrn, "prn")
+	if err != nil {
+		return profile, err
+	}
+
+	col := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_profiles")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err = col.FindOne(ctx, bson.M{"prn": accountPrn}).Decode(&profile)
+	if err != nil && err != mongo.ErrNoDocuments {
+		return profile, err
+	}
+
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err = col.UpdateOne(
+		ctx,
+		bson.M{"prn": accountPrn},
+		bson.M{"$set": bson.M{
+			"meta": metas,
+		}},
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	profile.Meta = metas
+	return profile, nil
 }

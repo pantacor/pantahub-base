@@ -53,9 +53,7 @@ func (a *App) handlePostProfile(w rest.ResponseWriter, r *rest.Request) {
 	content, _ := ioutil.ReadAll(r.Body)
 	r.Body.Close()
 
-	payload := &UpdateableProfile{
-		Picture: "",
-	}
+	payload := &UpdateableProfile{}
 	err := json.Unmarshal(content, payload)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Update: "+err.Error(), http.StatusInternalServerError)
@@ -71,6 +69,7 @@ func (a *App) handlePostProfile(w rest.ResponseWriter, r *rest.Request) {
 	newProfile := &Profile{
 		UpdateableProfile: payload,
 	}
+
 	profile, err := a.updateProfile(accountPrn, newProfile)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Update: "+err.Error(), http.StatusInternalServerError)

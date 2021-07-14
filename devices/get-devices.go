@@ -26,6 +26,7 @@ import (
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/accounts/accountsdata"
+	"gitlab.com/pantacor/pantahub-base/profiles"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
@@ -323,6 +324,9 @@ func (a *App) handleGetDevice(w rest.ResponseWriter, r *rest.Request) {
 				return
 			}
 		}
+
+		profileMeta, _ := a.getProfileMetaData(device.Owner)
+		device.UserMeta = utils.MergeMaps(profileMeta, device.UserMeta)
 		device.OwnerNick = ownerAccount.Nick
 	}
 
@@ -353,4 +357,21 @@ func (a *App) GetUserAccountByNick(nick string) (accounts.Account, error) {
 		}
 	}
 	return account, nil
+}
+
+func (a *App) getProfileMetaData(prn string) (map[string]interface{}, error) {
+	profile := &profiles.Profile{
+		Meta: map[string]interface{}{},
+	}
+	queryOptions := options.FindOneOptions{}
+	queryOptions.Projection = bson.M{
+		"meta": 1,
+	}
+
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_profiles")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := collection.FindOne(ctx, bson.M{"prn": prn}, &queryOptions).Decode(profile)
+	return profile.Meta, err
 }
