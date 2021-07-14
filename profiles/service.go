@@ -117,6 +117,24 @@ func New(jwtMiddleware *jwt.JWTMiddleware,
 			),
 		),
 		rest.Get(
+			"/config/meta",
+			rest.WrapMiddlewares(
+				[]rest.Middleware{
+					utils.InitScopeFilterMiddleware(readProfileScopes),
+				},
+				app.handleGetGlobalMeta,
+			),
+		),
+		rest.Put(
+			"/config/meta",
+			rest.WrapMiddlewares(
+				[]rest.Middleware{
+					utils.InitScopeFilterMiddleware(readProfileScopes),
+				},
+				app.handlePutGlobalMeta,
+			),
+		),
+		rest.Get(
 			"/#nick",
 			rest.WrapMiddlewares(
 				[]rest.Middleware{

@@ -88,3 +88,52 @@ func CalcBinarySize(data string) int {
 
 	return (l*3 - eq) / 4
 }
+
+// MergeMaps merge two maps overiding what is in the first map with the second one
+func MergeMaps(base map[string]interface{}, overwrite map[string]interface{}) map[string]interface{} {
+	if base == nil && overwrite != nil {
+		return overwrite
+	}
+
+	if overwrite == nil && base != nil {
+		return base
+	}
+
+	result := map[string]interface{}{}
+
+	for k, v := range base {
+		result[k] = v
+	}
+
+	for k, v := range overwrite {
+		result[k] = v
+	}
+
+	return result
+}
+
+// MergeDefaultProjection merge projection with required values
+func MergeDefaultProjection(p map[string]interface{}) map[string]interface{} {
+	inclusionProjection := false
+	for _, val := range p {
+		if val == 1 {
+			inclusionProjection = true
+			break
+		}
+	}
+
+	projection := map[string]interface{}{}
+	if inclusionProjection {
+		projection["_id"] = 1
+		projection["created_at"] = 1
+		projection["updated_at"] = 1
+		projection["deleted_at"] = 1
+		projection["owner"] = 1
+	}
+
+	for key, val := range p {
+		projection[key] = val
+	}
+
+	return projection
+}
