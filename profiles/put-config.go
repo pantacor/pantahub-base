@@ -1,4 +1,4 @@
-// Copyright 2020  Pantacor Ltd.
+// Copyright 2021  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,42 +23,36 @@ import (
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
 
-// handleGetProfile Get a user profile by user ID
-// @Summary Get a user profile by user ID
-// Public/Private Profile access logic:
-// 1.Check if the user have an active profile or not.
-// 2.Check if the user have Public devices or not
-// 3.If (1) is FALSE && (2) is TRUE then create a private profile for the user.
-// 4.If the user have private profile but have public devices then return only "nick" field as api response.
-// 5.If the user have private profile and have no public devices then return error api response.
-// 6.If the user have public profile but have no public devices then Mark the profile as private and return error api response
-// 7.if the user have public profile then return all the profile details as api response
-// @Description Get a user profile by user ID
+// handlePutGlobalMeta Get user profile global meta
+// @Summary Get user profile global meta
+// @Description Get user profile global meta
 // @Accept  json
 // @Produce  json
 // @Security ApiKeyAuth
 // @Tags user
-// @Param id path string true "ID"
-// @Success 200 {array} Profile
+// @Param body body map[string]interface{} true "Global meta"
+// @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} utils.RError
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
-// @Router /profiles/{id} [get]
-func (a *App) handleGetProfile(w rest.ResponseWriter, r *rest.Request) {
-	accountNick := r.PathParam("nick")
-	var tokenOwner string
+// @Router /profiles/metas [put]
+func (a *App) handlePutGlobalMeta(w rest.ResponseWriter, r *rest.Request) {
+	metas := map[string]interface{}{}
+	r.DecodeJsonPayload(&metas)
+	globalMeta := utils.BsonQuoteMap(&metas)
+
 	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
 	if !ok {
 		utils.RestErrorWrapper(w, "Token owner can't be defined", http.StatusInternalServerError)
 		return
 	}
-	tokenOwner, ok = jwtPayload.(jwtgo.MapClaims)["prn"].(string)
+	tokenOwner, ok := jwtPayload.(jwtgo.MapClaims)["prn"].(string)
 	if !ok {
 		utils.RestErrorWrapper(w, "Token owner can't be defined", http.StatusInternalServerError)
 		return
 	}
 
-	account, err := a.getUserAccount(accountNick, "")
+	account, err := a.getUserAccount(tokenOwner, "prn")
 	if err != nil {
 		switch err.(type) {
 		default:
@@ -73,7 +67,6 @@ func (a *App) handleGetProfile(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	// Make a new private profile if user have no profile & have public devices
 	if !haveProfile {
 		_, err := a.MakeUserProfile(account, nil)
 		if err != nil {
@@ -82,22 +75,16 @@ func (a *App) handleGetProfile(w rest.ResponseWriter, r *rest.Request) {
 		}
 	}
 
-	profile, err := a.getProfile(account.Prn, nil)
+	if account.Prn != tokenOwner {
+		utils.RestErrorWrapperUser(w, err.Error(), "Only owners can write profile", http.StatusForbidden)
+		return
+	}
+
+	profile, err := a.updateProfileMeta(account.Prn, globalMeta)
 	if err != nil {
 		utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
 		return
 	}
 
-	if !profile.Public && account.Prn != tokenOwner {
-		utils.RestErrorWrapperUser(w, err.Error(), "Profile is not public", http.StatusForbidden)
-		return
-	}
-
-	if account.Prn == tokenOwner {
-		profile.Email = account.Email
-	}
-
-	profile.Nick = account.Nick
-
-	w.WriteJson(profile)
+	w.WriteJson(utils.BsonUnquoteMap(&profile.Meta))
 }

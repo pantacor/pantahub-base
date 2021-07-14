@@ -57,10 +57,10 @@ const (
 
 type tokenResponse struct {
 	Token       string `json:"token"`
-	RedirectURI string `json:"redirect_uri"`
-	State       string `json:"state"`
-	TokenType   string `json:"token_type"`
-	Scopes      string `json:"scopes"`
+	RedirectURI string `json:"redirect_uri,omitempty"`
+	State       string `json:"state,omitempty"`
+	TokenType   string `json:"token_type,omitempty"`
+	Scopes      string `json:"scopes,omitempty"`
 }
 
 // App define auth rest application

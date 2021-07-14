@@ -49,14 +49,10 @@ func (a *App) getTokenUsingPassword(writer rest.ResponseWriter, r *rest.Request)
 	}
 
 	var scopes []string
-	if payload.Scope != "" && (payload.Username == "" || payload.Username == accountsdata.AnonAccountDefaultUsername) {
+	if payload.Scope != "" && payload.Username == accountsdata.AnonAccountDefaultUsername {
 		scopes = utils.ScopeStringFilterBy(strings.Fields(payload.Scope), ".readonly", "")
 	} else {
 		scopes = utils.ScopeStringFilterBy(strings.Fields(payload.Scope), "", "")
-	}
-
-	if len(scopes) > 0 && payload.Username == "" {
-		payload.Username = accountsdata.AnonAccountDefaultUsername
 	}
 
 	if payload.Username != accountsdata.AnonAccountDefaultUsername && !a.jwtMiddleware.Authenticator(payload.Username, payload.Password) {
@@ -102,9 +98,7 @@ func (a *App) getTokenUsingPassword(writer rest.ResponseWriter, r *rest.Request)
 	}
 
 	writer.WriteJson(tokenResponse{
-		Token:     tokenString,
-		TokenType: "bearer",
-		Scopes:    claims["scopes"].(string),
+		Token: tokenString,
 	})
 
 }

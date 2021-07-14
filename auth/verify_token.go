@@ -32,9 +32,6 @@ type requestPayload struct {
 	Signature  string `json:"signature"`
 }
 
-// responsePayload response to the verify token request
-type responsePayload struct{}
-
 // verifyToken Verify device token from TPM device validation
 // @Summary Verify device token from TPM device validation
 // @Description Verify device token from TPM device validation
@@ -47,7 +44,7 @@ type responsePayload struct{}
 // @Failure 400 {object} utils.RError
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
-// @Router /devices/register [post]
+// @Router /auth/signature/verify [post]
 func (a *App) verifyToken(w rest.ResponseWriter, r *rest.Request) {
 	payload := &requestPayload{}
 	r.DecodeJsonPayload(payload)
