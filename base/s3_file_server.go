@@ -110,7 +110,7 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	defer r.Body.Close()
 
-	tempName := finalName + "_part"
+	tempName := path.Join(path.Dir(finalName), "_part"+path.Base(finalName))
 	preSignedURL, err := s.s3.UploadURL(tempName)
 	if err != nil {
 		log.Printf("ERROR: failed to generate upload url, %v\n", err)
@@ -137,6 +137,15 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				break
 			}
+		}
+
+		sha := hasher.Sum(nil)
+		shaS := hex.EncodeToString(sha)
+
+		if shaS != objClaims.Sha {
+			log.Println("WARNING: file upload sha mismatch with claim: " + shaS + " != " + objClaims.Sha)
+			w.WriteHeader(http.StatusBadRequest)
+			return
 		}
 
 	} else {
@@ -169,23 +178,28 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		s.s3.Rename(tempName, finalName)
 		defer s3resp.Body.Close()
-
 		if s3resp.StatusCode != http.StatusOK {
 			log.Println("ERROR: unexpected response from remote S3 server")
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-	}
 
-	sha := hasher.Sum(nil)
-	shaS := hex.EncodeToString(sha)
+		sha := hasher.Sum(nil)
+		shaS := hex.EncodeToString(sha)
 
-	if shaS != objClaims.Sha {
-		log.Println("WARNING: file upload sha mismatch with claim: " + shaS + " != " + objClaims.Sha)
-		w.WriteHeader(http.StatusBadRequest)
-		return
+		if shaS != objClaims.Sha {
+			log.Println("WARNING: file upload sha mismatch with claim: " + shaS + " != " + objClaims.Sha)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		err = s.s3.Rename(tempName, finalName)
+		if err != nil {
+			log.Printf("ERROR: failed to commit s3 upload, %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 	}
 
 	w.WriteHeader(http.StatusOK)
