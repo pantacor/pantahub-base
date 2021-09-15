@@ -8,9 +8,11 @@ require (
 	github.com/ant0ine/go-json-rest v3.3.2+incompatible
 	github.com/asaskevich/govalidator v0.0.0-20200907205600-7a23bdc65eef
 	github.com/aws/aws-sdk-go v1.34.28
+	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
 	github.com/cloudflare/cfssl v1.5.0
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/dustinkirkland/golang-petname v0.0.0-20191129215211-8e5a1ed0cff0
+	github.com/facebookgo/ensure v0.0.0-20200202191622-63f1cf65ac4c // indirect
 	github.com/fatih/structs v1.1.0
 	github.com/fluent/fluent-logger-golang v1.5.0
 	github.com/gibson042/canonicaljson-go v1.0.3
@@ -25,7 +27,9 @@ require (
 	github.com/swaggo/swag v1.6.9
 	github.com/tiaguinho/gosoap v1.4.4
 	github.com/tinylib/msgp v1.1.5 // indirect
-	go.mongodb.org/mongo-driver v1.4.3
+	gitlab.com/pantacor/pantahub-gc v0.0.0-20200721025650-0a416f4322ef
+	gitlab.com/pantacor/pantahub-testharness v0.0.0-20190311155708-e39aa76a7650
+	go.mongodb.org/mongo-driver v1.5.1
 	golang.org/x/crypto v0.0.0-20201012173705-84dcc777aaee
 	golang.org/x/oauth2 v0.0.0-20190226205417-e64efc72b421
 	gopkg.in/mailgun/mailgun-go.v1 v1.1.1
