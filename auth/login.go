@@ -56,7 +56,7 @@ func (a *App) getTokenUsingPassword(writer rest.ResponseWriter, r *rest.Request)
 	}
 
 	if payload.Username != accountsdata.AnonAccountDefaultUsername && !a.jwtMiddleware.Authenticator(payload.Username, payload.Password) {
-		utils.RestErrorWrapper(writer, "Authentication Failed", http.StatusBadRequest)
+		utils.RestErrorWrapper(writer, "Authentication Failed", http.StatusUnauthorized)
 		return
 	}
 
