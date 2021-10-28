@@ -39,6 +39,20 @@ type S3FileServer struct {
 	s3 s3.S3
 }
 
+// WriteCounter counts the number of bytes written to it.
+type WriteCounter struct {
+	Total int64 // Total # of bytes written
+}
+
+// Write implements the io.Writer interface.
+//
+// Always completes and never returns an error.
+func (wc *WriteCounter) Write(p []byte) (int, error) {
+	n := len(p)
+	wc.Total += int64(n)
+	return n, nil
+}
+
 func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	dirName := filepath.Dir(r.URL.Path)
 	fileBase := filepath.Base(r.URL.Path)
@@ -120,7 +134,9 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// avoid body close for later sha256 calc
 	hasher := sha256.New()
-	s3Body := io.TeeReader(r.Body, hasher)
+	countWriter := &WriteCounter{}
+	intermediateBody := io.TeeReader(r.Body, hasher)
+	s3Body := io.TeeReader(intermediateBody, countWriter)
 
 	// storageID SHAONLY means that we only validate the sha for user
 	// we introduced this to keep old pvr clients backward compatible
@@ -143,7 +159,7 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		shaS := hex.EncodeToString(sha)
 
 		if shaS != objClaims.Sha {
-			log.Println("WARNING: file upload sha mismatch with claim: " + shaS + " != " + objClaims.Sha)
+			log.Printf("WARNING: file upload sha mismatch with claim: "+shaS+" != "+objClaims.Sha+" readbytes=%d\n", countWriter.Total)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -189,7 +205,7 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		shaS := hex.EncodeToString(sha)
 
 		if shaS != objClaims.Sha {
-			log.Println("WARNING: file upload sha mismatch with claim: " + shaS + " != " + objClaims.Sha)
+			log.Printf("WARNING: file upload sha mismatch with claim: "+shaS+" != "+objClaims.Sha+" readbytes=%d\n", countWriter.Total)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
