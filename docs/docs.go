@@ -962,6 +962,60 @@ var doc = `{
                 }
             }
         },
+        "/auth/signature/verify": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Verify device token from TPM device validation",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "devices"
+                ],
+                "summary": "Verify device token from TPM device validation",
+                "parameters": [
+                    {
+                        "description": "Token payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/auth.requestPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/token": {
             "post": {
                 "security": [
@@ -1738,7 +1792,7 @@ var doc = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Verify device token from TPM device validation",
+                "description": "Register a new device using the IDevID csr",
                 "consumes": [
                     "application/json"
                 ],
@@ -1748,21 +1802,24 @@ var doc = `{
                 "tags": [
                     "devices"
                 ],
-                "summary": "Verify device token from TPM device validation",
+                "summary": "Register a new device using the IDevID csr",
                 "parameters": [
                     {
-                        "description": "Token payload",
+                        "description": "Register Request",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/auth.requestPayload"
+                            "$ref": "#/definitions/devices.registerReq"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": ""
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/devices.Device"
+                        }
                     },
                     "400": {
                         "description": "Bad Request",
@@ -3164,10 +3221,8 @@ var doc = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/profiles.Profile"
-                            }
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     },
                     "400": {
@@ -3239,6 +3294,110 @@ var doc = `{
                     },
                     "500": {
                         "description": "Error processing request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/profiles/metas": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get user profile global meta",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user"
+                ],
+                "summary": "Get user profile global meta",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get user profile global meta",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user"
+                ],
+                "summary": "Get user profile global meta",
+                "parameters": [
+                    {
+                        "description": "Global meta",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/utils.RError"
                         }
@@ -3830,6 +3989,68 @@ var doc = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/trails.PvrRemote"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/trails/{id}/steps/{rev}/cancel": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Cancel a step that is in NEW state.\nOnly owner can cancel steps and only those steps still in NEW state.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trails"
+                ],
+                "summary": "Cancel a step that is in NEW state.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID|NICK|PRN",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "REV_ID",
+                        "name": "rev",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/trails.StepProgress"
                         }
                     },
                     "400": {
@@ -5173,6 +5394,10 @@ var doc = `{
                 "location": {
                     "type": "string"
                 },
+                "meta": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
                 "nick": {
                     "type": "string"
                 },
@@ -5533,6 +5758,9 @@ var doc = `{
                 },
                 "error": {
                     "type": "string"
+                },
+                "incident": {
+                    "type": "integer"
                 },
                 "msg": {
                     "type": "string"

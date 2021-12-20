@@ -481,6 +481,9 @@ definitions:
         type: string
       location:
         type: string
+      meta:
+        additionalProperties: true
+        type: object
       nick:
         type: string
       picture:
@@ -728,6 +731,8 @@ definitions:
         type: integer
       error:
         type: string
+      incident:
+        type: integer
       msg:
         type: string
     type: object
@@ -1350,6 +1355,40 @@ paths:
       summary: Create a new (anon) session account
       tags:
       - auth
+  /auth/signature/verify:
+    post:
+      consumes:
+      - application/json
+      description: Verify device token from TPM device validation
+      parameters:
+      - description: Token payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.requestPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ""
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Verify device token from TPM device validation
+      tags:
+      - devices
   /auth/token:
     post:
       consumes:
@@ -2241,19 +2280,21 @@ paths:
     post:
       consumes:
       - application/json
-      description: Verify device token from TPM device validation
+      description: Register a new device using the IDevID csr
       parameters:
-      - description: Token payload
+      - description: Register Request
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/auth.requestPayload'
+          $ref: '#/definitions/devices.registerReq'
       produces:
       - application/json
       responses:
         "200":
-          description: ""
+          description: OK
+          schema:
+            $ref: '#/definitions/devices.Device'
         "400":
           description: Bad Request
           schema:
@@ -2268,7 +2309,7 @@ paths:
             $ref: '#/definitions/utils.RError'
       security:
       - ApiKeyAuth: []
-      summary: Verify device token from TPM device validation
+      summary: Register a new device using the IDevID csr
       tags:
       - devices
   /devices/tokens:
@@ -2769,9 +2810,8 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/profiles.Profile'
-            type: array
+            additionalProperties: true
+            type: object
         "400":
           description: Bad Request
           schema:
@@ -2859,6 +2899,73 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Get a user profile by user ID
+      tags:
+      - user
+  /profiles/metas:
+    get:
+      consumes:
+      - application/json
+      description: Get user profile global meta
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get user profile global meta
+      tags:
+      - user
+    put:
+      consumes:
+      - application/json
+      description: Get user profile global meta
+      parameters:
+      - description: Global meta
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get user profile global meta
       tags:
       - user
   /subscriptions:
@@ -3205,6 +3312,48 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Get pvr remote information for a trail revision
+      tags:
+      - trails
+  /trails/{id}/steps/{rev}/cancel:
+    put:
+      consumes:
+      - application/json
+      description: |-
+        Cancel a step that is in NEW state.
+        Only owner can cancel steps and only those steps still in NEW state.
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: REV_ID
+        in: path
+        name: rev
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/trails.StepProgress'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Cancel a step that is in NEW state.
       tags:
       - trails
   /trails/{id}/steps/{rev}/meta:
