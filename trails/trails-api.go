@@ -45,7 +45,9 @@
 package trails
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -424,7 +426,11 @@ func GetStateObjects(
 		}
 		sha, found := v.(string)
 		if !found {
-			return nil, errors.New("state_object: Object is not a string[sha:" + sha + "]")
+			statejson, err := json.Marshal(state)
+			if err != nil {
+				return nil, fmt.Errorf("state_object: state can not be parse to json -- %w", err)
+			}
+			return nil, fmt.Errorf("state_object: Object is not a string[%s: %s] \n state details: \n %s", key, sha, statejson)
 		}
 
 		object, err := objectsApp.ResolveObjectWithLinks(owner, sha, autoLink)
