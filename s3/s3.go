@@ -30,11 +30,16 @@ type S3 interface {
 	Rename(oldKey, newKey string) error
 	UploadURL(key string) (string, error)
 	DownloadURL(key string) (string, error)
+	GetConnectionParams() ConnectionParameters
 }
 
 type s3impl struct {
 	connectionParams ConnectionParameters
 	session          *s3.S3
+}
+
+func (s *s3impl) GetConnectionParams() ConnectionParameters {
+	return s.connectionParams
 }
 
 func (s *s3impl) Delete(key string) error {

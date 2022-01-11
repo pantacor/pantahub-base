@@ -16,15 +16,34 @@
 
 package s3
 
-import "log"
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+)
 
 // ConnectionParameters s3 connection parameters
 type ConnectionParameters struct {
-	AccessKey string
-	SecretKey string
-	Region    string
-	Bucket    string
-	Endpoint  string
+	AccessKey string `json:"access_key"`
+	SecretKey string `json:"secret_key"`
+	Region    string `json:"region"`
+	Bucket    string `json:"bucket"`
+	Endpoint  string `json:"endpoint"`
+}
+
+// GetCPFromJsonByRegion get from the json configuration string the configuration parameters
+func GetCPFromJsonByRegion(src, region string) (*ConnectionParameters, error) {
+	connections := map[string]ConnectionParameters{}
+	if err := json.Unmarshal([]byte(src), &connections); err != nil {
+		return nil, err
+	}
+
+	value, ok := connections[region]
+	if !ok {
+		return nil, fmt.Errorf("configuration not found for region %s", region)
+	}
+
+	return &value, nil
 }
 
 // IsValid check connection parameters to be valid
