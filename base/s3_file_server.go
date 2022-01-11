@@ -18,25 +18,58 @@ package base
 
 import (
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
 	"net/url"
 	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/s3"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gopkg.in/resty.v1"
 )
+
+// selectedRegionConfig selected region configuration
+var selectedRegionConfig *s3.ConnectionParameters
+
+// ApiRegion k8s api region
+var apiRegion string
 
 // S3FileServer s3 file server definition
 type S3FileServer struct {
-	s3 s3.S3
+	s3       s3.S3
+	regionS3 s3.S3
+}
+
+// NewS3FileServer create new s3 file server
+func NewS3FileServer() *S3FileServer {
+	connParams := s3.ConnectionParameters{
+		AccessKey: utils.GetEnv(utils.EnvPantahubS3AccessKeyID),
+		SecretKey: utils.GetEnv(utils.EnvPantahubS3SecretAccessKeyID),
+		Region:    utils.GetEnv(utils.EnvPantahubS3Region),
+		Bucket:    utils.GetEnv(utils.EnvPantahubS3Bucket),
+		Endpoint:  utils.GetEnv(utils.EnvPantahubS3Endpoint),
+	}
+
+	server := &S3FileServer{
+		s3: s3.New(connParams),
+	}
+
+	if selectedRegionConfig != nil {
+		server.regionS3 = s3.New(*selectedRegionConfig)
+	}
+
+	return server
 }
 
 // WriteCounter counts the number of bytes written to it.
@@ -86,18 +119,44 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Disposition", "attachment; filename=\""+objClaims.DispositionName+"\"")
 		w.Header().Add("Content-Length", fmt.Sprintf("%d", objClaims.Size))
 
-		downloadURL, err := s.s3.DownloadURL(finalName)
-		if err != nil {
-			log.Printf("ERROR: getting download url, %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
+		var s3resp *http.Response
+		downloadUrl := ""
+		region := ""
+
+		// If there is a selected region config load the downloadUrl
+		if selectedRegionConfig != nil {
+			downloadUrl, err = s.regionS3.DownloadURL(finalName)
+			if err != nil {
+				log.Printf("ERROR: getting download url, %v", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			s3resp, err = http.Get(downloadUrl)
+			if err != nil {
+				log.Printf("ERROR: requesting download file, %v\n", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			region = s.regionS3.GetConnectionParams().Region
 		}
 
-		s3resp, err := http.Get(downloadURL)
-		if err != nil {
-			log.Printf("ERROR: requesting download file, %v\n", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
+		// If the object is not found on the selected region try in default region
+		if downloadUrl == "" || (s3resp != nil && s3resp.StatusCode == http.StatusNotFound) {
+			downloadUrl, err = s.s3.DownloadURL(finalName)
+			if err != nil {
+				log.Printf("ERROR: getting download url, %v", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			s3resp, err = http.Get(downloadUrl)
+			if err != nil {
+				log.Printf("ERROR: requesting download file, %v\n", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			region = s.s3.GetConnectionParams().Region
 		}
 
 		if s3resp.StatusCode != http.StatusOK {
@@ -106,6 +165,7 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		w.Header().Add("PantahubCallTraceRegion", fmt.Sprintf("api=%s; data:%s", apiRegion, region))
 		io.CopyN(w, s3resp.Body, objClaims.Size)
 		return
 	}
@@ -219,20 +279,96 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	return
 }
 
-// NewS3FileServer create new s3 file server
-func NewS3FileServer() *S3FileServer {
-	connParams := s3.ConnectionParameters{
-		AccessKey: utils.GetEnv(utils.EnvPantahubS3AccessKeyID),
-		SecretKey: utils.GetEnv(utils.EnvPantahubS3SecretAccessKeyID),
-		Region:    utils.GetEnv(utils.EnvPantahubS3Region),
-		Bucket:    utils.GetEnv(utils.EnvPantahubS3Bucket),
-		Endpoint:  utils.GetEnv(utils.EnvPantahubS3Endpoint),
+func LoadDynamicS3ByRegion() error {
+	if utils.GetEnv(utils.EnvPantahubS3RegionSelection) != "k8s" ||
+		utils.GetEnv(utils.EnvPantahubStorageDriver) != "s3" {
+		return nil
 	}
 
-	return &S3FileServer{
-		s3: s3.New(connParams),
+	fmt.Println("parsing s3 from k8s -- stating")
+
+	token, err := ioutil.ReadFile("/run/secrets/kubernetes.io/serviceaccount/token")
+	if err != nil {
+		return fmt.Errorf("token file can't be read %s -- %s", "/run/secrets/kubernetes.io/serviceaccount/token", err)
 	}
+
+	if utils.GetEnv(utils.EnvPantahubS3RegionalConfigMap) == "{}" &&
+		utils.GetEnv(utils.EnvK8sNodeName) == "" &&
+		utils.GetEnv(utils.EnvK8sApiUrl) == "" {
+		return fmt.Errorf(
+			"some environment variables are missing in order to start the auto region selection: \n %s: %s \n %s: %s \n %s: %s",
+			utils.EnvPantahubS3RegionalConfigMap, utils.GetEnv(utils.EnvPantahubS3RegionalConfigMap),
+			utils.EnvK8sNodeName, utils.GetEnv(utils.EnvK8sNodeName),
+			utils.EnvK8sApiUrl, utils.GetEnv(utils.EnvK8sApiUrl),
+		)
+	}
+
+	response := map[string]interface{}{}
+
+	client := resty.New()
+	client.SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	res, err := client.R().
+		SetHeader("Authorization", "Bearer "+string(token)).
+		Get(fmt.Sprintf("%s/api/v1/nodes/%s", utils.GetEnv(utils.EnvK8sApiUrl), utils.GetEnv(utils.EnvK8sNodeName)))
+	if err != nil {
+		return err
+	}
+
+	if err = json.Unmarshal(res.Body(), &response); err != nil {
+		return err
+	}
+
+	metadata, ok := response["metadata"].(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("can not find metada on k8s response: %s", res.Body())
+	}
+
+	labels, ok := metadata["labels"].(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("can not find labels on k8s response: %s", res.Body())
+	}
+
+	apiRegion = ""
+	for key := range labels {
+		if strings.Contains(key, "region-") {
+			values := strings.SplitAfter(key, "node-role.kubernetes.io/region-")
+			if len(values) == 2 {
+				apiRegion = values[1]
+			}
+		}
+	}
+
+	if apiRegion == "" {
+		fmt.Printf("parsing s3 from k8s -- \"node-role.kubernetes.io/region-*\" is not present on node metadata.labels, defaulting to %s \n", utils.GetEnv(utils.EnvPantahubS3Region))
+		fmt.Printf("parsing s3 from k8s -- %s, defaulting to %s \n", utils.EnvPantahubS3Endpoint, utils.GetEnv(utils.EnvPantahubS3Endpoint))
+		return nil
+	} else {
+		fmt.Printf("parsing s3 from k8s -- k8s cluster running in region %s \n", apiRegion)
+	}
+
+	config, err := s3.GetCPFromJsonByRegion(utils.GetEnv(utils.EnvPantahubS3RegionalConfigMap), apiRegion)
+	if err != nil {
+		fmt.Printf("parsing s3 from k8s -- can't parse PANTAHUB_S3_CONFIG_MAP, defaulting to %s \n", utils.GetEnv(utils.EnvPantahubS3Endpoint))
+		fmt.Printf("parsing s3 from k8s -- region, defaulting to %s \n", utils.GetEnv(utils.EnvPantahubS3Region))
+		fmt.Printf("parsing s3 from k8s -- r%s \n", err)
+		return nil
+	}
+
+	if config == nil {
+		fmt.Printf("parsing s3 from k8s -- The PANTAHUB_S3_CONFIG_MAP is empty or doesn't have configuration for %s \n", apiRegion)
+		return nil
+	}
+
+	selectedRegionConfig = config
+
+	fmt.Println("parsing s3 from k8s -- success")
+	fmt.Printf("parsing s3 from k8s -- selected storage: %s \n", selectedRegionConfig.Endpoint)
+
+	return nil
+}
+
+func GetSelectedRegionConfig() *s3.ConnectionParameters {
+	return selectedRegionConfig
 }
