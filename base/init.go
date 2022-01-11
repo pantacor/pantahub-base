@@ -50,25 +50,29 @@ import (
 
 // DoInit init pantahub REST Aplication
 func DoInit() {
+	if err := LoadDynamicS3ByRegion(); err != nil {
+		panic(err)
+	}
+
 	phAuth := utils.GetEnv(utils.EnvPantahubAuth)
 	jwtSecretBase64 := utils.GetEnv(utils.EnvPantahubJWTAuthSecret)
 	jwtSecretPem, err := base64.StdEncoding.DecodeString(jwtSecretBase64)
 	if err != nil {
-		panic(fmt.Errorf("No valid JWT secret (PANTAHUB_JWT_AUTH_SECRET) in base64 format: %s", err.Error()))
+		panic(fmt.Errorf("no valid JWT secret (PANTAHUB_JWT_AUTH_SECRET) in base64 format: %s", err.Error()))
 	}
 	jwtSecret, err := jwtgo.ParseRSAPrivateKeyFromPEM(jwtSecretPem)
 	if err != nil {
-		panic(fmt.Errorf("No valid JWT secret (PANTAHUB_JWT_AUTH_SECRET); must be rsa private key in PEM format: %s", err.Error()))
+		panic(fmt.Errorf("no valid JWT secret (PANTAHUB_JWT_AUTH_SECRET); must be rsa private key in PEM format: %s", err.Error()))
 	}
 
 	jwtPubBase64 := utils.GetEnv(utils.EnvPantahubJWTAuthPub)
 	jwtPubPem, err := base64.StdEncoding.DecodeString(jwtPubBase64)
 	if err != nil {
-		panic(fmt.Errorf("No valid JWT PUB KEY (PANTAHUB_JWT_AUTH_PUB) in base64 format: %s", err.Error()))
+		panic(fmt.Errorf("no valid JWT PUB KEY (PANTAHUB_JWT_AUTH_PUB) in base64 format: %s", err.Error()))
 	}
 	jwtPub, err := jwtgo.ParseRSAPublicKeyFromPEM(jwtPubPem)
 	if err != nil {
-		panic(fmt.Errorf("No valid JWT pub key (PANTAHUB_JWT_AUTH_PUB); must be rsa private key in PEM format: %s", err.Error()))
+		panic(fmt.Errorf("no valid JWT pub key (PANTAHUB_JWT_AUTH_PUB); must be rsa private key in PEM format: %s", err.Error()))
 	}
 
 	mongoClient, _ := utils.GetMongoClient()
@@ -211,7 +215,7 @@ func DoInit() {
 	{
 		cronJobTimeout, err := strconv.Atoi(utils.GetEnv(utils.EnvCronJobTimeout))
 		if err != nil {
-			panic(fmt.Errorf("Error Parsing CRON_JOB_TIMEOUT: %s", err.Error()))
+			panic(fmt.Errorf("error Parsing CRON_JOB_TIMEOUT: %s", err.Error()))
 		}
 
 		app := cron.New(&jwt.JWTMiddleware{

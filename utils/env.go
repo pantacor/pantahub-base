@@ -136,6 +136,12 @@ const (
 	// default: "NA"
 	EnvK8SNamespace = "K8S_NAMESPACE"
 
+	// EnvK8sNodeName k8s node name
+	EnvK8sNodeName = "K8S_NODE_NAME"
+
+	// EnvK8sApiUrl k8s api url to get node information
+	EnvK8sApiUrl = "K8S_API_URL"
+
 	// EnvHostName Set HOSTNAME info
 	// default: "localhost"
 	EnvHostName = "HOSTNAME"
@@ -244,11 +250,17 @@ const (
 	// EnvPantahubS3Region region where to store objects
 	EnvPantahubS3Region = "PANTAHUB_S3_REGION"
 
+	// EnvPantahubS3RegionSelection way to select the region
+	EnvPantahubS3RegionSelection = "PANTAHUB_S3_REGION_SELECTION"
+
 	// EnvPantahubS3Bucket bucket where to store objects
 	EnvPantahubS3Bucket = "PANTAHUB_S3_BUCKET"
 
 	// EnvPantahubS3Endpoint enpoint of s3 server
 	EnvPantahubS3Endpoint = "PANTAHUB_S3_ENDPOINT"
+
+	// EnvPantahubS3RegionalConfigMap s3 automatic selection variables
+	EnvPantahubS3RegionalConfigMap = "PANTAHUB_S3_CONFIG_MAP"
 
 	// EnvPantahubStoragePath for backing storage
 	// default: ../local-s3/
@@ -349,6 +361,8 @@ var defaultEnvs = map[string]string{
 
 	// K8S info
 	EnvK8SNamespace: "NA",
+	EnvK8sNodeName:  "",
+	EnvK8sApiUrl:    "https://kubernetes.default:443",
 
 	// HOSTNAME
 	EnvHostName: "localhost",
@@ -421,7 +435,9 @@ var defaultEnvs = map[string]string{
 	EnvPantahubS3Bucket: "pantahub",
 
 	// enpoint of s3 server
-	EnvPantahubS3Endpoint: "",
+	EnvPantahubS3Endpoint:          "",
+	EnvPantahubS3RegionalConfigMap: "{}",
+	EnvPantahubS3RegionSelection:   "",
 
 	// object storage path (when using "local" driver)
 	EnvPantahubStoragePath: "/",
