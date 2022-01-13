@@ -157,5 +157,6 @@ func (a *App) handlePostDevice(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
+	newDevice.UserMeta = utils.BsonUnquoteMap(&newDevice.UserMeta)
 	w.WriteJson(newDevice)
 }

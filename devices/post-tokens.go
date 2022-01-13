@@ -86,6 +86,9 @@ func (a *App) handlePostTokens(w rest.ResponseWriter, r *rest.Request) {
 	req.ID = primitive.NewObjectID()
 	req.Prn = utils.IDGetPrn(req.ID, "devices-tokens")
 
+	if req.DefaultUserMeta != nil {
+		req.DefaultUserMeta = utils.BsonQuoteMap(&req.DefaultUserMeta)
+	}
 	if req.Nick == "" {
 		req.Nick = petname.Generate(3, "_")
 	}
