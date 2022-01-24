@@ -68,7 +68,7 @@ func (a *App) getBase64AutoTokenInfo(tokenBase64 string) (*autoTokenInfo, error)
 
 	result := autoTokenInfo{}
 	result.Owner = res.Owner
-	result.UserMeta = res.DefaultUserMeta
+	result.UserMeta = utils.BsonQuoteMap(&res.DefaultUserMeta)
 
 	return &result, nil
 }
