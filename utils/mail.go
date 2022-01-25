@@ -202,42 +202,6 @@ func addMedias(message *mailgun.Message) error {
 		return err
 	}
 
-	twitterPng, err := base64.StdEncoding.DecodeString(ImageTwitter)
-	if err != nil {
-		log.Println("error:", err)
-		return err
-	}
-
-	linkedinPng, err := base64.StdEncoding.DecodeString(ImageLinkedin)
-	if err != nil {
-		log.Println("error:", err)
-		return err
-	}
-
-	rdPng, err := base64.StdEncoding.DecodeString(ImageRd)
-	if err != nil {
-		log.Println("error:", err)
-		return err
-	}
-
-	ruPng, err := base64.StdEncoding.DecodeString(ImageRu)
-	if err != nil {
-		log.Println("error:", err)
-		return err
-	}
-
-	redditPng, err := base64.StdEncoding.DecodeString(ImageReddit)
-	if err != nil {
-		log.Println("error:", err)
-		return err
-	}
-
 	message.AddReaderInline("logo.png", ioutil.NopCloser(bytes.NewReader(logoPng)))
-	message.AddReaderInline("twitter.png", ioutil.NopCloser(bytes.NewReader(twitterPng)))
-	message.AddReaderInline("linkedin.png", ioutil.NopCloser(bytes.NewReader(linkedinPng)))
-	message.AddReaderInline("reddit.png", ioutil.NopCloser(bytes.NewReader(redditPng)))
-	message.AddReaderInline("rd.png", ioutil.NopCloser(bytes.NewReader(rdPng)))
-	message.AddReaderInline("ru.png", ioutil.NopCloser(bytes.NewReader(ruPng)))
-
 	return nil
 }
