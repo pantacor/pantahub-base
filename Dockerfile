@@ -1,4 +1,4 @@
-FROM golang:alpine3.11 as builder
+FROM golang:1.18.0-alpine3.15 as builder
 
 ENV GO111MODULE=on
 
@@ -11,7 +11,7 @@ WORKDIR /app/
 COPY . .
 
 RUN go get -d -v ./... \
-    && go get github.com/swaggo/swag/cmd/swag@v1.6.9 && swag init \
+    && go install github.com/swaggo/swag/cmd/swag@v1.6.9 && swag init \
     && go install -v ./...
 
 FROM alpine
