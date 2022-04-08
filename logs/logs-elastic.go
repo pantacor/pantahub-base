@@ -31,13 +31,13 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
-	"strings"
 	"strconv"
+	"strings"
 	"time"
 
+	elastic "github.com/olivere/elastic/v7"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gopkg.in/mgo.v2/bson"
-	elastic "gopkg.in/olivere/elastic.v5"
 	"gopkg.in/resty.v1"
 )
 
@@ -165,7 +165,7 @@ func (s *elasticLogger) unregister(deleteIndex bool) error {
 
 func (s *elasticLogger) getLogs(start int64, page int64, before *time.Time,
 	after *time.Time, query Filters, sort Sorts, cursor bool) (*Pager, error) {
-	queryFmt := fmt.Sprintf(s.elasticIndexPrefix + "-*/pv/_search")
+	queryFmt := fmt.Sprintf(s.elasticIndexPrefix + "-*/_search")
 
 	queryURL, err := url.Parse(queryFmt)
 
@@ -398,7 +398,7 @@ func (s *elasticLogger) postLogs(e []Entry) error {
 
 	for _, v := range e {
 		// write the bulkd op)
-		m := bson.M{"index": bson.M{"_index": index, "_type": "pv"}}
+		m := bson.M{"index": bson.M{"_index": index}}
 		data, err := json.Marshal(&m)
 		if err != nil {
 			return err
@@ -475,12 +475,12 @@ func newElasticLogger() (*elasticLogger, error) {
 
 	defaultLogger.elasticIndexShards, err = strconv.Atoi(utils.GetEnv(utils.EnvPantahubElasticShards))
 	if err != nil {
-		log.Fatal("Elastic logger failed; bad config (must be integer) for "+utils.EnvPantahubElasticShards)
+		log.Fatal("Elastic logger failed; bad config (must be integer) for " + utils.EnvPantahubElasticShards)
 	}
 
 	defaultLogger.elasticIndexReplicas, err = strconv.Atoi(utils.GetEnv(utils.EnvPantahubElasticReplicas))
 	if err != nil {
-		log.Fatal("Elastic logger failed; bad config (must be integer) for "+utils.EnvPantahubElasticReplicas)
+		log.Fatal("Elastic logger failed; bad config (must be integer) for " + utils.EnvPantahubElasticReplicas)
 	}
 
 	if defaultLogger.elasticBaseURL == "" {
@@ -501,40 +501,35 @@ func newElasticLogger() (*elasticLogger, error) {
 			"number_of_replicas": defaultLogger.elasticIndexReplicas,
 		},
 		"mappings": bson.M{
-			"pv": bson.M{
-				"_source": bson.M{
-					"enabled": true,
+			"properties": bson.M{
+				"host": bson.M{
+					"type": "keyword",
 				},
-				"properties": bson.M{
-					"host": bson.M{
-						"type": "keyword",
-					},
-					"lvl": bson.M{
-						"type": "keyword",
-					},
-					"plat": bson.M{
-						"type": "keyword",
-					},
-					"src": bson.M{
-						"type": "keyword",
-					},
-					"msg": bson.M{
-						"type": "text",
-					},
-					"timeevent": bson.M{
-						"type":   "date",
-						"format": "strict_date_optional_time||epoch_millis",
-					},
-					"timerecord": bson.M{
-						"type":   "date",
-						"format": "strict_date_optional_time||epoch_millis",
-					},
-					"own": bson.M{
-						"type": "keyword",
-					},
-					"dev": bson.M{
-						"type": "keyword",
-					},
+				"lvl": bson.M{
+					"type": "keyword",
+				},
+				"plat": bson.M{
+					"type": "keyword",
+				},
+				"src": bson.M{
+					"type": "keyword",
+				},
+				"msg": bson.M{
+					"type": "text",
+				},
+				"timeevent": bson.M{
+					"type":   "date",
+					"format": "strict_date_optional_time||epoch_millis",
+				},
+				"timerecord": bson.M{
+					"type":   "date",
+					"format": "strict_date_optional_time||epoch_millis",
+				},
+				"own": bson.M{
+					"type": "keyword",
+				},
+				"dev": bson.M{
+					"type": "keyword",
 				},
 			},
 		},

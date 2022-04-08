@@ -90,10 +90,13 @@ func restErrorWrapperInternal(w rest.ResponseWriter, errorStr, userMsg string, c
 		Code:       code,
 	}
 
-	getLogger().Post("com.pantahub-base.incidents", structs.Map(&rError))
+	err := getLogger().Post("com.pantahub-base.incidents", structs.Map(&rError))
+	if err != nil {
+		log.Println(err)
+	}
 
 	w.WriteHeader(code)
-	err := w.WriteJson(RError{
+	err = w.WriteJson(RError{
 		Error: incidentStr,
 		Msg:   userMsg,
 		Code:  code,

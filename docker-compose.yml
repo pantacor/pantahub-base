@@ -8,10 +8,11 @@ services:
     links:
       - mongo
       - fluentd
-      - elasticsearch
       - localstack
+      - elasticsearch
     volumes:
       - ${PWD}:/go/src/gitlab.com/pantacor/pantahub-base
+      - ${PWD}/k8s_token:/run/secrets/kubernetes.io/serviceaccount/token
     ports:
       - 12365:12365
     env_file:
@@ -34,8 +35,27 @@ services:
 
   elasticsearch:
     container_name: elasticsearch
-    image: docker.elastic.co/elasticsearch/elasticsearch:6.5.4
+    image: docker.elastic.co/elasticsearch/elasticsearch:6.8.13
     environment:
+      - cluster.name=docker-cluster
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+      - xpack.watcher.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    restart: always
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:6.8.13
+    environment:
+      - SERVERNAME=kibana
+      - ELASTICSEARCH_HOSTS=https://elasticsearch:9200
       - cluster.name=docker-cluster
       - bootstrap.memory_lock=true
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
@@ -47,10 +67,10 @@ services:
         soft: -1
         hard: -1
     restart: always
+    depends_on:
+      - elasticsearch
     ports:
-      - "9200:9200"
-      - "9300:9300"
-
+      - "5601:5601"
   localstack:
     image: localstack/localstack:0.9.0
     environment:
