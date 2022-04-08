@@ -14,8 +14,12 @@ RUN wget https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSI
     && rm dockerize-alpine-linux-amd64-$DOCKERIZE_VERSION.tar.gz
 
 # install air
-RUN go get -u github.com/cosmtrek/air
+RUN go install github.com/cosmtrek/air@v1.29.0
 
 WORKDIR /go/src/gitlab.com/pantacor/pantahub-base
+
+COPY . .
+
+RUN go build .
 
 CMD ["dockerize", "-wait", "tcp://mongo:27017", "-wait", "tcp://fluentd:24224", "-wait", "tcp://elasticsearch:9200", "-timeout", "180s", "air", "-d"]
