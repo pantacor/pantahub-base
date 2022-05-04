@@ -96,7 +96,7 @@ type SubscriptionMgo struct {
 	TimeCreated time.Time `json:"time-created" bson:"time-created"`
 
 	// History log in cronological order (earliest first) . Max history is not implemented rightnow..
-	History []SubscriptionMgo `json:"history,omitempty", bson:"history,omitempty"`
+	History []SubscriptionMgo `json:"history,omitempty" bson:"history,omitempty"`
 
 	Attributes map[string]interface{} `json:"attr,omitempty" bson:"attr,omitempty"`
 }
