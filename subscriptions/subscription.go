@@ -10,6 +10,7 @@ package subscriptions
 import (
 	"errors"
 	"math"
+	"strings"
 	"time"
 
 	"gitlab.com/pantacor/pantahub-base/utils"
@@ -23,6 +24,9 @@ const (
 
 	// SubscriptionTypeCancelled canceled subscription
 	SubscriptionTypeCancelled = utils.Prn("prn::subscriptions:CANCELLED")
+
+	// SubscriptionTypeStripe stripe subscription
+	SubscriptionTypeStripe = utils.Prn("prn::subscriptions:stripe")
 
 	// SubscriptionTypeLocked locked subscription
 	SubscriptionTypeLocked = utils.Prn("prn::subscriptions:LOCKED")
@@ -96,7 +100,7 @@ type SubscriptionMgo struct {
 	TimeCreated time.Time `json:"time-created" bson:"time-created"`
 
 	// History log in cronological order (earliest first) . Max history is not implemented rightnow..
-	History []SubscriptionMgo `json:"history,omitempty", bson:"history,omitempty"`
+	History []SubscriptionMgo `json:"history,omitempty" bson:"history,omitempty"`
 
 	Attributes map[string]interface{} `json:"attr,omitempty" bson:"attr,omitempty"`
 }
@@ -117,6 +121,11 @@ var (
 		SubscriptionTypeLocked:    nil,
 		SubscriptionTypeCancelled: nil,
 		SubscriptionTypeCustom: map[string]interface{}{
+			"OBJECTS":   "0GiB",
+			"BANDWIDTH": "0GiB",
+			"DEVICES":   "0",
+		},
+		SubscriptionTypeStripe: map[string]interface{}{
 			"OBJECTS":   "0GiB",
 			"BANDWIDTH": "0GiB",
 			"DEVICES":   "0",
@@ -231,8 +240,8 @@ func (i SubscriptionMgo) UpdatePlan(issuer utils.Prn, plan utils.Prn, attrs map[
 	i.Issuer = issuer
 	i.Type = plan
 
-	// look up attributes to see if we have some.
-	subAttrs, ok := SubscriptionProperties[plan]
+	planData := strings.Split(string(plan), ":/")
+	subAttrs, ok := SubscriptionProperties[utils.Prn(planData[0])]
 	if !ok {
 		return errors.New("No such subscription plan available: " + string(plan))
 	}
