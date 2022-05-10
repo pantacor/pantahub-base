@@ -11,3 +11,6 @@ data
 vendor/
 .env.*
 .vscode
+*.test_data
+.chglog
+.tmp
