@@ -33,13 +33,28 @@ type emailData struct {
 	Link  string
 }
 
-func getMailer() mailgun.Mailgun {
-	mgDomain := GetEnv(EnvMailgunDomain)
-	mgAPIKey := GetEnv(EnvMailgunAPIKey)
-	mgPubAPIKey := GetEnv(EnvMailgunPubAPIKey)
+var mgun *mailgun.Mailgun
 
-	log.Println("Sending Mail through MAILGUN: " + mgDomain)
-	return mailgun.NewMailgun(mgDomain, mgAPIKey, mgPubAPIKey)
+func getMailer() mailgun.Mailgun {
+	if mgun != nil {
+		return *mgun
+	}
+	mgDomain := GetEnv(EnvMailgunDomain)
+
+	// if we have legacy settings we continue to init ourselves
+	if mgDomain != "" {
+		mgAPIKey := GetEnv(EnvMailgunAPIKey)
+		mgPubAPIKey := GetEnv(EnvMailgunPubAPIKey)
+		mg := mailgun.NewMailgun(mgDomain, mgAPIKey, mgPubAPIKey)
+		mgun = &mg
+	} else {
+		mg, err := mailgun.NewMailgunFromEnv()
+		if err == nil {
+			panic("unable to get mailer " + err.Error())
+		}
+		mgun = &mg
+	}
+	return *mgun
 }
 
 func getURLPrefix() string {
