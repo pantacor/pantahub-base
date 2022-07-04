@@ -49,7 +49,7 @@ func getMailer() mailgun.Mailgun {
 		mgun = &mg
 	} else {
 		mg, err := mailgun.NewMailgunFromEnv()
-		if err == nil {
+		if err != nil {
 			panic("unable to get mailer " + err.Error())
 		}
 		mgun = &mg
