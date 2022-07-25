@@ -267,7 +267,7 @@ func (s *elasticLogger) getLogs(start int64, page int64, before *time.Time,
 	}
 
 	if response.StatusCode() != http.StatusOK {
-		errStr := fmt.Sprintf("WARN: getLogs call failed: %d - %s\n", response.StatusCode(), response.Status())
+		errStr := fmt.Sprintf("WARN: getLogs call failed: %d - %s\n", response.StatusCode(), response.Body())
 		return nil, errors.New(errStr)
 	}
 
@@ -344,7 +344,7 @@ func (s *elasticLogger) getLogsByCursor(nextCursor string) (*Pager, error) {
 	}
 
 	if response.StatusCode() != http.StatusOK {
-		errStr := fmt.Sprintf("WARN: getLogs call failed: %d - %s\n", response.StatusCode(), response.Status())
+		errStr := fmt.Sprintf("WARN: getLogs call failed: %d - %s\n", response.StatusCode(), response.Body())
 		return nil, errors.New(errStr)
 	}
 
