@@ -24,6 +24,15 @@ import (
 	cjson "github.com/gibson042/canonicaljson-go"
 )
 
+func IsSha256HexString(shaString string) bool {
+	sha, err := DecodeSha256HexString(shaString)
+
+	if err == nil && len(sha) != sha256.Size {
+		return true
+	}
+	return false
+}
+
 // DecodeSha256HexString decode sha string
 func DecodeSha256HexString(shaString string) (sha []byte, err error) {
 	sha, err = hex.DecodeString(shaString)
