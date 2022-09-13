@@ -12,7 +12,7 @@ services:
       - elasticsearch
     volumes:
       - ${PWD}:/go/src/gitlab.com/pantacor/pantahub-base
-      - ${PWD}/k8s_token:/run/secrets/kubernetes.io/serviceaccount/token
+      - ${PWD}/k8s_token.test_data:/run/secrets/kubernetes.io/serviceaccount/token
     ports:
       - 12365:12365
     env_file:
@@ -35,10 +35,12 @@ services:
 
   elasticsearch:
     container_name: elasticsearch
-    image: docker.elastic.co/elasticsearch/elasticsearch:6.8.13
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.3
     environment:
       - cluster.name=docker-cluster
       - bootstrap.memory_lock=true
+      - discovery.type=single-node
+      - discovery.seed_hosts="localhost, 127.0.0.1"
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
       - xpack.security.enabled=false
       - xpack.watcher.enabled=false
@@ -52,7 +54,7 @@ services:
       - "9300:9300"
 
   kibana:
-    image: docker.elastic.co/kibana/kibana:6.8.13
+    image: docker.elastic.co/kibana/kibana:7.17.3
     environment:
       - SERVERNAME=kibana
       - ELASTICSEARCH_HOSTS=https://elasticsearch:9200

@@ -41,10 +41,6 @@ import (
 	"gopkg.in/resty.v1"
 )
 
-var (
-	defaultLogger *elasticLogger
-)
-
 type elasticLogEntry struct {
 	*Entry
 
@@ -178,53 +174,53 @@ func (s *elasticLogger) getLogs(start int64, page int64, before *time.Time,
 	// build query part
 	q := elastic.NewBoolQuery()
 	if query.Owner != "" {
-		q = q.Must(elastic.NewTermQuery("own", query.Owner))
+		q = q.Filter(elastic.NewMatchPhraseQuery("own", query.Owner))
 	}
 	if query.Device != "" {
 		components := strings.Split(query.Device, ",")
-		devices := []interface{}{}
+		queryBool := elastic.NewBoolQuery()
 		for _, device := range components {
-			devices = append(devices, device)
+			queryBool.Should(elastic.NewMatchPhraseQuery("dev", device))
 		}
-		q = q.Must(elastic.NewTermsQuery("dev", devices...))
+		q = q.Filter(queryBool)
 	}
 	if query.LogRev != "" {
 		components := strings.Split(query.LogRev, ",")
-		revs := []interface{}{}
+		queryBool := elastic.NewBoolQuery()
 		for _, rev := range components {
-			revs = append(revs, rev)
+			queryBool.Should(elastic.NewMatchPhraseQuery("rev", rev))
 		}
-		q = q.Must(elastic.NewTermsQuery("rev", revs...))
+		q = q.Filter(queryBool)
 	}
 	if query.LogPlat != "" {
 		components := strings.Split(query.LogPlat, ",")
-		plats := []interface{}{}
+		queryBool := elastic.NewBoolQuery()
 		for _, plat := range components {
-			plats = append(plats, plat)
+			queryBool.Should(elastic.NewMatchPhraseQuery("plat", plat))
 		}
-		q = q.Must(elastic.NewTermsQuery("plat", plats...))
+		q = q.Filter(queryBool)
 	}
 	if query.LogSource != "" {
 		components := strings.Split(query.LogSource, ",")
-		sources := []interface{}{}
+		queryBool := elastic.NewBoolQuery()
 		for _, source := range components {
-			sources = append(sources, source)
+			queryBool.Should(elastic.NewMatchPhraseQuery("src", source))
 		}
-		q = q.Must(elastic.NewTermsQuery("src", sources...))
+		q = q.Filter(queryBool)
 	}
 	if query.LogLevel != "" {
 		components := strings.Split(query.LogLevel, ",")
-		levels := []interface{}{}
+		queryBool := elastic.NewBoolQuery()
 		for _, level := range components {
-			levels = append(levels, level)
+			queryBool.Should(elastic.NewMatchPhraseQuery("lvl", level))
 		}
-		q = q.Must(elastic.NewTermsQuery("lvl", levels...))
+		q = q.Filter(queryBool)
 	}
 	if before != nil {
-		q = q.Must(elastic.NewRangeQuery("time-created").Lt(*before))
+		q = q.Filter(elastic.NewRangeQuery("time-created").Lt(*before))
 	}
 	if after != nil {
-		q = q.Must(elastic.NewRangeQuery("time-created").Gt(*after))
+		q = q.Filter(elastic.NewRangeQuery("time-created").Gt(*after))
 	}
 
 	// build search
@@ -247,7 +243,6 @@ func (s *elasticLogger) getLogs(start int64, page int64, before *time.Time,
 		}
 		searchS = searchS.Sort(v, asc)
 	}
-	searchS = searchS.Sort("_id", true)
 
 	searchBody, err := searchS.Source()
 	if err != nil {
@@ -324,13 +319,16 @@ func (s *elasticLogger) scrollBuildBodyNext(keepAlive string, scrollID string) (
 
 func (s *elasticLogger) getLogsByCursor(nextCursor string) (*Pager, error) {
 	queryFmt, values, err := s.scrollBuildNextURL(false)
-	queryURL, err := url.Parse(queryFmt)
-	queryURL.RawQuery = values.Encode()
-
 	if err != nil {
 		return nil, err
 	}
 
+	queryURL, err := url.Parse(queryFmt)
+	if err != nil {
+		return nil, err
+	}
+
+	queryURL.RawQuery = values.Encode()
 	queryURI := s.elasticURL.ResolveReference(queryURL)
 
 	searchBody, err := s.scrollBuildBodyNext("1m", nextCursor)
@@ -434,7 +432,7 @@ func (s *elasticLogger) postLogs(e []Entry) error {
 	}
 
 	response, err := s.r().
-		SetBody(string(buf.Bytes())).
+		SetBody(buf.String()).
 		SetHeader("Content-Type", "application/x-ndjson").
 		Post(postURL.String())
 

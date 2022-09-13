@@ -33,28 +33,29 @@ import (
 )
 
 // ## GET /logs/
-//   Post one or many log entries as an error of LogEntry
-//   Page through your logs.
 //
-//   Context:
-//      Can be called in user context
+//	  Post one or many log entries as an error of LogEntry
+//	  Page through your logs.
 //
-//   Paging Parameter:
-//     - start: list position to start page; either number or ID or
-//	            "<tsec>.<tnano>" of log entry
-//     - page: length of page
+//	  Context:
+//	     Can be called in user context
 //
-//   Filter Paramters:
-//     - dev: comma separated list of device prns  to include
-//     - lvl: comma separated list of log levels
-//     - src: comma separated list of sources
+//	  Paging Parameter:
+//	    - start: list position to start page; either number or ID or
+//		            "<tsec>.<tnano>" of log entry
+//	    - page: length of page
 //
-//   Sorting Parameters:
-//     - sort: common list of items of "tsec,tnano,device,src,lvl,time-created"
-//             you can use - on each individual item to reverse order
+//	  Filter Paramters:
+//	    - dev: comma separated list of device prns  to include
+//	    - lvl: comma separated list of log levels
+//	    - src: comma separated list of sources
 //
-//   Cursor Parameters:
-//     - cursor: true in case you want us to return a cursor ID as well.
+//	  Sorting Parameters:
+//	    - sort: common list of items of "tsec,tnano,device,src,lvl,time-created"
+//	            you can use - on each individual item to reverse order
+//
+//	  Cursor Parameters:
+//	    - cursor: true in case you want us to return a cursor ID as well.
 //
 // handleGetLogs Get one or many log entries as an error of LogEntry
 // @Summary Get one or many log entries as an error of LogEntry
