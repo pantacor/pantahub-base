@@ -1,3 +1,4 @@
+*.test_data
 tags
 debug.test
 pantahub-base
@@ -11,3 +12,6 @@ data
 vendor/
 .env.*
 .vscode
+*.test_data
+.chglog
+.tmp

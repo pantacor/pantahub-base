@@ -12,6 +12,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"strings"
 	"time"
 
 	"gitlab.com/pantacor/pantahub-base/utils"
@@ -102,7 +103,8 @@ func (i subscriptionService) New(subject utils.Prn,
 	s.TimeCreated = s.LastModified
 
 	// look up attributes to see if we have some.
-	attrs, ok := SubscriptionProperties[s.Type]
+	plans := strings.Split(string(s.Type), ":/")
+	attrs, ok := SubscriptionProperties[utils.Prn(plans[0])]
 	if !ok {
 		return nil, errors.New("No such subscription plan available: " + string(s.Type))
 	}

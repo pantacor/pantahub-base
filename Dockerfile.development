@@ -22,4 +22,4 @@ COPY . .
 
 RUN go build .
 
-CMD ["dockerize", "-wait", "tcp://mongo:27017", "-wait", "tcp://fluentd:24224", "-wait", "tcp://elasticsearch:9200", "-timeout", "180s", "air", "-d"]
+CMD ["dockerize", "-wait", "tcp://mongo:27017", "-wait", "tcp://fluentd:24224", "-wait", "tcp://elasticsearch:9200", "-timeout", "180s", "air", "-d", "-c", "air.conf"]
