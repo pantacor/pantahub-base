@@ -18,6 +18,7 @@ package callbacks
 
 import (
 	"context"
+	"errors"
 	"log"
 	"strings"
 
@@ -199,13 +200,16 @@ func (a *App) GetStepObjectShas(step *trails.Step) ([]string, error) {
 	}
 
 	for key, v := range state {
-		if strings.HasSuffix(key, ".json") ||
-			key == "#spec" {
-			continue
-		}
 		sha, ok := v.(string)
 		if !ok {
 			continue
+		}
+		if strings.HasSuffix(key, ".json") && !utils.IsSha256HexString(sha) ||
+			key == "#spec" {
+			continue
+		}
+		if !utils.IsSha256HexString(sha) {
+			return nil, errors.New("Bad JSON format: object sha not a sha: " + sha)
 		}
 		if _, ok := objMap[sha]; !ok {
 			existsInDb, err := a.IsObjectExistsInDb(sha)
@@ -214,6 +218,8 @@ func (a *App) GetStepObjectShas(step *trails.Step) ([]string, error) {
 			}
 			if existsInDb {
 				objectShaList = append(objectShaList, sha)
+			} else {
+				return nil, errors.New("Step " + step.ID + " state references object (" + sha + ") that does not exist in DB")
 			}
 		}
 	}
