@@ -184,7 +184,7 @@ func prnGetID(prn string) string {
 	return prn[idx+1:]
 }
 
-func (a *App) getLatestStePrev(trailID primitive.ObjectID) (int, error) {
+func (a *App) getLatestStepRev(trailID primitive.ObjectID) (int, error) {
 	collSteps := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
 	if collSteps == nil {
