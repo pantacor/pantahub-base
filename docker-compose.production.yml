@@ -43,8 +43,8 @@ services:
   localstack:
     image: localstack/localstack:0.9.0
     environment:
-      - SERVICES=s3:5000
+      - SERVICES=s3:4566
       - DEFAULT_REGION=us-east-1
       - HOSTNAME=localstack
     ports:
-      - "5000:5000"
+      - "4566:4566"

@@ -1,0 +1,23 @@
+#!/bin/sh
+
+sh -c '
+set -x
+
+while true; do
+	if ! curl kafka-connect:8083; then
+		echo \"waiting for kafka connect\"
+		sleep 10
+       		continue
+ 	fi		
+	echo \"found kafka-connect\"
+	break
+done
+
+echo UPLOADING CONFIGS FOR CONNECTORS
+for file in /opt/kafka-connect-configs/*; do
+	curl -XPOST -H "Content-Type: application/json" -T $file http://kafka-connect:8083/connectors
+done
+' &
+
+
+/etc/confluent/docker/run

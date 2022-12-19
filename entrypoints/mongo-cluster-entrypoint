@@ -1,0 +1,5 @@
+#!/bin/sh
+
+set -x
+
+mongod --keyFile /keys/mongokey.yaml --transitionToAuth --replSet rs0 --bind_ip_all $@

@@ -1,0 +1,23 @@
+#!/bin/sh
+
+/etc/confluent/docker/run &
+
+TOPICS="""
+pantacor-cp-kafka-connect-offset-dev
+pantacor-cp-kafka-connect-config-dev
+pantabase-mongo.pantabase-serv.pantahub_devices
+pantabase-mongo.pantabase-serv.pantahub_trails
+pantabase-mongo.pantabase-serv.pantahub_steps
+ph-device-summary
+ph-device-summary-flat
+fluentd-api
+"""
+
+for n in $TOPICS
+do
+    until kafka-topics --create --if-not-exists --zookeeper $KAFKA_ZOOKEEPER_CONNECT --replication-factor=1 --partitions=1 --topic "$n"; do
+        sleep 1
+    done
+done
+
+tail -f /proc/$(pidof java)/fd/1

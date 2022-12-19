@@ -107,6 +107,7 @@ func SendResetPasswordEmail(email, nick, token string) error {
 		return err
 	}
 	log.Printf("ID: %s Resp: %s\n", id, resp)
+	log.Printf("Reset Link: %s\n", link)
 
 	return nil
 }
