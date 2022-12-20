@@ -30,11 +30,18 @@ services:
 
   gc:
     image: registry.gitlab.com/pantacor/pantahub-gc:develop
+    env_file:
+      - ./env.default 
+      - ./.env.local
     environment:
       - PANTAHUB_GC_UNCLAIMED_EXPIRY="P5D"
       - PANTAHUB_GC_GARBAGE_EXPIRY="P2D"
+      - PANTAHUB_HOST=base
+      - PANTAHUB_PORT=12365
+      - PANTAHUB_GC_API=http://gc:2000
+
     volumes:
-      - .env.local:/opt/ph/bin/env.default
+      - ./.env.local:/opt/ph/bin/env.default
 
   pvr:
     image: registry.gitlab.com/pantacor/pantahub-pvr:latest
