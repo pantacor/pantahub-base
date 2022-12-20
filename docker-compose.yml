@@ -21,11 +21,20 @@ services:
       - elasticsearch
       - phs
       - pvr
+      - gc
     ports:
       - 12365:12365
     env_file:
       - ./env.default 
       - ./.env.local
+
+  gc:
+    image: registry.gitlab.com/pantacor/pantahub-gc:develop
+    environment:
+      - PANTAHUB_GC_UNCLAIMED_EXPIRY="P5D"
+      - PANTAHUB_GC_GARBAGE_EXPIRY="P2D"
+    volumes:
+      - .env.local:/opt/ph/bin/env.default
 
   pvr:
     image: registry.gitlab.com/pantacor/pantahub-pvr:latest
@@ -210,7 +219,7 @@ services:
       - kafka
 
   kafka-connect:
-    image: confluentinc/cp-kafka-connect:5.4.3
+    image: registry.gitlab.com/pantacor/kafka-connect-with-plugins:5.4.3
     ulimits:
       nofile:
         soft: 65536
@@ -243,7 +252,6 @@ services:
       - kafka-schema-registry
       - kafka-rest
     volumes:
-      - ${PWD}/kafka/connect-plugins:/opt/plugins:ro
       - ${PWD}/kafka/connect-configs:/opt/kafka-connect-configs:ro
       - ${PWD}/entrypoints/kafka-connect-entrypoint:/docker-entrypoint
     command: /docker-entrypoint
