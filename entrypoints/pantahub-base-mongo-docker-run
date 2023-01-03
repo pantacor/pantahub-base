@@ -1,14 +1,14 @@
 #!/bin/sh
 
-set -x
+set -ex
 
-mongod --keyFile /keys/mongokey.yaml --transitionToAuth --replSet rs0 --bind_ip_all --port 27017 &
+mongod --keyFile /keys/mongokey.yaml --transitionToAuth --replSet ${MONGO_RS} --bind_ip_all --port 27017 &
 sleep 5
 
 userQuery='{"user": "admin","pwd": "admin","roles": [{"role": "userAdminAnyDatabase","db": "admin"},{"role": "dbOwner","db": "admin"},{"role": "clusterAdmin","db": "admin"},{"role": "readWriteAnyDatabase","db": "admin"}],"mechanisms": ["SCRAM-SHA-1","SCRAM-SHA-256"]}'
 replicaSet="""
 {
-  \"_id\": \"rs0\",
+  \"_id\": \"${MONGO_RS}\",
   \"members\": [
     {
       \"_id\": 0,

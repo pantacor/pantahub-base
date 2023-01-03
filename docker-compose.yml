@@ -2,6 +2,8 @@ version: "3"
 
 services:
   base:
+    networks:
+      - base
     build:
       context: .
       dockerfile: Dockerfile.development
@@ -29,6 +31,8 @@ services:
       - ./.env.local
 
   gc:
+    networks:
+      - base
     image: registry.gitlab.com/pantacor/pantahub-gc:develop
     env_file:
       - ./env.default 
@@ -51,6 +55,8 @@ services:
       - 12367:12367
 
   www:
+    networks:
+      - base
     image: registry.gitlab.com/pantacor/pantahub-www:devel
     environment:
       - REACT_APP_TITLE="PantacorHub DevBench"
@@ -78,6 +84,8 @@ services:
       - 3000:80
 
   phs:
+    networks:
+      - base
     image: registry.gitlab.com/pantacor/pantahub-streams-devicesummary:X64-develop
     volumes:
       - ${PWD}/entrypoints/phs-entrypoint:/docker-entrypoint
@@ -99,9 +107,13 @@ services:
     command: /docker-entrypoint
 
   fluentd:
+    networks:
+      - base
     image: fluent/fluentd
 
   elasticsearch:
+    networks:
+      - base
     container_name: elasticsearch
     image: docker.elastic.co/elasticsearch/elasticsearch:7.17.3
     environment:
@@ -121,6 +133,8 @@ services:
     restart: always
 
   mongo:
+    networks:
+      - base
     image: mongo:4.4.3
     container_name: mongo
     env_file:
@@ -142,6 +156,8 @@ services:
       - mongo3
 
   mongo2:
+    networks:
+      - base
     image: mongo:4.4.3
     container_name: mongo2
     environment:
@@ -156,6 +172,8 @@ services:
       - 30002:30002
 
   mongo3:
+    networks:
+      - base
     image: mongo:4.4.3
     container_name: mongo3
     environment:
@@ -170,6 +188,8 @@ services:
       - 30003:30003
 
   zookeeper:
+    networks:
+      - base
     image: confluentinc/cp-zookeeper:5.4.3
     ulimits:
       nofile:
@@ -181,6 +201,8 @@ services:
       - ZOOKEEPER_SYNC_LIMIT=2
 
   kafka:
+    networks:
+      - base
     image: confluentinc/cp-kafka:5.4.3
     volumes:
       - ${PWD}/entrypoints/kafka-entrypoint:/docker-entrypoint
@@ -207,6 +229,8 @@ services:
       - zookeeper
 
   kafka-schema-registry:
+    networks:
+      - base
     image: confluentinc/cp-schema-registry:5.4.3
     environment:
       - SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS=PLAINTEXT://kafka:9092
@@ -226,6 +250,8 @@ services:
       - kafka
 
   kafka-connect:
+    networks:
+      - base
     image: registry.gitlab.com/pantacor/kafka-connect-with-plugins:5.4.3
     ulimits:
       nofile:
@@ -264,6 +290,8 @@ services:
     command: /docker-entrypoint
 
   kafka-rest:
+    networks:
+      - base
     image: confluentinc/cp-kafka-rest
     ulimits:
       nofile:
@@ -282,6 +310,8 @@ services:
       - zookeeper
 
   localstack:
+    networks:
+      - base
     image: localstack/localstack:1.3.0
     environment:
       - SERVICES=s3
@@ -303,3 +333,7 @@ services:
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
       - ${PWD}/data:/tmp/localstack/data
+
+networks:
+  base:
+    driver: bridge
