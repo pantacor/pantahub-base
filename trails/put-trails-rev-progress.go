@@ -93,13 +93,13 @@ func (a *App) handlePutStepProgress(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	isDevicePublic, err := a.IsDevicePublic(deviceID)
+	isDevicePublic, err := a.IsDevicePublic(r.Context(), deviceID)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error checking device is public or not:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	updateResult, err := coll.UpdateOne(
 		ctx,
@@ -124,7 +124,7 @@ func (a *App) handlePutStepProgress(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "Cannot update step progress "+err.Error(), http.StatusForbidden)
 		return
 	}
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	trailObjectID, err := primitive.ObjectIDFromHex(trailID)
 	if err != nil {

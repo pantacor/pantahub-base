@@ -40,6 +40,7 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/tracer"
 )
 
 // App plog rest application
@@ -69,9 +70,9 @@ type PvrRemote struct {
 	PostFieldsOpt      []string `json:"post-fields-opt"`  // what optional fields are available [default: <empty>]
 }
 
-//
 // ## GET /trails/summary
-//   get summary of all trails by the calling owner.
+//
+//	get summary of all trails by the calling owner.
 func (a *App) handleGetPlogPosts(w rest.ResponseWriter, r *rest.Request) {
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
@@ -98,7 +99,7 @@ func (a *App) handleGetPlogPosts(w rest.ResponseWriter, r *rest.Request) {
 	plogPosts := make([]Post, 0)
 	findOptions := options.Find()
 	findOptions.SetNoCursorTimeout(true)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	cur, err := collPlogPosts.Find(ctx, bson.M{
 		"owner": owner,
@@ -166,6 +167,10 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		rest.Get("/posts", app.handleGetPlogPosts),
 	//	rest.Post("/posts", app.handlePostPlogPosts),
 	)
+	app.API.Use(&tracer.OtelMiddleware{
+		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
+		Router:      apiRouter,
+	})
 	app.API.SetApp(apiRouter)
 
 	return app

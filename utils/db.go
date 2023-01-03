@@ -19,9 +19,11 @@ package utils
 import (
 	"context"
 	"log"
+	"os"
 	"time"
 
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.opentelemetry.io/contrib/instrumentation/go.mongodb.org/mongo-driver/mongo/otelmongo"
 	"gopkg.in/mgo.v2"
 
 	"go.mongodb.org/mongo-driver/mongo"
@@ -72,6 +74,11 @@ func GetMongoClient() (*mongo.Client, error) {
 	if mongoRs != "" {
 		clientOptions = clientOptions.SetReplicaSet(mongoRs)
 	}
+
+	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" {
+		clientOptions.SetMonitor(otelmongo.NewMonitor())
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

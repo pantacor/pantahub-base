@@ -21,10 +21,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
+	"os"
+	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/github"
 )
@@ -67,8 +71,8 @@ func GithubAuthorize(redirectURI string, config *oauth2.Config, w rest.ResponseW
 }
 
 // GithubCb use code to retrive service user data
-func GithubCb(config *oauth2.Config, code string) (*ResponsePayload, error) {
-	data, err := getUserDataFromGithub(config, code)
+func GithubCb(ctx context.Context, config *oauth2.Config, code string) (*ResponsePayload, error) {
+	data, err := getUserDataFromGithub(ctx, config, code)
 	if err != nil {
 		return nil, err
 	}
@@ -82,13 +86,13 @@ func GithubCb(config *oauth2.Config, code string) (*ResponsePayload, error) {
 	return &ResponsePayload{
 		Email: payload.Email,
 		Nick:  payload.Login,
-		Raw:   fmt.Sprintf("%s", data),
+		Raw:   string(data),
 	}, nil
 }
 
-func getUserDataFromGithub(config *oauth2.Config, code string) ([]byte, error) {
+func getUserDataFromGithub(ctx context.Context, config *oauth2.Config, code string) ([]byte, error) {
 	// Use code to get token and get user info from Github.
-	token, err := config.Exchange(context.Background(), code)
+	token, err := config.Exchange(ctx, code)
 	if err != nil {
 		return nil, fmt.Errorf("code exchange wrong: %s", err.Error())
 	}
@@ -100,7 +104,24 @@ func getUserDataFromGithub(config *oauth2.Config, code string) ([]byte, error) {
 
 	request.Header.Set("Authorization", fmt.Sprintf(" token %s", token.AccessToken))
 
-	response, err := http.DefaultClient.Do(request)
+	transport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   60 * time.Minute,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   30 * time.Second,
+		ExpectContinueTimeout: 15 * time.Second,
+	}
+
+	httpClient := &http.Client{Transport: transport}
+	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" {
+		httpClient = &http.Client{Transport: otelhttp.NewTransport(transport)}
+	}
+	response, err := httpClient.Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("failed getting user info: %s", err.Error())
 	}

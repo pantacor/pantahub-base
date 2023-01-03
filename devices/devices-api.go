@@ -43,10 +43,10 @@ func handleAuth(w rest.ResponseWriter, r *rest.Request) {
 }
 
 // ResolveDeviceIDOrNick : Parse DeviceID Or Nick from the given string and return device objectID
-func (a *App) ResolveDeviceIDOrNick(owner string, param string) (*primitive.ObjectID, error) {
+func (a *App) ResolveDeviceIDOrNick(ctx context.Context, owner string, param string) (*primitive.ObjectID, error) {
 	mgoid, err := primitive.ObjectIDFromHex(param)
 	if err != nil {
-		return a.LookupDeviceNick(owner, param)
+		return a.LookupDeviceNick(ctx, owner, param)
 	}
 	return &mgoid, nil
 }
@@ -70,8 +70,8 @@ func MarkDeviceAsGarbage(
 }
 
 // LookupDeviceNick : Lookup Device Nicks and return device id
-func (a *App) LookupDeviceNick(owner string, deviceID string) (*primitive.ObjectID, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func (a *App) LookupDeviceNick(ctx context.Context, owner string, deviceID string) (*primitive.ObjectID, error) {
+	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
@@ -79,7 +79,7 @@ func (a *App) LookupDeviceNick(owner string, deviceID string) (*primitive.Object
 	}
 	deviceObject := Device{}
 
-	dev := collection.FindOne(ctx,
+	dev := collection.FindOne(ctxC,
 		bson.M{
 			"owner":   owner,
 			"nick":    deviceID,
@@ -95,16 +95,16 @@ func (a *App) LookupDeviceNick(owner string, deviceID string) (*primitive.Object
 }
 
 // FindDeviceByID finds the device by id
-func (a *App) FindDeviceByID(ID primitive.ObjectID, device *Device) error {
+func (a *App) FindDeviceByID(ctx context.Context, ID primitive.ObjectID, device *Device) error {
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
 		return errors.New("Error with Database connectivity")
 	}
 
-	err := collection.FindOne(ctx, bson.M{
+	err := collection.FindOne(ctxC, bson.M{
 		"_id": ID,
 	}).Decode(&device)
 	if err != nil {

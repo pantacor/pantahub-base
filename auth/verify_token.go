@@ -50,7 +50,7 @@ func (a *App) verifyToken(w rest.ResponseWriter, r *rest.Request) {
 	r.DecodeJsonPayload(payload)
 
 	col := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
-	err := utils.ValidateOwnerSig(payload.Signature, payload.TokenID, payload.Owner, payload.IDevIDName, col)
+	err := utils.ValidateOwnerSig(r.Context(), payload.Signature, payload.TokenID, payload.Owner, payload.IDevIDName, col)
 	if err != nil {
 		rest.Error(w, err.Error(), http.StatusBadRequest)
 		return

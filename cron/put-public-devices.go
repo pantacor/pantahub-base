@@ -53,7 +53,7 @@ func (a *App) handlePutDevices(w rest.ResponseWriter, r *rest.Request) {
 
 	findOptions := options.Find()
 	findOptions.SetNoCursorTimeout(true)
-	ctx, cancel := context.WithTimeout(context.Background(), a.CronJobTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), a.CronJobTimeout)
 	defer cancel()
 	query := bson.M{
 		"ispublic":              true,
@@ -75,13 +75,13 @@ func (a *App) handlePutDevices(w rest.ResponseWriter, r *rest.Request) {
 			utils.RestErrorWrapper(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
 			return
 		}
-		stepsMarkedAsNonPublic, stepsMarkedAsPublic, err := a.ProcessPublicDevice(&device)
+		stepsMarkedAsNonPublic, stepsMarkedAsPublic, err := a.ProcessPublicDevice(r.Context(), &device)
 		if err != nil {
 			utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		// Mark the flag "mark_public_processed" as TRUE
-		err = callbackApp.MarkDeviceAsProcessed(device.ID)
+		err = callbackApp.MarkDeviceAsProcessed(r.Context(), device.ID)
 		if err != nil {
 			utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
 			return
@@ -97,7 +97,7 @@ func (a *App) handlePutDevices(w rest.ResponseWriter, r *rest.Request) {
 }
 
 // ProcessPublicDevice is to process a public device
-func (a *App) ProcessPublicDevice(device *devices.Device) (
+func (a *App) ProcessPublicDevice(ctx context.Context, device *devices.Device) (
 	stepsMarkedAsNonPublic int,
 	stepsMarkedAsPublic int,
 	err error,
@@ -109,10 +109,10 @@ func (a *App) ProcessPublicDevice(device *devices.Device) (
 
 	if device.IsPublic {
 		// Mark all steps under the device as public
-		stepsMarkedAsPublic, err = callbackApp.MarkDeviceStepsPublicFlag(device.ID, true)
+		stepsMarkedAsPublic, err = callbackApp.MarkDeviceStepsPublicFlag(ctx, device.ID, true)
 	} else {
 		// Mark all steps under the device as non-public
-		stepsMarkedAsNonPublic, err = callbackApp.MarkDeviceStepsPublicFlag(device.ID, false)
+		stepsMarkedAsNonPublic, err = callbackApp.MarkDeviceStepsPublicFlag(ctx, device.ID, false)
 	}
 
 	return stepsMarkedAsNonPublic, stepsMarkedAsPublic, err

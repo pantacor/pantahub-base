@@ -69,13 +69,15 @@ func (a *App) handleGetTrailPvrInfo(w rest.ResponseWriter, r *rest.Request) {
 	getID := r.PathParam("id")
 	step := Step{}
 
-	isPublic, err := a.isTrailPublic(getID)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	isPublic, err := a.isTrailPublic(ctx, getID)
 
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error getting trail public", http.StatusInternalServerError)
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
 	trailObjectID, err := primitive.ObjectIDFromHex(getID)

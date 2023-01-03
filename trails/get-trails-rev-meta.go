@@ -58,7 +58,14 @@ func (a *App) handleGetStepMeta(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+	authType := ""
+	authTypeData, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+	if ok {
+		authType = authTypeData.(string)
+	} else {
+		utils.RestErrorWrapper(w, "type of token is not defined", http.StatusForbidden)
+		return
+	}
 
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
@@ -71,13 +78,13 @@ func (a *App) handleGetStepMeta(w rest.ResponseWriter, r *rest.Request) {
 	trailID := r.PathParam("id")
 	rev := r.PathParam("rev")
 
-	isPublic, err := a.isTrailPublic(trailID)
+	isPublic, err := a.isTrailPublic(r.Context(), trailID)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error getting trail public:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
 	if isPublic {
@@ -91,12 +98,22 @@ func (a *App) handleGetStepMeta(w rest.ResponseWriter, r *rest.Request) {
 			"device":  owner,
 			"garbage": bson.M{"$ne": true},
 		}).Decode(&step)
-	} else if authType == "USER" && authType == "SESSION" {
+	} else if authType == "USER" || authType == "SESSION" {
 		err = coll.FindOne(ctx, bson.M{
 			"_id":     trailID + "-" + rev,
 			"owner":   owner,
 			"garbage": bson.M{"$ne": true},
 		}).Decode(&step)
+	} else {
+		err = coll.FindOne(ctx, bson.M{
+			"_id":     trailID + "-" + rev,
+			"owner":   owner,
+			"garbage": bson.M{"$ne": true},
+		}).Decode(&step)
+	}
+	if err != nil {
+		utils.RestErrorWrapper(w, "Error getting trail public:"+err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	if step.Meta == nil {

@@ -108,7 +108,7 @@ func (a *App) handleGetSummary(w rest.ResponseWriter, r *rest.Request) {
 	findOptions.SetSort(bson.M{"timestamp": -1})
 	findOptions.SetLimit(5)
 	findOptions.SetNoCursorTimeout(true)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	cur, err := summaryCol.Find(ctx, bson.M{
 		"owner":   owner,
@@ -151,7 +151,7 @@ func (a *App) handleGetSummary(w rest.ResponseWriter, r *rest.Request) {
 	summary.Prn = owner.(string)
 	summary.Nick = r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["nick"].(string)
 
-	sub, err := a.subService.LoadBySubject(utils.Prn(owner.(string)))
+	sub, err := a.subService.LoadBySubject(r.Context(), utils.Prn(owner.(string)))
 	if err != nil {
 		sub = a.subService.GetDefaultSubscription(utils.Prn(owner.(string)))
 	}
@@ -170,7 +170,7 @@ func (a *App) handleGetSummary(w rest.ResponseWriter, r *rest.Request) {
 		QuotaStats: copySubToDashMap(sub),
 	}
 
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	deviceCount, err := dCol.CountDocuments(ctx,
 		bson.M{
@@ -190,14 +190,14 @@ func (a *App) handleGetSummary(w rest.ResponseWriter, r *rest.Request) {
 
 	// quota on disk
 	resp := DiskQuotaUsageResult{}
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	pipeline := []bson.M{
-		bson.M{"$match": bson.M{
+		{"$match": bson.M{
 			"owner":   owner.(string),
 			"garbage": bson.M{"$ne": true},
 		}},
-		bson.M{
+		{
 			"$group": bson.M{
 				"_id":   "$owner",
 				"total": bson.M{"$sum": "$sizeint"},

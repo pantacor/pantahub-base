@@ -30,17 +30,18 @@ import (
 	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/tracer"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/x/bsonx"
 )
 
 // New create a new trails rest application
-//   finish getsteps
-//   post walk
-//   get walks
-//   search attributes for advanced steps/walk searching inside trail
 //
+//	finish getsteps
+//	post walk
+//	get walks
+//	search attributes for advanced steps/walk searching inside trail
 func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	app := new(App)
 	app.jwtMiddleware = jwtMiddleware
@@ -218,6 +219,10 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		rest.Put("/#id/steps/#rev/cancel", utils.ScopeFilter(writeTrailsScopes, app.handlePutStepProgressCancel)),
 		rest.Get("/#id/summary", utils.ScopeFilter(readTrailsScopes, app.handleGetTrailStepSummary)),
 	)
+	app.API.Use(&tracer.OtelMiddleware{
+		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
+		Router:      apiRouter,
+	})
 	app.API.SetApp(apiRouter)
 
 	return app

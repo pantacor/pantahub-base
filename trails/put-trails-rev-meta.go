@@ -72,7 +72,7 @@ func (a *App) handlePutStepMeta(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	err := coll.FindOne(ctx, bson.M{
 		"_id":     trailID + "-" + rev,
@@ -99,14 +99,14 @@ func (a *App) handlePutStepMeta(w rest.ResponseWriter, r *rest.Request) {
 
 	step.TimeModified = time.Now()
 
-	isDevicePublic, err := a.IsDevicePublic(step.TrailID)
+	isDevicePublic, err := a.IsDevicePublic(r.Context(), step.TrailID)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error checking device is public or not:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	step.IsPublic = isDevicePublic
 
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	updateResult, err := coll.UpdateOne(
 		ctx,

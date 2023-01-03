@@ -75,7 +75,7 @@ func (a *App) handlePostStepsObject(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "Unknown AuthType", http.StatusBadRequest)
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	err := coll.FindOne(ctx, bson.M{
 		"_id":     trailID + "-" + rev,
@@ -90,7 +90,7 @@ func (a *App) handlePostStepsObject(w rest.ResponseWriter, r *rest.Request) {
 	if authType == "DEVICE" && step.Device != owner {
 		utils.RestErrorWrapper(w, "No access for device", http.StatusForbidden)
 		return
-	} else if ( authType == "USER" || authType == "SESSION" ) && step.Owner != owner {
+	} else if (authType == "USER" || authType == "SESSION") && step.Owner != owner {
 		utils.RestErrorWrapper(w, "No access for 'foreign' user/session", http.StatusForbidden)
 		return
 	}
@@ -137,7 +137,7 @@ func (a *App) handlePostStepsObject(w rest.ResponseWriter, r *rest.Request) {
 
 	objectsapp := objects.Build(a.mongoClient)
 
-	resolvedObject, err := objectsapp.ResolveObjectWithBacking(owner.(string), newObject.Sha)
+	resolvedObject, err := objectsapp.ResolveObjectWithBacking(r.Context(), owner.(string), newObject.Sha)
 
 	if err != nil && err != objects.ErrNoBackingFile && err != mongo.ErrNoDocuments {
 		utils.RestErrorWrapper(w, "Error resolving Object "+err.Error(), http.StatusBadRequest)
@@ -154,13 +154,13 @@ func (a *App) handlePostStepsObject(w rest.ResponseWriter, r *rest.Request) {
 
 	// here we had no backing file to link to and no object at all
 	// we will try to create a link to an object available in a public step
-	resolvedObject, err = objectsapp.ResolveObjectWithLinks(owner.(string), newObject.Sha, autoLink)
+	resolvedObject, err = objectsapp.ResolveObjectWithLinks(r.Context(), owner.(string), newObject.Sha, autoLink)
 
 	// if this was possible, we use this object with adjusted Name from newObject
 	// and store it in our object collection
 	if err == nil {
 		resolvedObject.ObjectName = newObject.ObjectName
-		err = objectsapp.SaveObject(resolvedObject, false)
+		err = objectsapp.SaveObject(r.Context(), resolvedObject, false)
 		if err != nil {
 			utils.RestErrorWrapper(w, "Error saving our linkified object "+err.Error(), http.StatusInternalServerError)
 			return
@@ -175,7 +175,7 @@ func (a *App) handlePostStepsObject(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	err = objectsapp.SaveObject(&newObject, false)
+	err = objectsapp.SaveObject(r.Context(), &newObject, false)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error saving our linkified object "+err.Error(), http.StatusInternalServerError)
 		return

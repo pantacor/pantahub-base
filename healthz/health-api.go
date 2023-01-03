@@ -27,6 +27,7 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/tracer"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -96,7 +97,7 @@ func (a *App) handleHealthz(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 	val := map[string]interface{}{}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	err := collection.FindOne(ctx, bson.M{}).Decode(&val)
 	if err != nil && err != mongo.ErrNoDocuments {
@@ -143,6 +144,10 @@ func New(mongoClient *mongo.Client) *App {
 	apiRouter, _ := rest.MakeRouter(
 		rest.Get("/", app.handleHealthz),
 	)
+	app.API.Use(&tracer.OtelMiddleware{
+		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
+		Router:      apiRouter,
+	})
 	app.API.SetApp(apiRouter)
 
 	return app

@@ -37,7 +37,7 @@ type disableToken struct {
 }
 
 // helper function to make it easy to get info based on auth auth token...
-func (a *App) getBase64AutoTokenInfo(tokenBase64 string) (*autoTokenInfo, error) {
+func (a *App) getBase64AutoTokenInfo(ctx context.Context, tokenBase64 string) (*autoTokenInfo, error) {
 
 	tok := make([]byte, 24)
 
@@ -55,9 +55,9 @@ func (a *App) getBase64AutoTokenInfo(tokenBase64 string) (*autoTokenInfo, error)
 	res := utils.PantahubDevicesJoinToken{}
 
 	col := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	err = col.FindOne(ctx, bson.M{"tokensha": tokenSha}).Decode(&res)
+	err = col.FindOne(ctxC, bson.M{"tokensha": tokenSha}).Decode(&res)
 	if err != nil {
 		return nil, errors.New("token not found")
 	}

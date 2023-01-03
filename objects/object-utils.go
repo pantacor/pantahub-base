@@ -52,7 +52,7 @@ func NewObject(shaStr, owner, objectName string) (
 }
 
 // SaveObject saves an object
-func (a *App) SaveObject(object *Object, localS3Check bool) (err error) {
+func (a *App) SaveObject(parentCtx context.Context, object *Object, localS3Check bool) (err error) {
 
 	SyncObjectSizes(object)
 
@@ -60,7 +60,7 @@ func (a *App) SaveObject(object *Object, localS3Check bool) (err error) {
 	post := false
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
 	defer cancel()
 
 	oldObject := Object{}
@@ -78,20 +78,20 @@ func (a *App) SaveObject(object *Object, localS3Check bool) (err error) {
 	}
 
 	if post {
-		result, err = CalcUsageAfterPost(object.Owner, a.mongoClient, object.ID, object.SizeInt)
+		result, err = CalcUsageAfterPost(parentCtx, object.Owner, a.mongoClient, object.ID, object.SizeInt)
 		if err != nil {
 			log.Printf("ERROR: CalcUsageAfterPost failed: %s\n", err.Error())
 			return errors.New("Error posting object")
 		}
 	} else {
-		result, err = CalcUsageAfterPut(object.Owner, a.mongoClient, object.ID, object.SizeInt)
+		result, err = CalcUsageAfterPut(parentCtx, object.Owner, a.mongoClient, object.ID, object.SizeInt)
 		if err != nil {
 			log.Printf("ERROR: CalcUsageAfterPut failed: %s\n", err.Error())
 			return errors.New("Error posting object")
 		}
 	}
 
-	quota, err := a.GetDiskQuota(object.Owner)
+	quota, err := a.GetDiskQuota(parentCtx, object.Owner)
 	if err != nil {
 		log.Println("Error to calc diskquota: " + err.Error())
 		return errors.New("Error to calc quota")
@@ -129,7 +129,7 @@ func (a *App) SaveObject(object *Object, localS3Check bool) (err error) {
 	return nil
 }
 
-func (a *App) ResolveObjectWithBacking(owner string, sha string) (*Object, error) {
+func (a *App) ResolveObjectWithBacking(pctx context.Context, owner string, sha string) (*Object, error) {
 	var hasBackingFile bool
 
 	object := Object{}
@@ -142,7 +142,7 @@ func (a *App) ResolveObjectWithBacking(owner string, sha string) (*Object, error
 	// owner has its own copy of the object instance on DB side
 	storageID := MakeStorageID(owner, shaBytes)
 
-	err = a.FindObjectByStorageID(storageID, &object)
+	err = a.FindObjectByStorageID(pctx, storageID, &object)
 
 	if err == mongo.ErrNoDocuments {
 		return nil, err
@@ -163,11 +163,11 @@ func (a *App) ResolveObjectWithBacking(owner string, sha string) (*Object, error
 	return &object, nil
 }
 
-func (a *App) ResolveObjectWithLinks(owner string, sha string, autoLink bool) (*Object, error) {
+func (a *App) ResolveObjectWithLinks(ctx context.Context, owner string, sha string, autoLink bool) (*Object, error) {
 
 	var hasBackingFile bool
 
-	object, err := a.ResolveObjectWithBacking(owner, sha)
+	object, err := a.ResolveObjectWithBacking(ctx, owner, sha)
 
 	if err != nil && err != mongo.ErrNoDocuments && err != ErrNoBackingFile {
 		return nil, err
@@ -187,7 +187,7 @@ func (a *App) ResolveObjectWithLinks(owner string, sha string, autoLink bool) (*
 	// owner has its own copy of the object instance on DB side
 	storageID := MakeStorageID(owner, shaBytes)
 	object = new(Object)
-	err = a.FindObjectByStorageID(storageID, object)
+	err = a.FindObjectByStorageID(ctx, storageID, object)
 
 	if err == nil && object.LinkedObject == "" {
 		hasBackingFile, err = HasBackingFile(object)
@@ -210,7 +210,7 @@ func (a *App) ResolveObjectWithLinks(owner string, sha string, autoLink bool) (*
 
 	if autoLink && object.LinkedObject == "" && (err == mongo.ErrNoDocuments || !hasBackingFile) {
 		// Link object if there is any public object available
-		linked, err2 := a.LinkifyObject(object)
+		linked, err2 := a.LinkifyObject(ctx, object)
 		if err2 == mongo.ErrNoDocuments {
 			return nil, ErrNoLinkTargetAvail
 		} else if err2 != nil {
@@ -242,14 +242,14 @@ func HasBackingFile(object *Object) (bool, error) {
 }
 
 // LinkifyObject checks if there is any public object available to link and link if available
-func (a *App) LinkifyObject(object *Object) (
+func (a *App) LinkifyObject(ctx context.Context, object *Object) (
 	linked bool,
 	err error) {
 
 	notOwnedBy := object.Owner
 
 	// Find public object owner from public objects pool
-	publicObjectOwner, err := a.FindPublicObjectOwner(object.Sha, notOwnedBy)
+	publicObjectOwner, err := a.FindPublicObjectOwner(ctx, object.Sha, notOwnedBy)
 	if err == mongo.ErrNoDocuments {
 		return false, err
 	} else if err != nil {
@@ -257,7 +257,7 @@ func (a *App) LinkifyObject(object *Object) (
 	}
 
 	publicObject := Object{}
-	err = a.FindObjectByShaByOwner(object.Sha, publicObjectOwner, &publicObject)
+	err = a.FindObjectByShaByOwner(ctx, object.Sha, publicObjectOwner, &publicObject)
 	if err != nil {
 		return false, errors.New("Error finding object by sha '" + object.Sha + "' & by owner: '" + publicObjectOwner + "'" + err.Error())
 	}
@@ -279,14 +279,14 @@ func GetObjectWithAccess(object Object, endPoint string) *ObjectWithAccess {
 }
 
 // FindPublicObjectOwner is to check if the object is used in any of the public steps, if yes return the owner string
-func (a *App) FindPublicObjectOwner(sha string, notOwnedBy string) (
+func (a *App) FindPublicObjectOwner(parentCtx context.Context, sha string, notOwnedBy string) (
 	ownerStr string,
 	err error,
 ) {
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_public_steps")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
 	defer cancel()
 
 	publicStep := map[string]interface{}{}
@@ -308,21 +308,22 @@ func (a *App) FindPublicObjectOwner(sha string, notOwnedBy string) (
 
 // FindObjectByShaByOwner is to find object by sha & by owner
 func (a *App) FindObjectByShaByOwner(
+	parentCtx context.Context,
 	Sha, Owner string,
 	obj *Object,
 ) error {
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
 	defer cancel()
 
 	err := collection.FindOne(ctx, bson.M{
 		"id":    Sha,
 		"owner": Owner,
 		"$or": []bson.M{
-			bson.M{"linked_object": nil},
-			bson.M{"linked_object": ""},
+			{"linked_object": nil},
+			{"linked_object": ""},
 		},
 	}).Decode(&obj)
 

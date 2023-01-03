@@ -1,10 +1,16 @@
+// Copyright 2020  Pantacor Ltd.
 //
-// Package subscriptions offers simple subscription REST API to issue subscriptions
-// for services. In this file we define the rest frontend.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// (c) Pantacor Ltd, 2018
-// License: Apache 2.0 (see COPYRIGHT)
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
+//	Unless required by applicable law or agreed to in writing, software
+//	distributed under the License is distributed on an "AS IS" BASIS,
+//	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	See the License for the specific language governing permissions and
+//	limitations under the License.
 package subscriptions
 
 import (
@@ -16,6 +22,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/tracer"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -68,7 +75,7 @@ func (s *App) get(w rest.ResponseWriter, r *rest.Request) {
 	start := r.PathParam("start")
 	var startInt int
 	if start != "" {
-		startInt, err = strconv.Atoi(start)
+		startInt, _ = strconv.Atoi(start)
 	} else {
 		startInt = 0
 	}
@@ -76,13 +83,13 @@ func (s *App) get(w rest.ResponseWriter, r *rest.Request) {
 	page := r.PathParam("page")
 	var pageInt int
 	if page != "" {
-		pageInt, err = strconv.Atoi(page)
+		pageInt, _ = strconv.Atoi(page)
 	} else {
 		pageInt = -1
 	}
 
 	if authInfo.CallerType == "USER" {
-		subs, err := s.service.List(utils.Prn(authInfo.Caller), startInt, pageInt)
+		subs, err := s.service.List(r.Context(), utils.Prn(authInfo.Caller), startInt, pageInt)
 
 		if err != nil {
 			errID := bson.NewObjectId()
@@ -104,11 +111,12 @@ func (s *App) get(w rest.ResponseWriter, r *rest.Request) {
 
 	// XXX: right now not implemented
 	errID := bson.NewObjectId()
-	log.Printf("WARNING (%s): DEVICE/SERVICE  %s is using unsupported api method 'list subscriptios'\n",
-		errID.Hex(), authInfo.Caller)
-	utils.RestErrorWrapper(w, "NOT IMPLEMENTED ("+errID.Hex()+")", http.StatusNotImplemented)
-	return
+	log.Printf(
+		"WARNING (%s): DEVICE/SERVICE  %s is using unsupported api method 'list subscriptios'\n",
+		errID.Hex(),
+		authInfo.Caller)
 
+	utils.RestErrorWrapper(w, "NOT IMPLEMENTED ("+errID.Hex()+")", http.StatusNotImplemented)
 }
 
 // put Add a new subscription as a admin
@@ -162,7 +170,7 @@ func (s *App) put(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	sub, err := s.service.LoadBySubject(req.Subject)
+	sub, err := s.service.LoadBySubject(r.Context(), req.Subject)
 
 	if err != nil && err != mongo.ErrNoDocuments {
 		// XXX: right now not implemented
@@ -174,9 +182,9 @@ func (s *App) put(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if sub == nil {
-		sub, err = s.service.New(req.Subject, authInfo.Caller, req.Plan, req.Attrs)
+		sub, err = s.service.New(r.Context(), req.Subject, authInfo.Caller, req.Plan, req.Attrs)
 	} else {
-		err = sub.UpdatePlan(authInfo.Caller, req.Plan, req.Attrs)
+		err = sub.UpdatePlan(r.Context(), authInfo.Caller, req.Plan, req.Attrs)
 	}
 
 	if err != nil {
@@ -187,7 +195,8 @@ func (s *App) put(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "INTERNAL ERROR ("+errID.Hex()+")", http.StatusInternalServerError)
 		return
 	}
-	return
+
+	w.WriteJson(sub)
 }
 
 // MakeHandler make the api handler
@@ -239,6 +248,10 @@ func New(jwtMiddleware *jwt.JWTMiddleware, subscriptionService SubscriptionServi
 		rest.Get("/", app.get),
 		rest.Put("/admin/subscription", app.put),
 	)
+	app.API.Use(&tracer.OtelMiddleware{
+		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
+		Router:      apiRouter,
+	})
 	app.API.SetApp(apiRouter)
 	return app
 }

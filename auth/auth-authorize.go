@@ -92,7 +92,7 @@ func (app *App) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Request)
 		return
 	}
 
-	errCode, err := app.validateScopesAndURIs("", req.Service, req.Scopes, req.RedirectURI)
+	errCode, err := app.validateScopesAndURIs(r.Context(), "", req.Service, req.Scopes, req.RedirectURI)
 	if err != nil {
 		utils.RestErrorWrapper(w, err.Error(), errCode)
 		return
@@ -137,7 +137,7 @@ func (app *App) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Request)
 		return
 	}
 	// XXX: prototype: for production we need to prevent posting twice!!
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	_, err = collection.InsertOne(
 		ctx,
@@ -199,8 +199,11 @@ func (app *App) handlePostCode(w rest.ResponseWriter, r *rest.Request) {
 
 	req := codeRequest{}
 	err = r.DecodeJsonPayload(&req)
-
-	errCode, err := app.validateScopesAndURIs("", req.Service, req.Scopes, req.RedirectURI)
+	if err != nil {
+		utils.RestErrorWrapper(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	errCode, err := app.validateScopesAndURIs(r.Context(), "", req.Service, req.Scopes, req.RedirectURI)
 	if err != nil {
 		utils.RestErrorWrapper(w, err.Error(), errCode)
 		return
@@ -211,6 +214,7 @@ func (app *App) handlePostCode(w rest.ResponseWriter, r *rest.Request) {
 	if mapClaim == nil {
 		userAccountPayload := app.getAccountPayload(caller)
 		mapClaim, err = apps.AccessCodePayload(
+			r.Context(),
 			"",
 			req.Service,
 			req.ResponseType,
@@ -230,6 +234,10 @@ func (app *App) handlePostCode(w rest.ResponseWriter, r *rest.Request) {
 	code.Claims = mapClaim
 
 	response.Code, err = code.SignedString(app.jwtMiddleware.Key)
+	if err != nil {
+		utils.RestErrorWrapper(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	response.Scopes = req.Scopes
 
 	params := url.Values{}
@@ -248,9 +256,9 @@ func containsStringWithPrefix(slice []string, prefix string) bool {
 	return false
 }
 
-func (app *App) validateScopesAndURIs(caller, reqService, reqScopes, reqRedirectURI string) (int, error) {
+func (app *App) validateScopesAndURIs(ctx context.Context, caller, reqService, reqScopes, reqRedirectURI string) (int, error) {
 	defaultAccount := false
-	service, _, err := apps.SearchApp(caller, reqService, app.mongoClient.Database(utils.MongoDb))
+	service, _, err := apps.SearchApp(ctx, caller, reqService, app.mongoClient.Database(utils.MongoDb))
 	if err != nil {
 		// Support default accounts as before but only use pantahub scopes for those
 		serviceAccount, err := app.getAccount(reqService)
@@ -271,11 +279,11 @@ func (app *App) validateScopesAndURIs(caller, reqService, reqScopes, reqRedirect
 	}
 
 	// Validate scope only when the app comes from database
-	if defaultAccount == false {
+	if !defaultAccount {
 		scopes := strings.Fields(reqScopes)
 		allServicesScopes := utils.ParseScopes(service.Scopes)
 		if !utils.MatchAllScope(scopes, allServicesScopes) {
-			return http.StatusBadRequest, errors.New("You use a not allowed scoped for this application")
+			return http.StatusBadRequest, errors.New("you use a not allowed scoped for this application")
 		}
 	}
 

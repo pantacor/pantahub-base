@@ -74,7 +74,7 @@ func (a *App) handleDeleteObject(w rest.ResponseWriter, r *rest.Request) {
 	storageID := MakeStorageID(ownerStr, sha)
 
 	newObject := Object{}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	err = collection.FindOne(ctx, bson.M{
 		"_id":     storageID,
@@ -86,7 +86,7 @@ func (a *App) handleDeleteObject(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if newObject.Owner == owner {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 		deleteResult, err := collection.DeleteOne(ctx, bson.M{
 			"_id":     storageID,

@@ -97,7 +97,7 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 		autoLink = false
 	}
 
-	objectList, err := ProcessObjectsInState(newTrail.Owner, initialState, autoLink, a)
+	objectList, err := ProcessObjectsInState(r.Context(), newTrail.Owner, initialState, autoLink, a)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error processing trail objects in factory-state:"+err.Error(), http.StatusInternalServerError)
 		return
@@ -128,7 +128,7 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 	newStep.TimeModified = now
 	newStep.IsPublic = false
 
-	isDevicePublic, err := a.IsDevicePublic(newStep.TrailID)
+	isDevicePublic, err := a.IsDevicePublic(r.Context(), newStep.TrailID)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error checking device is public or not:"+err.Error(), http.StatusInternalServerError)
 		return
@@ -142,7 +142,7 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	objectList, err = ProcessObjectsInState(newStep.Owner, initialState, autoLink, a)
+	objectList, err = ProcessObjectsInState(r.Context(), newStep.Owner, initialState, autoLink, a)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error processing step objects in state"+err.Error(), http.StatusInternalServerError)
 		return
@@ -151,7 +151,7 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 	newStep.State = utils.BsonQuoteMap(&initialState)
 
 	// XXX: prototype: for production we need to prevent posting twice!!
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	_, err = collection.InsertOne(
 		ctx,
@@ -168,7 +168,7 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	_, err = collection.InsertOne(
 		ctx,

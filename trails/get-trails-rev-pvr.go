@@ -70,13 +70,13 @@ func (a *App) handleGetStepPvrInfo(w rest.ResponseWriter, r *rest.Request) {
 	stepID := getID + "-" + revID
 	step := Step{}
 
-	isPublic, err := a.isTrailPublic(getID)
+	isPublic, err := a.isTrailPublic(r.Context(), getID)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error getting trail public:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
 	//	get last step

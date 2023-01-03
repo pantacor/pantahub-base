@@ -24,6 +24,7 @@ package logs
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -159,7 +160,7 @@ func (s *elasticLogger) unregister(deleteIndex bool) error {
 	return nil
 }
 
-func (s *elasticLogger) getLogs(start int64, page int64, before *time.Time,
+func (s *elasticLogger) getLogs(pctx context.Context, start int64, page int64, before *time.Time,
 	after *time.Time, query Filters, sort Sorts, cursor bool) (*Pager, error) {
 	queryFmt := fmt.Sprintf(s.elasticIndexPrefix + "-*/_search")
 
@@ -256,7 +257,7 @@ func (s *elasticLogger) getLogs(start int64, page int64, before *time.Time,
 		queryURI.RawQuery = q1.Encode()
 	}
 
-	response, err := s.r().SetBody(searchBody).Post(queryURI.String())
+	response, err := s.r().SetContext(pctx).SetBody(searchBody).Post(queryURI.String())
 	if err != nil {
 		return nil, err
 	}
@@ -317,7 +318,7 @@ func (s *elasticLogger) scrollBuildBodyNext(keepAlive string, scrollID string) (
 	return body, nil
 }
 
-func (s *elasticLogger) getLogsByCursor(nextCursor string) (*Pager, error) {
+func (s *elasticLogger) getLogsByCursor(pctx context.Context, nextCursor string) (*Pager, error) {
 	queryFmt, values, err := s.scrollBuildNextURL(false)
 	if err != nil {
 		return nil, err
@@ -336,7 +337,7 @@ func (s *elasticLogger) getLogsByCursor(nextCursor string) (*Pager, error) {
 		return nil, err
 	}
 
-	response, err := s.r().SetBody(searchBody).Post(queryURI.String())
+	response, err := s.r().SetContext(pctx).SetBody(searchBody).Post(queryURI.String())
 	if err != nil {
 		return nil, err
 	}
@@ -373,7 +374,7 @@ func (s *elasticLogger) getLogsByCursor(nextCursor string) (*Pager, error) {
 	return &pagerResult, nil
 }
 
-func (s *elasticLogger) postLogs(e []Entry) error {
+func (s *elasticLogger) postLogs(parentCtx context.Context, e []Entry) error {
 	if !s.works {
 		return errors.New("logger not initialized/works")
 	}
@@ -432,6 +433,7 @@ func (s *elasticLogger) postLogs(e []Entry) error {
 	}
 
 	response, err := s.r().
+		SetContext(parentCtx).
 		SetBody(buf.String()).
 		SetHeader("Content-Type", "application/x-ndjson").
 		Post(postURL.String())
