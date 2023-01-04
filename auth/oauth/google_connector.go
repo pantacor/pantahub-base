@@ -70,8 +70,8 @@ func GoogleAuthorize(redirectURI string, config *oauth2.Config, w rest.ResponseW
 }
 
 // GoogleCb use code to retrive service user data
-func GoogleCb(config *oauth2.Config, code string) (*ResponsePayload, error) {
-	data, err := getUserDataFromGoogle(config, code)
+func GoogleCb(ctx context.Context, config *oauth2.Config, code string) (*ResponsePayload, error) {
+	data, err := getUserDataFromGoogle(ctx, config, code)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +82,7 @@ func GoogleCb(config *oauth2.Config, code string) (*ResponsePayload, error) {
 	}
 
 	if !googlePayload.VerifiedEmail {
-		return nil, errors.New("Users email is not verified")
+		return nil, errors.New("users email is not verified")
 	}
 
 	re := regexp.MustCompile(`@.*`)
@@ -94,13 +94,13 @@ func GoogleCb(config *oauth2.Config, code string) (*ResponsePayload, error) {
 	return &ResponsePayload{
 		Email: googlePayload.Email,
 		Nick:  nick,
-		Raw:   fmt.Sprintf("%s", data),
+		Raw:   string(data),
 	}, nil
 }
 
-func getUserDataFromGoogle(config *oauth2.Config, code string) ([]byte, error) {
+func getUserDataFromGoogle(ctx context.Context, config *oauth2.Config, code string) ([]byte, error) {
 	// Use code to get token and get user info from Google.
-	token, err := config.Exchange(context.Background(), code)
+	token, err := config.Exchange(ctx, code)
 	if err != nil {
 		return nil, fmt.Errorf("code exchange wrong: %s", err.Error())
 	}

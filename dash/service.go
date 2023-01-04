@@ -27,6 +27,7 @@ import (
 	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/subscriptions"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/tracer"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -127,25 +128,25 @@ var (
 
 	// StandardPlans define standard plans
 	StandardPlans = map[string]Plan{
-		"AlphaTester": Plan{
+		"AlphaTester": {
 			Name: "AlphaTester",
 			Quotas: map[QuotaType]Quota{
-				QuotaObjects: Quota{
+				QuotaObjects: {
 					Name: QuotaObjects,
 					Max:  2,
 					Unit: "GiB",
 				},
-				QuotaBandwidth: Quota{
+				QuotaBandwidth: {
 					Name: QuotaBandwidth,
 					Max:  2,
 					Unit: "GiB",
 				},
-				QuotaDevices: Quota{
+				QuotaDevices: {
 					Name: QuotaDevices,
 					Max:  25,
 					Unit: "Piece",
 				},
-				QuotaBillingDays: Quota{
+				QuotaBillingDays: {
 					Name: QuotaBillingDays,
 					Max:  30,
 					Unit: "Days",
@@ -158,25 +159,25 @@ var (
 				VatRegion: "World",
 			},
 		},
-		"VIP": Plan{
+		"VIP": {
 			Name: "VIP",
 			Quotas: map[QuotaType]Quota{
-				QuotaObjects: Quota{
+				QuotaObjects: {
 					Name: QuotaObjects,
 					Max:  25,
 					Unit: "GiB",
 				},
-				QuotaBandwidth: Quota{
+				QuotaBandwidth: {
 					Name: QuotaBandwidth,
 					Max:  50,
 					Unit: "GiB",
 				},
-				QuotaDevices: Quota{
+				QuotaDevices: {
 					Name: QuotaDevices,
 					Max:  100,
 					Unit: "Piece",
 				},
-				QuotaBillingDays: Quota{
+				QuotaBillingDays: {
 					Name: QuotaBillingDays,
 					Max:  30,
 					Unit: "Days",
@@ -248,6 +249,10 @@ func New(jwtMiddleware *jwt.JWTMiddleware,
 		rest.Get("/auth_status", handleAuth),
 		rest.Get("/", app.handleGetSummary),
 	)
+	app.API.Use(&tracer.OtelMiddleware{
+		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
+		Router:      apiRouter,
+	})
 	app.API.SetApp(apiRouter)
 
 	return app

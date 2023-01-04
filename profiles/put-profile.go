@@ -70,7 +70,7 @@ func (a *App) handlePostProfile(w rest.ResponseWriter, r *rest.Request) {
 		UpdateableProfile: payload,
 	}
 
-	profile, err := a.updateProfile(accountPrn, newProfile)
+	profile, err := a.updateProfile(r.Context(), accountPrn, newProfile)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Update: "+err.Error(), http.StatusInternalServerError)
 		return

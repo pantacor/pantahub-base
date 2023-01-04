@@ -58,7 +58,7 @@ func (a *App) handleGetProfile(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	account, err := a.getUserAccount(accountNick, "")
+	account, err := a.getUserAccount(r.Context(), accountNick, "")
 	if err != nil {
 		switch err.(type) {
 		default:
@@ -67,7 +67,7 @@ func (a *App) handleGetProfile(w rest.ResponseWriter, r *rest.Request) {
 		}
 	}
 
-	haveProfile, err := a.ExistsInProfiles(account.ID)
+	haveProfile, err := a.ExistsInProfiles(r.Context(), account.ID)
 	if err != nil {
 		utils.RestErrorWrapper(w, err.Error(), http.StatusForbidden)
 		return
@@ -75,14 +75,14 @@ func (a *App) handleGetProfile(w rest.ResponseWriter, r *rest.Request) {
 
 	// Make a new private profile if user have no profile & have public devices
 	if !haveProfile {
-		_, err := a.MakeUserProfile(account, nil)
+		_, err := a.MakeUserProfile(r.Context(), account, nil)
 		if err != nil {
 			utils.RestErrorWrapper(w, err.Error(), http.StatusForbidden)
 			return
 		}
 	}
 
-	profile, err := a.getProfile(account.Prn, nil)
+	profile, err := a.getProfile(r.Context(), account.Prn, nil)
 	if err != nil {
 		utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
 		return

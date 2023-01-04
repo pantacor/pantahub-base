@@ -80,7 +80,7 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 	trailID := r.PathParam("id")
 	trail := Trail{}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	trailObjectID, err := primitive.ObjectIDFromHex(trailID)
 	if err != nil {
@@ -125,7 +125,7 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 			utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		newStep.Rev, err = a.getLatestStePrev(trailObjectID)
+		newStep.Rev, err = a.getLatestStepRev(r.Context(), trailObjectID)
 		newStep.Rev++
 	}
 
@@ -135,7 +135,7 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	stepID := trailID + "-" + strconv.Itoa(newStep.Rev-1)
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	err = collSteps.FindOne(ctx, bson.M{
 		"_id":     stepID,
@@ -164,7 +164,7 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 	newStep.TimeModified = now
 	newStep.IsPublic = previousStep.IsPublic
 
-	isDevicePublic, err := a.IsDevicePublic(newStep.TrailID)
+	isDevicePublic, err := a.IsDevicePublic(r.Context(), newStep.TrailID)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error checking device is public or not:"+err.Error(), http.StatusInternalServerError)
 		return
@@ -185,7 +185,7 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 		autoLink = false
 	}
 
-	objectList, err := ProcessObjectsInState(newStep.Owner, newStep.State, autoLink, a)
+	objectList, err := ProcessObjectsInState(r.Context(), newStep.Owner, newStep.State, autoLink, a)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error processing step objects in state: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -199,7 +199,7 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 	newStep.TimeModified = time.Now()
 	newStep.TimeCreated = time.Now()
 
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	_, err = collSteps.InsertOne(
 		ctx,
@@ -211,7 +211,7 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "No access to resource or bad step rev1 "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	updateResult, err := collTrails.UpdateOne(
 		ctx,

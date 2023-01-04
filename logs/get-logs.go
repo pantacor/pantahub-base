@@ -126,7 +126,7 @@ func (a *App) handleGetLogs(w rest.ResponseWriter, r *rest.Request) {
 	platParam := r.FormValue("plat")
 	sourceParam := r.FormValue("src")
 	deviceParam := r.FormValue("dev")
-	deviceParam, err = a.ParseDeviceString(own.(string), deviceParam)
+	deviceParam, err = a.ParseDeviceString(r.Context(), own.(string), deviceParam)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error Parsing Device nicks:"+err.Error(), http.StatusBadRequest)
 		return
@@ -191,7 +191,7 @@ func (a *App) handleGetLogs(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	cursor := r.FormValue("cursor") != ""
-	result, err = a.backend.getLogs(startParamInt, pageParamInt, before, after, filter, logsSort, cursor)
+	result, err = a.backend.getLogs(r.Context(), startParamInt, pageParamInt, before, after, filter, logsSort, cursor)
 
 	if err != nil {
 		utils.RestErrorWrapper(w, "ERROR: getting logs failed "+err.Error(), http.StatusInternalServerError)

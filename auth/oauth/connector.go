@@ -17,6 +17,7 @@
 package oauth
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
@@ -52,7 +53,7 @@ type GetServiceConfigFunc func() *oauth2.Config
 type AuthorizeServiceFunc func(redirectURI string, config *oauth2.Config, w rest.ResponseWriter, r *rest.Request)
 
 // CallbackServiceFunc use service authorization method
-type CallbackServiceFunc func(config *oauth2.Config, code string) (*ResponsePayload, error)
+type CallbackServiceFunc func(ctx context.Context, config *oauth2.Config, code string) (*ResponsePayload, error)
 
 const (
 	// ServiceGoogle google service enum
@@ -108,7 +109,7 @@ func CbByService(r *rest.Request) (*ResponsePayload, error) {
 	service := ServiceType(r.PathParam("service"))
 	getConfig, found := ServicesConfigs[service]
 	if !found {
-		return nil, fmt.Errorf("We can't connect to service: %s", service)
+		return nil, fmt.Errorf("we can't connect to service: %s", service)
 	}
 
 	oauthState, err := r.Cookie(oauthCookie)
@@ -117,10 +118,10 @@ func CbByService(r *rest.Request) (*ResponsePayload, error) {
 	}
 
 	if r.FormValue("state") != oauthState.Value {
-		return nil, errors.New("We can't validate the state")
+		return nil, errors.New("we can't validate the state")
 	}
 
-	payload, err := ServicesCallback[service](getConfig(), r.FormValue("code"))
+	payload, err := ServicesCallback[service](r.Context(), getConfig(), r.FormValue("code"))
 	if err != nil {
 		return nil, err
 	}

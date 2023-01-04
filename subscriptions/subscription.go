@@ -1,13 +1,20 @@
+// Copyright 2020  Pantacor Ltd.
 //
-// Package subscriptions offers simple subscription REST API to issue subscriptions
-// for services
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// (c) Pantacor Ltd, 2018
-// License: Apache 2.0 (see COPYRIGHT)
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
+//	Unless required by applicable law or agreed to in writing, software
+//	distributed under the License is distributed on an "AS IS" BASIS,
+//	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	See the License for the specific language governing permissions and
+//	limitations under the License.
 package subscriptions
 
 import (
+	"context"
 	"errors"
 	"math"
 	"strings"
@@ -66,9 +73,9 @@ type Subscription interface {
 
 	// UpdatePlan changes plan for subscription to plan PRN. If not nil,
 	// attrs will overload the defaults that come with plan.
-	UpdatePlan(issuer utils.Prn, plan utils.Prn, attrs map[string]interface{}) error
-	Cancel(issuer utils.Prn) error
-	Lock(issuer utils.Prn) error
+	UpdatePlan(ctx context.Context, issuer utils.Prn, plan utils.Prn, attrs map[string]interface{}) error
+	Cancel(ctx context.Context, issuer utils.Prn) error
+	Lock(ctx context.Context, issuer utils.Prn) error
 }
 
 // SubscriptionMgo define Subscription mongo payload
@@ -211,9 +218,9 @@ func (i SubscriptionMgo) GetPeriodProgression() float64 {
 	start := i.GetPeriodStart()
 	end := i.GetPeriodEnd()
 	now := i.service.Now()
-	periodLenSec := end.Sub(start)
+	periodLen := end.Sub(start)
 	periodIn := now.Sub(start)
-	return math.Abs(float64(periodIn) / float64(periodLenSec))
+	return math.Abs(float64(periodIn) / float64(periodLen))
 }
 
 // IsCancelled check if the subscription is cancelled
@@ -227,7 +234,7 @@ func (i SubscriptionMgo) IsLocked() bool {
 }
 
 // UpdatePlan udpdate a plan with new configuration and saved the previous as history
-func (i SubscriptionMgo) UpdatePlan(issuer utils.Prn, plan utils.Prn, attrs map[string]interface{}) error {
+func (i SubscriptionMgo) UpdatePlan(ctx context.Context, issuer utils.Prn, plan utils.Prn, attrs map[string]interface{}) error {
 
 	// create a clone where we can strip history history
 	c := i
@@ -255,19 +262,19 @@ func (i SubscriptionMgo) UpdatePlan(issuer utils.Prn, plan utils.Prn, attrs map[
 	}
 
 	i.LastModified = i.service.Now()
-	err := i.service.Save(i)
+	err := i.service.Save(ctx, i)
 
 	return err
 }
 
 // Cancel cancel a subscription
-func (i SubscriptionMgo) Cancel(issuer utils.Prn) error {
-	err := i.UpdatePlan(issuer, SubscriptionTypeCancelled, i.Attributes)
+func (i SubscriptionMgo) Cancel(ctx context.Context, issuer utils.Prn) error {
+	err := i.UpdatePlan(ctx, issuer, SubscriptionTypeCancelled, i.Attributes)
 	return err
 }
 
 // Lock lock a subscription
-func (i SubscriptionMgo) Lock(issuer utils.Prn) error {
-	err := i.UpdatePlan(issuer, SubscriptionTypeLocked, i.Attributes)
+func (i SubscriptionMgo) Lock(ctx context.Context, issuer utils.Prn) error {
+	err := i.UpdatePlan(ctx, issuer, SubscriptionTypeLocked, i.Attributes)
 	return err
 }

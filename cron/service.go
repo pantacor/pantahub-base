@@ -24,6 +24,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/tracer"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -81,6 +82,10 @@ func New(jwtMiddleware *jwt.JWTMiddleware,
 		rest.Put("/public/devices", app.handlePutDevices),
 		rest.Put("/public/steps", app.handlePutSteps),
 	)
+	app.API.Use(&tracer.OtelMiddleware{
+		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
+		Router:      apiRouter,
+	})
 	app.API.SetApp(apiRouter)
 
 	return app

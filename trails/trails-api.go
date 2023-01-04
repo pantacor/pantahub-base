@@ -24,8 +24,8 @@
 // high latency, asynchronous configuration management as found in the problem
 // space of management of edge compute device world.
 //
-//  XXX: add proper API high level doc here (deleted outdated content)
-//       handler func inline doc should stay up to date though...
+//	XXX: add proper API high level doc here (deleted outdated content)
+//	     handler func inline doc should stay up to date though...
 //
 // Detailed documentation for the various operations on the API endpoints can be
 // at the handler functions below.
@@ -184,7 +184,7 @@ func prnGetID(prn string) string {
 	return prn[idx+1:]
 }
 
-func (a *App) getLatestStePrev(trailID primitive.ObjectID) (int, error) {
+func (a *App) getLatestStepRev(pctx context.Context, trailID primitive.ObjectID) (int, error) {
 	collSteps := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
 	if collSteps == nil {
@@ -192,7 +192,7 @@ func (a *App) getLatestStePrev(trailID primitive.ObjectID) (int, error) {
 	}
 
 	step := &Step{}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(pctx, 5*time.Second)
 	defer cancel()
 	findOneOptions := options.FindOne()
 	findOneOptions.SetSort(bson.M{"rev": -1})
@@ -240,7 +240,7 @@ func (a *App) handlePutStepsObject(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	err := coll.FindOne(ctx, bson.M{
 		"_id":     trailID + "-" + rev,
@@ -276,7 +276,7 @@ func (a *App) handlePutStepsObject(w rest.ResponseWriter, r *rest.Request) {
 
 	storageID := objects.MakeStorageID(step.Owner, sha)
 
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	err = collection.FindOne(ctx, bson.M{
 		"_id":     storageID,
@@ -312,7 +312,7 @@ func (a *App) handlePutStepsObject(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	objects.SyncObjectSizes(&newObject)
-	result, err := objects.CalcUsageAfterPut(newObject.Owner, a.mongoClient, newObject.ID, newObject.SizeInt)
+	result, err := objects.CalcUsageAfterPut(r.Context(), newObject.Owner, a.mongoClient, newObject.ID, newObject.SizeInt)
 
 	if err != nil {
 		log.Println("Error to calc diskquota: " + err.Error())
@@ -320,7 +320,7 @@ func (a *App) handlePutStepsObject(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	quota, err := objects.GetDiskQuota(newObject.Owner)
+	quota, err := objects.GetDiskQuota(r.Context(), newObject.Owner)
 
 	if err != nil {
 		log.Println("Error get diskquota setting: " + err.Error())
@@ -336,7 +336,7 @@ func (a *App) handlePutStepsObject(w rest.ResponseWriter, r *rest.Request) {
 			http.StatusPreconditionFailed)
 	}
 
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
 	updateOptions := options.Update()
@@ -367,6 +367,7 @@ func (a *App) handlePutStepsObject(w rest.ResponseWriter, r *rest.Request) {
 2.UnMark All Objects As Garbages if they are marked as garbage
 */
 func ProcessObjectsInState(
+	pctx context.Context,
 	owner string,
 	state map[string]interface{},
 	autoLink bool,
@@ -375,11 +376,11 @@ func ProcessObjectsInState(
 	objects []string,
 	err error,
 ) {
-	objectList, err := GetStateObjects(owner, state, autoLink, a)
+	objectList, err := GetStateObjects(pctx, owner, state, autoLink, a)
 	if err != nil {
 		return objectList, err
 	}
-	err = RestoreObjects(objectList, a)
+	err = RestoreObjects(pctx, objectList, a)
 	if err != nil {
 		return objectList, err
 	}
@@ -388,6 +389,7 @@ func ProcessObjectsInState(
 
 // GetStateObjects : Get State Objects
 func GetStateObjects(
+	pctx context.Context,
 	owner string,
 	state map[string]interface{},
 	autoLink bool,
@@ -433,14 +435,14 @@ func GetStateObjects(
 			return nil, fmt.Errorf("state_object: Object is not a string[%s: %s] \n state details: \n %s", key, sha, statejson)
 		}
 
-		object, err := objectsApp.ResolveObjectWithLinks(owner, sha, autoLink)
+		object, err := objectsApp.ResolveObjectWithLinks(pctx, owner, sha, autoLink)
 
 		if err != nil {
 			return nil, err
 		}
 
 		// Save object
-		err = objectsApp.SaveObject(object, false)
+		err = objectsApp.SaveObject(pctx, object, false)
 		if err != nil {
 			return nil, errors.New("Error saving object:" + err.Error())
 		}
@@ -454,18 +456,19 @@ func GetStateObjects(
 
 // RestoreObjects : Takes the list of objects and unmarks them garbage.
 func RestoreObjects(
+	pctx context.Context,
 	objectList []string,
 	a *App,
 ) error {
 
 	for _, storageSha := range objectList {
 
-		result, err := IsObjectGarbage(storageSha, a)
+		result, err := IsObjectGarbage(pctx, storageSha, a)
 		if err != nil {
 			return errors.New("Error checking garbage object:" + err.Error() + "[sha:" + storageSha + "]")
 		}
 		if result {
-			err := UnMarkObjectAsGarbage(storageSha, a)
+			err := UnMarkObjectAsGarbage(pctx, storageSha, a)
 			if err != nil {
 				return errors.New("Error unmarking object as garbage:" + err.Error() + "[sha:" + storageSha + "]")
 			}
@@ -475,12 +478,12 @@ func RestoreObjects(
 }
 
 // IsObjectGarbage : to check if an object is garbage or not
-func IsObjectGarbage(ObjectID string, a *App) (
+func IsObjectGarbage(pctx context.Context, ObjectID string, a *App) (
 	bool,
 	error,
 ) {
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(pctx, 5*time.Second)
 	defer cancel()
 
 	objectCount, err := collection.CountDocuments(ctx,
@@ -496,9 +499,9 @@ func IsObjectGarbage(ObjectID string, a *App) (
 }
 
 // UnMarkObjectAsGarbage : to unmark object as garbage
-func UnMarkObjectAsGarbage(ObjectID string, a *App) error {
+func UnMarkObjectAsGarbage(pctx context.Context, ObjectID string, a *App) error {
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(pctx, 5*time.Second)
 	defer cancel()
 	updateResult, err := collection.UpdateOne(
 		ctx,
@@ -519,12 +522,12 @@ func UnMarkObjectAsGarbage(ObjectID string, a *App) error {
 }
 
 // IsDevicePublic checks if a device is public or not
-func (a *App) IsDevicePublic(ID primitive.ObjectID) (bool, error) {
+func (a *App) IsDevicePublic(ctx context.Context, ID primitive.ObjectID) (bool, error) {
 
 	devicesApp := devices.Build(a.mongoClient)
 	device := devices.Device{}
 
-	err := devicesApp.FindDeviceByID(ID, &device)
+	err := devicesApp.FindDeviceByID(ctx, ID, &device)
 	if err != nil {
 		return false, err
 	}

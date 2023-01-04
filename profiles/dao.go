@@ -27,10 +27,43 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+const CollectionName = "pantahub_profiles"
+
 // ExistsInProfiles : Check if a user details exists in profiles or not
-func (a *App) ExistsInProfiles(ID primitive.ObjectID) (bool, error) {
-	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_profiles")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func (a *App) setIndexes() error {
+	CreateIndexesOptions := options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+
+	t := true
+	f := false
+
+	collection := a.mongoClient.Database(utils.MongoDb).Collection(CollectionName)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	_, err := collection.Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{
+			Keys: bson.D{
+				{Key: "prn", Value: 1},
+			},
+			Options: &options.IndexOptions{
+				Unique:     &t,
+				Background: &f,
+				Sparse:     &t,
+			},
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ExistsInProfiles : Check if a user details exists in profiles or not
+func (a *App) ExistsInProfiles(parentCtx context.Context, ID primitive.ObjectID) (bool, error) {
+	collection := a.mongoClient.Database(utils.MongoDb).Collection(CollectionName)
+	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
 	defer cancel()
 	count, err := collection.CountDocuments(ctx,
 		bson.M{
@@ -42,15 +75,15 @@ func (a *App) ExistsInProfiles(ID primitive.ObjectID) (bool, error) {
 	return count > 0, err
 }
 
-func (a *App) getProfile(prn string, projection map[string]interface{}) (*Profile, error) {
+func (a *App) getProfile(parentCtx context.Context, prn string, projection map[string]interface{}) (*Profile, error) {
 	profile := &Profile{}
 	queryOptions := options.FindOneOptions{}
 	if projection != nil {
 		queryOptions.Projection = utils.MergeDefaultProjection(projection)
 	}
 
-	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_profiles")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	collection := a.mongoClient.Database(utils.MongoDb).Collection(CollectionName)
+	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
 	defer cancel()
 
 	err := collection.FindOne(ctx, bson.M{"prn": prn}, &queryOptions).Decode(profile)
@@ -58,9 +91,9 @@ func (a *App) getProfile(prn string, projection map[string]interface{}) (*Profil
 }
 
 // HavePublicDevices : Check if a user have public devices or not
-func (a *App) HavePublicDevices(prn string) (bool, error) {
+func (a *App) HavePublicDevices(parentCtx context.Context, prn string) (bool, error) {
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
 	defer cancel()
 
 	count, err := collection.CountDocuments(ctx,
@@ -76,7 +109,7 @@ func (a *App) HavePublicDevices(prn string) (bool, error) {
 }
 
 // MakeUserProfile : Make User Profile from account
-func (a *App) MakeUserProfile(account *accounts.Account, newProfile *UpdateableProfile) (*Profile, error) {
+func (a *App) MakeUserProfile(parentCtx context.Context, account *accounts.Account, newProfile *UpdateableProfile) (*Profile, error) {
 	profile := &Profile{
 		UpdateableProfile: newProfile,
 		ID:                account.ID,
@@ -87,8 +120,8 @@ func (a *App) MakeUserProfile(account *accounts.Account, newProfile *UpdateableP
 		Public:            true,
 		Garbage:           false,
 	}
-	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_profiles")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	collection := a.mongoClient.Database(utils.MongoDb).Collection(CollectionName)
+	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
 	defer cancel()
 
 	_, err := collection.InsertOne(ctx, &profile)
@@ -97,13 +130,13 @@ func (a *App) MakeUserProfile(account *accounts.Account, newProfile *UpdateableP
 }
 
 // getUserAccount get user account using account by something (default: by nick)
-func (a *App) getUserAccount(accountNick string, by string) (*accounts.Account, error) {
+func (a *App) getUserAccount(parentCtx context.Context, accountNick string, by string) (*accounts.Account, error) {
 	if by == "" {
 		by = "nick"
 	}
 	account := &accounts.Account{}
 	col := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
 	defer cancel()
 
 	search := bson.M{}
@@ -114,10 +147,10 @@ func (a *App) getUserAccount(accountNick string, by string) (*accounts.Account, 
 }
 
 // MarkProfileAsPrivate : Mark Profile As Private
-func (a *App) MarkProfileAsPrivate(prn string) error {
-	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_profiles")
+func (a *App) MarkProfileAsPrivate(parentCtx context.Context, prn string) error {
+	collection := a.mongoClient.Database(utils.MongoDb).Collection(CollectionName)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
 	defer cancel()
 	_, err := collection.UpdateOne(
 		ctx,
@@ -131,21 +164,21 @@ func (a *App) MarkProfileAsPrivate(prn string) error {
 	return nil
 }
 
-func (a *App) updateProfile(accountPrn string, newProfile *Profile) (*Profile, error) {
+func (a *App) updateProfile(parentCtx context.Context, accountPrn string, newProfile *Profile) (*Profile, error) {
 	profile := &Profile{}
-	account, err := a.getUserAccount(accountPrn, "prn")
+	account, err := a.getUserAccount(parentCtx, accountPrn, "prn")
 	if err != nil {
 		return profile, err
 	}
 	newProfile.Nick = account.Nick
 
-	col := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_profiles")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	col := a.mongoClient.Database(utils.MongoDb).Collection(CollectionName)
+	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
 	defer cancel()
 
 	err = col.FindOne(ctx, bson.M{"prn": accountPrn}).Decode(&profile)
 	if err != nil && err == mongo.ErrNoDocuments {
-		profile, err = a.MakeUserProfile(account, newProfile.UpdateableProfile)
+		profile, err = a.MakeUserProfile(parentCtx, account, newProfile.UpdateableProfile)
 		if err != nil {
 			return profile, err
 		}
@@ -154,7 +187,7 @@ func (a *App) updateProfile(accountPrn string, newProfile *Profile) (*Profile, e
 		return profile, err
 	}
 
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(parentCtx, 5*time.Second)
 	defer cancel()
 	_, err = col.UpdateOne(
 		ctx,
@@ -171,15 +204,15 @@ func (a *App) updateProfile(accountPrn string, newProfile *Profile) (*Profile, e
 	return newProfile, nil
 }
 
-func (a *App) updateProfileMeta(accountPrn string, metas map[string]interface{}) (*Profile, error) {
+func (a *App) updateProfileMeta(parentCtx context.Context, accountPrn string, metas map[string]interface{}) (*Profile, error) {
 	profile := &Profile{}
-	_, err := a.getUserAccount(accountPrn, "prn")
+	_, err := a.getUserAccount(parentCtx, accountPrn, "prn")
 	if err != nil {
 		return profile, err
 	}
 
-	col := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_profiles")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	col := a.mongoClient.Database(utils.MongoDb).Collection(CollectionName)
+	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
 	defer cancel()
 
 	err = col.FindOne(ctx, bson.M{"prn": accountPrn}).Decode(&profile)
@@ -187,7 +220,7 @@ func (a *App) updateProfileMeta(accountPrn string, metas map[string]interface{})
 		return profile, err
 	}
 
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(parentCtx, 5*time.Second)
 	defer cancel()
 	_, err = col.UpdateOne(
 		ctx,

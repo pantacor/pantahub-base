@@ -55,7 +55,7 @@ func (a *App) handlePutSteps(w rest.ResponseWriter, r *rest.Request) {
 
 	findOptions := options.Find()
 	findOptions.SetNoCursorTimeout(true)
-	ctx, cancel := context.WithTimeout(context.Background(), a.CronJobTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), a.CronJobTimeout)
 	defer cancel()
 	query := bson.M{
 		"ispublic":              true,
@@ -80,20 +80,20 @@ func (a *App) handlePutSteps(w rest.ResponseWriter, r *rest.Request) {
 
 		var publicStep callbacks.PublicStep
 
-		err = callbackApp.FindPublicStep(step.ID, &publicStep)
+		err = callbackApp.FindPublicStep(r.Context(), step.ID, &publicStep)
 		if err != nil && err != mongo.ErrNoDocuments {
 			utils.RestErrorWrapper(w, err.Error(), http.StatusForbidden)
 			return
 		}
 
-		err = callbackApp.SavePublicStep(&step, &publicStep)
+		err = callbackApp.SavePublicStep(r.Context(), &step, &publicStep)
 		if err != nil {
 			utils.RestErrorWrapper(w, err.Error(), http.StatusForbidden)
 			return
 		}
 
 		// Mark the flag "mark_public_processed" as TRUE
-		err = callbackApp.MarkStepAsProcessed(step.ID)
+		err = callbackApp.MarkStepAsProcessed(r.Context(), step.ID)
 		if err != nil {
 			utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
 			return

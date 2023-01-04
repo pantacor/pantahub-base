@@ -19,7 +19,6 @@ package apps
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -34,7 +33,7 @@ import (
 )
 
 // CreateOrUpdateApp a new third party app
-func CreateOrUpdateApp(tpApp *TPApp, database *mongo.Database) (*TPApp, error) {
+func CreateOrUpdateApp(ctx context.Context, tpApp *TPApp, database *mongo.Database) (*TPApp, error) {
 	if tpApp.Nick == "" {
 		tpApp.Nick = petname.Generate(3, "-")
 	} else {
@@ -48,18 +47,19 @@ func CreateOrUpdateApp(tpApp *TPApp, database *mongo.Database) (*TPApp, error) {
 
 	collection := database.Collection(DBCollection)
 	if collection == nil {
-		return nil, errors.New("Error with Database connectivity")
+		return nil, errors.New("error with Database connectivity")
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
 	tpApp.ExposedScopesLength = len(tpApp.ExposedScopes)
 
 	updateOptions := options.Update()
 	updateOptions.SetUpsert(true)
+
+	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
 	_, err := collection.UpdateOne(
-		ctx,
+		ctxC,
 		bson.M{"_id": tpApp.ID},
 		bson.M{"$set": tpApp},
 		updateOptions,
@@ -72,7 +72,7 @@ func CreateOrUpdateApp(tpApp *TPApp, database *mongo.Database) (*TPApp, error) {
 func LoginAsApp(serviceID, secret string, database *mongo.Database) (*TPApp, error) {
 	collection := database.Collection(DBCollection)
 	if collection == nil {
-		return nil, errors.New("Error with Database connectivity")
+		return nil, errors.New("error with Database connectivity")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -99,10 +99,10 @@ func LoginAsApp(serviceID, secret string, database *mongo.Database) (*TPApp, err
 }
 
 // SearchApp search third party app by id or prn
-func SearchApp(owner string, id string, database *mongo.Database) (*TPApp, int, error) {
-	apps, err := SearchApps(owner, id, database)
+func SearchApp(ctx context.Context, owner string, id string, database *mongo.Database) (*TPApp, int, error) {
+	apps, err := SearchApps(ctx, owner, id, database)
 	if err != nil {
-		return nil, http.StatusInternalServerError, errors.New("Error reading third party application " + err.Error())
+		return nil, http.StatusInternalServerError, errors.New("error reading third party application " + err.Error())
 	}
 
 	if len(apps) != 1 {
@@ -115,16 +115,13 @@ func SearchApp(owner string, id string, database *mongo.Database) (*TPApp, int, 
 }
 
 // SearchApps search all third party app by id or prn
-func SearchApps(owner string, id string, database *mongo.Database) ([]TPApp, error) {
+func SearchApps(ctx context.Context, owner string, id string, database *mongo.Database) ([]TPApp, error) {
 	apps := make([]TPApp, 0)
 
 	collection := database.Collection(DBCollection)
 	if collection == nil {
-		return apps, errors.New("Error with Database connectivity")
+		return apps, errors.New("error with Database connectivity")
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
 	findQuery := bson.M{
 		"deleted-at": nil,
@@ -143,13 +140,16 @@ func SearchApps(owner string, id string, database *mongo.Database) ([]TPApp, err
 		}
 	}
 
-	cur, err := collection.Find(ctx, findQuery)
+	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	cur, err := collection.Find(ctxC, findQuery)
 	if err != nil {
 		return apps, err
 	}
-	defer cur.Close(ctx)
+	defer cur.Close(ctxC)
 
-	for cur.Next(ctx) {
+	for cur.Next(ctxC) {
 		result := TPApp{}
 		err := cur.Decode(&result)
 		if err != nil {
@@ -162,16 +162,13 @@ func SearchApps(owner string, id string, database *mongo.Database) ([]TPApp, err
 }
 
 // SearchExposedScopes search all third party app by id or prn
-func SearchExposedScopes(database *mongo.Database) ([]utils.Scope, error) {
+func SearchExposedScopes(ctx context.Context, database *mongo.Database) ([]utils.Scope, error) {
 	scopes := make([]utils.Scope, 0)
 
 	collection := database.Collection(DBCollection)
 	if collection == nil {
-		return nil, errors.New("Error with Database connectivity")
+		return nil, errors.New("error with Database connectivity")
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
 	findQuery := bson.M{
 		"deleted-at": nil,
@@ -180,15 +177,16 @@ func SearchExposedScopes(database *mongo.Database) ([]utils.Scope, error) {
 		},
 	}
 
-	cur, err := collection.Find(ctx, findQuery)
+	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	cur, err := collection.Find(ctxC, findQuery)
 	if err != nil {
 		return nil, err
 	}
-	defer cur.Close(ctx)
+	defer cur.Close(ctxC)
 
-	fmt.Println(cur)
-
-	for cur.Next(ctx) {
+	for cur.Next(ctxC) {
 		result := TPApp{}
 		err := cur.Decode(&result)
 		if err != nil {
@@ -201,8 +199,8 @@ func SearchExposedScopes(database *mongo.Database) ([]utils.Scope, error) {
 }
 
 // AccessCodePayload get accesscode payload for application
-func AccessCodePayload(owner, serviceName, responseType, scopes string, accountPayload map[string]interface{}, database *mongo.Database) (map[string]interface{}, error) {
-	service, _, err := SearchApp(owner, serviceName, database)
+func AccessCodePayload(ctx context.Context, owner, serviceName, responseType, scopes string, accountPayload map[string]interface{}, database *mongo.Database) (map[string]interface{}, error) {
+	service, _, err := SearchApp(ctx, owner, serviceName, database)
 	if err != nil {
 		return nil, err
 	}
@@ -223,8 +221,8 @@ func AccessCodePayload(owner, serviceName, responseType, scopes string, accountP
 }
 
 // GetAppPayload get app payload as account
-func GetAppPayload(serviceID string, database *mongo.Database) (map[string]interface{}, error) {
-	service, _, err := SearchApp("", serviceID, database)
+func GetAppPayload(ctx context.Context, serviceID string, database *mongo.Database) (map[string]interface{}, error) {
+	service, _, err := SearchApp(ctx, "", serviceID, database)
 	if err != nil {
 		return nil, err
 	}

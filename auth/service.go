@@ -33,6 +33,7 @@ import (
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/tracer"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -205,7 +206,9 @@ func AuthenticatePayload(app *App, jwtMiddleware *jwt.JWTMiddleware) func(string
 		}
 
 		if payload == nil {
-			payload, err := apps.GetAppPayload(userId, app.mongoClient.Database(utils.MongoDb))
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			payload, err := apps.GetAppPayload(ctx, userId, app.mongoClient.Database(utils.MongoDb))
 			if err != nil {
 				return nil
 			}
@@ -350,6 +353,10 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		rest.Get("/oauth/login/#service", app.HandleGetThirdPartyLogin),
 		rest.Get("/oauth/callback/#service", app.HandleGetThirdPartyCallback),
 	)
+	app.API.Use(&tracer.OtelMiddleware{
+		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
+		Router:      apiRouter,
+	})
 	app.API.SetApp(apiRouter)
 
 	return app

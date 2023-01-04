@@ -30,6 +30,7 @@ import (
 
 	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/subscriptions"
+	"gitlab.com/pantacor/pantahub-base/utils/tracer"
 
 	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -113,9 +114,9 @@ func MakeStorageID(owner string, sha []byte) string {
 }
 
 // GetDiskQuota get disk quota for a object
-func (a *App) GetDiskQuota(prn string) (float64, error) {
+func (a *App) GetDiskQuota(pctx context.Context, prn string) (float64, error) {
 
-	sub, err := a.subService.LoadBySubject(utils.Prn(prn))
+	sub, err := a.subService.LoadBySubject(pctx, utils.Prn(prn))
 	if err != nil {
 		sub = a.subService.GetDefaultSubscription(utils.Prn(prn))
 	}
@@ -133,8 +134,8 @@ func (a *App) GetDiskQuota(prn string) (float64, error) {
 var defaultObjectsApp *App
 
 // GetDiskQuota public function to get the default disk quota
-func GetDiskQuota(prn string) (float64, error) {
-	return defaultObjectsApp.GetDiskQuota(prn)
+func GetDiskQuota(ctx context.Context, prn string) (float64, error) {
+	return defaultObjectsApp.GetDiskQuota(ctx, prn)
 }
 
 // SyncObjectSizes syncronize objects sizes
@@ -311,6 +312,10 @@ func New(jwtMiddleware *jwt.JWTMiddleware, subService subscriptions.Subscription
 		rest.Put("/#id", utils.ScopeFilter(writeObjectScopes, app.handlePutObject)),
 		rest.Delete("/#id", utils.ScopeFilter(writeObjectScopes, app.handleDeleteObject)),
 	)
+	app.API.Use(&tracer.OtelMiddleware{
+		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
+		Router:      apiRouter,
+	})
 	app.API.SetApp(apiRouter)
 
 	return app

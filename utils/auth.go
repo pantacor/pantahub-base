@@ -140,13 +140,13 @@ func (s *AuthMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFu
 }
 
 // ValidateOwnerSig valdiate a owner signature
-func ValidateOwnerSig(sig, tokenID, owner, name string, col *mongo.Collection) error {
+func ValidateOwnerSig(pctx context.Context, sig, tokenID, owner, name string, col *mongo.Collection) error {
 	signature, err := base64.StdEncoding.DecodeString(sig)
 	if err != nil {
 		return errors.New("decode signature: " + err.Error())
 	}
 
-	token, err := getToken(tokenID, owner, col)
+	token, err := getToken(pctx, tokenID, owner, col)
 	if err != nil {
 		return errors.New("Token not found or you are not the owner: " + err.Error())
 	}
@@ -159,7 +159,7 @@ func ValidateOwnerSig(sig, tokenID, owner, name string, col *mongo.Collection) e
 
 	validSignature := validMAC(idevidNameHex, signature, tokenSha)
 	if !validSignature {
-		return errors.New("Invalid ownership signature signature")
+		return errors.New("invalid ownership signature signature")
 	}
 
 	return nil
@@ -174,10 +174,10 @@ func validMAC(message, messageMAC, key []byte) bool {
 	return hmac.Equal(messageMAC, expectedMAC)
 }
 
-func getToken(tokenID, owner string, col *mongo.Collection) (*PantahubDevicesJoinToken, error) {
+func getToken(pctx context.Context, tokenID, owner string, col *mongo.Collection) (*PantahubDevicesJoinToken, error) {
 	res := &PantahubDevicesJoinToken{}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(pctx, 5*time.Second)
 	defer cancel()
 
 	cleanToken := strings.TrimSuffix(tokenID, "\n")

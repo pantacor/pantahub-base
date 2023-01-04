@@ -33,6 +33,7 @@ import (
 	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/trails"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/tracer"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/x/bsonx"
@@ -283,9 +284,7 @@ func (a *App) handleGetChangesGeneric(w rest.ResponseWriter, r *rest.Request, ba
 		findOptions = findOptions.SetSort(bson.M{timeModifiedKey: -1})
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	cur, err := collection.Find(ctx, q, findOptions)
+	cur, err := collection.Find(r.Context(), q, findOptions)
 
 	if err != nil {
 		utils.RestErrorWrapper(w, "error getting changes for user:"+err.Error(), http.StatusForbidden)
@@ -303,8 +302,8 @@ func (a *App) handleGetChangesGeneric(w rest.ResponseWriter, r *rest.Request, ba
 	var result interface{}
 	var tm *time.Time
 
-	defer cur.Close(ctx)
-	for cur.Next(ctx) {
+	defer cur.Close(r.Context())
+	for cur.Next(r.Context()) {
 		result = findProtoFunc()
 		err := cur.Decode(result)
 		if err != nil {
@@ -491,7 +490,10 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		rest.Get("/steps", utils.ScopeFilter(readStepsScopes, app.handleGetChangesSteps)),
 		rest.Get("/trails", utils.ScopeFilter(readTrailsScopes, app.handleGetChangesTrail)),
 	)
-
+	app.API.Use(&tracer.OtelMiddleware{
+		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
+		Router:      apiRouter,
+	})
 	app.API.SetApp(apiRouter)
 
 	return app

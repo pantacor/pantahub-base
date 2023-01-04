@@ -39,6 +39,7 @@ import (
 	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/tracer"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gopkg.in/mgo.v2/bson"
@@ -88,10 +89,10 @@ type Pager struct {
 
 // Backend logs interface
 type Backend interface {
-	getLogs(start int64, page int64, before *time.Time, after *time.Time,
+	getLogs(ctx context.Context, start int64, page int64, before *time.Time, after *time.Time,
 		query Filters, sort Sorts, cursor bool) (*Pager, error)
-	getLogsByCursor(nextCursor string) (*Pager, error)
-	postLogs(e []Entry) error
+	getLogsByCursor(ctx context.Context, nextCursor string) (*Pager, error)
+	postLogs(parentCtx context.Context, e []Entry) error
 	register() error
 	unregister(deleteIndices bool) error
 }
@@ -109,8 +110,8 @@ type CursorClaim struct {
 }
 
 // ParseDeviceString : Parse Device Nicks & Device Id's from a string and replace them with device Prn
-func (a *App) ParseDeviceString(owner string, devicesString string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func (a *App) ParseDeviceString(parentCtx context.Context, owner string, devicesString string) (string, error) {
+	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
 	defer cancel()
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
@@ -254,6 +255,10 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		rest.Post("/cursor", app.handleGetLogsCursor),
 		rest.Post("/", app.handlePostLogs),
 	)
+	app.API.Use(&tracer.OtelMiddleware{
+		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
+		Router:      apiRouter,
+	})
 	app.API.SetApp(apiRouter)
 
 	return app
