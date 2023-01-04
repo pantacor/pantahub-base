@@ -57,21 +57,21 @@ type DiskQuotaUsageResult struct {
 }
 
 // CalcUsageAfterPost calculate usage after post new object
-func CalcUsageAfterPost(owner string, mongoClient *mongo.Client,
+func CalcUsageAfterPost(parentCtx context.Context, owner string, mongoClient *mongo.Client,
 	objectID string, newSize int64) (*DiskQuotaUsageResult, error) {
 
 	oCol := mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 	resp := DiskQuotaUsageResult{}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
 	defer cancel()
 	pipeline := []bson.M{
-		bson.M{
+		{
 			"$match": bson.M{
 				"owner":   owner,
 				"garbage": bson.M{"$ne": true},
 			},
 		},
-		bson.M{
+		{
 			"$group": bson.M{
 				"_id":   "$owner",
 				"total": bson.M{"$sum": "$sizeint"},
@@ -97,23 +97,23 @@ func CalcUsageAfterPost(owner string, mongoClient *mongo.Client,
 }
 
 // CalcUsageAfterPut calculate disk usage after update object
-func CalcUsageAfterPut(owner string, mongoClient *mongo.Client,
+func CalcUsageAfterPut(parentCtx context.Context, owner string, mongoClient *mongo.Client,
 	objectID string, newSize int64) (*DiskQuotaUsageResult, error) {
 
 	oCol := mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 	resp := DiskQuotaUsageResult{}
 	// match all objects, but leave out the one we replace
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
 	defer cancel()
 	pipeline := []bson.M{
-		bson.M{
+		{
 			"$match": bson.M{
 				"owner":   owner,
 				"garbage": bson.M{"$ne": true},
 				"_id":     bson.M{"$ne": objectID},
 			},
 		},
-		bson.M{
+		{
 			"$group": bson.M{
 				"_id":   "$owner",
 				"total": bson.M{"$sum": "$sizeint"},
@@ -139,10 +139,10 @@ func CalcUsageAfterPut(owner string, mongoClient *mongo.Client,
 }
 
 // FindObjectByStorageID find object instance by _id
-func (a *App) FindObjectByStorageID(storageID string, object *Object) error {
+func (a *App) FindObjectByStorageID(parentCtx context.Context, storageID string, object *Object) error {
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
 	defer cancel()
 	err := collection.FindOne(ctx,
 		bson.M{

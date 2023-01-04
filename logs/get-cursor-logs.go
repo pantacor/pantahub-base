@@ -100,7 +100,7 @@ func (a *App) handleGetLogsCursor(w rest.ResponseWriter, r *rest.Request) {
 			return
 		}
 		nextCursor := claims.NextCursor
-		result, err = a.backend.getLogsByCursor(nextCursor)
+		result, err = a.backend.getLogsByCursor(r.Context(), nextCursor)
 		if err != nil {
 			utils.RestErrorWrapper(w, "ERROR: getting logs failed "+err.Error(), http.StatusInternalServerError)
 			return

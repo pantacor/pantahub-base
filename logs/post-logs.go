@@ -22,6 +22,7 @@
 package logs
 
 import (
+	"context"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -34,7 +35,6 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-//
 // ## POST /logs/
 //
 // handleGetLogs Post one or many log entries as an error of LogEntry
@@ -103,7 +103,9 @@ func (a *App) handlePostLogs(w rest.ResponseWriter, r *rest.Request) {
 		newEntries = append(newEntries, v)
 	}
 
-	err = a.backend.postLogs(newEntries)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	err = a.backend.postLogs(ctx, newEntries)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error posting logs "+err.Error(), http.StatusInternalServerError)
 		log.Println("ERROR: Error posting logs " + err.Error())

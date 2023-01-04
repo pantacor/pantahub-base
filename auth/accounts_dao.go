@@ -30,16 +30,17 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func getUserByEmail(email string, db *mongo.Collection) (*accounts.Account, error) {
+func getUserByEmail(ctx context.Context, email string, db *mongo.Collection) (*accounts.Account, error) {
 	newAccount := &accounts.Account{}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
 	if db == nil {
-		return nil, errors.New("Error with Database connectivity")
+		return nil, errors.New("error with Database connectivity")
 	}
 
-	err := db.FindOne(ctx,
+	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	err := db.FindOne(ctxC,
 		bson.M{
 			"$or": []bson.M{
 				{"email": email},
@@ -50,7 +51,7 @@ func getUserByEmail(email string, db *mongo.Collection) (*accounts.Account, erro
 	return newAccount, err
 }
 
-func createUser(email, nick, password, challenge string, db *mongo.Collection) (*accounts.Account, error) {
+func createUser(ctx context.Context, email, nick, password, challenge string, db *mongo.Collection) (*accounts.Account, error) {
 	if password == "" {
 		b := make([]byte, 16)
 		rand.Read(b)
@@ -58,6 +59,10 @@ func createUser(email, nick, password, challenge string, db *mongo.Collection) (
 	}
 
 	passwordBcrypt, err := utils.HashPassword(password, utils.CryptoMethods.BCrypt)
+	if err != nil {
+		return nil, err
+	}
+
 	passwordScrypt, err := utils.HashPassword(password, utils.CryptoMethods.SCrypt)
 	if err != nil {
 		return nil, err
@@ -85,10 +90,10 @@ func createUser(email, nick, password, challenge string, db *mongo.Collection) (
 		TimeModified:   createdAt,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	_, err = db.InsertOne(ctx, newAccount)
+	_, err = db.InsertOne(ctxC, newAccount)
 
 	return newAccount, err
 }

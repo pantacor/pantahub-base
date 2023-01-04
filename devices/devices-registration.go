@@ -130,6 +130,7 @@ func (a *App) handleRegister(w rest.ResponseWriter, r *rest.Request) {
 
 	col := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
 	err = utils.ValidateOwnerSig(
+		r.Context(),
 		base64.StdEncoding.EncodeToString([]byte(extensions.NameSigByOwner)),
 		extensions.TokenID,
 		extensions.Owner,
@@ -156,7 +157,7 @@ func (a *App) handleRegister(w rest.ResponseWriter, r *rest.Request) {
 
 	// Create or update device with the new certificate
 	device.DeviceMeta["idevid"] = finalCert
-	_, err = device.save(a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices"))
+	_, err = device.save(r.Context(), a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices"))
 	if err != nil {
 		utils.RestErrorWrapper(w, "Failed to save device:"+err.Error(), http.StatusBadRequest)
 		return

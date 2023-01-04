@@ -48,27 +48,27 @@ func (a *App) handleGetGlobalMeta(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	account, err := a.getUserAccount(tokenOwner, "prn")
+	account, err := a.getUserAccount(r.Context(), tokenOwner, "prn")
 	if err != nil {
 		utils.RestErrorWrapper(w, "Account "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	haveProfile, err := a.ExistsInProfiles(account.ID)
+	haveProfile, err := a.ExistsInProfiles(r.Context(), account.ID)
 	if err != nil {
 		utils.RestErrorWrapper(w, err.Error(), http.StatusForbidden)
 		return
 	}
 
 	if !haveProfile {
-		_, err := a.MakeUserProfile(account, nil)
+		_, err := a.MakeUserProfile(r.Context(), account, nil)
 		if err != nil {
 			utils.RestErrorWrapper(w, err.Error(), http.StatusForbidden)
 			return
 		}
 	}
 
-	profile, err := a.getProfile(account.Prn, bson.M{"meta": 1})
+	profile, err := a.getProfile(r.Context(), account.Prn, bson.M{"meta": 1})
 	if err != nil {
 		utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
 		return

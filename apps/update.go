@@ -54,14 +54,14 @@ func (app *App) handleUpdateApp(w rest.ResponseWriter, r *rest.Request) {
 	var owner string
 	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
 	if ok {
-		owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"].(string)
+		owner, _ = jwtPayload.(jwtgo.MapClaims)["prn"].(string)
 	} else {
 		utils.RestErrorWrapper(w, "Owner can't be defined", http.StatusInternalServerError)
 		return
 	}
 
 	database := app.mongoClient.Database(utils.MongoDb)
-	tpApp, httpCode, err := SearchApp(owner, id, database)
+	tpApp, httpCode, err := SearchApp(r.Context(), owner, id, database)
 	if err != nil {
 		utils.RestErrorWrapper(w, err.Error(), httpCode)
 		return
@@ -116,7 +116,7 @@ func (app *App) handleUpdateApp(w rest.ResponseWriter, r *rest.Request) {
 	tpApp.Logo = payload.Logo
 	tpApp.TimeModified = time.Now()
 
-	_, err = CreateOrUpdateApp(tpApp, database)
+	_, err = CreateOrUpdateApp(r.Context(), tpApp, database)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error creating third party application "+err.Error(), http.StatusInternalServerError)
 		return

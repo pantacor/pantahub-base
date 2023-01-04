@@ -1,11 +1,16 @@
+// Copyright 2020  Pantacor Ltd.
 //
-// Package subscriptions offers simple subscription REST API to issue subscriptions
-// for services. In this file we define the SubscriptionService interface and mongo
-// backed implementation.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// (c) Pantacor Ltd, 2018
-// License: Apache 2.0 (see COPYRIGHT)
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
+//	Unless required by applicable law or agreed to in writing, software
+//	distributed under the License is distributed on an "AS IS" BASIS,
+//	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	See the License for the specific language governing permissions and
+//	limitations under the License.
 package subscriptions
 
 import (
@@ -79,7 +84,11 @@ func newTestService() SubscriptionService {
 func testNewSubscription(t *testing.T) {
 	sService := newTestService()
 
-	sub, err := sService.New(utils.Prn("prn::auth:/user1"),
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sub, err := sService.New(
+		ctx,
+		utils.Prn("prn::auth:/user1"),
 		utils.Prn("prn::auth:/admin1"), SubscriptionTypeCancelled, nil)
 
 	if err != nil {
@@ -88,14 +97,18 @@ func testNewSubscription(t *testing.T) {
 		return
 	}
 
-	_, err = sService.Load(sub.GetID())
+	ctx, cancel = context.WithCancel(context.Background())
+	defer cancel()
+	_, err = sService.Load(ctx, sub.GetID())
 
 	if err != nil {
 		t.Errorf("new subscriptions must be found in db: %s", err.Error())
 		t.Fail()
 	}
 
-	sub1, err := sService.Load(sub.GetID())
+	ctx, cancel = context.WithCancel(context.Background())
+	defer cancel()
+	sub1, err := sService.Load(ctx, sub.GetID())
 
 	if err != nil {
 		t.Errorf("subscriptions must not fail to load after they got saved to DB")
@@ -133,7 +146,11 @@ func testNewSubscription(t *testing.T) {
 func testNewSubscriptionWithDefaults(t *testing.T) {
 	sService := newTestService()
 
-	sub, err := sService.New(utils.Prn("prn::auth:/user1"),
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sub, err := sService.New(
+		ctx,
+		utils.Prn("prn::auth:/user1"),
 		utils.Prn("prn::auth:/admin1"),
 		SubscriptionTypeFree,
 		nil)
@@ -144,7 +161,9 @@ func testNewSubscriptionWithDefaults(t *testing.T) {
 		return
 	}
 
-	sub1, err := sService.Load(sub.GetID())
+	ctx, cancel = context.WithCancel(context.Background())
+	defer cancel()
+	sub1, err := sService.Load(ctx, sub.GetID())
 	if err != nil {
 		t.Errorf("Subscriptions must not fail to load after they got saved to DB")
 		t.Fail()
@@ -167,8 +186,14 @@ func testNewSubscriptionWithDefaults(t *testing.T) {
 
 func testNewCustomSubscription(t *testing.T) {
 	sService := newTestService()
-	sub, err := sService.New(utils.Prn("prn::auth:/user1"),
-		utils.Prn("prn::auth:/admin1"), SubscriptionTypeCustom, nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sub, err := sService.New(
+		ctx,
+		utils.Prn("prn::auth:/user1"),
+		utils.Prn("prn::auth:/admin1"),
+		SubscriptionTypeCustom,
+		nil)
 
 	if err != nil {
 		t.Errorf("error creating subscription: %s", err.Error())
@@ -176,7 +201,9 @@ func testNewCustomSubscription(t *testing.T) {
 		return
 	}
 
-	_, err = sService.Load(sub.GetID())
+	ctx, cancel = context.WithCancel(context.Background())
+	defer cancel()
+	_, err = sService.Load(ctx, sub.GetID())
 
 	if err != nil {
 		t.Errorf("new subscriptions must be found in db: %s", err.Error())
@@ -187,8 +214,14 @@ func testNewCustomSubscription(t *testing.T) {
 func testNewTimeModified(t *testing.T) {
 	timeStart := time.Now()
 	sService := newTestService()
-	sub, err := sService.New(utils.Prn("prn::auth:/user1"),
-		utils.Prn("prn::auth:/admin1"), SubscriptionTypeCustom, nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sub, err := sService.New(
+		ctx,
+		utils.Prn("prn::auth:/user1"),
+		utils.Prn("prn::auth:/admin1"),
+		SubscriptionTypeCustom,
+		nil)
 
 	if err != nil {
 		t.Errorf("error creating subscription: %s", err.Error())
@@ -204,7 +237,7 @@ func testNewTimeModified(t *testing.T) {
 		return
 	}
 
-	_, err = sService.Load(sub.GetID())
+	_, err = sService.Load(ctx, sub.GetID())
 
 	if err != nil {
 		t.Errorf("new subscriptions must be found in db: %s", err.Error())
@@ -221,8 +254,14 @@ func testNewTimeModified(t *testing.T) {
 
 func testNewCustomOverwriteSubscription(t *testing.T) {
 	sService := newTestService()
-	sub, err := sService.New(utils.Prn("prn::auth:/user1"),
-		utils.Prn("prn::auth:/admin1"), SubscriptionTypeCustom, nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sub, err := sService.New(
+		ctx,
+		utils.Prn("prn::auth:/user1"),
+		utils.Prn("prn::auth:/admin1"),
+		SubscriptionTypeCustom,
+		nil)
 
 	if err != nil {
 		t.Errorf("error creating subscription: %s", err.Error())
@@ -230,24 +269,28 @@ func testNewCustomOverwriteSubscription(t *testing.T) {
 		return
 	}
 
-	sub1, err := sService.Load(sub.GetID())
+	sub1, err := sService.Load(ctx, sub.GetID())
 
 	if err != nil {
 		t.Errorf("new subscriptions must be found in db: %s", err.Error())
 		t.Fail()
 	}
 
-	err = sub1.UpdatePlan(utils.Prn("prn::auth:/admin1"), SubscriptionTypeFree, map[string]interface{}{
-		"ALL/storage": "4GiB",
-		"ALL/network": "2GiB",
-	})
+	err = sub1.UpdatePlan(
+		ctx,
+		utils.Prn("prn::auth:/admin1"),
+		SubscriptionTypeFree,
+		map[string]interface{}{
+			"ALL/storage": "4GiB",
+			"ALL/network": "2GiB",
+		})
 
 	if err != nil {
 		t.Errorf("update plan must not fail: %s", err.Error())
 		t.Fail()
 	}
 
-	sub1, err = sService.Load(sub.GetID())
+	sub1, err = sService.Load(ctx, sub.GetID())
 
 	if err != nil {
 		t.Errorf("loading updated subsription must not fail: %s", err.Error())
@@ -262,8 +305,14 @@ func testNewCustomOverwriteSubscription(t *testing.T) {
 
 func testDeleteSubscription(t *testing.T) {
 	sService := newTestService()
-	sub, err := sService.New(utils.Prn("prn::auth:/user1"),
-		utils.Prn("prn::auth:/admin1"), SubscriptionTypeCustom, nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sub, err := sService.New(
+		ctx,
+		utils.Prn("prn::auth:/user1"),
+		utils.Prn("prn::auth:/admin1"),
+		SubscriptionTypeCustom,
+		nil)
 
 	if err != nil {
 		t.Errorf("error creating subscription: %s", err.Error())
@@ -271,14 +320,14 @@ func testDeleteSubscription(t *testing.T) {
 		return
 	}
 
-	err = sService.Delete(sub)
+	err = sService.Delete(ctx, sub)
 
 	if err != nil {
 		t.Errorf("delete subscription failed: %s", err.Error())
 		t.Fail()
 	}
 
-	_, err = sService.Load(sub.GetID())
+	_, err = sService.Load(ctx, sub.GetID())
 
 	if err == nil {
 		t.Errorf("deleted subscription must not be loadable")
@@ -288,8 +337,14 @@ func testDeleteSubscription(t *testing.T) {
 
 func testSaveDeletedSubscription(t *testing.T) {
 	sService := newTestService()
-	sub, err := sService.New(utils.Prn("prn::auth:/user1"),
-		utils.Prn("prn::auth:/admin1"), SubscriptionTypeCustom, nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sub, err := sService.New(
+		ctx,
+		utils.Prn("prn::auth:/user1"),
+		utils.Prn("prn::auth:/admin1"),
+		SubscriptionTypeCustom,
+		nil)
 
 	if err != nil {
 		t.Errorf("error creating subscription: %s", err.Error())
@@ -297,14 +352,14 @@ func testSaveDeletedSubscription(t *testing.T) {
 		return
 	}
 
-	err = sService.Delete(sub)
+	err = sService.Delete(ctx, sub)
 
 	if err != nil {
 		t.Errorf("delete subscription failed: %s", err.Error())
 		t.Fail()
 	}
 
-	err = sService.Save(sub)
+	err = sService.Save(ctx, sub)
 
 	if err == nil {
 		t.Errorf("deleted subscriptions must fail to save")
@@ -314,8 +369,14 @@ func testSaveDeletedSubscription(t *testing.T) {
 
 func testCancelSubscription(t *testing.T) {
 	sService := newTestService()
-	sub, err := sService.New(utils.Prn("prn::auth:/user1"),
-		utils.Prn("prn::auth:/admin1"), SubscriptionTypeCustom, bson.M{})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sub, err := sService.New(
+		ctx,
+		utils.Prn("prn::auth:/user1"),
+		utils.Prn("prn::auth:/admin1"),
+		SubscriptionTypeCustom,
+		bson.M{})
 
 	if err != nil {
 		t.Errorf("error creating subscription: %s", err.Error())
@@ -323,7 +384,7 @@ func testCancelSubscription(t *testing.T) {
 		return
 	}
 
-	err = sub.Cancel(utils.Prn("prn::auth:/admin1"))
+	err = sub.Cancel(ctx, utils.Prn("prn::auth:/admin1"))
 	if err != nil {
 		t.Errorf("error cancelling subscriptions: %s", err.Error())
 		t.Fail()
@@ -336,7 +397,7 @@ func testCancelSubscription(t *testing.T) {
 		t.Fail()
 	}
 
-	sub, err = sService.Load(sub.GetID())
+	sub, err = sService.Load(ctx, sub.GetID())
 	if err != nil {
 		t.Errorf("loading subscription must not fail: %s", err.Error())
 		t.Fail()
@@ -352,8 +413,14 @@ func testCancelSubscription(t *testing.T) {
 
 func testLockSubscription(t *testing.T) {
 	sService := newTestService()
-	sub, err := sService.New(utils.Prn("prn::auth:/user1"),
-		utils.Prn("prn::auth:/admin1"), SubscriptionTypeCustom, bson.M{})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sub, err := sService.New(
+		ctx,
+		utils.Prn("prn::auth:/user1"),
+		utils.Prn("prn::auth:/admin1"),
+		SubscriptionTypeCustom,
+		bson.M{})
 
 	if err != nil {
 		t.Errorf("error creating subscription: %s", err.Error())
@@ -361,7 +428,7 @@ func testLockSubscription(t *testing.T) {
 		return
 	}
 
-	err = sub.Lock(utils.Prn("prn::auth:/admin1"))
+	err = sub.Lock(ctx, utils.Prn("prn::auth:/admin1"))
 	if err != nil {
 		t.Errorf("error locking subscriptions: %s", err.Error())
 		t.Fail()
@@ -374,7 +441,7 @@ func testLockSubscription(t *testing.T) {
 		t.Fail()
 	}
 
-	sub, err = sService.Load(sub.GetID())
+	sub, err = sService.Load(ctx, sub.GetID())
 	if err != nil {
 		t.Errorf("loading subscription must not fail: %s", err.Error())
 		t.Fail()
@@ -390,8 +457,14 @@ func testLockSubscription(t *testing.T) {
 
 func testHistory(t *testing.T) {
 	sService := newTestService()
-	sub, err := sService.New(utils.Prn("prn::auth:/user1"),
-		utils.Prn("prn::auth:/admin1"), SubscriptionTypeCustom, bson.M{})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sub, err := sService.New(
+		ctx,
+		utils.Prn("prn::auth:/user1"),
+		utils.Prn("prn::auth:/admin1"),
+		SubscriptionTypeCustom,
+		bson.M{})
 
 	if err != nil {
 		t.Errorf("error creating subscription: %s", err.Error())
@@ -399,28 +472,32 @@ func testHistory(t *testing.T) {
 		return
 	}
 
-	err = sub.Lock(utils.Prn("prn::auth:/admin1"))
+	err = sub.Lock(ctx, utils.Prn("prn::auth:/admin1"))
 	if err != nil {
 		t.Errorf("error locking subscriptions: %s", err.Error())
 		t.Fail()
 		return
 	}
 
-	sub, err = sService.Load(sub.GetID())
+	sub, err = sService.Load(ctx, sub.GetID())
 	if err != nil {
 		t.Errorf("loading subscription must not fail: %s", err.Error())
 		t.Fail()
 		return
 	}
 
-	err = sub.UpdatePlan(utils.Prn("prn::auth:/admin1"), SubscriptionTypeVIP, nil)
+	err = sub.UpdatePlan(
+		ctx,
+		utils.Prn("prn::auth:/admin1"),
+		SubscriptionTypeVIP,
+		nil)
 	if err != nil {
 		t.Errorf("updating plan to VIP must not fail: %s", err.Error())
 		t.Fail()
 		return
 	}
 
-	sub, err = sService.Load(sub.GetID())
+	sub, err = sService.Load(ctx, sub.GetID())
 	if err != nil {
 		t.Errorf("loading subscription must not fail: %s", err.Error())
 		t.Fail()
@@ -450,8 +527,14 @@ func testHistory(t *testing.T) {
 
 func testList(t *testing.T) {
 	sService := newTestService()
-	_, err := sService.New(utils.Prn("prn::auth:/user1"),
-		utils.Prn("prn::auth:/admin1"), SubscriptionTypeCustom, bson.M{})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	_, err := sService.New(
+		ctx,
+		utils.Prn("prn::auth:/user1"),
+		utils.Prn("prn::auth:/admin1"),
+		SubscriptionTypeCustom,
+		bson.M{})
 
 	if err != nil {
 		t.Errorf("error creating subscription: %s", err.Error())
@@ -459,7 +542,7 @@ func testList(t *testing.T) {
 		return
 	}
 
-	subPage, err := sService.List(utils.Prn("prn::auth:/user1"), 0, -1)
+	subPage, _ := sService.List(ctx, utils.Prn("prn::auth:/user1"), 0, -1)
 	if subPage.Size != 1 {
 		t.Errorf("subscription list must be 1, not %d", subPage.Size)
 		t.Fail()
@@ -556,8 +639,14 @@ func TestPeriod(t *testing.T) {
 	setup(t)
 
 	sService := newTestService()
-	sub, err := sService.New(utils.Prn("prn::auth:/user1"),
-		utils.Prn("prn::auth:/admin1"), SubscriptionTypeCustom, bson.M{})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sub, err := sService.New(
+		ctx,
+		utils.Prn("prn::auth:/user1"),
+		utils.Prn("prn::auth:/admin1"),
+		SubscriptionTypeCustom,
+		bson.M{})
 
 	if err != nil {
 		t.Errorf("error creating subscription: %s", err.Error())

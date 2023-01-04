@@ -69,13 +69,13 @@ func (a *App) handleGetStepsObjects(w rest.ResponseWriter, r *rest.Request) {
 	trailID := r.PathParam("id")
 	rev := r.PathParam("rev")
 
-	isPublic, err := a.isTrailPublic(trailID)
+	isPublic, err := a.isTrailPublic(r.Context(), trailID)
 
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error getting trail public:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
 	if isPublic {
@@ -139,7 +139,7 @@ func (a *App) handleGetStepsObjects(w rest.ResponseWriter, r *rest.Request) {
 		storageID := objects.MakeStorageID(step.Owner, sha)
 
 		var newObject objects.Object
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 		err = collection.FindOne(ctx, bson.M{
 			"_id":     storageID,
@@ -203,12 +203,12 @@ func (a *App) handleGetStepsObject(w rest.ResponseWriter, r *rest.Request) {
 	rev := r.PathParam("rev")
 	objIDParam := r.PathParam("obj")
 
-	isPublic, err := a.isTrailPublic(trailID)
+	isPublic, err := a.isTrailPublic(r.Context(), trailID)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error getting trail public:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
 	if isPublic {
@@ -280,7 +280,7 @@ func (a *App) handleGetStepsObject(w rest.ResponseWriter, r *rest.Request) {
 		storageID := objects.MakeStorageID(step.Owner, sha)
 
 		var newObject objects.Object
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 		err = collection.FindOne(ctx, bson.M{
 			"_id":     storageID,
@@ -361,13 +361,13 @@ func (a *App) handleGetStepsObjectFile(w rest.ResponseWriter, r *rest.Request) {
 	rev := r.PathParam("rev")
 	objIDParam := r.PathParam("obj")
 
-	isPublic, err := a.isTrailPublic(trailID)
+	isPublic, err := a.isTrailPublic(r.Context(), trailID)
 
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error getting trail public:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
 	if isPublic {
@@ -439,7 +439,7 @@ func (a *App) handleGetStepsObjectFile(w rest.ResponseWriter, r *rest.Request) {
 		storageID := objects.MakeStorageID(step.Owner, sha)
 
 		var newObject objects.Object
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 		err = collection.FindOne(ctx, bson.M{
 			"_id":     storageID,

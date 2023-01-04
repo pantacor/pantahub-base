@@ -17,6 +17,7 @@
 package logs
 
 import (
+	"context"
 	"log"
 	"os"
 	"testing"
@@ -75,7 +76,9 @@ func doLog() error {
 		LogText:     "Test Log Text",
 	}, 3)
 
-	err := mgoTestLogger.postLogs(logs)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	err := mgoTestLogger.postLogs(ctx, logs)
 	return err
 }
 
@@ -97,7 +100,9 @@ func testMongoGetLogs(t *testing.T) {
 
 	filter := &Entry{}
 	sort := Sorts{}
-	pager, err := mgoTestLogger.getLogs(0, -1, nil, nil, filter, sort, false)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	pager, err := mgoTestLogger.getLogs(ctx, 0, -1, nil, nil, filter, sort, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
@@ -122,7 +127,9 @@ func testMongoDoGetLogs(t *testing.T) {
 		LogText:     "Test Log Text",
 	}, 3)
 
-	err := mgoTestLogger.postLogs(logs)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	err := mgoTestLogger.postLogs(ctx, logs)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
@@ -131,7 +138,9 @@ func testMongoDoGetLogs(t *testing.T) {
 
 	filter := &Entry{}
 	sort := Sorts{}
-	pager, err := mgoTestLogger.getLogs(0, 3, nil, nil, filter, sort, false)
+	ctx, cancel = context.WithCancel(context.Background())
+	defer cancel()
+	pager, err := mgoTestLogger.getLogs(ctx, 0, 3, nil, nil, filter, sort, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
@@ -141,7 +150,9 @@ func testMongoDoGetLogs(t *testing.T) {
 		t.Fail()
 	}
 
-	pager, err = mgoTestLogger.getLogs(1, 3, nil, nil, filter, sort, false)
+	ctx, cancel = context.WithCancel(context.Background())
+	defer cancel()
+	pager, err = mgoTestLogger.getLogs(ctx, 1, 3, nil, nil, filter, sort, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
@@ -151,7 +162,7 @@ func testMongoDoGetLogs(t *testing.T) {
 		t.Fail()
 	}
 
-	pager, err = mgoTestLogger.getLogs(1, 1, nil, nil, filter, sort, false)
+	pager, err = mgoTestLogger.getLogs(ctx, 1, 1, nil, nil, filter, sort, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
@@ -174,7 +185,9 @@ func testMongoDoGetLogsAfter(t *testing.T) {
 		LogText:     "Test Log Text",
 	}, 3)
 
-	err := mgoTestLogger.postLogs(logs)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	err := mgoTestLogger.postLogs(ctx, logs)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
@@ -183,7 +196,10 @@ func testMongoDoGetLogsAfter(t *testing.T) {
 
 	filter := &Entry{}
 	sort := Sorts{}
-	pager, err := mgoTestLogger.getLogs(0, 3, &timeBase, nil, filter, sort, false)
+
+	ctx, cancel = context.WithCancel(context.Background())
+	defer cancel()
+	pager, err := mgoTestLogger.getLogs(ctx, 0, 3, &timeBase, nil, filter, sort, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
@@ -193,7 +209,9 @@ func testMongoDoGetLogsAfter(t *testing.T) {
 		t.Fail()
 	}
 
-	pager, err = mgoTestLogger.getLogs(1, 3, &timeBase, nil, filter, sort, false)
+	ctx, cancel = context.WithCancel(context.Background())
+	defer cancel()
+	pager, err = mgoTestLogger.getLogs(ctx, 1, 3, &timeBase, nil, filter, sort, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())

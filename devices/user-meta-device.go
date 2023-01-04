@@ -71,7 +71,7 @@ func (a *App) handlePatchUserData(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	deviceID, err := a.ResolveDeviceIDOrNick(ownerStr, r.PathParam("id"))
+	deviceID, err := a.ResolveDeviceIDOrNick(r.Context(), ownerStr, r.PathParam("id"))
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error Parsing Device ID or Nick:"+err.Error(), http.StatusBadRequest)
 		return
@@ -97,7 +97,7 @@ func (a *App) handlePatchUserData(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	var device Device
 	err = collection.FindOne(ctx,
@@ -107,6 +107,10 @@ func (a *App) handlePatchUserData(w rest.ResponseWriter, r *rest.Request) {
 		}).
 		Decode(&device)
 
+	if err != nil {
+		utils.RestErrorWrapper(w, "error finding device "+err.Error(), http.StatusBadRequest)
+		return
+	}
 	for k, v := range data {
 		device.UserMeta[k] = v
 	}
@@ -188,7 +192,7 @@ func (a *App) handlePutUserData(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	deviceObjectID, err := primitive.ObjectIDFromHex(deviceID)
 	if err != nil {

@@ -25,6 +25,7 @@ import (
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/tracer"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -43,6 +44,11 @@ func New(jwtMiddleware *jwt.JWTMiddleware,
 	app.jwtMiddleware = jwtMiddleware
 	app.mongoClient = mongoClient
 
+	err := app.setIndexes()
+	if err != nil {
+		log.Fatalln("Error setting up index for pantahub_profiles: " + err.Error())
+		return nil
+	}
 	app.API = rest.NewApi()
 	// we dont use default stack because we dont want content type enforcement
 	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
@@ -145,6 +151,11 @@ func New(jwtMiddleware *jwt.JWTMiddleware,
 			),
 		),
 	)
+
+	app.API.Use(&tracer.OtelMiddleware{
+		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
+		Router:      apiRouter,
+	})
 	app.API.SetApp(apiRouter)
 
 	return app

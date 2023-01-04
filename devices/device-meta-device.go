@@ -93,7 +93,7 @@ func (a *App) handlePutDeviceData(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	updateResult, err := collection.UpdateOne(
 		ctx,
@@ -177,7 +177,7 @@ func (a *App) handlePatchDeviceData(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	err := collection.FindOne(ctx, bson.M{
 		"prn":     callerStr,
@@ -201,7 +201,7 @@ func (a *App) handlePatchDeviceData(w rest.ResponseWriter, r *rest.Request) {
 			delete(device.DeviceMeta, k)
 		}
 	}
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	updateResult, err := collection.UpdateOne(
 		ctx,

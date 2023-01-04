@@ -76,8 +76,7 @@ func (a *App) handleGetProfiles(w rest.ResponseWriter, r *rest.Request) {
 
 	findOptions := options.Find()
 	findOptions.SetNoCursorTimeout(true)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+
 	query := bson.M{}
 
 	limit := int64(20) //Default page size=20
@@ -120,6 +119,8 @@ func (a *App) handleGetProfiles(w rest.ResponseWriter, r *rest.Request) {
 		}
 	}
 
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
 	cur, err := collection.Find(ctx, query, findOptions)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error on fetching accounts:"+err.Error(), http.StatusForbidden)
@@ -134,13 +135,13 @@ func (a *App) handleGetProfiles(w rest.ResponseWriter, r *rest.Request) {
 			return
 		}
 
-		havePublicDevices, err := a.HavePublicDevices(result.Prn)
+		havePublicDevices, err := a.HavePublicDevices(r.Context(), result.Prn)
 		if err != nil {
 			utils.RestErrorWrapper(w, err.Error(), http.StatusForbidden)
 			return
 		}
 
-		profile, _ := a.getProfile(result.Prn, nil)
+		profile, _ := a.getProfile(r.Context(), result.Prn, nil)
 		if (havePublicDevices || result.Prn == owner.(string)) && result.Nick != "" {
 			profile.Nick = result.Nick
 			profiles = append(profiles, profile)

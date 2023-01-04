@@ -26,7 +26,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-func (a *App) isTrailPublic(trailID string) (bool, error) {
+func (a *App) isTrailPublic(pctx context.Context, trailID string) (bool, error) {
 
 	collTrails := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_trails")
 
@@ -35,7 +35,7 @@ func (a *App) isTrailPublic(trailID string) (bool, error) {
 	}
 
 	trail := Trail{}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(pctx, 5*time.Second)
 	defer cancel()
 	trailObjectID, err := primitive.ObjectIDFromHex(trailID)
 	if err != nil {
@@ -57,7 +57,7 @@ func (a *App) isTrailPublic(trailID string) (bool, error) {
 	}
 
 	device := devices.Device{}
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(pctx, 5*time.Second)
 	defer cancel()
 	err = collDevices.FindOne(ctx, bson.M{
 		"prn":     trail.Device,

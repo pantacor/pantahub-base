@@ -1,11 +1,16 @@
+// Copyright 2020  Pantacor Ltd.
 //
-// Package subscriptions offers simple subscription REST API to issue subscriptions
-// for services. In this file we define the SubscriptionService interface and mongo
-// backed implementation.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// (c) Pantacor Ltd, 2018
-// License: Apache 2.0 (see COPYRIGHT)
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
+//	Unless required by applicable law or agreed to in writing, software
+//	distributed under the License is distributed on an "AS IS" BASIS,
+//	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	See the License for the specific language governing permissions and
+//	limitations under the License.
 package subscriptions
 
 import (
@@ -35,9 +40,11 @@ type SubscriptionPage struct {
 type SubscriptionService interface {
 
 	// Delete Subscription
-	Delete(sub Subscription) error
+	Delete(pctx context.Context, sub Subscription) error
 
-	New(Subject utils.Prn,
+	New(
+		pctx context.Context,
+		Subject utils.Prn,
 		Issuer utils.Prn,
 		Type utils.Prn,
 		schema map[string]interface{}) (Subscription, error)
@@ -46,19 +53,19 @@ type SubscriptionService interface {
 	IsAdmin(user utils.Prn) bool
 
 	// Load subscription by ID
-	Load(ID string) (Subscription, error)
+	Load(pctx context.Context, ID string) (Subscription, error)
 
 	// Load subscription by ID
-	LoadBySubject(subject utils.Prn) (Subscription, error)
+	LoadBySubject(pctx context.Context, subject utils.Prn) (Subscription, error)
 
 	// Load subscription by ID
 	GetDefaultSubscription(subject utils.Prn) Subscription
 
 	// List subscription by owning "subject"
-	List(Subject utils.Prn, start, page int) (SubscriptionPage, error)
+	List(pctx context.Context, Subject utils.Prn, start, page int) (SubscriptionPage, error)
 
 	// Save subscription
-	Save(sub Subscription) error
+	Save(pctx context.Context, sub Subscription) error
 
 	// Now time
 	Now() time.Time
@@ -85,7 +92,9 @@ var (
 // New createsa a new Subscription. If subType is a known subscription
 // type PRN, we will use the properties savesd for that sub type instead
 // of the attributes provided as argument to this function.
-func (i subscriptionService) New(subject utils.Prn,
+func (i subscriptionService) New(
+	parentCtx context.Context,
+	subject utils.Prn,
 	issuer utils.Prn,
 	subType utils.Prn,
 	attributes map[string]interface{}) (Subscription, error) {
@@ -119,7 +128,7 @@ func (i subscriptionService) New(subject utils.Prn,
 	}
 
 	collection := i.mongoClient.Database(utils.MongoDb).Collection(collectionSubscription)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
 	defer cancel()
 	_, err := collection.InsertOne(
 		ctx,
@@ -142,10 +151,10 @@ func (i subscriptionService) IsAdmin(user utils.Prn) bool {
 	return false
 }
 
-func (i subscriptionService) Load(ID string) (Subscription, error) {
+func (i subscriptionService) Load(pctx context.Context, ID string) (Subscription, error) {
 	s := SubscriptionMgo{}
 	collection := i.mongoClient.Database(utils.MongoDb).Collection(collectionSubscription)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(pctx, 5*time.Second)
 	defer cancel()
 	err := collection.FindOne(ctx, bson.M{
 		"_id": ID,
@@ -158,10 +167,10 @@ func (i subscriptionService) Load(ID string) (Subscription, error) {
 	return &s, nil
 }
 
-func (i subscriptionService) LoadBySubject(subject utils.Prn) (Subscription, error) {
+func (i subscriptionService) LoadBySubject(pctx context.Context, subject utils.Prn) (Subscription, error) {
 	s := SubscriptionMgo{}
 	collection := i.mongoClient.Database(utils.MongoDb).Collection(collectionSubscription)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(pctx, 5*time.Second)
 	defer cancel()
 	err := collection.FindOne(ctx, bson.M{
 		"subject": subject,
@@ -183,7 +192,9 @@ func (i subscriptionService) GetDefaultSubscription(subject utils.Prn) Subscript
 	return sub
 }
 
-func (i subscriptionService) List(subject utils.Prn,
+func (i subscriptionService) List(
+	pctx context.Context,
+	subject utils.Prn,
 	start, page int) (SubscriptionPage, error) {
 
 	resultPage := SubscriptionPage{
@@ -207,7 +218,7 @@ func (i subscriptionService) List(subject utils.Prn,
 		findOptions.SetLimit(int64(page))
 	}
 	findOptions.SetNoCursorTimeout(true)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(pctx, 5*time.Second)
 	defer cancel()
 	cur, err := collection.Find(ctx, query, findOptions)
 	if err != nil {
@@ -223,7 +234,7 @@ func (i subscriptionService) List(subject utils.Prn,
 		subs = append(subs, result)
 	}
 
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(pctx, 5*time.Second)
 	defer cancel()
 	count, err := collection.CountDocuments(ctx, query)
 	if err != nil {
@@ -240,9 +251,9 @@ func (i subscriptionService) List(subject utils.Prn,
 	return resultPage, nil
 }
 
-func (i subscriptionService) Delete(sub Subscription) error {
+func (i subscriptionService) Delete(pctx context.Context, sub Subscription) error {
 	collection := i.mongoClient.Database(utils.MongoDb).Collection(collectionSubscription)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(pctx, 5*time.Second)
 	defer cancel()
 	_, err := collection.DeleteOne(ctx, bson.M{
 		"_id": sub.GetID(),
@@ -254,16 +265,16 @@ func (i subscriptionService) Delete(sub Subscription) error {
 	return nil
 }
 
-func (i subscriptionService) Save(sub Subscription) error {
+func (i subscriptionService) Save(pctx context.Context, sub Subscription) error {
 
 	s, ok := sub.(SubscriptionMgo)
 
 	if !ok {
-		return errors.New("Wrong Subscription Type Passed to service")
+		return errors.New("wrong Subscription Type Passed to service")
 	}
 
 	collection := i.mongoClient.Database(utils.MongoDb).Collection(collectionSubscription)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(pctx, 5*time.Second)
 	defer cancel()
 	_, err := collection.UpdateOne(
 		ctx,
@@ -307,8 +318,10 @@ func (i subscriptionService) ensureIndices() error {
 
 // NewService creates a new mongoClient backed subscription service
 // Will use the default DB configured in mongoClient provided as arg.
-func NewService(mongoClient *mongo.Client,
-	servicePrn utils.Prn, admins []utils.Prn,
+func NewService(
+	mongoClient *mongo.Client,
+	servicePrn utils.Prn,
+	admins []utils.Prn,
 	typeDefs map[utils.Prn]interface{}) SubscriptionService {
 
 	sub := new(subscriptionService)

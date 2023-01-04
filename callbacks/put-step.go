@@ -71,7 +71,7 @@ func (a *App) handlePutStep(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	err := collection.FindOne(ctx,
 		bson.M{
@@ -89,7 +89,7 @@ func (a *App) handlePutStep(w rest.ResponseWriter, r *rest.Request) {
 	var publicStep PublicStep
 	var hasPublicStep bool
 
-	err = a.FindPublicStep(step.ID, &publicStep)
+	err = a.FindPublicStep(r.Context(), step.ID, &publicStep)
 	if err == nil {
 		hasPublicStep = true
 	} else if err == mongo.ErrNoDocuments {
@@ -112,14 +112,14 @@ func (a *App) handlePutStep(w rest.ResponseWriter, r *rest.Request) {
 		}
 	}
 
-	err = a.SavePublicStep(&step, &publicStep)
+	err = a.SavePublicStep(r.Context(), &step, &publicStep)
 	if err != nil {
 		utils.RestErrorWrapper(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	// Mark the flag "mark_public_processed" as TRUE
-	err = a.MarkStepAsProcessed(step.ID)
+	err = a.MarkStepAsProcessed(r.Context(), step.ID)
 	if err != nil {
 		utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
 		return
@@ -129,7 +129,7 @@ func (a *App) handlePutStep(w rest.ResponseWriter, r *rest.Request) {
 }
 
 // SavePublicStep is used to save public step
-func (a *App) SavePublicStep(step *trails.Step, publicStep *PublicStep) error {
+func (a *App) SavePublicStep(ctx context.Context, step *trails.Step, publicStep *PublicStep) error {
 
 	if publicStep.StepID == "" {
 		publicStep.CreatedAt = time.Now()
@@ -142,7 +142,7 @@ func (a *App) SavePublicStep(step *trails.Step, publicStep *PublicStep) error {
 	publicStep.IsPublic = step.IsPublic
 	publicStep.Garbage = step.Garbage
 	publicStep.TimeModified = step.TimeModified
-	objectShaList, err := a.GetStepObjectShas(step)
+	objectShaList, err := a.GetStepObjectShas(ctx, step)
 	if err != nil {
 		return err
 	}
@@ -150,13 +150,13 @@ func (a *App) SavePublicStep(step *trails.Step, publicStep *PublicStep) error {
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_public_steps")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	updateOptions := options.Update()
 	updateOptions.SetUpsert(true)
 
-	_, err = collection.UpdateOne(ctx,
+	_, err = collection.UpdateOne(ctxC,
 		bson.M{"step_id": step.ID},
 		bson.M{"$set": &publicStep},
 		updateOptions)
@@ -167,15 +167,15 @@ func (a *App) SavePublicStep(step *trails.Step, publicStep *PublicStep) error {
 }
 
 // MarkStepAsProcessed is to mark step as processed
-func (a *App) MarkStepAsProcessed(ID string) error {
+func (a *App) MarkStepAsProcessed(ctx context.Context, ID string) error {
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	_, err := collection.UpdateOne(
-		ctx,
+		ctxC,
 		bson.M{"_id": ID},
 		bson.M{"$set": bson.M{
 			"mark_public_processed": true,
@@ -189,7 +189,7 @@ func (a *App) MarkStepAsProcessed(ID string) error {
 }
 
 // GetStepObjectShas is to get step object shas
-func (a *App) GetStepObjectShas(step *trails.Step) ([]string, error) {
+func (a *App) GetStepObjectShas(ctx context.Context, step *trails.Step) ([]string, error) {
 
 	objectShaList := []string{}
 	objMap := map[string]bool{}
@@ -212,7 +212,7 @@ func (a *App) GetStepObjectShas(step *trails.Step) ([]string, error) {
 			return nil, errors.New("Bad JSON format: object sha not a sha: " + sha)
 		}
 		if _, ok := objMap[sha]; !ok {
-			existsInDb, err := a.IsObjectExistsInDb(sha)
+			existsInDb, err := a.IsObjectExistsInDb(ctx, sha)
 			if err != nil {
 				return nil, err
 			}
@@ -228,13 +228,13 @@ func (a *App) GetStepObjectShas(step *trails.Step) ([]string, error) {
 }
 
 // FindPublicStep is to find public step
-func (a *App) FindPublicStep(StepID string, publicStep *PublicStep) error {
+func (a *App) FindPublicStep(ctx context.Context, StepID string, publicStep *PublicStep) error {
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_public_steps")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	err := collection.FindOne(ctx, bson.M{
+	err := collection.FindOne(ctxC, bson.M{
 		"step_id": StepID,
 	}).Decode(&publicStep)
 
@@ -242,18 +242,18 @@ func (a *App) FindPublicStep(StepID string, publicStep *PublicStep) error {
 }
 
 // IsObjectExistsInDb is to check wether an  object exists in db or not
-func (a *App) IsObjectExistsInDb(Sha string) (bool, error) {
+func (a *App) IsObjectExistsInDb(ctx context.Context, Sha string) (bool, error) {
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	count, err := collection.CountDocuments(ctx, bson.M{
+	count, err := collection.CountDocuments(ctxC, bson.M{
 		"id": Sha,
 		"$or": []bson.M{
-			bson.M{"linked_object": nil},
-			bson.M{"linked_object": ""},
+			{"linked_object": nil},
+			{"linked_object": ""},
 		},
 	})
 	return (count > 0), err

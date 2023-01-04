@@ -68,8 +68,8 @@ func GitlabAuthorize(redirectURI string, config *oauth2.Config, w rest.ResponseW
 }
 
 // GitlabCb use code to retrive service user data
-func GitlabCb(config *oauth2.Config, code string) (*ResponsePayload, error) {
-	data, err := getUserDataFromGitlab(config, code)
+func GitlabCb(ctx context.Context, config *oauth2.Config, code string) (*ResponsePayload, error) {
+	data, err := getUserDataFromGitlab(ctx, config, code)
 	if err != nil {
 		return nil, err
 	}
@@ -87,12 +87,12 @@ func GitlabCb(config *oauth2.Config, code string) (*ResponsePayload, error) {
 	return &ResponsePayload{
 		Email: payload.Email,
 		Nick:  payload.Username,
-		Raw:   fmt.Sprintf("%s", data),
+		Raw:   string(data),
 	}, nil
 }
 
-func getUserDataFromGitlab(config *oauth2.Config, code string) ([]byte, error) {
-	token, err := config.Exchange(context.Background(), code)
+func getUserDataFromGitlab(ctx context.Context, config *oauth2.Config, code string) ([]byte, error) {
+	token, err := config.Exchange(ctx, code)
 	if err != nil {
 		return nil, fmt.Errorf("code exchange wrong: %s", err.Error())
 	}

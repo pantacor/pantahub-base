@@ -25,6 +25,7 @@ import (
 	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/tracer"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -92,6 +93,10 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 			app.handleGetMetrics),
 		),
 	)
+	app.API.Use(&tracer.OtelMiddleware{
+		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
+		Router:      apiRouter,
+	})
 	app.API.SetApp(apiRouter)
 
 	return app

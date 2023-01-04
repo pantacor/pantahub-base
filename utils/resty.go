@@ -17,8 +17,11 @@
 package utils
 
 import (
+	"net/http"
+	"os"
 	"time"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"gopkg.in/resty.v1"
 )
 
@@ -28,6 +31,11 @@ var (
 
 func init() {
 	dbg := GetEnv(EnvRestyDebug)
+
+	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" {
+		resty.GetClient().Transport = otelhttp.NewTransport(http.DefaultTransport)
+	}
+
 	if dbg != "" {
 		debugEnabled = true
 	} else {
@@ -42,6 +50,9 @@ func R() *resty.Request {
 }
 
 func RT(timeout int) *resty.Request {
-	return resty.SetTimeout(time.Duration(timeout) * time.Second).
-		SetDebug(debugEnabled).SetAllowGetMethodPayload(true).R()
+
+	return resty.
+		SetTimeout(time.Duration(timeout) * time.Second).
+		SetDebug(debugEnabled).
+		SetAllowGetMethodPayload(true).R()
 }

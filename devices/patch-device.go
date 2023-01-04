@@ -75,7 +75,7 @@ func (a *App) handlePatchDevice(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	deviceID, err := primitive.ObjectIDFromHex(patchID)
 	if err != nil {
