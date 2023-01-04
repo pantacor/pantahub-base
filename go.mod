@@ -61,6 +61,7 @@ require (
 	github.com/xdg/stringprep v1.0.3 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20201027041543-1326539a0a0a // indirect
 	github.com/zmap/zlint/v2 v2.2.1 // indirect
+	gitlab.com/pantacor/pantahub-testharness v0.0.0-20190311155708-e39aa76a7650 // indirect
 	go.etcd.io/etcd/v3 v3.5.2 // indirect
 	go.mongodb.org/mongo-driver v1.10.2
 	go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux v0.36.0 // indirect
@@ -95,7 +96,7 @@ require (
 	gopkg.in/mailgun/mailgun-go.v1 v1.1.1
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 	gopkg.in/olivere/elastic.v5 v5.0.86
-	gopkg.in/resty.v1 v1.12.0
+	gopkg.in/resty.v1 v1.12.0 // indirect
 	gopkg.in/square/go-jose.v2 v2.6.0
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
@@ -103,3 +104,5 @@ require (
 replace github.com/ant0ine/go-json-rest => github.com/pantacor/go-json-rest v0.0.0-20220930143134-28fc15ec4ffc
 
 replace github.com/tiaguinho/gosoap => github.com/highercomve/gosoap v1.3.0-a747454
+
+replace github.com/go-resty/resty => gopkg.in/resty.v1 v1.12.0

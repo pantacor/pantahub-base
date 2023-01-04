@@ -145,7 +145,7 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: admin
     volumes:
       - ${PWD}/entrypoints/pantahub-base-mongo-docker-run:/docker-entrypoint
-      - ${PWD}/data/mongo-1:/data/db
+      - ${PWD}/.data/mongo-1:/data/db
       - ${PWD}/entrypoints/mongokey.yaml:/keys/mongokey.yaml
     command: /docker-entrypoint
     depends_on:
@@ -166,7 +166,7 @@ services:
     command: ["/docker-entrypoint", "--port", "30002"]
     volumes:
       - ${PWD}/entrypoints/mongo-cluster-entrypoint:/docker-entrypoint
-      - ${PWD}/data/mongo-2:/data/db
+      - ${PWD}/.data/mongo-2:/data/db
       - ${PWD}/entrypoints/mongokey.yaml:/keys/mongokey.yaml
     ports:
       - 30002:30002
@@ -182,7 +182,7 @@ services:
     command: ["/docker-entrypoint", "--port", "30003"]
     volumes:
       - ${PWD}/entrypoints/mongo-cluster-entrypoint:/docker-entrypoint
-      - ${PWD}/data/mongo-3:/data/db
+      - ${PWD}/.data/mongo-3:/data/db
       - ${PWD}/entrypoints/mongokey.yaml:/keys/mongokey.yaml
     ports:
       - 30003:30003
@@ -332,7 +332,7 @@ services:
       - "4566-4599:4566-4599"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
-      - ${PWD}/data:/tmp/localstack/data
+      - ${PWD}/.data/localstack:/tmp/localstack/data
 
 networks:
   base:
