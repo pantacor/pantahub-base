@@ -55,7 +55,7 @@ func (app *App) handleGetApp(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	tpApp, httpCode, err := SearchApp("", id, app.mongoClient.Database(utils.MongoDb))
+	tpApp, httpCode, err := SearchApp(r.Context(), "", id, app.mongoClient.Database(utils.MongoDb))
 	if err != nil {
 		utils.RestErrorWrapper(w, err.Error(), httpCode)
 		return
@@ -119,7 +119,7 @@ func (app *App) handleGetApps(w rest.ResponseWriter, r *rest.Request) {
 	} else {
 		owner = sessionOwner
 	}
-	apps, err := SearchApps(owner, id, app.mongoClient.Database(utils.MongoDb))
+	apps, err := SearchApps(r.Context(), owner, id, app.mongoClient.Database(utils.MongoDb))
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error reading third party application "+err.Error(), http.StatusInternalServerError)
 		return
@@ -160,7 +160,7 @@ func (app *App) handleGetPhScopes(w rest.ResponseWriter, r *rest.Request) {
 	id := r.Request.URL.Query().Get("serviceID")
 
 	if id == "" {
-		scopes, err := SearchExposedScopes(app.mongoClient.Database(utils.MongoDb))
+		scopes, err := SearchExposedScopes(r.Context(), app.mongoClient.Database(utils.MongoDb))
 		if err != nil {
 			utils.RestErrorWrapper(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -169,7 +169,7 @@ func (app *App) handleGetPhScopes(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	tpApp, httpCode, err := SearchApp("", id, app.mongoClient.Database(utils.MongoDb))
+	tpApp, httpCode, err := SearchApp(r.Context(), "", id, app.mongoClient.Database(utils.MongoDb))
 	if err != nil {
 		utils.RestErrorWrapper(w, err.Error(), httpCode)
 		return

@@ -29,6 +29,7 @@ import (
 	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-base/utils/caclient"
+	"gitlab.com/pantacor/pantahub-base/utils/tracer"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -39,7 +40,7 @@ import (
 const PantahubDevicesAutoTokenV1 = "Pantahub-Devices-Auto-Token-V1"
 const CreateIndexTimeout = 600 * time.Second
 
-//DeviceNickRule : Device nick rule used to create/update a device nick
+// DeviceNickRule : Device nick rule used to create/update a device nick
 const DeviceNickRule = `(?m)^[a-zA-Z0-9_\-+%]+$`
 
 // App Web app structure
@@ -320,6 +321,10 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		// lookup by nick-path (np)
 		rest.Get("/np/#usernick/#devicenick", utils.ScopeFilter(readDevicesScopes, app.handleGetUserDevice)),
 	)
+	app.API.Use(&tracer.OtelMiddleware{
+		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
+		Router:      apiRouter,
+	})
 	app.API.SetApp(apiRouter)
 
 	return app

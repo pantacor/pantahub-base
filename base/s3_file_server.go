@@ -28,6 +28,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -36,6 +37,7 @@ import (
 	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/s3"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"gopkg.in/resty.v1"
 )
 
@@ -244,7 +246,11 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			TLSHandshakeTimeout:   30 * time.Second,
 			ExpectContinueTimeout: 15 * time.Second,
 		}
+
 		httpClient := &http.Client{Transport: transport}
+		if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" {
+			httpClient = &http.Client{Transport: otelhttp.NewTransport(transport)}
+		}
 
 		s3resp, err := httpClient.Do(s3req)
 		if err != nil {

@@ -51,7 +51,7 @@ func (app *App) handleDeleteApp(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	database := app.mongoClient.Database(utils.MongoDb)
-	tpApp, httpCode, err := SearchApp(owner, id, database)
+	tpApp, httpCode, err := SearchApp(r.Context(), owner, id, database)
 	if err != nil {
 		utils.RestErrorWrapper(w, err.Error(), httpCode)
 		return
@@ -60,7 +60,7 @@ func (app *App) handleDeleteApp(w rest.ResponseWriter, r *rest.Request) {
 	now := time.Now()
 	tpApp.DeletedAt = &now
 	tpApp.TimeModified = time.Now()
-	_, err = CreateOrUpdateApp(tpApp, database)
+	_, err = CreateOrUpdateApp(r.Context(), tpApp, database)
 	if err != nil {
 		utils.RestErrorWrapper(w, err.Error(), httpCode)
 		return

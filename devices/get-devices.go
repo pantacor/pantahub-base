@@ -37,8 +37,10 @@ import (
 // @Summary Get all accounts devices
 // Get Any user's public devices by using owner/ owner-nick params
 // Eg:
-//  GET /devices/?owner-nick=asac
-//  GET /devices/?owner=prn:pantahub.com:auth:/5e1875e2fb13950bc38d0ebd
+//
+//	GET /devices/?owner-nick=asac
+//	GET /devices/?owner=prn:pantahub.com:auth:/5e1875e2fb13950bc38d0ebd
+//
 // @Description Get all accounts devices
 // @Accept  json
 // @Produce  json
@@ -85,7 +87,7 @@ func (a *App) handleGetDevices(w rest.ResponseWriter, r *rest.Request) {
 
 	findOptions := options.Find()
 	findOptions.SetNoCursorTimeout(true)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	query := bson.M{
 		"garbage": bson.M{"$ne": true},
@@ -107,7 +109,7 @@ func (a *App) handleGetDevices(w rest.ResponseWriter, r *rest.Request) {
 
 	} else if ok2 {
 		//To get devices of any user who have public devices by using owner nick
-		account, err := a.GetUserAccountByNick(ownerNickvalue[0])
+		account, err := a.GetUserAccountByNick(r.Context(), ownerNickvalue[0])
 		if err != nil {
 			utils.RestErrorWrapper(w, "Error finding owner user account by nick:"+err.Error(), http.StatusForbidden)
 			return
@@ -253,7 +255,7 @@ func (a *App) handleGetDevice(w rest.ResponseWriter, r *rest.Request) {
 
 	value, useOtherOwnerNick := r.URL.Query()["owner-nick"]
 	if useOtherOwnerNick {
-		account, err := a.GetUserAccountByNick(value[0])
+		account, err := a.GetUserAccountByNick(r.Context(), value[0])
 		if err != nil {
 			utils.RestErrorWrapper(w, "Error finding owner user account by nick:"+err.Error(), http.StatusForbidden)
 			return
@@ -261,7 +263,7 @@ func (a *App) handleGetDevice(w rest.ResponseWriter, r *rest.Request) {
 		owner = account.Prn
 	}
 
-	mgoid, err := a.ResolveDeviceIDOrNick(owner, r.PathParam("id"))
+	mgoid, err := a.ResolveDeviceIDOrNick(r.Context(), owner, r.PathParam("id"))
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error Parsing Device ID or Nick:"+err.Error(), http.StatusBadRequest)
 		return
@@ -280,7 +282,7 @@ func (a *App) handleGetDevice(w rest.ResponseWriter, r *rest.Request) {
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	err = collection.FindOne(ctx, query).Decode(&device)
 	if err != nil {
@@ -313,7 +315,7 @@ func (a *App) handleGetDevice(w rest.ResponseWriter, r *rest.Request) {
 		// first check default accounts like user1, user2, etc...
 		ownerAccount, ok := accountsdata.DefaultAccounts[device.Owner]
 		if !ok {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 			defer cancel()
 			err := collectionAccounts.FindOne(ctx,
 				bson.M{"prn": device.Owner}).
@@ -325,7 +327,7 @@ func (a *App) handleGetDevice(w rest.ResponseWriter, r *rest.Request) {
 			}
 		}
 
-		profileMeta, _ := a.getProfileMetaData(device.Owner)
+		profileMeta, _ := a.getProfileMetaData(r.Context(), device.Owner)
 		device.UserMeta = utils.MergeMaps(profileMeta, device.UserMeta)
 		device.OwnerNick = ownerAccount.Nick
 	}
@@ -337,7 +339,7 @@ func (a *App) handleGetDevice(w rest.ResponseWriter, r *rest.Request) {
 }
 
 // GetUserAccountByNick : Get User Account By Nick
-func (a *App) GetUserAccountByNick(nick string) (accounts.Account, error) {
+func (a *App) GetUserAccountByNick(parentCtx context.Context, nick string) (accounts.Account, error) {
 
 	var account accounts.Account
 
@@ -346,7 +348,7 @@ func (a *App) GetUserAccountByNick(nick string) (accounts.Account, error) {
 
 		collectionAccounts := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
 		defer cancel()
 		err := collectionAccounts.FindOne(ctx,
 			bson.M{"nick": nick}).
@@ -359,7 +361,7 @@ func (a *App) GetUserAccountByNick(nick string) (accounts.Account, error) {
 	return account, nil
 }
 
-func (a *App) getProfileMetaData(prn string) (map[string]interface{}, error) {
+func (a *App) getProfileMetaData(parentCtx context.Context, prn string) (map[string]interface{}, error) {
 	profile := &profiles.Profile{
 		Meta: map[string]interface{}{},
 	}
@@ -369,7 +371,7 @@ func (a *App) getProfileMetaData(prn string) (map[string]interface{}, error) {
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_profiles")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
 	defer cancel()
 
 	err := collection.FindOne(ctx, bson.M{"prn": prn}, &queryOptions).Decode(profile)

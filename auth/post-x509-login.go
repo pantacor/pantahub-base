@@ -73,7 +73,7 @@ func (a *App) handleAuthUsingDeviceCert(w rest.ResponseWriter, r *rest.Request) 
 
 	deviceID := cert.Subject.SerialNumber
 
-	device, err := devices.GetDeviceByID(deviceID, a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices"))
+	device, err := devices.GetDeviceByID(r.Context(), deviceID, a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices"))
 	if err != nil {
 		utils.RestErrorWrapper(w, err.Error(), http.StatusForbidden)
 		return
@@ -127,7 +127,6 @@ func createToken(device *devices.Device) (*TokenPayload, error) {
 // behind a proxy it is mandatory that the proxy authenticates itself to the backend in order
 // to enable the code path that uses the "PhClientCertificate" Http header field to retrieve
 // the client certificate used.
-//
 func tlsProxyCertFilter(w rest.ResponseWriter, req *rest.Request) *x509.Certificate {
 	var cert *x509.Certificate
 

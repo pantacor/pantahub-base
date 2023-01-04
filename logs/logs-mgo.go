@@ -190,7 +190,7 @@ func (s *mgoLogger) unregister(delete bool) error {
 	return nil
 }
 
-func (s *mgoLogger) getLogs(start int64, page int64, before *time.Time,
+func (s *mgoLogger) getLogs(parentCtx context.Context, start int64, page int64, before *time.Time,
 	after *time.Time, query Filters, sort Sorts, cursor bool) (*Pager, error) {
 	var result Pager
 	var err error
@@ -277,7 +277,7 @@ func (s *mgoLogger) getLogs(start int64, page int64, before *time.Time,
 	} else {
 		findOptions.SetSort(bson.M{"time-created": -1})
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 30*time.Second)
 	defer cancel()
 	cur, err := collLogs.Find(ctx, findFilter, findOptions)
 	if err != nil {
@@ -295,7 +295,7 @@ func (s *mgoLogger) getLogs(start int64, page int64, before *time.Time,
 		}
 		entries = append(entries, result)
 	}
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(parentCtx, 5*time.Second)
 	defer cancel()
 	count, err := collLogs.CountDocuments(ctx, findFilter)
 	if err != nil {
@@ -309,11 +309,11 @@ func (s *mgoLogger) getLogs(start int64, page int64, before *time.Time,
 	return &result, nil
 }
 
-func (s *mgoLogger) getLogsByCursor(nextCursor string) (*Pager, error) {
+func (s *mgoLogger) getLogsByCursor(parentCtx context.Context, nextCursor string) (*Pager, error) {
 	return nil, ErrCursorNotImplemented
 }
 
-func (s *mgoLogger) postLogs(e []Entry) error {
+func (s *mgoLogger) postLogs(parentCtx context.Context, e []Entry) error {
 	collLogs := s.mongoClient.Database(utils.MongoDb).Collection(s.mgoCollection)
 
 	if collLogs == nil {
@@ -324,7 +324,7 @@ func (s *mgoLogger) postLogs(e []Entry) error {
 	for i, v := range e {
 		arr[i] = v
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
 	defer cancel()
 
 	_, err := collLogs.InsertMany(

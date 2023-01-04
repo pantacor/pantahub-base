@@ -50,17 +50,17 @@ func createDevice(id, secret, owner string) (*Device, error) {
 	return newDevice, nil
 }
 
-func (device *Device) save(collection *mongo.Collection) (*mongo.UpdateResult, error) {
+func (device *Device) save(ctx context.Context, collection *mongo.Collection) (*mongo.UpdateResult, error) {
 	if collection == nil {
 		return nil, errors.New("Error with Database connectivity")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	updateOptions := options.Update()
 	updateOptions.SetUpsert(true)
 	result, err := collection.UpdateOne(
-		ctx,
+		ctxC,
 		bson.M{"_id": device.ID},
 		bson.M{"$set": device},
 		updateOptions,
@@ -70,7 +70,7 @@ func (device *Device) save(collection *mongo.Collection) (*mongo.UpdateResult, e
 }
 
 // GetDeviceByID get device using string ID
-func GetDeviceByID(id string, collection *mongo.Collection) (*Device, error) {
+func GetDeviceByID(ctx context.Context, id string, collection *mongo.Collection) (*Device, error) {
 	var device Device
 	if collection == nil {
 		return nil, errors.New("Error with Database connectivity")
@@ -81,10 +81,10 @@ func GetDeviceByID(id string, collection *mongo.Collection) (*Device, error) {
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	err = collection.FindOne(ctx,
+	err = collection.FindOne(ctxC,
 		bson.M{
 			"_id":     mgoid,
 			"garbage": bson.M{"$ne": true},

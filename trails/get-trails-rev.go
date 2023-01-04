@@ -61,7 +61,7 @@ func (a *App) handleGetStep(w rest.ResponseWriter, r *rest.Request) {
 
 	trailID := r.PathParam("id")
 
-	isPublic, err := a.isTrailPublic(trailID)
+	isPublic, err := a.isTrailPublic(r.Context(), trailID)
 
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error getting trail public:"+err.Error(), http.StatusInternalServerError)
@@ -82,7 +82,7 @@ func (a *App) handleGetStep(w rest.ResponseWriter, r *rest.Request) {
 		"garbage": bson.M{"$ne": true},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
 	if isPublic {

@@ -1,0 +1,107 @@
+version: "3"
+
+services:
+  base:
+    build:
+      context: .
+      dockerfile: Dockerfile.development
+    links:
+      - mongo
+      - fluentd
+      - localstack
+      - elasticsearch
+    volumes:
+      - ${PWD}:/go/src/gitlab.com/pantacor/pantahub-base
+      - ${PWD}/k8s_token.test_data:/run/secrets/kubernetes.io/serviceaccount/token
+    ports:
+      - 12365:12365
+    env_file:
+      - ./env.default 
+      - ./.env.local
+
+  mongo:
+    image: mongo:4.4.3
+    hostname: mongo
+    restart: always
+    command: /docker-entrypoint
+    env_file:
+      - ./env.default
+      - ./.env.local
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: user
+      MONGO_INITDB_ROOT_PASSWORD: pass
+      MONGO_INITDB_DATABASE: pantabase
+    volumes:
+      - ./pantahub-base-mongo-docker-run:/docker-entrypoint
+    ports:
+      - "27017:27017"
+    links:
+      - fluentd
+      - localstack
+      - elasticsearch
+
+  fluentd:
+    image: fluent/fluentd
+    ports:
+      - "5140:5140"
+      - "24224:24224"
+
+  elasticsearch:
+    container_name: elasticsearch
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.3
+    environment:
+      - cluster.name=docker-cluster
+      - bootstrap.memory_lock=true
+      - discovery.type=single-node
+      - discovery.seed_hosts="localhost, 127.0.0.1"
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+      - xpack.watcher.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    restart: always
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.17.3
+    environment:
+      - SERVERNAME=kibana
+      - ELASTICSEARCH_HOSTS=https://elasticsearch:9200
+      - cluster.name=docker-cluster
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+      - xpack.watcher.enabled=false
+      - "discovery.type=single-node"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    restart: always
+    depends_on:
+      - elasticsearch
+    ports:
+      - "5601:5601"
+  localstack:
+    image: localstack/localstack:0.9.0
+    environment:
+      - SERVICES=s3:5000
+      - DEFAULT_REGION=us-east-1
+      - HOSTNAME=localstack
+    ports:
+      - "5000:5000"
+
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - ./docker_confs/nginx-conf.d:/etc/nginx/conf.d:ro
+      - ./docker_confs/nginx-certs.d/:/etc/nginx/certs.d:ro
+    ports:
+      - "12375:80"
+      - "12376:443"
+    links:
+      - base

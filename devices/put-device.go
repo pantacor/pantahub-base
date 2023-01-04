@@ -86,7 +86,7 @@ func (a *App) handlePutDevice(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	deviceObjectID, err := primitive.ObjectIDFromHex(putID)
 	if err != nil {
@@ -186,7 +186,7 @@ func (a *App) handlePutDevice(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	newDevice.TimeModified = time.Now()
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	updateOptions := options.Update()
 	updateOptions.SetUpsert(true)
@@ -196,6 +196,10 @@ func (a *App) handlePutDevice(w rest.ResponseWriter, r *rest.Request) {
 		bson.M{"$set": newDevice},
 		updateOptions,
 	)
+	if err != nil {
+		utils.RestErrorWrapper(w, "error updating device: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	// unquote back to original format
 	newDevice.UserMeta = utils.BsonUnquoteMap(&newDevice.UserMeta)

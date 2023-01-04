@@ -129,7 +129,7 @@ func (app *App) handleCreateApp(w rest.ResponseWriter, r *rest.Request) {
 	newApp.TimeModified = newApp.TimeCreated
 	newApp.DeletedAt = nil
 
-	_, err = CreateOrUpdateApp(newApp, app.mongoClient.Database(utils.MongoDb))
+	_, err = CreateOrUpdateApp(r.Context(), newApp, app.mongoClient.Database(utils.MongoDb))
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error creating third party application "+err.Error(), http.StatusInternalServerError)
 		return

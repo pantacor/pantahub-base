@@ -52,7 +52,7 @@ func (a *App) handlePutGlobalMeta(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	account, err := a.getUserAccount(tokenOwner, "prn")
+	account, err := a.getUserAccount(r.Context(), tokenOwner, "prn")
 	if err != nil {
 		switch err.(type) {
 		default:
@@ -61,14 +61,14 @@ func (a *App) handlePutGlobalMeta(w rest.ResponseWriter, r *rest.Request) {
 		}
 	}
 
-	haveProfile, err := a.ExistsInProfiles(account.ID)
+	haveProfile, err := a.ExistsInProfiles(r.Context(), account.ID)
 	if err != nil {
 		utils.RestErrorWrapper(w, err.Error(), http.StatusForbidden)
 		return
 	}
 
 	if !haveProfile {
-		_, err := a.MakeUserProfile(account, nil)
+		_, err := a.MakeUserProfile(r.Context(), account, nil)
 		if err != nil {
 			utils.RestErrorWrapper(w, err.Error(), http.StatusForbidden)
 			return
@@ -80,7 +80,7 @@ func (a *App) handlePutGlobalMeta(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	profile, err := a.updateProfileMeta(account.Prn, globalMeta)
+	profile, err := a.updateProfileMeta(r.Context(), account.Prn, globalMeta)
 	if err != nil {
 		utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
 		return

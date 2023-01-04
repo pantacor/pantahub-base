@@ -80,7 +80,7 @@ func (a *App) handlePutObject(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	// find object owned by caller, but only if download is possible
-	object, err := a.ResolveObjectWithBacking(ownerStr, putID)
+	object, err := a.ResolveObjectWithBacking(r.Context(), ownerStr, putID)
 
 	if err != nil && ErrNoBackingFile != err {
 		utils.RestErrorWrapper(w, "Object to update not found", http.StatusBadRequest)
@@ -88,7 +88,7 @@ func (a *App) handlePutObject(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if ErrNoBackingFile == err {
-		object, err = a.ResolveObjectWithLinks(ownerStr, putID, autoLink)
+		object, err = a.ResolveObjectWithLinks(r.Context(), ownerStr, putID, autoLink)
 		if err != nil {
 			utils.RestErrorWrapper(w, "No link found for object without backing file", http.StatusBadRequest)
 			return
@@ -96,7 +96,7 @@ func (a *App) handlePutObject(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if object == nil {
-		object, err = a.ResolveObjectWithLinks(ownerStr, putID, autoLink)
+		object, err = a.ResolveObjectWithLinks(r.Context(), ownerStr, putID, autoLink)
 		if err != nil {
 			utils.RestErrorWrapper(w, "No link found for not existing object", http.StatusBadRequest)
 			return
@@ -131,7 +131,7 @@ func (a *App) handlePutObject(w rest.ResponseWriter, r *rest.Request) {
 	if newObject.ObjectName != "" {
 		object.ObjectName = newObject.ObjectName
 	}
-	err = a.SaveObject(object, false)
+	err = a.SaveObject(r.Context(), object, false)
 
 	if err != nil {
 		utils.RestErrorWrapper(w, "Failed to save object: "+err.Error(), http.StatusInternalServerError)

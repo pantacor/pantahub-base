@@ -33,7 +33,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-const dubKeyErrCode = 11000
+const DubKeyErrCode = 11000
 
 // TokenPayload login token payload
 type TokenPayload struct {
@@ -90,17 +90,17 @@ func (a *App) HandleGetThirdPartyCallback(w rest.ResponseWriter, r *rest.Request
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
-	account, err := getUserByEmail(payload.Email, collection)
+	account, err := getUserByEmail(r.Context(), payload.Email, collection)
 	if err != nil && err != mongo.ErrNoDocuments {
 		processErr(w, r.Request, err, "Error with Database connectivity", http.StatusInternalServerError, payload.RedirectTo)
 		return
 	}
 
 	if err == mongo.ErrNoDocuments {
-		account, err = createUser(payload.Email, payload.Nick, "", "", collection)
+		account, err = createUser(r.Context(), payload.Email, payload.Nick, "", "", collection)
 		if err != nil && isDubplicateKey("nick", err) {
 			scopeNick := payload.Nick + "_" + string(payload.Service)
-			account, err = createUser(payload.Email, scopeNick, "", "", collection)
+			account, err = createUser(r.Context(), payload.Email, scopeNick, "", "", collection)
 		}
 
 		urlPrefix := utils.GetEnv(utils.EnvPantahubScheme) + "://" + utils.GetEnv(utils.EnvPantahubWWWHost)

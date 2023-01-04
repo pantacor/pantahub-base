@@ -67,9 +67,7 @@ func (a *App) handlePutDevice(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	err = collection.FindOne(ctx,
+	err = collection.FindOne(r.Context(),
 		bson.M{
 			"_id": mgoid,
 		}).Decode(&device)
@@ -99,21 +97,21 @@ func (a *App) handlePutDevice(w rest.ResponseWriter, r *rest.Request) {
 
 	if device.IsPublic {
 		// Mark all steps under the device as public
-		stepsMarkedAsPublic, err = a.MarkDeviceStepsPublicFlag(device.ID, true)
+		stepsMarkedAsPublic, err = a.MarkDeviceStepsPublicFlag(r.Context(), device.ID, true)
 		if err != nil {
 			utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 	} else {
 		// Mark all steps under the device as non-public
-		stepsMarkedAsNonPublic, err = a.MarkDeviceStepsPublicFlag(device.ID, false)
+		stepsMarkedAsNonPublic, err = a.MarkDeviceStepsPublicFlag(r.Context(), device.ID, false)
 		if err != nil {
 			utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 	}
 	// Mark the flag "mark_public_processed" as TRUE
-	err = a.MarkDeviceAsProcessed(device.ID)
+	err = a.MarkDeviceAsProcessed(r.Context(), device.ID)
 	if err != nil {
 		utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
 		return
@@ -126,15 +124,15 @@ func (a *App) handlePutDevice(w rest.ResponseWriter, r *rest.Request) {
 }
 
 // MarkDeviceAsProcessed is used to mark a device as processed
-func (a *App) MarkDeviceAsProcessed(ID primitive.ObjectID) error {
+func (a *App) MarkDeviceAsProcessed(ctx context.Context, ID primitive.ObjectID) error {
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	_, err := collection.UpdateOne(
-		ctx,
+		ctxC,
 		bson.M{"_id": ID},
 		bson.M{"$set": bson.M{
 			"mark_public_processed": true,
@@ -144,19 +142,20 @@ func (a *App) MarkDeviceAsProcessed(ID primitive.ObjectID) error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
 // MarkDeviceStepsPublicFlag mark all device steps public flag by device ID
-func (a *App) MarkDeviceStepsPublicFlag(ID primitive.ObjectID, public bool) (int, error) {
+func (a *App) MarkDeviceStepsPublicFlag(ctx context.Context, ID primitive.ObjectID, public bool) (int, error) {
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	updateResult, err := collection.UpdateMany(
-		ctx,
+		ctxC,
 		bson.M{
 			"trail-id": ID,
 			"ispublic": bson.M{
@@ -174,5 +173,6 @@ func (a *App) MarkDeviceStepsPublicFlag(ID primitive.ObjectID, public bool) (int
 	if err != nil {
 		return int(updateResult.MatchedCount), err
 	}
+
 	return int(updateResult.MatchedCount), nil
 }

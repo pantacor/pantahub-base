@@ -27,6 +27,7 @@ import (
 	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/tracer"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -86,7 +87,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		return nil
 	}
 
-	app.setAPI()
+	app.setupAPI()
 
 	// Define router or service
 	apiRouter, _ := rest.MakeRouter(
@@ -97,6 +98,10 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		rest.Put("/#id", app.handleUpdateApp),
 		rest.Delete("/#id", app.handleDeleteApp),
 	)
+	app.API.Use(&tracer.OtelMiddleware{
+		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
+		Router:      apiRouter,
+	})
 	app.API.SetApp(apiRouter)
 
 	return app
@@ -106,7 +111,7 @@ func needsAuth(request *rest.Request) bool {
 	return request.URL.Path != "/scopes"
 }
 
-func (app *App) setAPI() {
+func (app *App) setupAPI() {
 	app.API = rest.NewApi()
 
 	// we dont use default stack because we dont want content type enforcement
@@ -156,7 +161,7 @@ func (app *App) setIndexes() error {
 	collection := app.mongoClient.Database(utils.MongoDb).Collection(DBCollection)
 	_, err := collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
 	if err != nil {
-		return fmt.Errorf("Error setting up index for %s: %s", DBCollection, err.Error())
+		return fmt.Errorf("error setting up index for %s: %s", DBCollection, err.Error())
 	}
 
 	CreateIndexesOptions = options.CreateIndexesOptions{}
@@ -176,7 +181,7 @@ func (app *App) setIndexes() error {
 	collection = app.mongoClient.Database(utils.MongoDb).Collection(DBCollection)
 	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
 	if err != nil {
-		return fmt.Errorf("Error setting up index for %s: %s", DBCollection, err.Error())
+		return fmt.Errorf("error setting up index for %s: %s", DBCollection, err.Error())
 	}
 
 	return nil
