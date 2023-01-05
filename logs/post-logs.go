@@ -23,6 +23,9 @@ package logs
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -31,6 +34,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/tracer"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -73,16 +77,9 @@ func (a *App) handlePostLogs(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	body, err := ioutil.ReadAll(r.Body)
+	entries, err := readLogsBody(r.Context(), r.Body)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error reading logs body", http.StatusBadRequest)
-		return
-	}
-
-	entries, err := unmarshalBody(body)
-
-	if err != nil {
-		utils.RestErrorWrapper(w, "Error parsing logs body: "+err.Error()+" '"+string(body)+"'", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -103,7 +100,7 @@ func (a *App) handlePostLogs(w rest.ResponseWriter, r *rest.Request) {
 		newEntries = append(newEntries, v)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
 	err = a.backend.postLogs(ctx, newEntries)
 	if err != nil {
@@ -113,4 +110,24 @@ func (a *App) handlePostLogs(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	w.WriteJson(newEntries)
+}
+
+func readLogsBody(ctx context.Context, buff io.ReadCloser) ([]Entry, error) {
+	t := tracer.GetFunctionTracer()
+	if t != nil {
+		span := t.NewSpan(ctx, "readLogsBody")
+		defer span.End()
+	}
+
+	body, err := ioutil.ReadAll(buff)
+	if err != nil {
+		return nil, errors.New("error reading logs body")
+	}
+
+	entries, err := unmarshalBody(body)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing logs body: %s '%s'", err, body)
+	}
+
+	return entries, nil
 }

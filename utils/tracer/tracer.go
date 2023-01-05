@@ -27,8 +27,16 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc/credentials"
 )
+
+type OtelTracer struct {
+	tracer  oteltrace.Tracer
+	options []Option
+}
+
+var funcTracer *OtelTracer
 
 func Init(serviceName string) *sdktrace.TracerProvider {
 	var (
@@ -89,4 +97,44 @@ func Init(serviceName string) *sdktrace.TracerProvider {
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
 
 	return traceProvider
+}
+
+func GetFunctionTracer() *OtelTracer {
+	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") == "" {
+		return nil
+	}
+
+	if funcTracer != nil {
+		return funcTracer
+	}
+
+	otelTracer := &OtelTracer{}
+	cfg := config{}
+
+	if otelTracer.options == nil {
+		otelTracer.options = []Option{}
+	}
+
+	for _, opt := range otelTracer.options {
+		opt.apply(&cfg)
+	}
+	if cfg.TracerProvider == nil {
+		cfg.TracerProvider = otel.GetTracerProvider()
+	}
+	otelTracer.tracer = cfg.TracerProvider.Tracer(
+		tracerName,
+		oteltrace.WithInstrumentationVersion(SemVersion()),
+	)
+	if cfg.Propagators == nil {
+		cfg.Propagators = otel.GetTextMapPropagator()
+	}
+
+	funcTracer = otelTracer
+
+	return otelTracer
+}
+
+func (t *OtelTracer) NewSpan(ctx context.Context, spanName string) oteltrace.Span {
+	_, childSpan := t.tracer.Start(ctx, spanName)
+	return childSpan
 }
