@@ -46,14 +46,16 @@ type tracerResponseWriter struct {
 	writer     rest.ResponseWriter
 	ctx        context.Context
 	span       oteltrace.Span
+	tracer     oteltrace.Tracer
 	StatusCode int
 }
 
-func CreateTracerWriter(w rest.ResponseWriter, ctx context.Context, span oteltrace.Span) *tracerResponseWriter {
+func CreateTracerWriter(w rest.ResponseWriter, ctx context.Context, span oteltrace.Span, tracer oteltrace.Tracer) *tracerResponseWriter {
 	return &tracerResponseWriter{
 		writer: w,
 		ctx:    ctx,
 		span:   span,
+		tracer: tracer,
 	}
 }
 
@@ -66,23 +68,38 @@ func (w *tracerResponseWriter) Header() http.Header {
 // they are not already written, then write the payload.
 // The Content-Type header is set to "application/json", unless already specified.
 func (w *tracerResponseWriter) WriteJson(v interface{}) error {
-	return w.writer.WriteJson(v)
+	_, childSpan := w.tracer.Start(w.ctx, "WriteJson")
+	defer childSpan.End()
+
+	resp, err := w.EncodeJson(v)
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Write(resp)
+	return err
 }
 
 // Encode the data structure to JSON, mainly used to wrap ResponseWriter in
 // middlewares.
 func (w *tracerResponseWriter) EncodeJson(v interface{}) ([]byte, error) {
+	_, childSpan := w.tracer.Start(w.ctx, "EncodeJson")
+	defer childSpan.End()
 	return w.writer.EncodeJson(v)
 }
 
 // Identical to the http.ResponseWriter interface
 func (w *tracerResponseWriter) Write(body []byte) (int, error) {
+	_, childSpan := w.tracer.Start(w.ctx, "Write")
+	defer childSpan.End()
 	return w.writer.Write(body)
 }
 
 // Similar to the http.ResponseWriter interface, with additional JSON related
 // headers set.
 func (w *tracerResponseWriter) WriteHeader(code int) {
+	_, childSpan := w.tracer.Start(w.ctx, "WriteHeader")
+	defer childSpan.End()
 	w.StatusCode = code
 	w.writer.WriteHeader(code)
 }
@@ -153,7 +170,7 @@ func (mw *OtelMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.HandlerFunc {
 		r.Request = request.WithContext(ctx)
 
 		// serve the request to the next middleware
-		writer := CreateTracerWriter(w, ctx, span)
+		writer := CreateTracerWriter(w, ctx, span, tracer)
 		h(writer, r)
 
 		code := writer.StatusCode
