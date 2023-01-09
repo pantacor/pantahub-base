@@ -141,7 +141,7 @@ func (a *App) handleGetSteps(w rest.ResponseWriter, r *rest.Request) {
 		result := Step{}
 		err := cur.Decode(&result)
 		if err != nil {
-			utils.RestErrorWrapper(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
+			utils.RestErrorWrapper(w, "Cursor Decode Error:"+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		result.Meta = utils.BsonUnquoteMap(&result.Meta)
