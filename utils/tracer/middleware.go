@@ -109,6 +109,27 @@ func (w *tracerResponseWriter) Count() uint64 {
 	return w.writer.Count()
 }
 
+func GetTraceHeaderFromJaeger(r *http.Request) {
+	traceID := r.Header.Get("Uber-Trace-ID")
+	if traceID == "" {
+		return
+	}
+
+	traceSlice := strings.Split(traceID, ":")
+	if len(traceSlice) < 4 {
+		return
+	}
+
+	traceparent := fmt.Sprintf(
+		"00-%s-%s-0%s",
+		traceSlice[0],
+		traceSlice[1],
+		traceSlice[3],
+	)
+
+	r.Header.Set("traceparent", traceparent)
+}
+
 // MiddlewareFunc makes OtelMiddleware implement the Middleware interface.
 func (mw *OtelMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.HandlerFunc {
 	cfg := config{}
@@ -141,7 +162,7 @@ func (mw *OtelMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.HandlerFunc {
 			r.Request = request
 		}()
 
-		fmt.Printf("%+v", request.Header)
+		fmt.Printf("%+v", r.Header)
 
 		ctx := cfg.Propagators.Extract(savedCtx, propagation.HeaderCarrier(request.Header))
 		opts := []oteltrace.SpanStartOption{
