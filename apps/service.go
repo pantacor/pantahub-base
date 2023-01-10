@@ -129,7 +129,7 @@ func (app *App) setupAPI() {
 		},
 		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{
-			"Accept", "Content-Type", "X-Custom-Header", "Origin", "Authorization"},
+			"Accept", "Content-Type", "X-Custom-Header", "Origin", "Authorization", "X-Trace-Id"},
 		AccessControlAllowCredentials: true,
 		AccessControlMaxAge:           3600,
 	})
