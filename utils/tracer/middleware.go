@@ -141,6 +141,8 @@ func (mw *OtelMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.HandlerFunc {
 			r.Request = request
 		}()
 
+		fmt.Printf("%+v", request.Header)
+
 		ctx := cfg.Propagators.Extract(savedCtx, propagation.HeaderCarrier(request.Header))
 		opts := []oteltrace.SpanStartOption{
 			oteltrace.WithAttributes(semconv.NetAttributesFromHTTPRequest("tcp", request)...),
