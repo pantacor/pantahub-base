@@ -109,6 +109,30 @@ func (w *tracerResponseWriter) Count() uint64 {
 	return w.writer.Count()
 }
 
+func GetTraceHeaderFromJaeger(r *http.Request) {
+	uberTraceID := r.Header.Get("Uber-Trace-ID")
+	if uberTraceID == "" {
+		return
+	}
+
+	traceSlice := strings.Split(uberTraceID, ":")
+	if len(traceSlice) < 4 {
+		return
+	}
+
+	traceID := fmt.Sprintf("%0*s", 32, traceSlice[0])
+	spanID := fmt.Sprintf("%0*s", 16, traceSlice[1])
+	spanFlags := fmt.Sprintf("%0*s", 2, traceSlice[3])
+	traceparent := fmt.Sprintf(
+		"00-%s-%s-0%s",
+		traceID,
+		spanID,
+		spanFlags,
+	)
+
+	r.Header.Set("traceparent", traceparent)
+}
+
 // MiddlewareFunc makes OtelMiddleware implement the Middleware interface.
 func (mw *OtelMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.HandlerFunc {
 	cfg := config{}
@@ -141,6 +165,7 @@ func (mw *OtelMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.HandlerFunc {
 			r.Request = request
 		}()
 
+		GetTraceHeaderFromJaeger(request)
 		ctx := cfg.Propagators.Extract(savedCtx, propagation.HeaderCarrier(request.Header))
 		opts := []oteltrace.SpanStartOption{
 			oteltrace.WithAttributes(semconv.NetAttributesFromHTTPRequest("tcp", request)...),
@@ -171,6 +196,8 @@ func (mw *OtelMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.HandlerFunc {
 
 		// serve the request to the next middleware
 		writer := CreateTracerWriter(w, ctx, span, tracer)
+		cfg.Propagators.Inject(ctx, propagation.HeaderCarrier(w.Header()))
+
 		h(writer, r)
 
 		code := writer.StatusCode
