@@ -173,6 +173,7 @@ func (mw *OtelMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.HandlerFunc {
 
 		// serve the request to the next middleware
 		writer := CreateTracerWriter(w, ctx, span, tracer)
+		writer.Header().Add("TraceId", r.Request.Header.Get("TraceId"))
 		h(writer, r)
 
 		code := writer.StatusCode
