@@ -162,6 +162,7 @@ func (mw *OtelMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.HandlerFunc {
 			r.Request = request
 		}()
 
+		GetTraceHeaderFromJaeger(request)
 		fmt.Printf("%+v", r.Header)
 
 		ctx := cfg.Propagators.Extract(savedCtx, propagation.HeaderCarrier(request.Header))
