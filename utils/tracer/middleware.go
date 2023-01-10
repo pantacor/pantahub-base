@@ -163,7 +163,7 @@ func (mw *OtelMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.HandlerFunc {
 		}()
 
 		GetTraceHeaderFromJaeger(request)
-		fmt.Printf("%+v", r.Header)
+		fmt.Printf("%+v", request.Header)
 
 		ctx := cfg.Propagators.Extract(savedCtx, propagation.HeaderCarrier(request.Header))
 		opts := []oteltrace.SpanStartOption{
@@ -195,7 +195,7 @@ func (mw *OtelMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.HandlerFunc {
 
 		// serve the request to the next middleware
 		writer := CreateTracerWriter(w, ctx, span, tracer)
-		cfg.Propagators.Inject(r.Request.Context(), propagation.HeaderCarrier(w.Header()))
+		cfg.Propagators.Inject(ctx, propagation.HeaderCarrier(w.Header()))
 
 		h(writer, r)
 
