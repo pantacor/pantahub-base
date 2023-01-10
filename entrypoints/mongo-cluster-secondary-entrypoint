@@ -1,0 +1,12 @@
+#!/bin/sh
+
+set -ex
+
+mongod --keyFile /keys/mongokey.yaml --transitionToAuth --replSet ${MONGO_RS} --bind_ip_all $@ &
+
+# sleep 5
+
+# mongo --eval "rs.secondaryOk()" $@ --quiet
+
+
+tail -f /proc/$(pidof mongod)/fd/1

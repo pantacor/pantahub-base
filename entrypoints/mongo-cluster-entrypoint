@@ -5,9 +5,7 @@ set -ex
 mongod --keyFile /keys/mongokey.yaml --transitionToAuth --replSet ${MONGO_RS} --bind_ip_all --port 27017 &
 sleep 5
 
-userQuery='{"user": "admin","pwd": "admin","roles": [{"role": "userAdminAnyDatabase","db": "admin"},{"role": "dbOwner","db": "admin"},{"role": "clusterAdmin","db": "admin"},{"role": "readWriteAnyDatabase","db": "admin"}],"mechanisms": ["SCRAM-SHA-1","SCRAM-SHA-256"]}'
-replicaSet="""
-{
+replicaSet="""{
   \"_id\": \"${MONGO_RS}\",
   \"members\": [
     {
@@ -23,35 +21,30 @@ replicaSet="""
       \"host\": \"mongo3:30003\"
     }
   ]
-}
-"""
+}"""
 
 until mongo --eval "rs.initiate($replicaSet).ok || rs.status().ok" --port 27017 --quiet; do
   echo "checking mongo replica set"
   sleep 1
 done
 
-# until mongo --eval "db.createUser($userQuery)" localhost:27017/admin; do
-#   sleep 1
-# done 
-
 until mongo --eval 'db.createUser({user: "user", pwd: "pass", roles: [{role: "readWrite", db:"pantabase-serv"}], mechanisms: ["SCRAM-SHA-1"]})' localhost:27017/pantabase-serv; do
-  echo "checking mongo"
+  echo "checking user"
   if mongo --eval 'db.getUsers()' mongodb://user:pass@localhost:27017/pantabase-serv; then
     echo "get users"
     break
   fi
-  echo "checking mongo done"
+  echo "checking user done"
   sleep 1
 done
 
 until mongo --eval 'db.createUser({user: "phskafkaconnectsink", pwd: "pass", roles: [{role: "readWrite", db:"pantabase_devicesummary"}], mechanisms: ["SCRAM-SHA-1"]})' localhost:27017/pantabase_devicesummary; do
-  echo "checking mongo"
+  echo "checking phskafkaconnectsink"
   if mongo --eval 'db.getUsers()' mongodb://phskafkaconnectsink:pass@localhost:27017/pantabase_devicesummary; then
     echo "get users"
     break
   fi
-  echo "checking mongo done"
+  echo "checking phskafkaconnectsink done"
   sleep 1
 done
 

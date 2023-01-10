@@ -110,6 +110,8 @@ services:
     networks:
       - base
     image: fluent/fluentd
+    ports:
+      - 24224:24224
 
   elasticsearch:
     networks:
@@ -143,11 +145,14 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: admin
+      MONGO_RS: rs0
     volumes:
-      - ${PWD}/entrypoints/pantahub-base-mongo-docker-run:/docker-entrypoint
+      - ${PWD}/entrypoints/mongo-cluster-entrypoint:/docker-entrypoint
       - ${PWD}/.data/mongo-1:/data/db
-      - ${PWD}/entrypoints/mongokey.yaml:/keys/mongokey.yaml
+      - ${PWD}/entrypoints/mongokey.yaml:/keys/mongokey.yaml:ro
     command: /docker-entrypoint
+    ports:
+      - 27017:27017
     depends_on:
       - mongo2
       - mongo3
@@ -163,11 +168,12 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: admin
+      MONGO_RS: rs0
     command: ["/docker-entrypoint", "--port", "30002"]
     volumes:
-      - ${PWD}/entrypoints/mongo-cluster-entrypoint:/docker-entrypoint
+      - ${PWD}/entrypoints/mongo-cluster-secondary-entrypoint:/docker-entrypoint
       - ${PWD}/.data/mongo-2:/data/db
-      - ${PWD}/entrypoints/mongokey.yaml:/keys/mongokey.yaml
+      - ${PWD}/entrypoints/mongokey.yaml:/keys/mongokey.yaml:ro
     ports:
       - 30002:30002
 
@@ -179,11 +185,12 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: admin
+      MONGO_RS: rs0
     command: ["/docker-entrypoint", "--port", "30003"]
     volumes:
-      - ${PWD}/entrypoints/mongo-cluster-entrypoint:/docker-entrypoint
+      - ${PWD}/entrypoints/mongo-cluster-secondary-entrypoint:/docker-entrypoint
       - ${PWD}/.data/mongo-3:/data/db
-      - ${PWD}/entrypoints/mongokey.yaml:/keys/mongokey.yaml
+      - ${PWD}/entrypoints/mongokey.yaml:/keys/mongokey.yaml:ro
     ports:
       - 30003:30003
 
