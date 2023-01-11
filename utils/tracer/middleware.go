@@ -110,21 +110,24 @@ func (w *tracerResponseWriter) Count() uint64 {
 }
 
 func GetTraceHeaderFromJaeger(r *http.Request) {
-	traceID := r.Header.Get("Uber-Trace-ID")
-	if traceID == "" {
+	uberTraceID := r.Header.Get("Uber-Trace-ID")
+	if uberTraceID == "" {
 		return
 	}
 
-	traceSlice := strings.Split(traceID, ":")
+	traceSlice := strings.Split(uberTraceID, ":")
 	if len(traceSlice) < 4 {
 		return
 	}
 
+	traceID := fmt.Sprintf("%0*s", 32, traceSlice[0])
+	spanID := fmt.Sprintf("%0*s", 16, traceSlice[1])
+	spanFlags := fmt.Sprintf("%0*s", 2, traceSlice[3])
 	traceparent := fmt.Sprintf(
-		"00-%s-%s-0%s",
-		traceSlice[0],
-		traceSlice[1],
-		traceSlice[3],
+		"00-%s-%s-%s",
+		traceID,
+		spanID,
+		spanFlags,
 	)
 
 	r.Header.Set("traceparent", traceparent)
@@ -163,8 +166,6 @@ func (mw *OtelMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.HandlerFunc {
 		}()
 
 		GetTraceHeaderFromJaeger(request)
-		fmt.Printf("%+v", request.Header)
-
 		ctx := cfg.Propagators.Extract(savedCtx, propagation.HeaderCarrier(request.Header))
 		opts := []oteltrace.SpanStartOption{
 			oteltrace.WithAttributes(semconv.NetAttributesFromHTTPRequest("tcp", request)...),
