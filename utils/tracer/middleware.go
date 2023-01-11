@@ -109,6 +109,11 @@ func (w *tracerResponseWriter) Count() uint64 {
 	return w.writer.Count()
 }
 
+// GetTraceHeaderFromJaeger conver uber-trace-id header to traceparent
+// here you can read more about those formats:
+//
+//	https://www.w3.org/TR/trace-context/#traceparent-header
+//	https://www.jaegertracing.io/docs/1.22/client-libraries/#key
 func GetTraceHeaderFromJaeger(r *http.Request) {
 	uberTraceID := r.Header.Get("Uber-Trace-ID")
 	if uberTraceID == "" {
