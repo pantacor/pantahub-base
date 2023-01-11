@@ -110,7 +110,7 @@ func (w *tracerResponseWriter) Count() uint64 {
 }
 
 func GetTraceHeaderFromJaeger(r *http.Request) {
-	uberTraceID := r.Header.Get("uber-trace-id")
+	uberTraceID := r.Header.Get("Uber-Trace-ID")
 	if uberTraceID == "" {
 		return
 	}

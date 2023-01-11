@@ -140,6 +140,7 @@ func (app *App) setupAPI() {
 			"X-Request-ID",
 			"TraceID",
 			"ParentID",
+			"Uber-Trace-ID",
 			"uber-trace-id",
 			"traceparent",
 			"tracestate",
