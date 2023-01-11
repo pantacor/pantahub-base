@@ -124,7 +124,7 @@ func GetTraceHeaderFromJaeger(r *http.Request) {
 	spanID := fmt.Sprintf("%0*s", 16, traceSlice[1])
 	spanFlags := fmt.Sprintf("%0*s", 2, traceSlice[3])
 	traceparent := fmt.Sprintf(
-		"00-%s-%s-0%s",
+		"00-%s-%s-%s",
 		traceID,
 		spanID,
 		spanFlags,
