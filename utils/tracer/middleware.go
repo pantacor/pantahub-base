@@ -116,7 +116,8 @@ func (w *tracerResponseWriter) Count() uint64 {
 //	https://www.jaegertracing.io/docs/1.22/client-libraries/#key
 func GetTraceHeaderFromJaeger(r *http.Request) {
 	uberTraceID := r.Header.Get("Uber-Trace-ID")
-	if uberTraceID == "" {
+	traceparent := r.Header.Get("traceparent")
+	if uberTraceID == "" || traceparent != "" {
 		return
 	}
 
@@ -128,7 +129,7 @@ func GetTraceHeaderFromJaeger(r *http.Request) {
 	traceID := fmt.Sprintf("%0*s", 32, traceSlice[0])
 	spanID := fmt.Sprintf("%0*s", 16, traceSlice[1])
 	spanFlags := fmt.Sprintf("%0*s", 2, traceSlice[3])
-	traceparent := fmt.Sprintf(
+	traceparent = fmt.Sprintf(
 		"00-%s-%s-%s",
 		traceID,
 		spanID,
