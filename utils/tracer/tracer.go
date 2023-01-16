@@ -40,13 +40,9 @@ var funcTracer *OtelTracer
 
 func Init(serviceName string) *sdktrace.TracerProvider {
 	var (
-		signozToken  = os.Getenv("SIGNOZ_ACCESS_TOKEN")
 		collectorURL = os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
 		insecure     = os.Getenv("OTEL_INSECURE_MODE")
 	)
-	headers := map[string]string{
-		"signoz-access-token": signozToken,
-	}
 
 	secureOption := otlptracegrpc.WithTLSCredentials(credentials.NewClientTLSFromCert(nil, "")) // config can be passed to configure TLS
 	if len(insecure) > 0 {
@@ -58,7 +54,6 @@ func Init(serviceName string) *sdktrace.TracerProvider {
 		otlptracegrpc.NewClient(
 			secureOption,
 			otlptracegrpc.WithEndpoint(collectorURL),
-			otlptracegrpc.WithHeaders(headers),
 		),
 	)
 	if err != nil {
