@@ -14,6 +14,7 @@ require (
 	github.com/cloudflare/go-metrics v0.0.0-20151117154305-6a9aea36fb41 // indirect
 	github.com/cncf/udpa/go v0.0.0-20220112060539-c52dc94e7fbe // indirect
 	github.com/cncf/xds/go v0.0.0-20220330162227-eded343319d0 // indirect
+	github.com/dangkaka/go-kafka-avro v0.0.0-20200609051134-e714c259f1e9 // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/dustinkirkland/golang-petname v0.0.0-20191129215211-8e5a1ed0cff0
 	github.com/envoyproxy/protoc-gen-validate v0.6.7 // indirect

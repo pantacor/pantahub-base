@@ -28,34 +28,40 @@ until mongo --eval "rs.initiate($replicaSet).ok || rs.status().ok" --port 27017 
   sleep 1
 done
 
-until mongo --eval 'db.createUser({user: "admin", pwd: "admin", roles: [{role: "readWrite", db:"admin"}], mechanisms: ["SCRAM-SHA-1"]})' localhost:27017/admin; do
-  echo "checking user"
-  if mongo --eval 'db.getUsers()' mongodb://admin:admin@localhost:27017/admin?authSource=admin&authMechanism=SCRAM-SHA-1&replicaSet=rs0; then
-    echo "get users"
-    break
-  fi
-  echo "checking user done"
-  sleep 1
-done
+if ! mongo --eval 'db.getUsers()' "mongodb://admin:admin@localhost:27017/admin?authSource=admin&authMechanism=SCRAM-SHA-1&replicaSet=rs0"; then
+  until mongo --eval 'db.createUser({user: "admin", pwd: "admin", roles: [{role: "readWrite", db:"admin"}], mechanisms: ["SCRAM-SHA-1"]})' localhost:27017/admin&replicaSet=rs0; do
+    echo "checking user"
+    if mongo --eval 'db.getUsers()' "mongodb://admin:admin@localhost:27017/admin?authSource=admin&authMechanism=SCRAM-SHA-1&replicaSet=rs0"; then
+      echo "get users"
+      break
+    fi
+    echo "checking user done"
+    sleep 1
+  done
+fi
 
-until mongo --eval 'db.createUser({user: "user", pwd: "pass", roles: [{role: "readWrite", db:"pantabase-serv"}], mechanisms: ["SCRAM-SHA-1"]})' localhost:27017/pantabase-serv; do
-  echo "checking user"
-  if mongo --eval 'db.getUsers()' mongodb://user:pass@localhost:27017/pantabase-serv?authSource=pantabase-serv&authMechanism=SCRAM-SHA-1&replicaSet=rs0; then
-    echo "get users"
-    break
-  fi
-  echo "checking user done"
-  sleep 1
-done
+if ! mongo --eval 'db.getUsers()' "mongodb://user:pass@localhost:27017/pantabase-serv?authSource=pantabase-serv&authMechanism=SCRAM-SHA-1&replicaSet=rs0"; then
+  until mongo --eval 'db.createUser({user: "user", pwd: "pass", roles: [{role: "readWrite", db:"pantabase-serv"}], mechanisms: ["SCRAM-SHA-1"]})' localhost:27017/pantabase-serv&replicaSet=rs0; do
+    echo "checking user"
+    if mongo --eval 'db.getUsers()' "mongodb://user:pass@localhost:27017/pantabase-serv?authSource=pantabase-serv&authMechanism=SCRAM-SHA-1&replicaSet=rs0"; then
+      echo "get users"
+      break
+    fi
+    echo "checking user done"
+    sleep 1
+  done
+fi
 
-until mongo --eval 'db.createUser({user: "phskafkaconnectsink", pwd: "pass", roles: [{role: "readWrite", db:"pantabase_devicesummary"}], mechanisms: ["SCRAM-SHA-1"]})' localhost:27017/pantabase_devicesummary; do
-  echo "checking phskafkaconnectsink"
-  if mongo --eval 'db.getUsers()' mongodb://phskafkaconnectsink:pass@localhost:27017/pantabase_devicesummary?authSource=pantabase_devicesummary&authMechanism=SCRAM-SHA-1&replicaSet=rs0; then
-    echo "get users"
-    break
-  fi
-  echo "checking phskafkaconnectsink done"
-  sleep 1
-done
+if ! mongo --eval 'db.getUsers()' "mongodb://phskafkaconnectsink:pass@localhost:27017/pantabase_devicesummary?authSource=pantabase_devicesummary&authMechanism=SCRAM-SHA-1&replicaSet=rs0"; then
+  until mongo --eval 'db.createUser({user: "phskafkaconnectsink", pwd: "pass", roles: [{role: "readWrite", db:"pantabase_devicesummary"}], mechanisms: ["SCRAM-SHA-1"]})' localhost:27017/pantabase_devicesummary&replicaSet=rs0; do
+    echo "checking phskafkaconnectsink"
+    if mongo --eval 'db.getUsers()' "mongodb://phskafkaconnectsink:pass@localhost:27017/pantabase_devicesummary?authSource=pantabase_devicesummary&authMechanism=SCRAM-SHA-1&replicaSet=rs0"; then
+      echo "get users"
+      break
+    fi
+    echo "checking phskafkaconnectsink done"
+    sleep 1
+  done
+fi 
 
 tail -f /proc/$(pidof mongod)/fd/1

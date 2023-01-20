@@ -163,6 +163,7 @@ func (mw *OtelMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.HandlerFunc {
 	return func(w rest.ResponseWriter, r *rest.Request) {
 		if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") == "" {
 			h(w, r)
+			return
 		}
 		request := r.Request
 		savedCtx := request.Context()

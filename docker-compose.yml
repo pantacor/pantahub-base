@@ -9,21 +9,12 @@ services:
       dockerfile: Dockerfile.development
     volumes:
       - ${PWD}:/go/src/gitlab.com/pantacor/pantahub-base
+      - ${PWD}/.data/local-s3/:/local-s3/
     links:
-      - mongo
-      - fluentd
-      - elasticsearch
-      - phs
-      - pvr
       - www
-      - localstack
-    depends_on:
-      - mongo
-      - fluentd
-      - elasticsearch
-      - phs
       - pvr
-      - gc
+    depends_on:
+      - pvr
     ports:
       - 12365:12365
     env_file:
@@ -43,7 +34,6 @@ services:
       - PANTAHUB_HOST=base
       - PANTAHUB_PORT=12365
       - PANTAHUB_GC_API=http://gc:2000
-
     volumes:
       - ./.env.local:/opt/ph/bin/env.default
 
@@ -51,6 +41,15 @@ services:
     image: registry.gitlab.com/pantacor/pantahub-pvr:latest
     environment:
       - PANTAHUB_API_HOST=http://base:12365
+    links:
+      - mongo
+      - fluentd
+      - elasticsearch
+      - phs
+      - www
+      - localstack
+    depends_on:
+      - mongo
     ports:
       - 12367:12367
 
@@ -291,6 +290,7 @@ services:
       - kafka
       - kafka-schema-registry
       - kafka-rest
+      - mongo
     volumes:
       - ${PWD}/kafka/connect-configs:/opt/kafka-connect-configs:ro
       - ${PWD}/entrypoints/kafka-connect-entrypoint:/docker-entrypoint
