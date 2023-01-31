@@ -145,6 +145,7 @@ services:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: admin
       MONGO_RS: rs0
+      MONGO_PORT: 27017
     volumes:
       - ${PWD}/entrypoints/mongo-cluster-entrypoint:/docker-entrypoint
       - ${PWD}/.data/mongo-1:/data/db
@@ -152,9 +153,6 @@ services:
     command: /docker-entrypoint
     ports:
       - 27017:27017
-    depends_on:
-      - mongo2
-      - mongo3
     links:
       - mongo2
       - mongo3
@@ -168,7 +166,8 @@ services:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: admin
       MONGO_RS: rs0
-    command: ["/docker-entrypoint", "--port", "30002"]
+      MONGO_PORT: 30002
+    command: ["/docker-entrypoint"]
     volumes:
       - ${PWD}/entrypoints/mongo-cluster-secondary-entrypoint:/docker-entrypoint
       - ${PWD}/.data/mongo-2:/data/db
@@ -185,7 +184,8 @@ services:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: admin
       MONGO_RS: rs0
-    command: ["/docker-entrypoint", "--port", "30003"]
+      MONGO_PORT: 30003
+    command: ["/docker-entrypoint"]
     volumes:
       - ${PWD}/entrypoints/mongo-cluster-secondary-entrypoint:/docker-entrypoint
       - ${PWD}/.data/mongo-3:/data/db
@@ -212,6 +212,7 @@ services:
     image: confluentinc/cp-kafka:5.4.3
     volumes:
       - ${PWD}/entrypoints/kafka-entrypoint:/docker-entrypoint
+      - ${PWD}/.data/kafka-data:/var/lib/kafka/data
     command: /docker-entrypoint
     ulimits:
       nofile:
