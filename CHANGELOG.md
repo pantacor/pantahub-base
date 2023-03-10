@@ -1,6 +1,14 @@
 
-<a name="037"></a>
-## [037](https://gitlab.com/pantacor/pantahub-base/compare/036...037) (2023-03-03)
+<a name="039"></a>
+## [039](https://gitlab.com/pantacor/pantahub-base/compare/038...039) (2023-03-10)
+
+### Feature
+
+* **trails:** revision step fileds projection as in steps list
+
+
+<a name="038"></a>
+## [038](https://gitlab.com/pantacor/pantahub-base/compare/036...038) (2023-03-03)
 
 ### Feature
 
