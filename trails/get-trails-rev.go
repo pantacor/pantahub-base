@@ -28,6 +28,8 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/querymongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -58,25 +60,27 @@ func (a *App) handleGetStep(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+	if !ok {
+		// XXX: find right error
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
+		return
+	}
 
 	trailID := r.PathParam("id")
-
 	isPublic, err := a.isTrailPublic(r.Context(), trailID)
-
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error getting trail public:"+err.Error(), http.StatusInternalServerError)
 	}
 
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
-
 	if coll == nil {
 		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
+	asp := querymongo.GetAllQueryPagination(r.URL, filterByKeys)
 	step := Step{}
 	rev := r.PathParam("rev")
-
 	query := bson.M{
 		"_id":     trailID + "-" + rev,
 		"garbage": bson.M{"$ne": true},
@@ -85,23 +89,25 @@ func (a *App) handleGetStep(w rest.ResponseWriter, r *rest.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	if isPublic {
-		err = coll.FindOne(ctx, query).Decode(&step)
-	} else if authType == "DEVICE" {
-		query["device"] = owner
-		err = coll.FindOne(ctx, query).Decode(&step)
-	} else if authType == "USER" || authType == "SESSION" {
-		query["owner"] = owner
-		err = coll.FindOne(ctx, bson.M{
-			"_id":     trailID + "-" + rev,
-			"owner":   owner,
-			"garbage": bson.M{"$ne": true},
-		}).Decode(&step)
-	} else {
+	findOptions := options.FindOne()
+	if asp.Fields != nil {
+		findOptions.Projection = querymongo.MergeDefaultProjection(asp.Fields)
+	}
+
+	if (authType != "DEVICE" && authType != "USER" && authType != "SESSION") && !isPublic {
 		utils.RestErrorWrapper(w, "No Access to step", http.StatusForbidden)
 		return
 	}
 
+	if authType == "DEVICE" {
+		query["device"] = owner
+	}
+
+	if authType == "USER" || authType == "SESSION" {
+		query["owner"] = owner
+	}
+
+	err = coll.FindOne(ctx, query, findOptions).Decode(&step)
 	if err != nil {
 		utils.RestErrorWrapper(w, "No access", http.StatusInternalServerError)
 		return
