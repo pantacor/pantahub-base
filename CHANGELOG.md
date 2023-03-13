@@ -1,4 +1,12 @@
 
+<a name="040"></a>
+## [040](https://gitlab.com/pantacor/pantahub-base/compare/039...040) (2023-03-13)
+
+### Fix
+
+* **trails:** get trails revision correct authorization logic
+
+
 <a name="039"></a>
 ## [039](https://gitlab.com/pantacor/pantahub-base/compare/038...039) (2023-03-10)
 
@@ -225,15 +233,15 @@
 
 
 <a name="010-rc1"></a>
-## [010-rc1](https://gitlab.com/pantacor/pantahub-base/compare/009-rc1...010-rc1) (2020-01-14)
-
-
-<a name="009-rc1"></a>
-## [009-rc1](https://gitlab.com/pantacor/pantahub-base/compare/009...009-rc1) (2019-08-15)
+## [010-rc1](https://gitlab.com/pantacor/pantahub-base/compare/009...010-rc1) (2020-01-14)
 
 
 <a name="009"></a>
-## [009](https://gitlab.com/pantacor/pantahub-base/compare/007...009) (2019-08-15)
+## [009](https://gitlab.com/pantacor/pantahub-base/compare/009-rc1...009) (2019-08-15)
+
+
+<a name="009-rc1"></a>
+## [009-rc1](https://gitlab.com/pantacor/pantahub-base/compare/007...009-rc1) (2019-08-15)
 
 
 <a name="007"></a>
