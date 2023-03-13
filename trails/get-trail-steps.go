@@ -29,10 +29,13 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/querymongo"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"gopkg.in/mgo.v2/bson"
 )
+
+var filterByKeys = map[string]bool{}
 
 // handleGetSteps Get steps of the the given trail.
 // @Summary Get steps of the the given trail.
@@ -63,14 +66,18 @@ func (a *App) handleGetSteps(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+	if !ok {
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
+		return
+	}
 
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
-
 	if coll == nil {
 		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
+	asp := querymongo.GetAllQueryPagination(r.URL, filterByKeys)
 	steps := make([]Step, 0)
 
 	trailID := r.PathParam("id")
@@ -126,7 +133,17 @@ func (a *App) handleGetSteps(w rest.ResponseWriter, r *rest.Request) {
 	if authType == "DEVICE" && progressStatus == "" {
 		findOptions.SetLimit(1)
 	}
-	findOptions.SetSort(bson.M{"rev": 1}) //order by rev asc
+
+	sort := bson.M{"rev": 1}
+	for key, value := range asp.Filters {
+		query[key] = value
+	}
+
+	if asp.Fields != nil {
+		findOptions.Projection = querymongo.MergeDefaultProjection(asp.Fields)
+	}
+
+	querymongo.SetMongoPagination(query, sort, asp.Pagination, findOptions)
 
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
