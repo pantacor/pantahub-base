@@ -95,13 +95,13 @@ func (a *App) handleGetStep(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if isPublic {
-		err = coll.FindOne(ctx, query).Decode(&step)
+		err = coll.FindOne(ctx, query, findOptions).Decode(&step)
 	} else if authType == "DEVICE" {
 		query["device"] = owner
-		err = coll.FindOne(ctx, query).Decode(&step)
+		err = coll.FindOne(ctx, query, findOptions).Decode(&step)
 	} else if authType == "USER" || authType == "SESSION" {
 		query["owner"] = owner
-		err = coll.FindOne(ctx, query).Decode(&step)
+		err = coll.FindOne(ctx, query, findOptions).Decode(&step)
 	} else {
 		utils.RestErrorWrapper(w, "No Access to step", http.StatusForbidden)
 		return
