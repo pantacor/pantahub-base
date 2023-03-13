@@ -94,20 +94,19 @@ func (a *App) handleGetStep(w rest.ResponseWriter, r *rest.Request) {
 		findOptions.Projection = querymongo.MergeDefaultProjection(asp.Fields)
 	}
 
-	if (authType != "DEVICE" && authType != "USER" && authType != "SESSION") && !isPublic {
+	if isPublic {
+		err = coll.FindOne(ctx, query).Decode(&step)
+	} else if authType == "DEVICE" {
+		query["device"] = owner
+		err = coll.FindOne(ctx, query).Decode(&step)
+	} else if authType == "USER" || authType == "SESSION" {
+		query["owner"] = owner
+		err = coll.FindOne(ctx, query).Decode(&step)
+	} else {
 		utils.RestErrorWrapper(w, "No Access to step", http.StatusForbidden)
 		return
 	}
 
-	if authType == "DEVICE" {
-		query["device"] = owner
-	}
-
-	if authType == "USER" || authType == "SESSION" {
-		query["owner"] = owner
-	}
-
-	err = coll.FindOne(ctx, query, findOptions).Decode(&step)
 	if err != nil {
 		utils.RestErrorWrapper(w, "No access", http.StatusInternalServerError)
 		return
