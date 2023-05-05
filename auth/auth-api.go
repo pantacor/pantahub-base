@@ -576,6 +576,7 @@ func (a *App) handlePasswordReset(writer rest.ResponseWriter, r *rest.Request) {
 			"password":        "",
 			"password_bcrypt": passwordBcrypt,
 			"password_scrypt": passwordScrypt,
+			"challenge":       "",
 			"time-modified":   time.Now(),
 		},
 	}
