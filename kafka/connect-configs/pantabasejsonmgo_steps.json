@@ -1,0 +1,13 @@
+{
+  "connector.class": "com.mongodb.kafka.connect.MongoSourceConnector",
+  "key.converter.schemas.enable": "false",
+  "database": "pantabase-serv",
+  "publish.full.document.only": "true",
+  "topic.prefix": "pantabasemgo",
+  "connection.uri": "mongodb://admin:admin@mongo:27017/pantabase-serv?authSource=admin&authMechanism=SCRAM-SHA-1",
+  "value.converter.schemas.enable": "false",
+  "collection": "pantahub_steps",
+  "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+  "key.converter": "org.apache.kafka.connect.json.JsonConverter"
+}
+

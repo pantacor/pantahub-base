@@ -69,9 +69,8 @@ func (a *App) handlePostDevice(w rest.ResponseWriter, r *rest.Request) {
 		}
 	}
 
-	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
-
 	var owner interface{}
+	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
 	if ok {
 		owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
 	}

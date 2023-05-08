@@ -198,6 +198,9 @@ const (
 	// default: <none>
 	EnvMongoRs = "MONGO_RS"
 
+	// EnvMongoSsl connect using ssl to the database
+	EnvMongoSsl = "MONGO_SSL"
+
 	// EnvPantahubSaAdminSecret Service Account Admin Secret to use
 	// default: <none> (Required!)
 	EnvPantahubSaAdminSecret = "PANTAHUB_SA_ADMIN_SECRET"
@@ -378,6 +381,7 @@ var defaultEnvs = map[string]string{
 	EnvMongoPassword: "",
 	EnvMongoPort:     "27017",
 	EnvMongoRs:       "", // replicaSet; needed if connecting to multiple hosts
+	EnvMongoSsl:      "true",
 
 	// elastic search access
 	EnvElasticURL:      "http://localhost:9200",

@@ -8,10 +8,10 @@ debug
 pantahub-base.exe
 s3-storage/
 tmp
-data
 vendor/
 .env.*
 .vscode
 *.test_data
 .chglog
 .tmp
+.data

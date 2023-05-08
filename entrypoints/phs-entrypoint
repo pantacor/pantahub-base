@@ -1,0 +1,11 @@
+#!/bin/sh
+
+set -x
+
+until curl http://kafka-connect:8083/connectors/pantabase; do
+	sleep 5
+done
+sleep 5
+
+cd /target && java -jar devicesummary.jar
+

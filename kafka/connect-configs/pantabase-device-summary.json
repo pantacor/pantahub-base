@@ -1,0 +1,30 @@
+{
+  "name": "pantabase-device-summary",
+  "config": {
+    "connector.class": "com.mongodb.kafka.connect.MongoSinkConnector",
+    "key.converter": "io.confluent.connect.avro.AvroConverter",
+    "key.converter.schema.registry.url": "http://kafka-schema-registry:8081",
+    "collection": "device_summary_short_new_v2",
+    "connection.uri": "mongodb://phskafkaconnectsink:pass@mongo:27017/pantabase_devicesummary?authSource=pantabase_devicesummary&authMechanism=SCRAM-SHA-1",
+    "document.id.strategy": "com.mongodb.kafka.connect.sink.processor.id.strategy.PartialValueStrategy",
+    "value.projection.list": "deviceid",
+    "value.projection.type": "whitelist",
+    "topics": "ph-device-summary",
+    "database": "pantabase_devicesummary",
+    "transforms": "timestamp,step_time,progress_time,trail_touched_time",
+    "transforms.progress_time.field": "progress_time",
+    "transforms.progress_time.target.type": "Timestamp",
+    "transforms.progress_time.type": "org.apache.kafka.connect.transforms.TimestampConverter$Value",
+    "transforms.step_time.field": "step_time",
+    "transforms.step_time.target.type": "Timestamp",
+    "transforms.step_time.type": "org.apache.kafka.connect.transforms.TimestampConverter$Value",
+    "transforms.timestamp.field": "timestamp",
+    "transforms.timestamp.target.type": "Timestamp",
+    "transforms.timestamp.type": "org.apache.kafka.connect.transforms.TimestampConverter$Value",
+    "transforms.trail_touched_time.field": "trail_touched_time",
+    "transforms.trail_touched_time.target.type": "Timestamp",
+    "transforms.trail_touched_time.type": "org.apache.kafka.connect.transforms.TimestampConverter$Value",
+    "value.converter": "io.confluent.connect.avro.AvroConverter",
+    "value.converter.schema.registry.url": "http://kafka-schema-registry:8081"
+  }
+}

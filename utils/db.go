@@ -40,6 +40,7 @@ func GetMongoClient() (*mongo.Client, error) {
 	host := GetEnv(EnvMongoHost)
 	port := GetEnv(EnvMongoPort)
 	mongoRs := GetEnv(EnvMongoRs)
+	ssl := GetEnv(EnvMongoSsl)
 
 	//Setting Client Options
 	clientOptions := options.Client()
@@ -68,6 +69,11 @@ func GetMongoClient() (*mongo.Client, error) {
 
 	if mongoRs != "" {
 		mongoConnect += "&replicaSet=" + mongoRs
+	}
+
+	if ssl == "false" {
+		mongoConnect += "&ssl=false"
+
 	}
 
 	clientOptions = clientOptions.ApplyURI(mongoConnect)

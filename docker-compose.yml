@@ -2,38 +2,119 @@ version: "3"
 
 services:
   base:
+    networks:
+      - base
     build:
       context: .
       dockerfile: Dockerfile.development
-    links:
-      - mongo
-      - fluentd
-      - localstack
-      - elasticsearch
     volumes:
       - ${PWD}:/go/src/gitlab.com/pantacor/pantahub-base
-      - ${PWD}/k8s_token.test_data:/run/secrets/kubernetes.io/serviceaccount/token
+      - ${PWD}/.data/local-s3/:/local-s3/
+    links:
+      - www
+      - pvr
+    depends_on:
+      - pvr
     ports:
       - 12365:12365
     env_file:
       - ./env.default 
       - ./.env.local
 
-  mongo:
-    image: mongo
+  gc:
+    networks:
+      - base
+    image: registry.gitlab.com/pantacor/pantahub-gc:develop
+    env_file:
+      - ./env.default 
+      - ./.env.local
+    environment:
+      - PANTAHUB_GC_UNCLAIMED_EXPIRY="P5D"
+      - PANTAHUB_GC_GARBAGE_EXPIRY="P2D"
+      - PANTAHUB_HOST=base
+      - PANTAHUB_PORT=12365
+      - PANTAHUB_GC_API=http://gc:2000
     volumes:
-      - ./pantahub-base-mongo-docker-run:/docker-entrypoint
-    command: /docker-entrypoint
+      - ./.env.local:/opt/ph/bin/env.default
+
+  pvr:
+    image: registry.gitlab.com/pantacor/pantahub-pvr:latest
+    environment:
+      - PANTAHUB_API_HOST=http://base:12365
+    links:
+      - mongo
+      - fluentd
+      - elasticsearch
+      - phs
+      - www
+      - localstack
+    depends_on:
+      - mongo
     ports:
-      - "27017:27017"
+      - 12367:12367
+
+  www:
+    networks:
+      - base
+    image: registry.gitlab.com/pantacor/pantahub-www:devel
+    environment:
+      - REACT_APP_TITLE="PantacorHub DevBench"
+      - REACT_APP_API_URL=http://localhost:12365
+      - REACT_APP_WWW_URL=http://localhost:3000
+      - REACT_APP_PVR_URL=http://localhost:12367
+      - REACT_APP_IMAGES_CI_CHANNEL=release-candidate
+      - REACT_APP_SUPPORTED_DEVICES_URL=https://pantavisor-ci.s3.amazonaws.com/pv-initial-devices/stable.json
+      - REACT_APP_REFRESH_RATE=6000
+      - REACT_APP_CAPTCHA_SITE_KEY=
+      - REACT_APP_HOSTED_LOGO=
+      - REACT_APP_MIXPANEL_ID=
+      - REACT_APP_MAIN_LOGO=
+      - REACT_APP_GA_KEY=
+      - REACT_APP_GTM_ID=
+      - REACT_APP_SOCIAL_OAUTH_GOOGLE_DISABLE=false
+      - REACT_APP_SOCIAL_OAUTH_GITLAB_DISABLE=false
+      - REACT_APP_SOCIAL_OAUTH_GITHUB_DISABLE=false
+      - REACT_APP_SOCIAL_OAUTH_DISABLE=false
+      - REACT_APP_SERVICE_WORKER=false
+      - REACT_APP_REDUX_DEBUG=true
+      - SKIP_PREFLIGHT_CHECK=true
+      - REACT_APP_DEBUG=true
+    ports:
+      - 3000:80
+
+  phs:
+    networks:
+      - base
+    image: registry.gitlab.com/pantacor/pantahub-streams-devicesummary:X64-develop
+    volumes:
+      - ${PWD}/entrypoints/phs-entrypoint:/docker-entrypoint
+    environment:
+      - PANTAHUB_KAFKA_HOSTPORT=kafka:9092
+      - PANTAHUB_SCHEMAREGISTRY_URL=http://kafka-schema-registry:8081
+      - PANTAHUB_KAFKA_TOPIC_FLUENTD=fluentd-api
+      - PANTAHUB_KAFKA_STREAMS_ID=ph-device-summary
+      - PANTAHUB_KAFKA_TOPIC_SUMMARY=ph-device-summary-short
+      - PANTAHUB_KAFKA_TOPIC_PREFIX=pantabase-serv.pantabase-serv
+    links:
+      - kafka
+      - kafka-schema-registry
+      - kafka-connect
+    depends_on:
+      - kafka
+      - kafka-schema-registry
+      - kafka-connect
+    command: /docker-entrypoint
 
   fluentd:
+    networks:
+      - base
     image: fluent/fluentd
     ports:
-      - "5140:5140"
-      - "24224:24224"
+      - 24224:24224
 
   elasticsearch:
+    networks:
+      - base
     container_name: elasticsearch
     image: docker.elastic.co/elasticsearch/elasticsearch:7.17.3
     environment:
@@ -44,51 +125,223 @@ services:
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
       - xpack.security.enabled=false
       - xpack.watcher.enabled=false
+    ports:
+      - 9200:9200
     ulimits:
       memlock:
         soft: -1
         hard: -1
     restart: always
-    ports:
-      - "9200:9200"
-      - "9300:9300"
 
-  kibana:
-    image: docker.elastic.co/kibana/kibana:7.17.3
-    environment:
-      - SERVERNAME=kibana
-      - ELASTICSEARCH_HOSTS=https://elasticsearch:9200
-      - cluster.name=docker-cluster
-      - bootstrap.memory_lock=true
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-      - xpack.security.enabled=false
-      - xpack.watcher.enabled=false
-      - "discovery.type=single-node"
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-    restart: always
-    depends_on:
-      - elasticsearch
-    ports:
-      - "5601:5601"
-  localstack:
-    image: localstack/localstack:0.9.0
-    environment:
-      - SERVICES=s3:5000
-      - DEFAULT_REGION=us-east-1
-      - HOSTNAME=localstack
-    ports:
-      - "5000:5000"
-
-  nginx:
-    image: nginx:alpine
-    volumes:
-      - ./docker_confs/nginx-conf.d:/etc/nginx/conf.d:ro
-      - ./docker_confs/nginx-certs.d/:/etc/nginx/certs.d:ro
-    ports:
-      - "12375:80"
-      - "12376:443"
-    links:
+  mongo:
+    networks:
       - base
+    image: mongo:4.4.3
+    container_name: mongo
+    env_file:
+      - ./env.default
+      - ./.env.local
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin
+      MONGO_RS: rs0
+      MONGO_PORT: 27017
+    volumes:
+      - ${PWD}/entrypoints/mongo-cluster-entrypoint:/docker-entrypoint
+      - ${PWD}/.data/mongo-1:/data/db
+      - ${PWD}/entrypoints/mongokey.yaml:/keys/mongokey.yaml:ro
+    command: /docker-entrypoint
+    ports:
+      - 27017:27017
+    links:
+      - mongo2
+      - mongo3
+
+  mongo2:
+    networks:
+      - base
+    image: mongo:4.4.3
+    container_name: mongo2
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin
+      MONGO_RS: rs0
+      MONGO_PORT: 30002
+    command: ["/docker-entrypoint"]
+    volumes:
+      - ${PWD}/entrypoints/mongo-cluster-secondary-entrypoint:/docker-entrypoint
+      - ${PWD}/.data/mongo-2:/data/db
+      - ${PWD}/entrypoints/mongokey.yaml:/keys/mongokey.yaml:ro
+    ports:
+      - 30002:30002
+
+  mongo3:
+    networks:
+      - base
+    image: mongo:4.4.3
+    container_name: mongo3
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin
+      MONGO_RS: rs0
+      MONGO_PORT: 30003
+    command: ["/docker-entrypoint"]
+    volumes:
+      - ${PWD}/entrypoints/mongo-cluster-secondary-entrypoint:/docker-entrypoint
+      - ${PWD}/.data/mongo-3:/data/db
+      - ${PWD}/entrypoints/mongokey.yaml:/keys/mongokey.yaml:ro
+    ports:
+      - 30003:30003
+
+  zookeeper:
+    networks:
+      - base
+    image: confluentinc/cp-zookeeper:5.4.3
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      - ZOOKEEPER_CLIENT_PORT=2181
+      - ZOOKEEPER_TICK_TIME=2000
+      - ZOOKEEPER_SYNC_LIMIT=2
+
+  kafka:
+    networks:
+      - base
+    image: confluentinc/cp-kafka:5.4.3
+    volumes:
+      - ${PWD}/entrypoints/kafka-entrypoint:/docker-entrypoint
+      - ${PWD}/.data/kafka-data:/var/lib/kafka/data
+    command: /docker-entrypoint
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_BROKER_ID=1
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_DEFAULT_REPLICATION_FACTOR=1
+      - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_DELETE_TOPIC_ENABLE=true
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+    ports:
+      - 9092:9092
+    links:
+      - zookeeper
+    depends_on:
+      - zookeeper
+
+  kafka-schema-registry:
+    networks:
+      - base
+    image: confluentinc/cp-schema-registry:5.4.3
+    environment:
+      - SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS=PLAINTEXT://kafka:9092
+      - SCHEMA_REGISTRY_KAFKASTORE_GROUP_ID=pantacor-dev
+      - SCHEMA_REGISTRY_MASTER_ELIGIBILITY=true
+      - SCHEMA_REGISTRY_HOST_NAME=kafka-schema-registry
+      - JMX_PORT=5555
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      - 8081:8081
+    links:
+      - kafka
+    depends_on:
+      - kafka
+
+  kafka-connect:
+    networks:
+      - base
+    image: registry.gitlab.com/pantacor/kafka-connect-with-plugins:5.4.3
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      - CONNECT_REST_ADVERTISED_HOST_NAME=kafka-connect
+      - CONNECT_REST_PORT=8083
+      - CONNECT_PLUGIN_PATH=/opt/plugins/,/usr/share/java/
+      - CONNECT_BOOTSTRAP_SERVERS=kafka:9092
+      - CONNECT_GROUP_ID=pantacor-dev
+      - CONNECT_OFFSET_STORAGE_TOPIC=pantacor-cp-kafka-connect-offset-dev
+      - CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR=1
+      - CONNECT_STATUS_STORAGE_TOPIC=pantacor-cp-kafka-connect-status
+      - CONNECT_STATUS_STORAGE_REPLICATION_FACTOR=1
+      - CONNECT_CONFIG_STORAGE_TOPIC=pantacor-cp-kafka-connect-config-dev
+      - CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR=1
+      - CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL=http://kafka-schema-registry:8081
+      - CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL=http://kafka-schema-registry:8081
+      - CONNECT_KEY_CONVERTER=io.confluent.connect.avro.AvroConverter
+      - CONNECT_VALUE_CONVERTER=io.confluent.connect.avro.AvroConverter
+      - CONNECT_INTERNAL_KEY_CONVERTER=org.apache.kafka.connect.json.JsonConverter
+      - CONNECT_INTERNAL_VALUE_CONVERTER=org.apache.kafka.connect.json.JsonConverter
+      - KAFKA_JMX_PORT=5555
+    links:
+      - kafka
+      - kafka-schema-registry
+      - kafka-rest
+    depends_on:
+      - kafka
+      - kafka-schema-registry
+      - kafka-rest
+      - mongo
+    volumes:
+      - ${PWD}/kafka/connect-configs:/opt/kafka-connect-configs:ro
+      - ${PWD}/entrypoints/kafka-connect-entrypoint:/docker-entrypoint
+    command: /docker-entrypoint
+
+  kafka-rest:
+    networks:
+      - base
+    image: confluentinc/cp-kafka-rest
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      - KAFKA_REST_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_REST_HOST_NAME=kafka-rest
+      - KAFKA_REST_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_REST_LISTENERS=http://kafka-rest:8083
+    links:
+      - kafka
+      - zookeeper
+    depends_on:
+      - kafka
+      - zookeeper
+
+  localstack:
+    networks:
+      - base
+    image: localstack/localstack:1.3.0
+    environment:
+      - SERVICES=s3
+      - DEFAULT_REGION=us-east-1
+      - AWS_DEFAULT_REGION=us-east-1
+      - BUCKET_NAME=pantahub
+      - LAMBDA_EXECUTOR=docker
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - LAMBDA_REMOTE_DOCKER=true
+      - HOSTNAME_EXTERNAL=localstack
+      - HOSTNAME=localstack
+      - USE_SSL=false
+      - DATA_DIR=/data
+      - DEBUG=1
+    expose:
+      - "4566-4599"
+    ports:
+      - "4566-4599:4566-4599"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - ${PWD}/.data/localstack:/tmp/localstack/data
+
+networks:
+  base:
+    driver: bridge

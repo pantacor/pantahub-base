@@ -1,0 +1,5 @@
+auth: on
+security:
+  keyFile: /keys/mongo.key
+replication:
+  replSetName: rs0

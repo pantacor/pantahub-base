@@ -1,0 +1,15 @@
+#!/bin/sh
+
+set -ex
+
+MONGO_PORT=${MONGO_PORT:-27017}
+mongod --keyFile /keys/mongokey.yaml --transitionToAuth --port ${MONGO_PORT} --replSet ${MONGO_RS} --bind_ip_all $@ &
+
+sleep 5
+
+until mongo --eval "rs.status().ok" --port ${MONGO_PORT} --quiet; do
+  echo "checking mongo replica set"
+  sleep 1
+done
+
+tail -f /proc/$(pidof mongod)/fd/1

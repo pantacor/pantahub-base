@@ -14,6 +14,7 @@ require (
 	github.com/cloudflare/go-metrics v0.0.0-20151117154305-6a9aea36fb41 // indirect
 	github.com/cncf/udpa/go v0.0.0-20220112060539-c52dc94e7fbe // indirect
 	github.com/cncf/xds/go v0.0.0-20220330162227-eded343319d0 // indirect
+	github.com/dangkaka/go-kafka-avro v0.0.0-20200609051134-e714c259f1e9 // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/dustinkirkland/golang-petname v0.0.0-20191129215211-8e5a1ed0cff0
 	github.com/envoyproxy/protoc-gen-validate v0.6.7 // indirect
@@ -61,6 +62,7 @@ require (
 	github.com/xdg/stringprep v1.0.3 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20201027041543-1326539a0a0a // indirect
 	github.com/zmap/zlint/v2 v2.2.1 // indirect
+	gitlab.com/pantacor/pantahub-testharness v0.0.0-20190311155708-e39aa76a7650 // indirect
 	go.etcd.io/etcd/v3 v3.5.2 // indirect
 	go.mongodb.org/mongo-driver v1.10.2
 	go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux v0.36.0 // indirect
@@ -95,7 +97,7 @@ require (
 	gopkg.in/mailgun/mailgun-go.v1 v1.1.1
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 	gopkg.in/olivere/elastic.v5 v5.0.86
-	gopkg.in/resty.v1 v1.12.0
+	gopkg.in/resty.v1 v1.12.0 // indirect
 	gopkg.in/square/go-jose.v2 v2.6.0
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
@@ -103,3 +105,5 @@ require (
 replace github.com/ant0ine/go-json-rest => github.com/pantacor/go-json-rest v0.0.0-20220930143134-28fc15ec4ffc
 
 replace github.com/tiaguinho/gosoap => github.com/highercomve/gosoap v1.3.0-a747454
+
+replace github.com/go-resty/resty => gopkg.in/resty.v1 v1.12.0
