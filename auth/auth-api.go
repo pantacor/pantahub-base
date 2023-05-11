@@ -31,7 +31,7 @@ import (
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/accounts/accountsdata"
-	"gitlab.com/pantacor/pantahub-base/auth/authservices"
+	"gitlab.com/pantacor/pantahub-base/auth/authmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -209,7 +209,7 @@ func (a *App) handlePostSession(w rest.ResponseWriter, r *rest.Request) {
 // @Accept  json
 // @Produce  json
 // @Tags auth
-// @Param body body authservices.AccountCreationPayload true "Account Payload"
+// @Param body body authmodels.AccountCreationPayload true "Account Payload"
 // @Success 200 {object} accounts.Account
 // @Failure 400 {object} utils.RError "Invalid payload"
 // @Failure 412 {object} utils.RError "Invalid payload"
@@ -217,7 +217,7 @@ func (a *App) handlePostSession(w rest.ResponseWriter, r *rest.Request) {
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /auth/accounts [post]
 func (a *App) handlePostAccount(w rest.ResponseWriter, r *rest.Request) {
-	newAccount := authservices.AccountCreationPayload{}
+	newAccount := authmodels.AccountCreationPayload{}
 
 	r.DecodeJsonPayload(&newAccount)
 
@@ -506,7 +506,7 @@ func (a *App) handleVerify(w rest.ResponseWriter, r *rest.Request) {
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /auth/password [post]
 func (a *App) handlePasswordReset(writer rest.ResponseWriter, r *rest.Request) {
-	data := authservices.PasswordReset{}
+	data := authmodels.PasswordReset{}
 
 	r.DecodeJsonPayload(&data)
 
@@ -520,7 +520,7 @@ func (a *App) handlePasswordReset(writer rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	token, err := jwtgo.ParseWithClaims(data.Token, &authservices.ResetPasswordClaims{}, func(token *jwtgo.Token) (interface{}, error) {
+	token, err := jwtgo.ParseWithClaims(data.Token, &authmodels.ResetPasswordClaims{}, func(token *jwtgo.Token) (interface{}, error) {
 		return a.jwtMiddleware.Pub, nil
 	})
 	if err != nil {
@@ -528,7 +528,7 @@ func (a *App) handlePasswordReset(writer rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	claims := token.Claims.(*authservices.ResetPasswordClaims)
+	claims := token.Claims.(*authmodels.ResetPasswordClaims)
 	err = claims.Valid()
 	if err != nil {
 		utils.RestError(writer, err, tokenInvalidOrExpiredErr, http.StatusInternalServerError)
@@ -613,7 +613,7 @@ func (a *App) handlePasswordReset(writer rest.ResponseWriter, r *rest.Request) {
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /auth/recover [post]
 func (a *App) handlePasswordRecovery(writer rest.ResponseWriter, r *rest.Request) {
-	data := authservices.PasswordResetRequest{}
+	data := authmodels.PasswordResetRequest{}
 
 	r.DecodeJsonPayload(&data)
 
@@ -648,7 +648,7 @@ func (a *App) handlePasswordRecovery(writer rest.ResponseWriter, r *rest.Request
 		utils.RestError(writer, err, err.Error(), http.StatusInternalServerError)
 	}
 
-	claims := authservices.ResetPasswordClaims{
+	claims := authmodels.ResetPasswordClaims{
 		account.Email,
 		account.TimeModified,
 		jwtgo.StandardClaims{
@@ -690,7 +690,7 @@ func (a *App) handlePasswordRecovery(writer rest.ResponseWriter, r *rest.Request
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /auth/token [post]
 func (a *App) handlePostToken(writer rest.ResponseWriter, r *rest.Request) {
-	tokenRequest := authservices.TokenRequest{}
+	tokenRequest := authmodels.TokenRequest{}
 	err := r.DecodeJsonPayload(&tokenRequest)
 	if err != nil {
 		utils.RestErrorWrapper(writer, "Failed to decode token Request", http.StatusBadRequest)
@@ -770,7 +770,7 @@ func (a *App) handlePostToken(writer rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	tokenStore := authservices.TokenStore{
+	tokenStore := authmodels.TokenStore{
 		ID:      tokenClaims["token_id"].(primitive.ObjectID),
 		Client:  service,
 		Owner:   user,
@@ -786,7 +786,7 @@ func (a *App) handlePostToken(writer rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	tokenResult := authservices.TokenResponse{
+	tokenResult := authmodels.TokenResponse{
 		Token:     tokenString,
 		TokenType: "bearer",
 		Scopes:    scopes,

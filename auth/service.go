@@ -27,6 +27,7 @@ import (
 	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/accounts/accountsdata"
+	"gitlab.com/pantacor/pantahub-base/auth/authmodels"
 	"gitlab.com/pantacor/pantahub-base/auth/authservices"
 	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/utils"
@@ -210,7 +211,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	return app
 }
 
-func handleGetEncryptedAccount(accountData *authservices.AccountCreationPayload) (*authservices.EncryptedAccountToken, error) {
+func handleGetEncryptedAccount(accountData *authmodels.AccountCreationPayload) (*authmodels.EncryptedAccountToken, error) {
 	encryptedAccountData, err := utils.CreateJWE(accountData)
 	if err != nil {
 		return nil, err
@@ -221,7 +222,7 @@ func handleGetEncryptedAccount(accountData *authservices.AccountCreationPayload)
 	urlPrefix += utils.GetEnv(utils.EnvPantahubSignupPath)
 	urlPrefix += "#account=" + encryptedAccountData
 
-	response := &authservices.EncryptedAccountToken{
+	response := &authmodels.EncryptedAccountToken{
 		Token:       encryptedAccountData,
 		RedirectURI: urlPrefix,
 	}

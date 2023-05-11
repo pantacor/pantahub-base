@@ -29,6 +29,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/apps"
+	"gitlab.com/pantacor/pantahub-base/auth/authmodels"
 	"gitlab.com/pantacor/pantahub-base/auth/authservices"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -123,7 +124,7 @@ func (app *App) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Request)
 		return
 	}
 
-	tokenStore := authservices.TokenStore{
+	tokenStore := authmodels.TokenStore{
 		ID:      tokenClaims["token_id"].(primitive.ObjectID),
 		Client:  req.Service,
 		Owner:   caller,
@@ -156,7 +157,7 @@ func (app *App) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Request)
 	params.Add("scope", req.Scopes)
 	params.Add("state", req.State)
 
-	response := authservices.TokenResponse{
+	response := authmodels.TokenResponse{
 		Token:       tokenString,
 		RedirectURI: req.RedirectURI + "#" + params.Encode(),
 		TokenType:   "bearer",

@@ -20,6 +20,7 @@ import (
 	"net/http"
 
 	"github.com/ant0ine/go-json-rest/rest"
+	"gitlab.com/pantacor/pantahub-base/auth/authmodels"
 	"gitlab.com/pantacor/pantahub-base/auth/authservices"
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
@@ -31,7 +32,7 @@ func (a *App) getTokenUsingPassword(writer rest.ResponseWriter, r *rest.Request)
 		return
 	}
 
-	payload := &authservices.LoginRequestPayload{}
+	payload := &authmodels.LoginRequestPayload{}
 	err := r.DecodeJsonPayload(payload)
 	if err != nil {
 		utils.RestErrorWrapper(writer, "Failed to decode token Request", http.StatusBadRequest)
@@ -44,7 +45,7 @@ func (a *App) getTokenUsingPassword(writer rest.ResponseWriter, r *rest.Request)
 		return
 	}
 
-	writer.WriteJson(authservices.TokenResponse{
+	writer.WriteJson(authmodels.TokenResponse{
 		Token: tokenString,
 	})
 
