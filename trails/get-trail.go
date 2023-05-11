@@ -1,4 +1,4 @@
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2023 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
+	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"gopkg.in/mgo.v2/bson"
@@ -40,7 +41,7 @@ import (
 // @Tags trails
 // @Security ApiKeyAuth
 // @Param id path string true "ID|NICK|PRN"
-// @Success 200 {object} Trail
+// @Success 200 {object} trailmodels.Trail
 // @Failure 400 {object} utils.RError
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
@@ -66,7 +67,7 @@ func (a *App) handleGetTrail(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	getID := r.PathParam("id")
-	trail := Trail{}
+	trail := trailmodels.Trail{}
 
 	isPublic, err := a.isTrailPublic(r.Context(), getID)
 

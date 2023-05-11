@@ -1,5 +1,5 @@
 //
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2023 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
+	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -57,6 +58,11 @@ func (a *App) handleGetStepState(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+	if !ok {
+		// XXX: find right error
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
+		return
+	}
 
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
@@ -65,7 +71,7 @@ func (a *App) handleGetStepState(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	step := Step{}
+	step := trailmodels.Step{}
 
 	trailID := r.PathParam("id")
 	rev := r.PathParam("rev")

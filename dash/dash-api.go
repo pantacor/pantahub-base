@@ -1,5 +1,5 @@
 //
-// Copyright 2017,2018  Pantacor Ltd.
+// Copyright (c) 2017-2023 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import (
 
 	"github.com/alecthomas/units"
 	"github.com/ant0ine/go-json-rest/rest"
-	"gitlab.com/pantacor/pantahub-base/trails"
+	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -103,7 +103,7 @@ func (a *App) handleGetSummary(w rest.ResponseWriter, r *rest.Request) {
 
 	summary := Summary{}
 
-	var mostRecentDeviceTrails []trails.TrailSummary
+	var mostRecentDeviceTrails []trailmodels.TrailSummary
 	findOptions := options.Find()
 	findOptions.SetSort(bson.M{"timestamp": -1})
 	findOptions.SetLimit(5)
@@ -120,7 +120,7 @@ func (a *App) handleGetSummary(w rest.ResponseWriter, r *rest.Request) {
 	}
 	defer cur.Close(ctx)
 	for cur.Next(ctx) {
-		result := trails.TrailSummary{}
+		result := trailmodels.TrailSummary{}
 		err := cur.Decode(&result)
 		if err != nil {
 			utils.RestErrorWrapper(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)

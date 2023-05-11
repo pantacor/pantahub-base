@@ -1,5 +1,5 @@
 //
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2023 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
+	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"gopkg.in/mgo.v2/bson"
@@ -47,8 +48,8 @@ import (
 // @Tags trails
 // @Security ApiKeyAuth
 // @Param id path string true "ID|NICK|PRN"
-// @Param body body Step true "Step Payload"
-// @Success 200 {object} Trail
+// @Param body body trailmodels.Step true "Step Payload"
+// @Success 200 {object} trailmodels.Trail
 // @Failure 400 {object} utils.RError
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
@@ -78,7 +79,7 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	trailID := r.PathParam("id")
-	trail := Trail{}
+	trail := trailmodels.Trail{}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
@@ -115,8 +116,8 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	newStep := Step{}
-	previousStep := Step{}
+	newStep := trailmodels.Step{}
+	previousStep := trailmodels.Step{}
 	r.DecodeJsonPayload(&newStep)
 
 	if newStep.Rev == -1 {
@@ -153,7 +154,7 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 	newStep.ID = trail.ID.Hex() + "-" + strconv.Itoa(newStep.Rev)
 	newStep.Owner = trail.Owner
 	newStep.Device = trail.Device
-	newStep.StepProgress = StepProgress{
+	newStep.StepProgress = trailmodels.StepProgress{
 		Status: "NEW",
 	}
 	newStep.TrailID = trail.ID

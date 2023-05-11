@@ -1,4 +1,4 @@
-// Copyright 2017  Pantacor Ltd.
+// Copyright (c) 2017-2023 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,20 +21,20 @@ import (
 	"time"
 
 	"gitlab.com/pantacor/pantahub-base/devices"
+	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"gopkg.in/mgo.v2/bson"
 )
 
 func (a *App) isTrailPublic(pctx context.Context, trailID string) (bool, error) {
-
 	collTrails := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_trails")
 
 	if collTrails == nil {
 		return false, errors.New("Cannot get collection")
 	}
 
-	trail := Trail{}
+	trail := trailmodels.Trail{}
 	ctx, cancel := context.WithTimeout(pctx, 5*time.Second)
 	defer cancel()
 	trailObjectID, err := primitive.ObjectIDFromHex(trailID)

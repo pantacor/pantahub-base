@@ -1,5 +1,5 @@
 //
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2023 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/ant0ine/go-json-rest/rest"
-	"gitlab.com/pantacor/pantahub-base/trails"
+	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
 
@@ -61,7 +61,7 @@ type PublicStep struct {
 // @Failure 500 {object} utils.RError
 // @Router /callbacks/steps/{id} [put]
 func (a *App) handlePutStep(w rest.ResponseWriter, r *rest.Request) {
-	var step trails.Step
+	var step trailmodels.Step
 	stepID := r.PathParam("id")
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
@@ -129,7 +129,7 @@ func (a *App) handlePutStep(w rest.ResponseWriter, r *rest.Request) {
 }
 
 // SavePublicStep is used to save public step
-func (a *App) SavePublicStep(ctx context.Context, step *trails.Step, publicStep *PublicStep) error {
+func (a *App) SavePublicStep(ctx context.Context, step *trailmodels.Step, publicStep *PublicStep) error {
 
 	if publicStep.StepID == "" {
 		publicStep.CreatedAt = time.Now()
@@ -189,7 +189,7 @@ func (a *App) MarkStepAsProcessed(ctx context.Context, ID string) error {
 }
 
 // GetStepObjectShas is to get step object shas
-func (a *App) GetStepObjectShas(ctx context.Context, step *trails.Step) ([]string, error) {
+func (a *App) GetStepObjectShas(ctx context.Context, step *trailmodels.Step) ([]string, error) {
 
 	objectShaList := []string{}
 	objMap := map[string]bool{}

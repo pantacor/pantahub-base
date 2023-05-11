@@ -1,5 +1,5 @@
 //
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2023 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
+	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-base/utils/querymongo"
 	"go.mongodb.org/mongo-driver/bson"
@@ -51,7 +52,7 @@ var filterByKeys = map[string]bool{}
 // @Tags trails
 // @Security ApiKeyAuth
 // @Param id path string true "ID|NICK|PRN"
-// @Success 200 {array} Step
+// @Success 200 {array} trailmodels.Step
 // @Failure 400 {object} utils.RError
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
@@ -78,7 +79,7 @@ func (a *App) handleGetSteps(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	asp := querymongo.GetAllQueryPagination(r.URL, filterByKeys)
-	steps := make([]Step, 0)
+	steps := make([]trailmodels.Step, 0)
 
 	trailID := r.PathParam("id")
 	query := bson.M{}
@@ -155,7 +156,7 @@ func (a *App) handleGetSteps(w rest.ResponseWriter, r *rest.Request) {
 	defer cur.Close(ctx)
 
 	for cur.Next(ctx) {
-		result := Step{}
+		result := trailmodels.Step{}
 		err := cur.Decode(&result)
 		if err != nil {
 			utils.RestErrorWrapper(w, "Cursor Decode Error:"+err.Error(), http.StatusInternalServerError)

@@ -622,9 +622,7 @@ var doc = `{
                     }
                 ],
                 "responses": {
-                    "302": {
-                        "description": ""
-                    },
+                    "302": {},
                     "400": {
                         "description": "Invalid payload",
                         "schema": {
@@ -685,9 +683,7 @@ var doc = `{
                     }
                 ],
                 "responses": {
-                    "302": {
-                        "description": ""
-                    },
+                    "302": {},
                     "400": {
                         "description": "Invalid payload",
                         "schema": {
@@ -992,9 +988,7 @@ var doc = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": ""
-                    },
+                    "200": {},
                     "400": {
                         "description": "Bad Request",
                         "schema": {
@@ -2579,6 +2573,66 @@ var doc = `{
                 }
             }
         },
+        "/exports/{owner}/{nick}/{rev}/{filename}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Export a tar gz file with of a device",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "exports"
+                ],
+                "summary": "Export a tar gz file with of a device",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Owner nick",
+                        "name": "owner-nick",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Owner PRN",
+                        "name": "owner",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "binary"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
         "/healthz": {
             "get": {
                 "security": [
@@ -2850,9 +2904,7 @@ var doc = `{
                 ],
                 "summary": "Get API metrics",
                 "responses": {
-                    "200": {
-                        "description": ""
-                    },
+                    "200": {},
                     "400": {
                         "description": "Bad Request",
                         "schema": {
@@ -3175,9 +3227,7 @@ var doc = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": ""
-                    },
+                    "200": {},
                     "400": {
                         "description": "Bad Request",
                         "schema": {
@@ -3493,9 +3543,7 @@ var doc = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": ""
-                    },
+                    "200": {},
                     "400": {
                         "description": "Bad Request",
                         "schema": {
@@ -3541,7 +3589,7 @@ var doc = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/trails.Trail"
+                                "$ref": "#/definitions/trailmodels.Trail"
                             }
                         }
                     },
@@ -3597,7 +3645,7 @@ var doc = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/trails.Trail"
+                            "$ref": "#/definitions/trailmodels.Trail"
                         }
                     },
                     "400": {
@@ -3643,7 +3691,7 @@ var doc = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/trails.PvrRemote"
+                            "$ref": "#/definitions/trailmodels.PvrRemote"
                         }
                     },
                     "400": {
@@ -3689,7 +3737,7 @@ var doc = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/trails.TrailSummary"
+                            "$ref": "#/definitions/trailmodels.TrailSummary"
                         }
                     },
                     "400": {
@@ -3744,7 +3792,7 @@ var doc = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/trails.Trail"
+                            "$ref": "#/definitions/trailmodels.Trail"
                         }
                     },
                     "400": {
@@ -3801,7 +3849,7 @@ var doc = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/trails.Step"
+                                "$ref": "#/definitions/trailmodels.Step"
                             }
                         }
                     },
@@ -3856,7 +3904,7 @@ var doc = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/trails.Step"
+                            "$ref": "#/definitions/trailmodels.Step"
                         }
                     }
                 ],
@@ -3864,7 +3912,7 @@ var doc = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/trails.Trail"
+                            "$ref": "#/definitions/trailmodels.Trail"
                         }
                     },
                     "400": {
@@ -3926,7 +3974,7 @@ var doc = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/trails.Step"
+                            "$ref": "#/definitions/trailmodels.Step"
                         }
                     },
                     "400": {
@@ -3988,7 +4036,7 @@ var doc = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/trails.PvrRemote"
+                            "$ref": "#/definitions/trailmodels.PvrRemote"
                         }
                     },
                     "400": {
@@ -4050,7 +4098,7 @@ var doc = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/trails.StepProgress"
+                            "$ref": "#/definitions/trailmodels.StepProgress"
                         }
                     },
                     "400": {
@@ -4378,9 +4426,7 @@ var doc = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": ""
-                    },
+                    "200": {},
                     "400": {
                         "description": "Bad Request",
                         "schema": {
@@ -4441,7 +4487,7 @@ var doc = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/trails.StepProgress"
+                            "$ref": "#/definitions/trailmodels.StepProgress"
                         }
                     }
                 ],
@@ -4449,7 +4495,7 @@ var doc = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/trails.StepProgress"
+                            "$ref": "#/definitions/trailmodels.StepProgress"
                         }
                     },
                     "400": {
@@ -4635,7 +4681,7 @@ var doc = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/trails.TrailSummary"
+                            "$ref": "#/definitions/trailmodels.TrailSummary"
                         }
                     },
                     "400": {
@@ -5433,21 +5479,21 @@ var doc = `{
                 }
             }
         },
-        "trails.DownloadProgress": {
+        "trailmodels.DownloadProgress": {
             "type": "object",
             "properties": {
                 "objects": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/trails.ObjectProgress"
+                        "$ref": "#/definitions/trailmodels.ObjectProgress"
                     }
                 },
                 "total": {
-                    "$ref": "#/definitions/trails.ObjectProgress"
+                    "$ref": "#/definitions/trailmodels.ObjectProgress"
                 }
             }
         },
-        "trails.ObjectProgress": {
+        "trailmodels.ObjectProgress": {
             "type": "object",
             "properties": {
                 "current_time": {
@@ -5470,7 +5516,7 @@ var doc = `{
                 }
             }
         },
-        "trails.PvrRemote": {
+        "trailmodels.PvrRemote": {
             "type": "object",
             "properties": {
                 "json-get-url": {
@@ -5509,7 +5555,7 @@ var doc = `{
                 }
             }
         },
-        "trails.Step": {
+        "trailmodels.Step": {
             "type": "object",
             "properties": {
                 "commit-msg": {
@@ -5540,7 +5586,7 @@ var doc = `{
                     "type": "string"
                 },
                 "progress": {
-                    "$ref": "#/definitions/trails.StepProgress"
+                    "$ref": "#/definitions/trailmodels.StepProgress"
                 },
                 "progress-time": {
                     "type": "string"
@@ -5577,7 +5623,7 @@ var doc = `{
                 }
             }
         },
-        "trails.StepProgress": {
+        "trailmodels.StepProgress": {
             "type": "object",
             "properties": {
                 "data": {
@@ -5586,7 +5632,7 @@ var doc = `{
                 },
                 "downloads": {
                     "description": "progress number. steps or 1-100",
-                    "$ref": "#/definitions/trails.DownloadProgress"
+                    "$ref": "#/definitions/trailmodels.DownloadProgress"
                 },
                 "log": {
                     "description": "log if available",
@@ -5606,7 +5652,7 @@ var doc = `{
                 }
             }
         },
-        "trails.Trail": {
+        "trailmodels.Trail": {
             "type": "object",
             "properties": {
                 "device": {
@@ -5637,7 +5683,7 @@ var doc = `{
                 }
             }
         },
-        "trails.TrailSummary": {
+        "trailmodels.TrailSummary": {
             "type": "object",
             "properties": {
                 "device": {
@@ -5803,7 +5849,6 @@ var doc = `{
         "OAuth2Application": {
             "type": "oauth2",
             "flow": "application",
-            "authorizationUrl": "",
             "tokenUrl": "/auth/token",
             "scopes": {
                 "admin": " Grants read and write access to administrative information",
@@ -5822,7 +5867,6 @@ var doc = `{
         "OAuth2Password": {
             "type": "oauth2",
             "flow": "password",
-            "authorizationUrl": "",
             "tokenUrl": "/auth/token",
             "scopes": {
                 "admin": " Grants read and write access to administrative information",

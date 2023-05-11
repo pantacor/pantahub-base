@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"math/rand"
 	"net/http"
 	"time"
@@ -28,6 +29,9 @@ import (
 	"gitlab.com/pantacor/pantahub-base/gcapi"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/x/bsonx"
 	"gopkg.in/mgo.v2/bson"
 	"gopkg.in/resty.v1"
 )
@@ -35,6 +39,119 @@ import (
 func init() {
 	// seed this for petname as dustin dropped our patch upstream... moo
 	rand.Seed(time.Now().Unix())
+}
+
+func (app *App) EnsureDevicesIndices() error {
+	collection := app.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
+
+	CreateIndexesOptions := options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(CreateIndexTimeout)
+
+	indexOptions := options.IndexOptions{}
+	indexOptions.SetUnique(true)
+	indexOptions.SetSparse(false)
+	indexOptions.SetBackground(true)
+
+	index := mongo.IndexModel{
+		Keys: bsonx.Doc{
+			{Key: "owner", Value: bsonx.Int32(1)},
+			{Key: "nick", Value: bsonx.Int32(1)},
+		},
+		Options: &indexOptions,
+	}
+	_, err := collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
+	if err != nil {
+		log.Fatalln("Error setting up index for pantahub_devices: " + err.Error())
+		return nil
+	}
+
+	CreateIndexesOptions = options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(CreateIndexTimeout)
+
+	indexOptions = options.IndexOptions{}
+	indexOptions.SetUnique(false)
+	indexOptions.SetSparse(false)
+	indexOptions.SetBackground(true)
+
+	index = mongo.IndexModel{
+		Keys: bsonx.Doc{
+			{Key: "timemodified", Value: bsonx.Int32(1)},
+		},
+		Options: &indexOptions,
+	}
+	collection = app.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
+	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
+	if err != nil {
+		log.Fatalln("Error setting up index for pantahub_devices: " + err.Error())
+		return nil
+	}
+
+	CreateIndexesOptions = options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(CreateIndexTimeout)
+
+	indexOptions = options.IndexOptions{}
+	indexOptions.SetUnique(false)
+	indexOptions.SetSparse(false)
+	indexOptions.SetBackground(true)
+
+	index = mongo.IndexModel{
+		Keys: bsonx.Doc{
+			{Key: "prn", Value: bsonx.Int32(1)},
+		},
+		Options: &indexOptions,
+	}
+	collection = app.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
+	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
+	if err != nil {
+		log.Fatalln("Error setting up index for pantahub_devices: " + err.Error())
+		return nil
+	}
+	// Indexing for the owner,garbage fields
+	CreateIndexesOptions = options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(CreateIndexTimeout)
+
+	indexOptions = options.IndexOptions{}
+	indexOptions.SetUnique(false)
+	indexOptions.SetSparse(false)
+	indexOptions.SetBackground(true)
+
+	index = mongo.IndexModel{
+		Keys: bsonx.Doc{
+			{Key: "owner", Value: bsonx.Int32(1)},
+			{Key: "garbage", Value: bsonx.Int32(1)},
+		},
+		Options: &indexOptions,
+	}
+	collection = app.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
+	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
+	if err != nil {
+		log.Fatalln("Error setting up index for pantahub_devices: " + err.Error())
+		return nil
+	}
+	// Indexing for the device,garbage fields
+	CreateIndexesOptions = options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(CreateIndexTimeout)
+
+	indexOptions = options.IndexOptions{}
+	indexOptions.SetUnique(false)
+	indexOptions.SetSparse(false)
+	indexOptions.SetBackground(true)
+
+	index = mongo.IndexModel{
+		Keys: bsonx.Doc{
+			{Key: "device", Value: bsonx.Int32(1)},
+			{Key: "garbage", Value: bsonx.Int32(1)},
+		},
+		Options: &indexOptions,
+	}
+	collection = app.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
+	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
+	if err != nil {
+		log.Fatalln("Error setting up index for pantahub_devices: " + err.Error())
+		return nil
+	}
+
+	return nil
 }
 
 func handleAuth(w rest.ResponseWriter, r *rest.Request) {

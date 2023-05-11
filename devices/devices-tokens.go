@@ -1,5 +1,5 @@
 //
-// Copyright 2018-2019  Pantacor Ltd.
+// Copyright (c) 2017-2023 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -93,7 +93,7 @@ func (a *App) EnsureTokenIndices() error {
 	}
 	_, err := collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
 	if err != nil {
-		log.Fatalln("Error setting up index for pantahub_devices: " + err.Error())
+		log.Fatalln("Error setting up index for pantahub_devices_tokens: " + err.Error())
 		return nil
 	}
 
@@ -114,7 +114,7 @@ func (a *App) EnsureTokenIndices() error {
 	collection = a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
 	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
 	if err != nil {
-		log.Fatalln("Error setting up index for pantahub_devices: " + err.Error())
+		log.Fatalln("Error setting up index for pantahub_devices_tokens: " + err.Error())
 		return nil
 	}
 
@@ -135,7 +135,7 @@ func (a *App) EnsureTokenIndices() error {
 	collection = a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
 	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
 	if err != nil {
-		log.Fatalln("Error setting up index for pantahub_devices: " + err.Error())
+		log.Fatalln("Error setting up index for pantahub_devices_tokens: " + err.Error())
 		return nil
 	}
 
@@ -156,7 +156,7 @@ func (a *App) EnsureTokenIndices() error {
 	collection = a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
 	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
 	if err != nil {
-		log.Fatalln("Error setting up index for pantahub_devices: " + err.Error())
+		log.Fatalln("Error setting up index for pantahub_devices_tokens: " + err.Error())
 		return nil
 	}
 
@@ -177,7 +177,7 @@ func (a *App) EnsureTokenIndices() error {
 	collection = a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
 	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
 	if err != nil {
-		log.Fatalln("Error setting up index for pantahub_devices: " + err.Error())
+		log.Fatalln("Error setting up index for pantahub_devices_tokens: " + err.Error())
 		return nil
 	}
 

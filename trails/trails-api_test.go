@@ -12,6 +12,7 @@ import (
 	"gitlab.com/pantacor/pantahub-base/auth"
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/testutils"
+	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gopkg.in/resty.v1"
 )
@@ -109,7 +110,7 @@ func postState(t *testing.T) {
 		t.Fail()
 	}
 
-	var trail Trail
+	var trail trailmodels.Trail
 	err = json.Unmarshal(res.Body(), &trail)
 
 	if err != nil {
@@ -131,7 +132,7 @@ func postStateHash(t *testing.T) {
 		t.Fail()
 	}
 
-	var step Step
+	var step trailmodels.Step
 	err = json.Unmarshal(res.Body(), &step)
 
 	if err != nil {
@@ -165,7 +166,7 @@ func postStep(t *testing.T) {
 		t.Fail()
 	}
 
-	var step Step
+	var step trailmodels.Step
 	err = json.Unmarshal(res.Body(), &step)
 
 	if err != nil {
@@ -187,7 +188,7 @@ func postStepsHash(t *testing.T) {
 		t.Fail()
 	}
 
-	var step Step
+	var step trailmodels.Step
 	err = json.Unmarshal(res.Body(), &step)
 
 	if err != nil {

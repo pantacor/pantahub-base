@@ -1,5 +1,5 @@
 //
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2023 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
+	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -63,7 +64,7 @@ func (a *App) handlePutStepMeta(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	step := Step{}
+	step := trailmodels.Step{}
 	trailID := r.PathParam("id")
 	rev := r.PathParam("rev")
 

@@ -7,7 +7,7 @@ mongod --keyFile /keys/mongokey.yaml --transitionToAuth --port ${MONGO_PORT} --r
 
 sleep 5
 
-until mongo --eval "rs.status().ok" --port ${MONGO_PORT} --quiet; do
+until mongo --eval 'rs.status().ok' --port ${MONGO_PORT} --quiet; do
   echo "checking mongo replica set"
   sleep 1
 done

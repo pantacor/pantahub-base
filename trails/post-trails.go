@@ -1,5 +1,5 @@
 //
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2023 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
+	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -44,7 +45,7 @@ type state map[string]interface{}
 // @Tags trails
 // @Security ApiKeyAuth
 // @Param body body state true "initial state"
-// @Success 200 {object} Trail
+// @Success 200 {object} trailmodels.Trail
 // @Failure 400 {object} utils.RError
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
@@ -79,7 +80,7 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 	deviceID := prnGetID(device.(string))
 
 	// do we need tip/tail here? or is that always read-only?
-	newTrail := Trail{}
+	newTrail := trailmodels.Trail{}
 	deviceObjectID, err := primitive.ObjectIDFromHex(deviceID)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
@@ -105,7 +106,7 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 	newTrail.UsedObjects = objectList
 	newTrail.FactoryState = utils.BsonQuoteMap(&initialState)
 
-	newStep := Step{}
+	newStep := trailmodels.Step{}
 	newStep.ID = newTrail.ID.Hex() + "-0"
 	newStep.TrailID = newTrail.ID
 	newStep.Rev = 0

@@ -1,5 +1,5 @@
 //
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2023 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ import (
 
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/metrics"
-	"gitlab.com/pantacor/pantahub-base/trails"
+	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-base/utils/tracer"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -69,11 +69,11 @@ type ChangePage struct {
 type FindPrototypeFunc = func() interface{}
 
 func findProtoSteps() interface{} {
-	return &trails.Step{}
+	return &trailmodels.Step{}
 }
 
 func findProtoTrails() interface{} {
-	return &trails.Trail{}
+	return &trailmodels.Trail{}
 }
 
 func findProtoDevices() interface{} {
@@ -101,13 +101,13 @@ func timeModifiedDevice(proto interface{}) (*time.Time, error) {
 
 func timeModifiedStep(proto interface{}) (*time.Time, error) {
 
-	var step *trails.Step
+	var step *trailmodels.Step
 
 	if proto == nil {
 		return nil, errors.New("proto step is nil")
 	}
 
-	step = proto.(*trails.Step)
+	step = proto.(*trailmodels.Step)
 
 	if step == nil {
 		return nil, errors.New("proto not a valid device")
@@ -118,13 +118,13 @@ func timeModifiedStep(proto interface{}) (*time.Time, error) {
 
 func timeModifiedTrail(proto interface{}) (*time.Time, error) {
 
-	var trail *trails.Trail
+	var trail *trailmodels.Trail
 
 	if proto == nil {
 		return nil, errors.New("proto trail is nil")
 	}
 
-	trail = proto.(*trails.Trail)
+	trail = proto.(*trailmodels.Trail)
 
 	if trail == nil {
 		return nil, errors.New("proto not a valid device")

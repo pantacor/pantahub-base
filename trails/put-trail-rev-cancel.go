@@ -1,5 +1,5 @@
 //
-// Copyright 2021  Pantacor Ltd.
+// Copyright (c) 2017-2023 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
+	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"gopkg.in/mgo.v2/bson"
@@ -43,14 +44,14 @@ import (
 // @Security ApiKeyAuth
 // @Param id path string true "ID|NICK|PRN"
 // @Param rev path string true "REV_ID"
-// @Success 200 {object} StepProgress
+// @Success 200 {object} trailmodels.StepProgress
 // @Failure 400 {object} utils.RError
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /trails/{id}/steps/{rev}/cancel [put]
 func (a *App) handlePutStepProgressCancel(w rest.ResponseWriter, r *rest.Request) {
 
-	stepProgress := StepProgress{}
+	stepProgress := trailmodels.StepProgress{}
 	trailID := r.PathParam("id")
 	stepID := trailID + "-" + r.PathParam("rev")
 

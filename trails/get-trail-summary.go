@@ -1,5 +1,5 @@
 //
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2023 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
+	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -45,7 +46,7 @@ import (
 // @Tags trails
 // @Security ApiKeyAuth
 // @Param id path string true "ID|NICK|PRN"
-// @Success 200 {object} TrailSummary
+// @Success 200 {object} trailmodels.TrailSummary
 // @Failure 400 {object} utils.RError
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
@@ -89,7 +90,7 @@ func (a *App) handleGetTrailStepSummary(w rest.ResponseWriter, r *rest.Request) 
 		},
 	}
 
-	summary := TrailSummary{}
+	summary := trailmodels.TrailSummary{}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	err := summaryCol.FindOne(ctx, query).Decode(&summary)

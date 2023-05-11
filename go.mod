@@ -49,7 +49,7 @@ require (
 	github.com/rainycape/unidecode v0.0.0-20150907023854-cb7f23ec59be // indirect
 	github.com/rs/cors v1.8.2
 	github.com/spf13/cobra v1.4.0 // indirect
-	github.com/stretchr/testify v1.8.0
+	github.com/stretchr/testify v1.8.1
 	github.com/swaggo/gin-swagger v1.2.0 // indirect
 	github.com/swaggo/http-swagger v1.2.5
 	github.com/swaggo/swag v1.8.1
@@ -63,6 +63,7 @@ require (
 	github.com/youmark/pkcs8 v0.0.0-20201027041543-1326539a0a0a // indirect
 	github.com/zmap/zlint/v2 v2.2.1 // indirect
 	gitlab.com/pantacor/pantahub-testharness v0.0.0-20190311155708-e39aa76a7650 // indirect
+	gitlab.com/pantacor/pvr v0.0.0-20230414065852-0a05035d1fc5
 	go.etcd.io/etcd/v3 v3.5.2 // indirect
 	go.mongodb.org/mongo-driver v1.10.2
 	go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux v0.36.0 // indirect
@@ -97,7 +98,7 @@ require (
 	gopkg.in/mailgun/mailgun-go.v1 v1.1.1
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 	gopkg.in/olivere/elastic.v5 v5.0.86
-	gopkg.in/resty.v1 v1.12.0 // indirect
+	gopkg.in/resty.v1 v1.12.0
 	gopkg.in/square/go-jose.v2 v2.6.0
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
@@ -106,4 +107,4 @@ replace github.com/ant0ine/go-json-rest => github.com/pantacor/go-json-rest v0.0
 
 replace github.com/tiaguinho/gosoap => github.com/highercomve/gosoap v1.3.0-a747454
 
-replace github.com/go-resty/resty => gopkg.in/resty.v1 v1.12.0
+replace github.com/go-resty/resty => gopkg.in/resty.v1 v1.11.0

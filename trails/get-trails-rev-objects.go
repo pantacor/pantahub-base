@@ -1,5 +1,5 @@
 //
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2023 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,6 +28,8 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/objects"
+	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
+	"gitlab.com/pantacor/pantahub-base/trails/trailservices"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -47,7 +49,6 @@ import (
 // @Failure 500 {object} utils.RError
 // @Router /trails/{id}/steps/{rev}/objects [get]
 func (a *App) handleGetStepsObjects(w rest.ResponseWriter, r *rest.Request) {
-
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
@@ -56,112 +57,42 @@ func (a *App) handleGetStepsObjects(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+	if !ok {
+		utils.RestErrorWrapper(w, "You need to be logged in.", http.StatusForbidden)
+		return
+	}
 
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
-
 	if coll == nil {
 		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
-	step := Step{}
-
 	trailID := r.PathParam("id")
 	rev := r.PathParam("rev")
 
 	isPublic, err := a.isTrailPublic(r.Context(), trailID)
-
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error getting trail public:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-	defer cancel()
 
-	if isPublic {
-		err = coll.FindOne(ctx, bson.M{
-			"_id":     trailID + "-" + rev,
-			"garbage": bson.M{"$ne": true},
-		}).Decode(&step)
-	} else if authType == "DEVICE" {
-		err = coll.FindOne(ctx, bson.M{
-			"_id":     trailID + "-" + rev,
-			"device":  owner,
-			"garbage": bson.M{"$ne": true},
-		}).Decode(&step)
-	} else if authType == "USER" || authType == "SESSION" {
-		err = coll.FindOne(ctx, bson.M{
-			"_id":     trailID + "-" + rev,
-			"owner":   owner,
-			"garbage": bson.M{"$ne": true},
-		}).Decode(&step)
+	trailservice := trailservices.CreateService(a.mongoClient, utils.MongoDb)
+	objectsWithAccess, rerr := trailservice.GetTrailObjectsWithAccess(
+		r.Context(),
+		trailID,
+		rev,
+		owner.(string),
+		authType.(string),
+		isPublic,
+		"",
+	)
+
+	if rerr != nil {
+		utils.RestErrorWrite(w, rerr)
+		return
 	}
 
-	var objectsWithAccess []objects.ObjectWithAccess
-	objectsWithAccess = make([]objects.ObjectWithAccess, 0)
-
-	stateU := utils.BsonUnquoteMap(&step.State)
-
-	for k, v := range stateU {
-		_, ok := v.(string)
-
-		if !ok {
-			// we found a json element
-			continue
-		}
-
-		if k == "#spec" {
-			continue
-		}
-
-		collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
-
-		if collection == nil {
-			utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-			return
-		}
-
-		callingPrincipalStr, ok := owner.(string)
-		if !ok {
-			// XXX: find right error
-			utils.RestErrorWrapper(w, "Invalid Access", http.StatusForbidden)
-			return
-		}
-
-		objID := v.(string)
-		sha, err := utils.DecodeSha256HexString(objID)
-
-		if err != nil {
-			utils.RestErrorWrapper(w, "Get Steps Object id must be a valid sha256", http.StatusBadRequest)
-			return
-		}
-
-		storageID := objects.MakeStorageID(step.Owner, sha)
-
-		var newObject objects.Object
-		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-		defer cancel()
-		err = collection.FindOne(ctx, bson.M{
-			"_id":     storageID,
-			"garbage": bson.M{"$ne": true},
-		}).Decode(&newObject)
-
-		if err != nil {
-			utils.RestErrorWrapper(w, "Not Accessible Resource Id: "+storageID+" ERR: "+err.Error(), http.StatusForbidden)
-			return
-		}
-
-		if newObject.Owner != step.Owner {
-			utils.RestErrorWrapper(w, "Invalid Object Access", http.StatusForbidden)
-			return
-		}
-
-		newObject.ObjectName = k
-
-		issuerURL := utils.GetAPIEndpoint("/trails")
-		objWithAccess := objects.MakeObjAccessible(issuerURL, callingPrincipalStr, newObject, storageID)
-		objectsWithAccess = append(objectsWithAccess, objWithAccess)
-	}
 	w.WriteJson(&objectsWithAccess)
 }
 
@@ -197,7 +128,7 @@ func (a *App) handleGetStepsObject(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	step := Step{}
+	step := trailmodels.Step{}
 
 	trailID := r.PathParam("id")
 	rev := r.PathParam("rev")
@@ -355,7 +286,7 @@ func (a *App) handleGetStepsObjectFile(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	step := Step{}
+	step := trailmodels.Step{}
 
 	trailID := r.PathParam("id")
 	rev := r.PathParam("rev")

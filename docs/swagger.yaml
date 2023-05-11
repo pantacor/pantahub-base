@@ -17,7 +17,8 @@ definitions:
       prn:
         type: string
       redirect_uris:
-        description: Oauth2RedirectURIs is limiting the prefix available for redirecting users with oauth code and accesstoken to
+        description: Oauth2RedirectURIs is limiting the prefix available for redirecting
+          users with oauth code and accesstoken to
         items:
           type: string
         type: array
@@ -141,7 +142,8 @@ definitions:
       prn:
         type: string
       redirect_uris:
-        description: Oauth2RedirectURIs is limiting the prefix available for redirecting users with oauth code and accesstoken to
+        description: Oauth2RedirectURIs is limiting the prefix available for redirecting
+          users with oauth code and accesstoken to
         items:
           type: string
         type: array
@@ -507,16 +509,16 @@ definitions:
       subject:
         type: string
     type: object
-  trails.DownloadProgress:
+  trailmodels.DownloadProgress:
     properties:
       objects:
         items:
-          $ref: '#/definitions/trails.ObjectProgress'
+          $ref: '#/definitions/trailmodels.ObjectProgress'
         type: array
       total:
-        $ref: '#/definitions/trails.ObjectProgress'
+        $ref: '#/definitions/trailmodels.ObjectProgress'
     type: object
-  trails.ObjectProgress:
+  trailmodels.ObjectProgress:
     properties:
       current_time:
         type: integer
@@ -531,7 +533,7 @@ definitions:
       total_size:
         type: integer
     type: object
-  trails.PvrRemote:
+  trailmodels.PvrRemote:
     properties:
       json-get-url:
         description: where to pvr post stuff
@@ -559,7 +561,7 @@ definitions:
         description: the pvr remote protocol spec available
         type: string
     type: object
-  trails.Step:
+  trailmodels.Step:
     properties:
       commit-msg:
         type: string
@@ -581,7 +583,7 @@ definitions:
       owner:
         type: string
       progress:
-        $ref: '#/definitions/trails.StepProgress'
+        $ref: '#/definitions/trailmodels.StepProgress'
       progress-time:
         type: string
       rev:
@@ -606,13 +608,13 @@ definitions:
           type: string
         type: array
     type: object
-  trails.StepProgress:
+  trailmodels.StepProgress:
     properties:
       data:
         description: data field that can hold things the device wants to remember
         type: object
       downloads:
-        $ref: '#/definitions/trails.DownloadProgress'
+        $ref: '#/definitions/trailmodels.DownloadProgress'
         description: progress number. steps or 1-100
       log:
         description: log if available
@@ -627,7 +629,7 @@ definitions:
         description: message of progress status
         type: string
     type: object
-  trails.Trail:
+  trailmodels.Trail:
     properties:
       device:
         type: string
@@ -637,7 +639,8 @@ definitions:
       id:
         type: string
       last-insync:
-        description: 'Admins   []string `json:"admins"`   // XXX: maybe this is best way to do delegating device access....'
+        description: 'Admins   []string `json:"admins"`   // XXX: maybe this is best
+          way to do delegating device access....'
         type: string
       last-touched:
         type: string
@@ -648,7 +651,7 @@ definitions:
           type: string
         type: array
     type: object
-  trails.TrailSummary:
+  trailmodels.TrailSummary:
     properties:
       device:
         type: string
@@ -1133,8 +1136,7 @@ paths:
       produces:
       - application/json
       responses:
-        "302":
-          description: ""
+        "302": {}
         "400":
           description: Invalid payload
           schema:
@@ -1173,8 +1175,7 @@ paths:
       produces:
       - application/json
       responses:
-        "302":
-          description: ""
+        "302": {}
         "400":
           description: Invalid payload
           schema:
@@ -1272,7 +1273,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: send email with token to user in order to reset password to given user
+      description: send email with token to user in order to reset password to given
+        user
       parameters:
       - description: New password payload
         in: body
@@ -1306,7 +1308,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: send email with token to user in order to reset password to given user
+      description: send email with token to user in order to reset password to given
+        user
       parameters:
       - description: Account recovery payload
         in: body
@@ -1370,8 +1373,7 @@ paths:
       produces:
       - application/json
       responses:
-        "200":
-          description: ""
+        "200": {}
         "400":
           description: Bad Request
           schema:
@@ -1586,7 +1588,8 @@ paths:
             $ref: '#/definitions/utils.RError'
       security:
       - ApiKeyAuth: []
-      summary: Get all devices that have changed after or before a given point in time
+      summary: Get all devices that have changed after or before a given point in
+        time
       tags:
       - devices
   /changes/steps:
@@ -1650,7 +1653,8 @@ paths:
             $ref: '#/definitions/utils.RError'
       security:
       - ApiKeyAuth: []
-      summary: Get all devices that have changed after or before a given point in time
+      summary: Get all devices that have changed after or before a given point in
+        time
       tags:
       - devices
   /cron/devices:
@@ -2401,6 +2405,44 @@ paths:
       summary: Disable a device token in order to be unable to used as authetication
       tags:
       - devices
+  /exports/{owner}/{nick}/{rev}/{filename}:
+    get:
+      consumes:
+      - application/json
+      description: Export a tar gz file with of a device
+      parameters:
+      - description: Owner nick
+        in: query
+        name: owner-nick
+        type: string
+      - description: Owner PRN
+        in: query
+        name: owner
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: binary
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Export a tar gz file with of a device
+      tags:
+      - exports
   /healthz:
     get:
       consumes:
@@ -2444,7 +2486,8 @@ paths:
         Get one or many log entries as an error of LogEntry
         Page through your logs.
       parameters:
-      - description: list position to start page; either number or ID or '<tsec>.<tnano>' of log entry
+      - description: list position to start page; either number or ID or '<tsec>.<tnano>'
+          of log entry
         in: query
         name: start
         type: string
@@ -2464,7 +2507,8 @@ paths:
         in: query
         name: src
         type: string
-      - description: common list of items of 'tsec,tnano,device,src,lvl,time-created' you can use - on each individual item to reverse order
+      - description: common list of items of 'tsec,tnano,device,src,lvl,time-created'
+          you can use - on each individual item to reverse order
         in: query
         name: sort
         type: string
@@ -2575,8 +2619,7 @@ paths:
       produces:
       - plain/text
       responses:
-        "200":
-          description: ""
+        "200": {}
         "400":
           description: Bad Request
           schema:
@@ -2780,8 +2823,7 @@ paths:
       produces:
       - application/json
       responses:
-        "200":
-          description: ""
+        "200": {}
         "400":
           description: Bad Request
           schema:
@@ -2983,8 +3025,7 @@ paths:
       produces:
       - application/json
       responses:
-        "200":
-          description: ""
+        "200": {}
         "400":
           description: Bad Request
           schema:
@@ -3016,7 +3057,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/trails.Trail'
+              $ref: '#/definitions/trailmodels.Trail'
             type: array
         "400":
           description: Bad Request
@@ -3056,7 +3097,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/trails.Trail'
+            $ref: '#/definitions/trailmodels.Trail'
         "400":
           description: Bad Request
           schema:
@@ -3085,7 +3126,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/trails.PvrRemote'
+            $ref: '#/definitions/trailmodels.PvrRemote'
         "400":
           description: Bad Request
           schema:
@@ -3122,7 +3163,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/trails.Trail'
+            $ref: '#/definitions/trailmodels.Trail'
         "400":
           description: Bad Request
           schema:
@@ -3165,7 +3206,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/trails.Step'
+              $ref: '#/definitions/trailmodels.Step'
             type: array
         "400":
           description: Bad Request
@@ -3205,14 +3246,14 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/trails.Step'
+          $ref: '#/definitions/trailmodels.Step'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/trails.Trail'
+            $ref: '#/definitions/trailmodels.Trail'
         "400":
           description: Bad Request
           schema:
@@ -3256,7 +3297,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/trails.Step'
+            $ref: '#/definitions/trailmodels.Step'
         "400":
           description: Bad Request
           schema:
@@ -3296,7 +3337,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/trails.PvrRemote'
+            $ref: '#/definitions/trailmodels.PvrRemote'
         "400":
           description: Bad Request
           schema:
@@ -3338,7 +3379,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/trails.StepProgress'
+            $ref: '#/definitions/trailmodels.StepProgress'
         "400":
           description: Bad Request
           schema:
@@ -3399,7 +3440,8 @@ paths:
     put:
       consumes:
       - application/json
-      description: Put step meta just the raw data of a step without metainfo like pvr put
+      description: Put step meta just the raw data of a step without metainfo like
+        pvr put
       parameters:
       - description: ID|NICK|PRN
         in: path
@@ -3438,7 +3480,8 @@ paths:
             $ref: '#/definitions/utils.RError'
       security:
       - ApiKeyAuth: []
-      summary: Put step meta just the raw data of a step without metainfo like pvr put
+      summary: Put step meta just the raw data of a step without metainfo like pvr
+        put
       tags:
       - trails
   /trails/{id}/steps/{rev}/objects:
@@ -3550,8 +3593,7 @@ paths:
       produces:
       - application/json
       responses:
-        "200":
-          description: ""
+        "200": {}
         "400":
           description: Bad Request
           schema:
@@ -3593,14 +3635,14 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/trails.StepProgress'
+          $ref: '#/definitions/trailmodels.StepProgress'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/trails.StepProgress'
+            $ref: '#/definitions/trailmodels.StepProgress'
         "400":
           description: Bad Request
           schema:
@@ -3661,7 +3703,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: put step state (only if not yet consumed). just the raw data of a step without metainfo like pvr pu
+      description: put step state (only if not yet consumed). just the raw data of
+        a step without metainfo like pvr pu
       parameters:
       - description: ID|NICK|PRN
         in: path
@@ -3727,7 +3770,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/trails.TrailSummary'
+            $ref: '#/definitions/trailmodels.TrailSummary'
         "400":
           description: Bad Request
           schema:
@@ -3756,7 +3799,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/trails.TrailSummary'
+            $ref: '#/definitions/trailmodels.TrailSummary'
         "400":
           description: Bad Request
           schema:
@@ -3787,7 +3830,6 @@ securityDefinitions:
     tokenUrl: /auth/token
     type: oauth2
   OAuth2Application:
-    authorizationUrl: ""
     flow: application
     scopes:
       admin: ' Grants read and write access to administrative information'
@@ -3802,7 +3844,6 @@ securityDefinitions:
       write: ' Grants write access'
     type: oauth2
   OAuth2Password:
-    authorizationUrl: ""
     flow: password
     scopes:
       admin: ' Grants read and write access to administrative information'

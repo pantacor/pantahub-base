@@ -1,5 +1,5 @@
 //
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2023 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"gitlab.com/pantacor/pantahub-base/callbacks"
-	"gitlab.com/pantacor/pantahub-base/trails"
+	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
 
@@ -71,7 +71,7 @@ func (a *App) handlePutSteps(w rest.ResponseWriter, r *rest.Request) {
 	response := []callbacks.PublicStep{}
 
 	for cur.Next(ctx) {
-		step := trails.Step{}
+		step := trailmodels.Step{}
 		err := cur.Decode(&step)
 		if err != nil {
 			utils.RestErrorWrapper(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)

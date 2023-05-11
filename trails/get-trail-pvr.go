@@ -1,5 +1,5 @@
 //
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2023 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
+	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -42,7 +43,7 @@ import (
 // @Produce  json
 // @Tags trails
 // @Security ApiKeyAuth
-// @Success 200 {object} PvrRemote
+// @Success 200 {object} trailmodels.PvrRemote
 // @Failure 400 {object} utils.RError
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
@@ -67,7 +68,7 @@ func (a *App) handleGetTrailPvrInfo(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	getID := r.PathParam("id")
-	step := Step{}
+	step := trailmodels.Step{}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -123,7 +124,7 @@ func (a *App) handleGetTrailPvrInfo(w rest.ResponseWriter, r *rest.Request) {
 	postFields := []string{"commit-msg"}
 	postFieldsOpt := []string{"rev"}
 
-	remoteInfo := PvrRemote{
+	remoteInfo := trailmodels.PvrRemote{
 		RemoteSpec:         "pvr-pantahub-1",
 		JSONGetURL:         jsonGet,
 		ObjectsEndpointURL: oe,

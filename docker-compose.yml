@@ -38,6 +38,8 @@ services:
       - ./.env.local:/opt/ph/bin/env.default
 
   pvr:
+    networks:
+      - base
     image: registry.gitlab.com/pantacor/pantahub-pvr:latest
     environment:
       - PANTAHUB_API_HOST=http://base:12365
@@ -58,7 +60,7 @@ services:
       - base
     image: registry.gitlab.com/pantacor/pantahub-www:devel
     environment:
-      - REACT_APP_TITLE="PantacorHub DevBench"
+      - REACT_APP_TITLE=PantacorHub DevBench
       - REACT_APP_API_URL=http://localhost:12365
       - REACT_APP_WWW_URL=http://localhost:3000
       - REACT_APP_PVR_URL=http://localhost:12367
