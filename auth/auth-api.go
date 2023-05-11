@@ -31,6 +31,7 @@ import (
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/accounts/accountsdata"
+	"gitlab.com/pantacor/pantahub-base/auth/authservices"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -208,7 +209,7 @@ func (a *App) handlePostSession(w rest.ResponseWriter, r *rest.Request) {
 // @Accept  json
 // @Produce  json
 // @Tags auth
-// @Param body body accountCreationPayload true "Account Payload"
+// @Param body body authservices.AccountCreationPayload true "Account Payload"
 // @Success 200 {object} accounts.Account
 // @Failure 400 {object} utils.RError "Invalid payload"
 // @Failure 412 {object} utils.RError "Invalid payload"
@@ -216,7 +217,7 @@ func (a *App) handlePostSession(w rest.ResponseWriter, r *rest.Request) {
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /auth/accounts [post]
 func (a *App) handlePostAccount(w rest.ResponseWriter, r *rest.Request) {
-	newAccount := accountCreationPayload{}
+	newAccount := authservices.AccountCreationPayload{}
 
 	r.DecodeJsonPayload(&newAccount)
 
@@ -505,7 +506,7 @@ func (a *App) handleVerify(w rest.ResponseWriter, r *rest.Request) {
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /auth/password [post]
 func (a *App) handlePasswordReset(writer rest.ResponseWriter, r *rest.Request) {
-	data := passwordReset{}
+	data := authservices.PasswordReset{}
 
 	r.DecodeJsonPayload(&data)
 
@@ -519,7 +520,7 @@ func (a *App) handlePasswordReset(writer rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	token, err := jwtgo.ParseWithClaims(data.Token, &resetPasswordClaims{}, func(token *jwtgo.Token) (interface{}, error) {
+	token, err := jwtgo.ParseWithClaims(data.Token, &authservices.ResetPasswordClaims{}, func(token *jwtgo.Token) (interface{}, error) {
 		return a.jwtMiddleware.Pub, nil
 	})
 	if err != nil {
@@ -527,7 +528,7 @@ func (a *App) handlePasswordReset(writer rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	claims := token.Claims.(*resetPasswordClaims)
+	claims := token.Claims.(*authservices.ResetPasswordClaims)
 	err = claims.Valid()
 	if err != nil {
 		utils.RestError(writer, err, tokenInvalidOrExpiredErr, http.StatusInternalServerError)
@@ -612,7 +613,7 @@ func (a *App) handlePasswordReset(writer rest.ResponseWriter, r *rest.Request) {
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /auth/recover [post]
 func (a *App) handlePasswordRecovery(writer rest.ResponseWriter, r *rest.Request) {
-	data := passwordResetRequest{}
+	data := authservices.PasswordResetRequest{}
 
 	r.DecodeJsonPayload(&data)
 
@@ -647,7 +648,7 @@ func (a *App) handlePasswordRecovery(writer rest.ResponseWriter, r *rest.Request
 		utils.RestError(writer, err, err.Error(), http.StatusInternalServerError)
 	}
 
-	claims := resetPasswordClaims{
+	claims := authservices.ResetPasswordClaims{
 		account.Email,
 		account.TimeModified,
 		jwtgo.StandardClaims{
@@ -689,7 +690,7 @@ func (a *App) handlePasswordRecovery(writer rest.ResponseWriter, r *rest.Request
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /auth/token [post]
 func (a *App) handlePostToken(writer rest.ResponseWriter, r *rest.Request) {
-	tokenRequest := tokenRequest{}
+	tokenRequest := authservices.TokenRequest{}
 	err := r.DecodeJsonPayload(&tokenRequest)
 	if err != nil {
 		utils.RestErrorWrapper(writer, "Failed to decode token Request", http.StatusBadRequest)
@@ -769,7 +770,7 @@ func (a *App) handlePostToken(writer rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	tokenStore := tokenStore{
+	tokenStore := authservices.TokenStore{
 		ID:      tokenClaims["token_id"].(primitive.ObjectID),
 		Client:  service,
 		Owner:   user,
@@ -785,7 +786,7 @@ func (a *App) handlePostToken(writer rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	tokenResult := tokenResponse{
+	tokenResult := authservices.TokenResponse{
 		Token:     tokenString,
 		TokenType: "bearer",
 		Scopes:    scopes,

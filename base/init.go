@@ -30,11 +30,13 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger"
 	"gitlab.com/pantacor/pantahub-base/apps"
 	"gitlab.com/pantacor/pantahub-base/auth"
+	"gitlab.com/pantacor/pantahub-base/auth/authservices"
 	"gitlab.com/pantacor/pantahub-base/callbacks"
 	"gitlab.com/pantacor/pantahub-base/changes"
 	"gitlab.com/pantacor/pantahub-base/cron"
 	"gitlab.com/pantacor/pantahub-base/dash"
 	"gitlab.com/pantacor/pantahub-base/devices"
+	"gitlab.com/pantacor/pantahub-base/exports"
 	"gitlab.com/pantacor/pantahub-base/healthz"
 	"gitlab.com/pantacor/pantahub-base/logs"
 	"gitlab.com/pantacor/pantahub-base/metrics"
@@ -77,23 +79,36 @@ func DoInit() {
 
 	mongoClient, _ := utils.GetMongoClient()
 
+	timeoutStr := utils.GetEnv(utils.EnvPantahubJWTTimeoutMinutes)
+	timeout, err := strconv.Atoi(timeoutStr)
+	if err != nil {
+		panic(err)
+	}
+
+	maxRefreshStr := utils.GetEnv(utils.EnvPantahubJWTMaxRefreshMinutes)
+	maxRefresh, err := strconv.Atoi(maxRefreshStr)
+	if err != nil {
+		panic(err)
+	}
+
+	defaultJwtMiddleware := &jwt.JWTMiddleware{
+		Key:              jwtSecret,
+		Pub:              jwtPub,
+		Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
+		Authenticator:    falseAuthenticator,
+		Timeout:          time.Minute * time.Duration(timeout),
+		MaxRefresh:       time.Minute * time.Duration(maxRefresh),
+		SigningAlgorithm: "RS256",
+	}
+
+	defaultJwtMiddleware.Authenticator = authservices.AuthWithUserPassFactory(mongoClient)
+	defaultJwtMiddleware.PayloadFunc = authservices.AuthenticatePayloadFactory(mongoClient, defaultJwtMiddleware)
+
 	adminUsers := utils.GetSubscriptionAdmins()
 	subService := subscriptions.NewService(mongoClient, utils.Prn("prn::subscriptions:"),
 		adminUsers, subscriptions.SubscriptionProperties)
 
 	{
-		timeoutStr := utils.GetEnv(utils.EnvPantahubJWTTimeoutMinutes)
-		timeout, err := strconv.Atoi(timeoutStr)
-		if err != nil {
-			panic(err)
-		}
-
-		maxRefreshStr := utils.GetEnv(utils.EnvPantahubJWTMaxRefreshMinutes)
-		maxRefresh, err := strconv.Atoi(maxRefreshStr)
-		if err != nil {
-			panic(err)
-		}
-
 		app := auth.New(&jwt.JWTMiddleware{
 			Key:              jwtSecret,
 			Pub:              jwtPub,
@@ -101,115 +116,55 @@ func DoInit() {
 			Timeout:          time.Minute * time.Duration(timeout),
 			MaxRefresh:       time.Minute * time.Duration(maxRefresh),
 			SigningAlgorithm: "RS256",
-			LogFunc: func(text string) {
-				log.Println("/auth: " + text)
-			},
 		}, mongoClient)
 		http.Handle("/auth/", http.StripPrefix("/auth", app.API.MakeHandler()))
 	}
 	{
-		app := objects.New(&jwt.JWTMiddleware{
-			Pub:              jwtPub,
-			Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
-			Authenticator:    falseAuthenticator,
-			SigningAlgorithm: "RS256",
-		}, subService, mongoClient)
+		app := objects.New(defaultJwtMiddleware, subService, mongoClient)
 		http.Handle("/objects/", http.StripPrefix("/objects", app.API.MakeHandler()))
 	}
 	{
-		app := changes.New(&jwt.JWTMiddleware{
-			Pub:              jwtPub,
-			Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
-			Authenticator:    falseAuthenticator,
-			SigningAlgorithm: "RS256",
-		}, mongoClient)
+		app := changes.New(defaultJwtMiddleware, mongoClient)
 		http.Handle("/changes/", http.StripPrefix("/changes", app.API.MakeHandler()))
 	}
 	{
-		app := devices.New(&jwt.JWTMiddleware{
-			Pub:              jwtPub,
-			Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
-			Authenticator:    falseAuthenticator,
-			SigningAlgorithm: "RS256",
-		}, mongoClient)
+		app := devices.New(defaultJwtMiddleware, mongoClient)
 		http.Handle("/devices/", http.StripPrefix("/devices", app.API.MakeHandler()))
 	}
 	{
-		app := trails.New(&jwt.JWTMiddleware{
-			Pub:              jwtPub,
-			Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
-			Authenticator:    falseAuthenticator,
-			SigningAlgorithm: "RS256",
-		}, mongoClient)
+		app := trails.New(defaultJwtMiddleware, mongoClient)
 		http.Handle("/trails/", http.StripPrefix("/trails", app.API.MakeHandler()))
 	}
 	{
-		app := plog.New(&jwt.JWTMiddleware{
-			Pub:              jwtPub,
-			Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
-			Authenticator:    falseAuthenticator,
-			SigningAlgorithm: "RS256",
-		}, mongoClient)
+		app := plog.New(defaultJwtMiddleware, mongoClient)
 		http.Handle("/plog/", http.StripPrefix("/plog", app.API.MakeHandler()))
 	}
 	{
-		app := logs.New(&jwt.JWTMiddleware{
-			Key:              jwtSecret,
-			Pub:              jwtPub,
-			Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
-			Authenticator:    falseAuthenticator,
-			SigningAlgorithm: "RS256",
-		}, mongoClient)
+		app := logs.New(defaultJwtMiddleware, mongoClient)
 		http.Handle("/logs/", http.StripPrefix("/logs", app.API.MakeHandler()))
 	}
-
 	{
 		app := healthz.New(mongoClient)
 		http.Handle("/healthz/", http.StripPrefix("/healthz", app.API.MakeHandler()))
 	}
 	{
-		app := dash.New(&jwt.JWTMiddleware{
-			Pub:              jwtPub,
-			Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
-			Authenticator:    falseAuthenticator,
-			SigningAlgorithm: "RS256",
-		}, subService, mongoClient)
+		app := dash.New(defaultJwtMiddleware, subService, mongoClient)
 		http.Handle("/dash/", http.StripPrefix("/dash", app.API.MakeHandler()))
 	}
 	{
-		app := subscriptions.New(&jwt.JWTMiddleware{
-			Pub:              jwtPub,
-			Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
-			Authenticator:    falseAuthenticator,
-			SigningAlgorithm: "RS256",
-		}, subService, mongoClient)
+		app := subscriptions.New(defaultJwtMiddleware, subService, mongoClient)
 		http.Handle("/subscriptions/", http.StripPrefix("/subscriptions", app.MakeHandler()))
 	}
 	{
-		app := metrics.New(&jwt.JWTMiddleware{
-			Pub:              jwtPub,
-			Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
-			Authenticator:    falseAuthenticator,
-			SigningAlgorithm: "RS256",
-		}, mongoClient)
+		app := metrics.New(defaultJwtMiddleware, mongoClient)
 		http.Handle("/metrics/", http.StripPrefix("/metrics", app.API.MakeHandler()))
 	}
 	{
-		app := apps.New(&jwt.JWTMiddleware{
-			Pub:              jwtPub,
-			Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
-			Authenticator:    falseAuthenticator,
-			SigningAlgorithm: "RS256",
-		}, mongoClient)
+		app := apps.New(defaultJwtMiddleware, mongoClient)
 		http.Handle("/apps/", http.StripPrefix("/apps", app.API.MakeHandler()))
 	}
 	{
-		app := profiles.New(&jwt.JWTMiddleware{
-			Pub:              jwtPub,
-			Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
-			Authenticator:    falseAuthenticator,
-			SigningAlgorithm: "RS256",
-		}, mongoClient)
+		app := profiles.New(defaultJwtMiddleware, mongoClient)
 		http.Handle("/profiles/", http.StripPrefix("/profiles", app.API.MakeHandler()))
 	}
 	{
@@ -218,23 +173,17 @@ func DoInit() {
 			panic(fmt.Errorf("error Parsing CRON_JOB_TIMEOUT: %s", err.Error()))
 		}
 
-		app := cron.New(&jwt.JWTMiddleware{
-			Pub:              jwtPub,
-			Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
-			Authenticator:    falseAuthenticator,
-			SigningAlgorithm: "RS256",
-		}, (time.Duration(cronJobTimeout) * time.Second),
+		app := cron.New(defaultJwtMiddleware, (time.Duration(cronJobTimeout) * time.Second),
 			mongoClient)
 		http.Handle("/cron/", http.StripPrefix("/cron", app.API.MakeHandler()))
 	}
 	{
-		app := callbacks.New(&jwt.JWTMiddleware{
-			Pub:              jwtPub,
-			Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
-			Authenticator:    falseAuthenticator,
-			SigningAlgorithm: "RS256",
-		}, mongoClient)
+		app := callbacks.New(defaultJwtMiddleware, mongoClient)
 		http.Handle("/callbacks/", http.StripPrefix("/callbacks", app.API.MakeHandler()))
+	}
+	{
+		app := exports.New(defaultJwtMiddleware, mongoClient)
+		http.Handle("/exports/", http.StripPrefix("/exports", app.API.MakeHandler()))
 	}
 
 	var fservermux FileUploadServer

@@ -18,21 +18,11 @@ package auth
 
 import (
 	"net/http"
-	"strconv"
-	"strings"
-	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/dgrijalva/jwt-go"
-	"gitlab.com/pantacor/pantahub-base/accounts/accountsdata"
+	"gitlab.com/pantacor/pantahub-base/auth/authservices"
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
-
-type loginRequestPayload struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Scope    string `json:"scope"`
-}
 
 func (a *App) getTokenUsingPassword(writer rest.ResponseWriter, r *rest.Request) {
 	userAgent := r.Header.Get("User-Agent")
@@ -41,63 +31,20 @@ func (a *App) getTokenUsingPassword(writer rest.ResponseWriter, r *rest.Request)
 		return
 	}
 
-	payload := &loginRequestPayload{}
+	payload := &authservices.LoginRequestPayload{}
 	err := r.DecodeJsonPayload(payload)
 	if err != nil {
 		utils.RestErrorWrapper(writer, "Failed to decode token Request", http.StatusBadRequest)
 		return
 	}
 
-	var scopes []string
-	if payload.Scope != "" && payload.Username == accountsdata.AnonAccountDefaultUsername {
-		scopes = utils.ScopeStringFilterBy(strings.Fields(payload.Scope), ".readonly", "")
-	} else {
-		scopes = utils.ScopeStringFilterBy(strings.Fields(payload.Scope), "", "")
-	}
-
-	if payload.Username != accountsdata.AnonAccountDefaultUsername && !a.jwtMiddleware.Authenticator(payload.Username, payload.Password) {
-		utils.RestErrorWrapper(writer, "Authentication Failed", http.StatusUnauthorized)
+	tokenString, rerr := authservices.CreateUserToken(payload, a.jwtMiddleware)
+	if rerr != nil {
+		utils.RestErrorWrite(writer, rerr)
 		return
 	}
 
-	token := jwt.New(jwt.GetSigningMethod(a.jwtMiddleware.SigningAlgorithm))
-	claims := token.Claims.(jwt.MapClaims)
-
-	if a.jwtMiddleware.PayloadFunc != nil {
-		for key, value := range a.jwtMiddleware.PayloadFunc(payload.Username) {
-			claims[key] = value
-		}
-	}
-
-	if payload.Username != accountsdata.AnonAccountDefaultUsername {
-		claims["id"] = payload.Username
-	}
-
-	claims["exp"] = time.Now().Add(a.jwtMiddleware.Timeout).Unix()
-
-	if len(scopes) > 0 {
-		claims["scopes"] = strings.Join(scopes, " ")
-	}
-
-	if payload.Username == accountsdata.AnonAccountDefaultUsername {
-		timeoutStr := utils.GetEnv(utils.EnvAnonJWTTimeoutMinutes)
-		timeout, err := strconv.Atoi(timeoutStr)
-		if err != nil {
-			timeout = 5
-		}
-		claims["exp"] = time.Now().Add(time.Minute * time.Duration(timeout)).Unix()
-	}
-
-	if a.jwtMiddleware.MaxRefresh != 0 {
-		claims["orig_iat"] = time.Now().Unix()
-	}
-	tokenString, err := token.SignedString(a.jwtMiddleware.Key)
-	if err != nil {
-		utils.RestErrorWrapper(writer, "Error signing new token", http.StatusInternalServerError)
-		return
-	}
-
-	writer.WriteJson(tokenResponse{
+	writer.WriteJson(authservices.TokenResponse{
 		Token: tokenString,
 	})
 

@@ -29,6 +29,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/apps"
+	"gitlab.com/pantacor/pantahub-base/auth/authservices"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -122,7 +123,7 @@ func (app *App) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Request)
 		return
 	}
 
-	tokenStore := tokenStore{
+	tokenStore := authservices.TokenStore{
 		ID:      tokenClaims["token_id"].(primitive.ObjectID),
 		Client:  req.Service,
 		Owner:   caller,
@@ -155,7 +156,7 @@ func (app *App) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Request)
 	params.Add("scope", req.Scopes)
 	params.Add("state", req.State)
 
-	response := tokenResponse{
+	response := authservices.TokenResponse{
 		Token:       tokenString,
 		RedirectURI: req.RedirectURI + "#" + params.Encode(),
 		TokenType:   "bearer",
@@ -261,7 +262,7 @@ func (app *App) validateScopesAndURIs(ctx context.Context, caller, reqService, r
 	service, _, err := apps.SearchApp(ctx, caller, reqService, app.mongoClient.Database(utils.MongoDb))
 	if err != nil {
 		// Support default accounts as before but only use pantahub scopes for those
-		serviceAccount, err := app.getAccount(reqService)
+		serviceAccount, err := authservices.GetAccount(reqService, app.mongoClient)
 		if err != nil && err != mongo.ErrNoDocuments {
 			log.Println("error implicit access token creation failed to look up service: " + err.Error())
 			return http.StatusInternalServerError, errors.New("error  implicit access token creation failed to look up service")

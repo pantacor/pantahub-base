@@ -37,6 +37,7 @@ var service1ObjectID primitive.ObjectID
 var service2ObjectID primitive.ObjectID
 var service3ObjectID primitive.ObjectID
 var client1ObjectID primitive.ObjectID
+var anonObjectID primitive.ObjectID
 
 // SetAccountIDs : Set IDs for Demo accounts
 func SetAccountIDs() {
@@ -50,7 +51,8 @@ func SetAccountIDs() {
 	service1ObjectID, _ = primitive.ObjectIDFromHex("123651236512365123650008")
 	service2ObjectID, _ = primitive.ObjectIDFromHex("123651236512365123650009")
 	service3ObjectID, _ = primitive.ObjectIDFromHex("123651236512365123650010")
-	client1ObjectID, _ = primitive.ObjectIDFromHex("223651236512365123650010")
+	client1ObjectID, _ = primitive.ObjectIDFromHex("223651236512365123650011")
+	anonObjectID, _ = primitive.ObjectIDFromHex("223651236512365123650012")
 }
 
 // DefaultAccounts all hardcoded accounts for admins, devices and services
@@ -166,5 +168,15 @@ var DefaultAccounts = map[string]accounts.Account{
 		TimeModified:       time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
 		Password:           "client1",
 		Oauth2RedirectURIs: []string{"https://www.fleet.pantahub.com", "https://www.fleet2.pantahub.com", "http://localhost"},
+	},
+	AnonAccountDefaultUsername: {
+		ID:           anonObjectID,
+		Type:         accounts.AccountTypeUser,
+		Prn:          "prn:pantahub.com:auth:/anon",
+		Nick:         "anonymous",
+		Email:        AnonAccountDefaultUsername,
+		TimeCreated:  time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
+		TimeModified: time.Date(2016, time.October, 1, 0, 0, 0, 0, time.UTC),
+		Password:     "anonymous",
 	},
 }
