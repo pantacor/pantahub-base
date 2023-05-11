@@ -167,6 +167,11 @@ func (s *EService) GetDevice(ctx context.Context, nick, owner, tokenOwner string
 func (s *EService) WriteExportTar(w rest.ResponseWriter, filename string, objectDownloads []objects.ObjectWithAccess, state []byte) {
 	var fileWriter io.Writer = w
 
+	w.Header().Add("Content-disposition", "attachment; filename="+filename)
+	w.Header().Add("Content-type", "application/octet-stream")
+	w.Header().Add("Pragma", "no-cache")
+	w.Header().Add("Expires", "0")
+
 	if strings.HasSuffix(strings.ToLower(filename), ".gz") ||
 		strings.HasSuffix(strings.ToLower(filename), ".tgz") {
 		f := gzip.NewWriter(w)
@@ -182,8 +187,6 @@ func (s *EService) WriteExportTar(w rest.ResponseWriter, filename string, object
 		utils.RestErrorWrapper(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	// fmt.Println(len(objectDownloads))
 
 	for _, object := range objectDownloads {
 		resp, err := http.Get(object.SignedGetURL)
