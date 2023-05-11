@@ -499,7 +499,7 @@ func (a *App) handleVerify(w rest.ResponseWriter, r *rest.Request) {
 // @Accept  json
 // @Produce  json
 // @Tags auth
-// @Param body body passwordReset true "New password payload"
+// @Param body body authmodels.PasswordReset true "New password payload"
 // @Success 200 {object} accounts.Account
 // @Failure 400 {object} utils.RError "Invalid payload"
 // @Failure 404 {object} utils.RError "Account not found"
@@ -606,7 +606,7 @@ func (a *App) handlePasswordReset(writer rest.ResponseWriter, r *rest.Request) {
 // @Accept  json
 // @Produce  json
 // @Tags auth
-// @Param body body passwordResetRequest true "Account recovery payload"
+// @Param body body authmodels.PasswordResetRequest true "Account recovery payload"
 // @Success 200 {object} accounts.Account
 // @Failure 400 {object} utils.RError "Invalid payload"
 // @Failure 404 {object} utils.RError "Account not found"

@@ -121,7 +121,20 @@ definitions:
       type:
         type: string
     type: object
-  auth.accountCreationPayload:
+  auth.requestPayload:
+    properties:
+      idevid-name:
+        type: string
+      owner:
+        type: string
+      service:
+        type: string
+      signature:
+        type: string
+      token-id:
+        type: string
+    type: object
+  authmodels.AccountCreationPayload:
     properties:
       captcha:
         type: string
@@ -154,29 +167,16 @@ definitions:
       type:
         type: string
     type: object
-  auth.passwordReset:
+  authmodels.PasswordReset:
     properties:
       password:
         type: string
       token:
         type: string
     type: object
-  auth.passwordResetRequest:
+  authmodels.PasswordResetRequest:
     properties:
       email:
-        type: string
-    type: object
-  auth.requestPayload:
-    properties:
-      idevid-name:
-        type: string
-      owner:
-        type: string
-      service:
-        type: string
-      signature:
-        type: string
-      token-id:
         type: string
     type: object
   callbacks.ProcessDeviceResult:
@@ -1055,7 +1055,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/auth.accountCreationPayload'
+          $ref: '#/definitions/authmodels.AccountCreationPayload'
       produces:
       - application/json
       responses:
@@ -1281,7 +1281,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/auth.passwordReset'
+          $ref: '#/definitions/authmodels.PasswordReset'
       produces:
       - application/json
       responses:
@@ -1316,7 +1316,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/auth.passwordResetRequest'
+          $ref: '#/definitions/authmodels.PasswordResetRequest'
       produces:
       - application/json
       responses:

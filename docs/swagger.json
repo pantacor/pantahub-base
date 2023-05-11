@@ -477,7 +477,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/auth.accountCreationPayload"
+                            "$ref": "#/definitions/authmodels.AccountCreationPayload"
                         }
                     }
                 ],
@@ -829,7 +829,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/auth.passwordReset"
+                            "$ref": "#/definitions/authmodels.PasswordReset"
                         }
                     }
                 ],
@@ -881,7 +881,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/auth.passwordResetRequest"
+                            "$ref": "#/definitions/authmodels.PasswordResetRequest"
                         }
                     }
                 ],
@@ -4873,7 +4873,27 @@
                 }
             }
         },
-        "auth.accountCreationPayload": {
+        "auth.requestPayload": {
+            "type": "object",
+            "properties": {
+                "idevid-name": {
+                    "type": "string"
+                },
+                "owner": {
+                    "type": "string"
+                },
+                "service": {
+                    "type": "string"
+                },
+                "signature": {
+                    "type": "string"
+                },
+                "token-id": {
+                    "type": "string"
+                }
+            }
+        },
+        "authmodels.AccountCreationPayload": {
             "type": "object",
             "properties": {
                 "captcha": {
@@ -4921,7 +4941,7 @@
                 }
             }
         },
-        "auth.passwordReset": {
+        "authmodels.PasswordReset": {
             "type": "object",
             "properties": {
                 "password": {
@@ -4932,30 +4952,10 @@
                 }
             }
         },
-        "auth.passwordResetRequest": {
+        "authmodels.PasswordResetRequest": {
             "type": "object",
             "properties": {
                 "email": {
-                    "type": "string"
-                }
-            }
-        },
-        "auth.requestPayload": {
-            "type": "object",
-            "properties": {
-                "idevid-name": {
-                    "type": "string"
-                },
-                "owner": {
-                    "type": "string"
-                },
-                "service": {
-                    "type": "string"
-                },
-                "signature": {
-                    "type": "string"
-                },
-                "token-id": {
                     "type": "string"
                 }
             }
