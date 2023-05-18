@@ -1,4 +1,40 @@
 
+<a name="042"></a>
+## [042](https://gitlab.com/pantacor/pantahub-base/compare/041...042) (2023-05-11)
+
+### Feature
+
+* **dev tools:** add full docker configuration to debug and test kafka pipelines
+* **exports:** create endpoint to export devices tarball
+
+### Fix
+
+* **ci:** update gitlab variables
+* **docs:** solve documentation models reference
+* **exports:** add correct header to download file
+
+### Refactor
+
+* **auth:** move auth model to proper authmodels package
+* **auth:** allow jwt authentication to run in all aps
+
+
+<a name="041"></a>
+## [041](https://gitlab.com/pantacor/pantahub-base/compare/040-rev1...041) (2023-05-05)
+
+### Fix
+
+* **auth:** remove challenge on user password change to activate account
+
+
+<a name="040-rev1"></a>
+## [040-rev1](https://gitlab.com/pantacor/pantahub-base/compare/040...040-rev1) (2023-03-13)
+
+### Fix
+
+* **trails:** add findoptions to find one trails revision
+
+
 <a name="040"></a>
 ## [040](https://gitlab.com/pantacor/pantahub-base/compare/039...040) (2023-03-13)
 
@@ -16,11 +52,15 @@
 
 
 <a name="038"></a>
-## [038](https://gitlab.com/pantacor/pantahub-base/compare/036...038) (2023-03-03)
+## [038](https://gitlab.com/pantacor/pantahub-base/compare/037...038) (2023-03-03)
 
 ### Feature
 
 * **trails:** add filters and fields selection to steps list endpoint
+
+
+<a name="037"></a>
+## [037](https://gitlab.com/pantacor/pantahub-base/compare/036...037) (2023-01-16)
 
 ### Fix
 
