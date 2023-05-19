@@ -45,8 +45,13 @@ type ExportService interface {
 	GetUserAccountByNick(ctx context.Context, nick string) (accounts.Account, error)
 	GetDevice(ctx context.Context, nick, owner, tokenOwner string) (device *devices.Device, rerr *utils.RError)
 	GetTrailObjects(ctx context.Context, deviceID, rev, owner, authType string, isPublic bool, frags string) (owa []objects.ObjectWithAccess, rerr *utils.RError)
-	GetStepRev(ctx context.Context, trailID, rev, frags string) (r string, state []byte, rerr *utils.RError)
-	WriteExportTar(w rest.ResponseWriter, filename string, objectDownloads []objects.ObjectWithAccess, state []byte)
+	GetStepRev(ctx context.Context, trailID, rev, frags string) (r string, state []byte, modtime *time.Time, rerr *utils.RError)
+	WriteExportTar(
+		w rest.ResponseWriter,
+		filename string,
+		objectDownloads []objects.ObjectWithAccess,
+		state []byte,
+		modetime *time.Time)
 }
 
 type EService struct {
@@ -61,13 +66,13 @@ func CreateService(client *mongo.Client, db string) ExportService {
 	}
 }
 
-func (s *EService) GetStepRev(ctx context.Context, trailID, rev, frags string) (r string, state []byte, rerr *utils.RError) {
+func (s *EService) GetStepRev(ctx context.Context, trailID, rev, frags string) (r string, state []byte, modtime *time.Time, rerr *utils.RError) {
 	var err error
 
 	trailservice := trailservices.CreateService(s.storage, s.db.Name())
 	step, rerr := trailservice.GetStepRev(ctx, trailID, rev)
 	if rerr != nil {
-		return r, nil, rerr
+		return r, nil, nil, rerr
 	}
 
 	r = strconv.Itoa(step.Rev)
@@ -81,7 +86,7 @@ func (s *EService) GetStepRev(ctx context.Context, trailID, rev, frags string) (
 				Error: err.Error(),
 				Code:  http.StatusInternalServerError,
 			}
-			return r, state, rerr
+			return r, state, &step.TimeModified, rerr
 		}
 	}
 
@@ -91,10 +96,10 @@ func (s *EService) GetStepRev(ctx context.Context, trailID, rev, frags string) (
 			Error: err.Error(),
 			Code:  http.StatusInternalServerError,
 		}
-		return r, state, rerr
+		return r, state, &step.TimeModified, rerr
 	}
 
-	return r, state, rerr
+	return r, state, &step.TimeModified, rerr
 }
 
 func (s *EService) GetTrailObjects(ctx context.Context, deviceID, rev, owner, authType string, isPublic bool, frags string) (owa []objects.ObjectWithAccess, rerr *utils.RError) {
@@ -164,7 +169,13 @@ func (s *EService) GetDevice(ctx context.Context, nick, owner, tokenOwner string
 	return device, rerr
 }
 
-func (s *EService) WriteExportTar(w rest.ResponseWriter, filename string, objectDownloads []objects.ObjectWithAccess, state []byte) {
+func (s *EService) WriteExportTar(
+	w rest.ResponseWriter,
+	filename string,
+	objectDownloads []objects.ObjectWithAccess,
+	state []byte,
+	modetime *time.Time,
+) {
 	var fileWriter io.Writer = w
 
 	w.Header().Add("Content-disposition", "attachment; filename="+filename)
@@ -182,7 +193,7 @@ func (s *EService) WriteExportTar(w rest.ResponseWriter, filename string, object
 	tw := tar.NewWriter(fileWriter)
 	defer tw.Close()
 
-	err := addToTarFileFromBytes(tw, "json", state)
+	err := addToTarFileFromBytes(tw, "json", state, modetime)
 	if err != nil {
 		utils.RestErrorWrapper(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -203,7 +214,7 @@ func (s *EService) WriteExportTar(w rest.ResponseWriter, filename string, object
 	}
 }
 
-func addToTarFileFromBytes(writer *tar.Writer, archivePath string, content []byte) error {
+func addToTarFileFromBytes(writer *tar.Writer, archivePath string, content []byte, modtime *time.Time) error {
 	file, err := os.CreateTemp(os.TempDir(), "tempfile.XXXXXXXX")
 	if err != nil {
 		return err
@@ -235,7 +246,11 @@ func addToTarFileFromBytes(writer *tar.Writer, archivePath string, content []byt
 	header.Name = archivePath
 	header.Size = stat.Size()
 	header.Mode = int64(stat.Mode())
-	header.ModTime = stat.ModTime()
+	if modtime == nil {
+		header.ModTime = stat.ModTime()
+	} else {
+		header.ModTime = *modtime
+	}
 
 	if err = writer.WriteHeader(header); err != nil {
 		return err

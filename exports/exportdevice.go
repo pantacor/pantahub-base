@@ -96,7 +96,7 @@ func (a *App) handleGetExport(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	revision, state, rerr := exportservice.GetStepRev(r.Context(), device.ID.Hex(), rev, frags)
+	revision, state, modtime, rerr := exportservice.GetStepRev(r.Context(), device.ID.Hex(), rev, frags)
 	if rerr != nil {
 		utils.RestErrorWrite(w, rerr)
 		return
@@ -116,5 +116,5 @@ func (a *App) handleGetExport(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	exportservice.WriteExportTar(w, filename, objectDownloads, state)
+	exportservice.WriteExportTar(w, filename, objectDownloads, state, modtime)
 }
