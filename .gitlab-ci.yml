@@ -65,11 +65,11 @@ build-tags:
     - docker run --rm --privileged multiarch/qemu-user-static:register || true
   script:
     - docker pull $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG || true
-    - docker build -f Dockerfile --build-arg NS=api --cache-from $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG --tag $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA --tag $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG .
-    - docker tag $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA $CONTAINER_IMAGE:$CI_BUILD_TAG
+    - docker build -f Dockerfile --build-arg NS=master --cache-from $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG --tag $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA --tag $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG .
+    - docker tag $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA $CONTAINER_IMAGE:$CI_COMMIT_TAG
     - docker push $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
     - docker push $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG
-    - docker push $CONTAINER_IMAGE:$CI_BUILD_TAG
+    - docker push $CONTAINER_IMAGE:$CI_COMMIT_TAG
   only:
     - tags
 
