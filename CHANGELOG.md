@@ -1,6 +1,15 @@
 
+<a name="042-rev1"></a>
+## [042-rev1](https://gitlab.com/pantacor/pantahub-base/compare/042...042-rev1) (2023-05-19)
+
+### Fix
+
+* **ci:** correct gitlab variables when building tags
+* **exports:** create tarball using the step modified date instead of now
+
+
 <a name="042"></a>
-## [042](https://gitlab.com/pantacor/pantahub-base/compare/041...042) (2023-05-11)
+## [042](https://gitlab.com/pantacor/pantahub-base/compare/041...042) (2023-05-18)
 
 ### Feature
 
