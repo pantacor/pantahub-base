@@ -174,7 +174,7 @@ func (s *EService) WriteExportTar(
 	filename string,
 	objectDownloads []objects.ObjectWithAccess,
 	state []byte,
-	modetime *time.Time,
+	modtime *time.Time,
 ) {
 	var fileWriter io.Writer = w
 
@@ -193,7 +193,7 @@ func (s *EService) WriteExportTar(
 	tw := tar.NewWriter(fileWriter)
 	defer tw.Close()
 
-	err := addToTarFileFromBytes(tw, "json", state, modetime)
+	err := addToTarFileFromBytes(tw, "json", state, modtime)
 	if err != nil {
 		utils.RestErrorWrapper(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -206,7 +206,7 @@ func (s *EService) WriteExportTar(
 			return
 		}
 
-		err = addToTarFromResponse(tw, "objects/"+object.ID, resp)
+		err = addToTarFromResponse(tw, "objects/"+object.ID, resp, modtime)
 		if err != nil {
 			utils.RestErrorWrapper(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -263,14 +263,14 @@ func addToTarFileFromBytes(writer *tar.Writer, archivePath string, content []byt
 	return nil
 }
 
-func addToTarFromResponse(writer *tar.Writer, archivePath string, resp *http.Response) (err error) {
+func addToTarFromResponse(writer *tar.Writer, archivePath string, resp *http.Response, mtime *time.Time) (err error) {
 	size, err := strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 64)
 	if err != nil {
 		return err
 	}
 	modtime := time.Now()
-	if mtime, err := time.Parse(time.RFC1123, resp.Header.Get("Last-Modified")); err == nil {
-		modtime = mtime
+	if mtime != nil {
+		modtime = *mtime
 	}
 	header := new(tar.Header)
 	header.Name = archivePath
