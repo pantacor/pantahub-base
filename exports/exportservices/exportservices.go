@@ -24,6 +24,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -58,6 +59,12 @@ type EService struct {
 	storage *mongo.Client
 	db      *mongo.Database
 }
+
+type ByObjectName []objects.ObjectWithAccess
+
+func (a ByObjectName) Len() int           { return len(a) }
+func (a ByObjectName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByObjectName) Less(i, j int) bool { return a[i].Object.ObjectName < a[j].Object.ObjectName }
 
 func CreateService(client *mongo.Client, db string) ExportService {
 	return &EService{
@@ -199,6 +206,8 @@ func (s *EService) WriteExportTar(
 		return
 	}
 
+	sort.Sort(ByObjectName(objectDownloads))
+
 	for _, object := range objectDownloads {
 		resp, err := http.Get(object.SignedGetURL)
 		if err != nil {
@@ -206,7 +215,7 @@ func (s *EService) WriteExportTar(
 			return
 		}
 
-		err = addToTarFromResponse(tw, "objects/"+object.ID, resp, modtime)
+		err = addToTarFromResponse(tw, "objects/"+object.ID, resp, &object.TimeModified)
 		if err != nil {
 			utils.RestErrorWrapper(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -246,6 +255,7 @@ func addToTarFileFromBytes(writer *tar.Writer, archivePath string, content []byt
 	header.Name = archivePath
 	header.Size = stat.Size()
 	header.Mode = int64(stat.Mode())
+	header.Format = tar.FormatUSTAR
 	if modtime == nil {
 		header.ModTime = stat.ModTime()
 	} else {

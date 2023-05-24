@@ -149,6 +149,16 @@ func (s *TService) GetTrailObjectsWithAccess(
 		}
 	}
 
+	collection := s.db.Collection("pantahub_objects")
+	if collection == nil {
+		rerr = &utils.RError{
+			Error: "Error with Database connectivity",
+			Msg:   "Error with Database connectivity",
+			Code:  http.StatusInternalServerError,
+		}
+		return owa, rerr
+	}
+
 	for k, v := range stateU {
 		_, ok := v.(string)
 
@@ -159,16 +169,6 @@ func (s *TService) GetTrailObjectsWithAccess(
 
 		if k == "#spec" {
 			continue
-		}
-
-		collection := s.db.Collection("pantahub_objects")
-		if collection == nil {
-			rerr = &utils.RError{
-				Error: "Error with Database connectivity",
-				Msg:   "Error with Database connectivity",
-				Code:  http.StatusInternalServerError,
-			}
-			return owa, rerr
 		}
 
 		objID := v.(string)
