@@ -1,4 +1,13 @@
 
+<a name="043"></a>
+## [043](https://gitlab.com/pantacor/pantahub-base/compare/042-rev1...043) (2023-05-24)
+
+### Fix
+
+* **exports:** get a reproducible sha sum when creating the same revision export
+* **exports:** use same modtime for json and object files
+
+
 <a name="042-rev1"></a>
 ## [042-rev1](https://gitlab.com/pantacor/pantahub-base/compare/042...042-rev1) (2023-05-19)
 
