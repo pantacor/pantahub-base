@@ -78,20 +78,26 @@ func (a *App) SaveObject(parentCtx context.Context, object *Object, localS3Check
 	}
 
 	if post {
-		result, err = CalcUsageAfterPost(parentCtx, object.Owner, a.mongoClient, object.ID, object.SizeInt)
+		ctx, cancel = context.WithTimeout(parentCtx, 5*time.Second)
+		defer cancel()
+		result, err = CalcUsageAfterPost(ctx, object.Owner, a.mongoClient, object.ID, object.SizeInt)
 		if err != nil {
 			log.Printf("ERROR: CalcUsageAfterPost failed: %s\n", err.Error())
 			return errors.New("Error posting object")
 		}
 	} else {
-		result, err = CalcUsageAfterPut(parentCtx, object.Owner, a.mongoClient, object.ID, object.SizeInt)
+		ctx, cancel = context.WithTimeout(parentCtx, 5*time.Second)
+		defer cancel()
+		result, err = CalcUsageAfterPut(ctx, object.Owner, a.mongoClient, object.ID, object.SizeInt)
 		if err != nil {
 			log.Printf("ERROR: CalcUsageAfterPut failed: %s\n", err.Error())
 			return errors.New("Error posting object")
 		}
 	}
 
-	quota, err := a.GetDiskQuota(parentCtx, object.Owner)
+	ctx, cancel = context.WithTimeout(parentCtx, 5*time.Second)
+	defer cancel()
+	quota, err := a.GetDiskQuota(ctx, object.Owner)
 	if err != nil {
 		log.Println("Error to calc diskquota: " + err.Error())
 		return errors.New("Error to calc quota")
@@ -117,8 +123,10 @@ func (a *App) SaveObject(parentCtx context.Context, object *Object, localS3Check
 
 	updateOptions := options.Update()
 	updateOptions.SetUpsert(true)
+	ctx, cancel = context.WithTimeout(parentCtx, 5*time.Second)
+	defer cancel()
 	_, err = collection.UpdateOne(
-		parentCtx,
+		ctx,
 		bson.M{"_id": object.StorageID},
 		bson.M{"$set": object},
 		updateOptions,

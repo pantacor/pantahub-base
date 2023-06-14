@@ -152,7 +152,7 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 	newStep.State = utils.BsonQuoteMap(&initialState)
 
 	// XXX: prototype: for production we need to prevent posting twice!!
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	_, err = collection.InsertOne(
 		ctx,

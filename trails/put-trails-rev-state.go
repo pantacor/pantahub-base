@@ -57,6 +57,11 @@ func (a *App) handlePutStepState(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+	if !ok {
+		// XXX: find right error
+		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
+		return
+	}
 
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 	if coll == nil {
@@ -98,6 +103,10 @@ func (a *App) handlePutStepState(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	step.StateSha, err = utils.StateSha(&stateMap)
+	if err != nil {
+		utils.RestErrorWrapper(w, "Error with request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	step.StepTime = time.Now()
 	step.ProgressTime = time.Unix(0, 0)
@@ -119,7 +128,9 @@ func (a *App) handlePutStepState(w rest.ResponseWriter, r *rest.Request) {
 
 	step.TimeModified = time.Now()
 
-	isDevicePublic, err := a.IsDevicePublic(r.Context(), step.TrailID)
+	ctx, cancel = context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	isDevicePublic, err := a.IsDevicePublic(ctx, step.TrailID)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error checking device is public or not:"+err.Error(), http.StatusInternalServerError)
 		return

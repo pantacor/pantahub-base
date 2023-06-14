@@ -126,7 +126,13 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 			utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		newStep.Rev, err = a.getLatestStepRev(r.Context(), trailObjectID)
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+		newStep.Rev, err = a.getLatestStepRev(ctx, trailObjectID)
+		if err != nil {
+			utils.RestErrorWrapper(w, "Error with getLatestStepRev: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 		newStep.Rev++
 	}
 
