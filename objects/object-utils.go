@@ -118,7 +118,7 @@ func (a *App) SaveObject(parentCtx context.Context, object *Object, localS3Check
 	updateOptions := options.Update()
 	updateOptions.SetUpsert(true)
 	_, err = collection.UpdateOne(
-		ctx,
+		parentCtx,
 		bson.M{"_id": object.StorageID},
 		bson.M{"$set": object},
 		updateOptions,
