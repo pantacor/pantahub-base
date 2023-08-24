@@ -18,7 +18,6 @@ package callbacks
 
 import (
 	"context"
-	"errors"
 	"log"
 	"strings"
 
@@ -209,7 +208,8 @@ func (a *App) GetStepObjectShas(ctx context.Context, step *trailmodels.Step) ([]
 			continue
 		}
 		if !utils.IsSha256HexString(sha) {
-			return nil, errors.New("Bad JSON format: object sha not a sha: " + sha)
+			log.Println("Bad JSON format: object sha not a sha: " + sha)
+			continue
 		}
 		if _, ok := objMap[sha]; !ok {
 			existsInDb, err := a.IsObjectExistsInDb(ctx, sha)
@@ -219,7 +219,8 @@ func (a *App) GetStepObjectShas(ctx context.Context, step *trailmodels.Step) ([]
 			if existsInDb {
 				objectShaList = append(objectShaList, sha)
 			} else {
-				return nil, errors.New("Step " + step.ID + " state references object (" + sha + ") that does not exist in DB")
+				log.Println("Step " + step.ID + " state references object (" + sha + ") that does not exist in DB")
+				continue
 			}
 		}
 	}
