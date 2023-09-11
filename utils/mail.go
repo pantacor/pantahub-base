@@ -19,12 +19,12 @@ package utils
 import (
 	"bytes"
 	"encoding/base64"
-	"io/ioutil"
+	"io"
 	"log"
 	"path/filepath"
 	"text/template"
 
-	"gopkg.in/mailgun/mailgun-go.v1"
+	"github.com/mailgun/mailgun-go/v3"
 )
 
 type emailData struct {
@@ -217,6 +217,6 @@ func addMedias(message *mailgun.Message) error {
 		return err
 	}
 
-	message.AddReaderInline("logo.png", ioutil.NopCloser(bytes.NewReader(logoPng)))
+	message.AddReaderInline("logo.png", io.NopCloser(bytes.NewReader(logoPng)))
 	return nil
 }

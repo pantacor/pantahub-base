@@ -39,6 +39,7 @@ require (
 	github.com/jonboulle/clockwork v0.2.3 // indirect
 	github.com/karrick/godirwalk v1.10.3 // indirect
 	github.com/klauspost/compress v1.15.1 // indirect
+	github.com/mailgun/mailgun-go/v3 v3.6.4 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/miolini/datacounter v1.0.3 // indirect
 	github.com/olivere/elastic/v7 v7.0.32
@@ -95,7 +96,6 @@ require (
 	google.golang.org/genproto v0.0.0-20220407144326-9054f6ed7bac // indirect
 	google.golang.org/grpc v1.49.0
 	google.golang.org/protobuf v1.28.0 // indirect
-	gopkg.in/mailgun/mailgun-go.v1 v1.1.1
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 	gopkg.in/olivere/elastic.v5 v5.0.86
 	gopkg.in/resty.v1 v1.12.0
