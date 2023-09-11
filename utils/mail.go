@@ -110,6 +110,7 @@ func SendResetPasswordEmail(email, nick, token string) error {
 	resp, id, err := mg.Send(ctx, message)
 	if err != nil {
 		log.Println("error sending email:", err)
+		log.Println("error sending email:", resp)
 		return err
 	}
 	log.Printf("ID: %s Resp: %s\n", id, resp)
@@ -154,6 +155,7 @@ func SendWelcome(email, nick, urlPrefix string) error {
 	resp, id, err := mg.Send(ctx, message)
 	if err != nil {
 		log.Println("error sending email:", err)
+		log.Println("error sending email:", resp)
 		return err
 	}
 
@@ -201,6 +203,7 @@ func SendVerification(email, nick, id, u string, urlPrefix string) bool {
 	resp, id, err := mg.Send(ctx, message)
 	if err != nil {
 		log.Println("error sending email:", err)
+		log.Println("error sending email:", resp)
 		return false
 	}
 
