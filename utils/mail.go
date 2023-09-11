@@ -18,13 +18,15 @@ package utils
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"io"
 	"log"
 	"path/filepath"
 	"text/template"
+	"time"
 
-	"github.com/mailgun/mailgun-go/v3"
+	"github.com/mailgun/mailgun-go/v4"
 )
 
 type emailData struct {
@@ -33,28 +35,29 @@ type emailData struct {
 	Link  string
 }
 
-var mgun *mailgun.Mailgun
+var mgun mailgun.Mailgun
 
 func getMailer() mailgun.Mailgun {
 	if mgun != nil {
-		return *mgun
+		return mgun
 	}
 	mgDomain := GetEnv(EnvMailgunDomain)
 
 	// if we have legacy settings we continue to init ourselves
 	if mgDomain != "" {
 		mgAPIKey := GetEnv(EnvMailgunAPIKey)
-		mgPubAPIKey := GetEnv(EnvMailgunPubAPIKey)
-		mg := mailgun.NewMailgun(mgDomain, mgAPIKey, mgPubAPIKey)
-		mgun = &mg
+		// mgPubAPIKey := GetEnv(EnvMailgunPubAPIKey)
+		mg := mailgun.NewMailgun(mgDomain, mgAPIKey)
+		mgun = mg
 	} else {
 		mg, err := mailgun.NewMailgunFromEnv()
 		if err != nil {
 			panic("unable to get mailer " + err.Error())
 		}
-		mgun = &mg
+		mgun = mg
 	}
-	return *mgun
+
+	return mgun
 }
 
 func getURLPrefix() string {
@@ -101,7 +104,10 @@ func SendResetPasswordEmail(email, nick, token string) error {
 		return nil
 	}
 
-	resp, id, err := mg.Send(message)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	resp, id, err := mg.Send(ctx, message)
 	if err != nil {
 		log.Println("error sending email:", err)
 		return err
@@ -142,7 +148,10 @@ func SendWelcome(email, nick, urlPrefix string) error {
 		return nil
 	}
 
-	resp, id, err := mg.Send(message)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	resp, id, err := mg.Send(ctx, message)
 	if err != nil {
 		log.Println("error sending email:", err)
 		return err
@@ -186,7 +195,10 @@ func SendVerification(email, nick, id, u string, urlPrefix string) bool {
 		return false
 	}
 
-	resp, id, err := mg.Send(message)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	resp, id, err := mg.Send(ctx, message)
 	if err != nil {
 		log.Println("error sending email:", err)
 		return false

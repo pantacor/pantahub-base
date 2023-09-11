@@ -39,7 +39,7 @@ require (
 	github.com/jonboulle/clockwork v0.2.3 // indirect
 	github.com/karrick/godirwalk v1.10.3 // indirect
 	github.com/klauspost/compress v1.15.1 // indirect
-	github.com/mailgun/mailgun-go/v3 v3.6.4 // indirect
+	github.com/mailgun/mailgun-go/v4 v4.11.0 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/miolini/datacounter v1.0.3 // indirect
 	github.com/olivere/elastic/v7 v7.0.32
