@@ -182,13 +182,13 @@ func SendVerification(email, nick, id, u string, urlPrefix string) bool {
 
 	err = addMedias(message)
 	if err != nil {
-		log.Println("error:", err)
+		log.Println("error adding medias:", err)
 		return false
 	}
 
 	resp, id, err := mg.Send(message)
 	if err != nil {
-		log.Print(err)
+		log.Println("error sending email:", err)
 		return false
 	}
 
