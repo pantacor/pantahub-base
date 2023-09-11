@@ -57,6 +57,11 @@ func getMailer() mailgun.Mailgun {
 		mgun = mg
 	}
 
+	apiUrl := GetEnv(EnvMailgunApiURL)
+	if apiUrl != "" {
+		mgun.SetAPIBase(apiUrl)
+	}
+
 	return mgun
 }
 

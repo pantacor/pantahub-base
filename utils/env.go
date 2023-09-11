@@ -170,6 +170,10 @@ const (
 	// default: <empty>
 	EnvMailgunAPIKey = "MAILGUN_APIKEY"
 
+	// EnvMailgunApiURL mailgun api url
+	// default: <empty>
+	EnvMailgunApiURL = "MG_URL"
+
 	// EnvMailgunPubAPIKey mailgone pub api key
 	// default: <empty>
 	EnvMailgunPubAPIKey = "MAILGUN_PUBAPIKEY"
