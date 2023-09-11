@@ -97,13 +97,13 @@ func SendResetPasswordEmail(email, nick, token string) error {
 
 	err = addMedias(message)
 	if err != nil {
-		log.Println("error:", err)
+		log.Println("error adding medias:", err)
 		return nil
 	}
 
 	resp, id, err := mg.Send(message)
 	if err != nil {
-		log.Print(err)
+		log.Println("error sending email:", err)
 		return err
 	}
 	log.Printf("ID: %s Resp: %s\n", id, resp)
@@ -138,13 +138,13 @@ func SendWelcome(email, nick, urlPrefix string) error {
 
 	err = addMedias(message)
 	if err != nil {
-		log.Println("error:", err)
+		log.Println("error adding medias:", err)
 		return nil
 	}
 
 	resp, id, err := mg.Send(message)
 	if err != nil {
-		log.Print(err)
+		log.Println("error sending email:", err)
 		return err
 	}
 
