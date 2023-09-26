@@ -117,6 +117,7 @@ func (a *App) handleGetStepPvrInfo(w rest.ResponseWriter, r *rest.Request) {
 		revID + "/state")
 
 	postURL := utils.GetAPIEndpoint("/trails/" + getID + "/steps")
+	stepGetUrl := utils.GetAPIEndpoint("/trails/" + getID + "/steps/" + revID)
 	postFields := []string{"msg"}
 	postFieldsOpt := []string{}
 
@@ -128,6 +129,7 @@ func (a *App) handleGetStepPvrInfo(w rest.ResponseWriter, r *rest.Request) {
 		PostURL:            postURL,
 		PostFields:         postFields,
 		PostFieldsOpt:      postFieldsOpt,
+		StepGetUrl:         stepGetUrl,
 	}
 
 	w.WriteJson(remoteInfo)

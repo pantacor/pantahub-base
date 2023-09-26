@@ -76,6 +76,7 @@ type PvrRemote struct {
 	PostURL            string   `json:"post-url"`         // where to post/announce new revisions
 	PostFields         []string `json:"post-fields"`      // what fields require input
 	PostFieldsOpt      []string `json:"post-fields-opt"`  // what optional fields are available [default: <empty>]
+	StepGetUrl         string   `json:"step-get-url"`     // where to get the latest step status
 }
 
 // App trails rest application
