@@ -121,6 +121,7 @@ func (a *App) handleGetTrailPvrInfo(w rest.ResponseWriter, r *rest.Request) {
 	oe := utils.GetAPIEndpoint("/trails/" + getID + "/steps/" + strconv.Itoa(step.Rev) + "/objects")
 	jsonGet := utils.GetAPIEndpoint("/trails/" + getID + "/steps/" + strconv.Itoa(step.Rev) + "/state")
 	postURL := utils.GetAPIEndpoint("/trails/" + getID + "/steps")
+	stepGetUrl := utils.GetAPIEndpoint("/trails/" + getID + "/steps/" + strconv.Itoa(step.Rev))
 	postFields := []string{"commit-msg"}
 	postFieldsOpt := []string{"rev"}
 
@@ -132,6 +133,7 @@ func (a *App) handleGetTrailPvrInfo(w rest.ResponseWriter, r *rest.Request) {
 		PostURL:            postURL,
 		PostFields:         postFields,
 		PostFieldsOpt:      postFieldsOpt,
+		StepGetUrl:         stepGetUrl,
 	}
 
 	w.WriteJson(remoteInfo)
