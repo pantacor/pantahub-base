@@ -120,7 +120,7 @@ func (a *App) handlePutStepState(w rest.ResponseWriter, r *rest.Request) {
 
 	objectList, err := ProcessObjectsInState(r.Context(), step.Owner, stateMap, autoLink, a)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error processing step objects in state:"+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error processing step objects in state: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	step.UsedObjects = objectList
@@ -132,7 +132,7 @@ func (a *App) handlePutStepState(w rest.ResponseWriter, r *rest.Request) {
 	defer cancel()
 	isDevicePublic, err := a.IsDevicePublic(ctx, step.TrailID)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error checking device is public or not:"+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error checking device is public or not: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	step.IsPublic = isDevicePublic

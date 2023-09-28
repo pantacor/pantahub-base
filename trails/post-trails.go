@@ -145,7 +145,7 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 
 	objectList, err = ProcessObjectsInState(r.Context(), newStep.Owner, initialState, autoLink, a)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error processing step objects in state"+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapper(w, "Error processing step objects in state: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	newStep.UsedObjects = objectList

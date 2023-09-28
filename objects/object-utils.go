@@ -19,6 +19,7 @@ package objects
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
@@ -60,7 +61,7 @@ func (a *App) SaveObject(parentCtx context.Context, object *Object, localS3Check
 	post := false
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
-	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 1*time.Minute)
 	defer cancel()
 
 	oldObject := Object{}
@@ -78,29 +79,26 @@ func (a *App) SaveObject(parentCtx context.Context, object *Object, localS3Check
 	}
 
 	if post {
-		ctx, cancel = context.WithTimeout(parentCtx, 5*time.Second)
+		ctx, cancel = context.WithTimeout(parentCtx, 1*time.Minute)
 		defer cancel()
 		result, err = CalcUsageAfterPost(ctx, object.Owner, a.mongoClient, object.ID, object.SizeInt)
 		if err != nil {
-			log.Printf("ERROR: CalcUsageAfterPost failed: %s\n", err.Error())
-			return errors.New("Error posting object")
+			return fmt.Errorf("error CalcUsageAfterPost failed: %s", err.Error())
 		}
 	} else {
-		ctx, cancel = context.WithTimeout(parentCtx, 5*time.Second)
+		ctx, cancel = context.WithTimeout(parentCtx, 1*time.Minute)
 		defer cancel()
 		result, err = CalcUsageAfterPut(ctx, object.Owner, a.mongoClient, object.ID, object.SizeInt)
 		if err != nil {
-			log.Printf("ERROR: CalcUsageAfterPut failed: %s\n", err.Error())
-			return errors.New("Error posting object")
+			return fmt.Errorf("error CalcUsageAfterPut failed: %s", err.Error())
 		}
 	}
 
-	ctx, cancel = context.WithTimeout(parentCtx, 5*time.Second)
+	ctx, cancel = context.WithTimeout(parentCtx, 1*time.Minute)
 	defer cancel()
 	quota, err := a.GetDiskQuota(ctx, object.Owner)
 	if err != nil {
-		log.Println("Error to calc diskquota: " + err.Error())
-		return errors.New("Error to calc quota")
+		return fmt.Errorf("error to calc diskquota: %s", err.Error())
 	}
 
 	if result.Total > quota {
@@ -123,7 +121,7 @@ func (a *App) SaveObject(parentCtx context.Context, object *Object, localS3Check
 
 	updateOptions := options.Update()
 	updateOptions.SetUpsert(true)
-	ctx, cancel = context.WithTimeout(parentCtx, 5*time.Second)
+	ctx, cancel = context.WithTimeout(parentCtx, 1*time.Minute)
 	defer cancel()
 	_, err = collection.UpdateOne(
 		ctx,
@@ -294,7 +292,7 @@ func (a *App) FindPublicObjectOwner(parentCtx context.Context, sha string, notOw
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_public_steps")
 
-	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 1*time.Minute)
 	defer cancel()
 
 	publicStep := map[string]interface{}{}
@@ -323,7 +321,7 @@ func (a *App) FindObjectByShaByOwner(
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 
-	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 1*time.Minute)
 	defer cancel()
 
 	err := collection.FindOne(ctx, bson.M{

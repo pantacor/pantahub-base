@@ -17,6 +17,7 @@
 package objects
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -115,7 +116,8 @@ func (a *App) handlePostObject(w rest.ResponseWriter, r *rest.Request) {
 	}
 	newObject.StorageID = MakeStorageID(ownerStr, shabyte)
 
-	resolvedObject, err := a.ResolveObjectWithBacking(r.Context(), ownerStr, newObject.Sha)
+	childCtx := context.WithoutCancel(r.Context())
+	resolvedObject, err := a.ResolveObjectWithBacking(childCtx, ownerStr, newObject.Sha)
 
 	if err != nil && err != ErrNoBackingFile && err != mongo.ErrNoDocuments {
 		utils.RestErrorWrapper(w, "Error resolving Object "+err.Error(), http.StatusBadRequest)
@@ -132,13 +134,15 @@ func (a *App) handlePostObject(w rest.ResponseWriter, r *rest.Request) {
 
 	// here we had no backing file to link to and no object at all
 	// we will try to create a link to an object available in a public step
-	resolvedObject, err = a.ResolveObjectWithLinks(r.Context(), ownerStr, newObject.Sha, autoLink)
+	childCtx = context.WithoutCancel(r.Context())
+	resolvedObject, err = a.ResolveObjectWithLinks(childCtx, ownerStr, newObject.Sha, autoLink)
 
 	// if this was possible, we use this object with adjusted Name from newObject
 	// and store it in our object collection
 	if err == nil {
 		resolvedObject.ObjectName = newObject.ObjectName
-		err = a.SaveObject(r.Context(), resolvedObject, false)
+		childCtx = context.WithoutCancel(r.Context())
+		err = a.SaveObject(childCtx, resolvedObject, false)
 		if err != nil {
 			utils.RestErrorWrapper(w, "Error saving our linkified object "+err.Error(), http.StatusInternalServerError)
 			return
@@ -153,7 +157,8 @@ func (a *App) handlePostObject(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	err = a.SaveObject(r.Context(), &newObject, false)
+	childCtx = context.WithoutCancel(r.Context())
+	err = a.SaveObject(childCtx, &newObject, false)
 	if err != nil {
 		if utils.IsUserError(err) {
 			utils.RestErrorWrapperUser(w, err.Error(), err.Error(), http.StatusInternalServerError)
