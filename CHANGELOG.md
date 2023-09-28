@@ -1,4 +1,28 @@
 
+<a name="044"></a>
+## [044](https://gitlab.com/pantacor/pantahub-base/compare/043...044) (2023-09-28)
+
+### Feature
+
+* **.pvrremote:** add step get url to /trails/.pvrremote
+* **.pvrremote:** add step get url to .pvrremote
+* **pvrremote:** add get step revision url to response
+
+### Fix
+
+* **callbacks:** do not fail if state values aren't objects
+* **mail:** add mailgun url from environment
+* **objects:** SaveObject should use parent context to save instead of 5 minutes timeout
+* **trails:** create a children context for database actions
+* **trails:** create a children context for database actions
+
+### Refactor
+
+* **email:** update mailgun library and go version
+* **email:** add messeges to trace errors with mailgun
+* **email:** add messeges to trace errors with mailgun
+
+
 <a name="043"></a>
 ## [043](https://gitlab.com/pantacor/pantahub-base/compare/042-rev1...043) (2023-05-24)
 
