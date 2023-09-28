@@ -72,7 +72,7 @@ func (a *App) handlePutPublic(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	deviceObjectID, err := primitive.ObjectIDFromHex(putID)
 	if err != nil {
@@ -97,7 +97,7 @@ func (a *App) handlePutPublic(w rest.ResponseWriter, r *rest.Request) {
 	newDevice.IsPublic = true
 	newDevice.TimeModified = time.Now()
 
-	ctx, cancel = context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	updateOptions := options.Update()
 	updateOptions.SetUpsert(true)
@@ -157,7 +157,7 @@ func (a *App) handleDeletePublic(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	deviceObjectID, err := primitive.ObjectIDFromHex(putID)
@@ -183,7 +183,7 @@ func (a *App) handleDeletePublic(w rest.ResponseWriter, r *rest.Request) {
 	newDevice.IsPublic = false
 	newDevice.TimeModified = time.Now()
 
-	ctx, cancel = context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	updateOptions := options.Update()
 	updateOptions.SetUpsert(true)

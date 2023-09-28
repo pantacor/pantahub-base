@@ -97,7 +97,7 @@ func (a *App) handleHealthz(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 	val := map[string]interface{}{}
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	err := collection.FindOne(ctx, bson.M{}).Decode(&val)
 	if err != nil && err != mongo.ErrNoDocuments {

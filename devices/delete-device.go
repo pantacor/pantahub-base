@@ -62,7 +62,7 @@ func (a *App) handleDeleteDevice(w rest.ResponseWriter, r *rest.Request) {
 
 	device := Device{}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	deviceObjectID, err := primitive.ObjectIDFromHex(delID)
 	if err != nil {

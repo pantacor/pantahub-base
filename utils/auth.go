@@ -177,7 +177,7 @@ func validMAC(message, messageMAC, key []byte) bool {
 func getToken(pctx context.Context, tokenID, owner string, col *mongo.Collection) (*PantahubDevicesJoinToken, error) {
 	res := &PantahubDevicesJoinToken{}
 
-	ctx, cancel := context.WithTimeout(pctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(pctx, 10*time.Second)
 	defer cancel()
 
 	cleanToken := strings.TrimSuffix(tokenID, "\n")

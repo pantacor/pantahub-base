@@ -50,7 +50,7 @@ func CreateService(client *mongo.Client, db string) TrailService {
 
 func (s *TService) GetStepRev(ctx context.Context, trailID string, rev string) (step *trailmodels.Step, rerr *utils.RError) {
 	coll := s.db.Collection("pantahub_steps")
-	ctxi, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctxi, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	findOneOptions := options.FindOne()
@@ -100,7 +100,7 @@ func (s *TService) GetTrailObjectsWithAccess(
 	frags string,
 ) (owa []objects.ObjectWithAccess, rerr *utils.RError) {
 	coll := s.db.Collection("pantahub_steps")
-	ctxi, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctxi, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	var err error
@@ -186,7 +186,7 @@ func (s *TService) GetTrailObjectsWithAccess(
 		storageID := objects.MakeStorageID(step.Owner, sha)
 		var newObject objects.Object
 
-		ctxi, cancel := context.WithTimeout(ctx, 5*time.Second)
+		ctxi, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 
 		err = collection.

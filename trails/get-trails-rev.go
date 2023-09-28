@@ -87,7 +87,7 @@ func (a *App) handleGetStep(w rest.ResponseWriter, r *rest.Request) {
 		"garbage": bson.M{"$ne": true},
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	findOptions := options.FindOne()

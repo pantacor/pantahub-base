@@ -100,7 +100,7 @@ func (a *App) handleGetAccounts(w rest.ResponseWriter, r *rest.Request) {
 	resultSet := make([]accounts.AccountPublic, 0)
 	findOptions := options.Find()
 	findOptions.SetNoCursorTimeout(true)
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	// NO ADMIN: FILTER
@@ -161,7 +161,7 @@ func (a *App) handlePostSession(w rest.ResponseWriter, r *rest.Request) {
 	sessionAccount.TimeModified = sessionAccount.TimeCreated
 
 	opts := options.InsertOneOptions{}
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
 	_, err := collection.InsertOne(
@@ -256,7 +256,7 @@ func (a *App) handlePostAccount(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	// Validate if user already exist
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
 
@@ -332,7 +332,7 @@ func (a *App) handlePostAccount(w rest.ResponseWriter, r *rest.Request) {
 
 	updateOptions := options.Update()
 	updateOptions.SetUpsert(true)
-	ctx, cancel = context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	_, err = collection.UpdateOne(
 		ctx,
@@ -386,7 +386,7 @@ func (a *App) handleGetProfile(w rest.ResponseWriter, r *rest.Request) {
 
 	if account, ok = accountsdata.DefaultAccounts[accountPrn]; !ok {
 		col := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
-		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
 		err := col.FindOne(ctx, bson.M{"prn": accountPrn}).Decode(&account)
 		// always unset credentials so we dont end up sending them out
@@ -432,7 +432,7 @@ func (a *App) handleVerify(w rest.ResponseWriter, r *rest.Request) {
 	r.ParseForm()
 	putID := r.FormValue("id")
 
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	ObjectID, err := primitive.ObjectIDFromHex(putID)
 	if err != nil {
@@ -546,7 +546,7 @@ func (a *App) handlePasswordReset(writer rest.ResponseWriter, r *rest.Request) {
 		"garbage": bson.M{"$ne": true},
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	account := accounts.AccountPublic{}
@@ -583,7 +583,7 @@ func (a *App) handlePasswordReset(writer rest.ResponseWriter, r *rest.Request) {
 	}
 
 	updateOptions := options.Update()
-	ctx, cancel = context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	_, err = collection.UpdateOne(
@@ -628,7 +628,7 @@ func (a *App) handlePasswordRecovery(writer rest.ResponseWriter, r *rest.Request
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	account := accounts.AccountPublic{}
@@ -778,7 +778,7 @@ func (a *App) handlePostToken(writer rest.ResponseWriter, r *rest.Request) {
 		Claims:  tokenClaims,
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	_, err = collection.InsertOne(ctx, &tokenStore)
 	if err != nil {

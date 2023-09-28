@@ -78,7 +78,7 @@ func (a *App) handlePutStepState(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	err := coll.FindOne(ctx, bson.M{
 		"_id":             trailID + "-" + rev,
@@ -118,7 +118,9 @@ func (a *App) handlePutStepState(w rest.ResponseWriter, r *rest.Request) {
 		autoLink = false
 	}
 
-	objectList, err := ProcessObjectsInState(r.Context(), step.Owner, stateMap, autoLink, a)
+	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	objectList, err := ProcessObjectsInState(ctx, step.Owner, stateMap, autoLink, a)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error processing step objects in state: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -128,7 +130,7 @@ func (a *App) handlePutStepState(w rest.ResponseWriter, r *rest.Request) {
 
 	step.TimeModified = time.Now()
 
-	ctx, cancel = context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	isDevicePublic, err := a.IsDevicePublic(ctx, step.TrailID)
 	if err != nil {
@@ -137,7 +139,7 @@ func (a *App) handlePutStepState(w rest.ResponseWriter, r *rest.Request) {
 	}
 	step.IsPublic = isDevicePublic
 
-	ctx, cancel = context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	updateResult, err := coll.UpdateOne(
 		ctx,

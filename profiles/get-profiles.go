@@ -119,7 +119,7 @@ func (a *App) handleGetProfiles(w rest.ResponseWriter, r *rest.Request) {
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	cur, err := collection.Find(ctx, query, findOptions)
 	if err != nil {

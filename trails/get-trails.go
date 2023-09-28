@@ -79,7 +79,7 @@ func (a *App) handleGetTrails(w rest.ResponseWriter, r *rest.Request) {
 
 	findOptions := options.Find()
 	findOptions.SetNoCursorTimeout(true)
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	cur, err := coll.Find(ctx, bson.M{
 		ownerField: owner,

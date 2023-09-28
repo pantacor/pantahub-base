@@ -95,7 +95,7 @@ func (a *App) getLatestStepRev(pctx context.Context, trailID primitive.ObjectID)
 	}
 
 	step := &trailmodels.Step{}
-	ctx, cancel := context.WithTimeout(pctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(pctx, 10*time.Second)
 	defer cancel()
 	findOneOptions := options.FindOne()
 	findOneOptions.SetSort(bson.M{"rev": -1})
@@ -143,7 +143,7 @@ func (a *App) handlePutStepsObject(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	err := coll.FindOne(ctx, bson.M{
 		"_id":     trailID + "-" + rev,
@@ -179,7 +179,7 @@ func (a *App) handlePutStepsObject(w rest.ResponseWriter, r *rest.Request) {
 
 	storageID := objects.MakeStorageID(step.Owner, sha)
 
-	ctx, cancel = context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	err = collection.FindOne(ctx, bson.M{
 		"_id":     storageID,
@@ -239,7 +239,7 @@ func (a *App) handlePutStepsObject(w rest.ResponseWriter, r *rest.Request) {
 			http.StatusPreconditionFailed)
 	}
 
-	ctx, cancel = context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	updateOptions := options.Update()
@@ -338,16 +338,18 @@ func GetStateObjects(
 			return nil, fmt.Errorf("state_object: Object is not a string[%s: %s] \n state details: \n %s", key, sha, statejson)
 		}
 
-		object, err := objectsApp.ResolveObjectWithLinks(pctx, owner, sha, autoLink)
+		ctx := context.WithoutCancel(pctx)
+		object, err := objectsApp.ResolveObjectWithLinks(ctx, owner, sha, autoLink)
 
 		if err != nil {
 			return nil, err
 		}
 
 		// Save object
-		err = objectsApp.SaveObject(pctx, object, false)
+		ctx = context.WithoutCancel(pctx)
+		err = objectsApp.SaveObject(ctx, object, false)
 		if err != nil {
-			return nil, errors.New("Error saving object:" + err.Error())
+			return nil, errors.New("Error saving object: " + err.Error())
 		}
 
 		if _, ok := objMap[object.StorageID]; !ok {
@@ -366,14 +368,16 @@ func RestoreObjects(
 
 	for _, storageSha := range objectList {
 
-		result, err := IsObjectGarbage(pctx, storageSha, a)
+		ctx := context.WithoutCancel(pctx)
+		result, err := IsObjectGarbage(ctx, storageSha, a)
 		if err != nil {
-			return errors.New("Error checking garbage object:" + err.Error() + "[sha:" + storageSha + "]")
+			return errors.New("Error checking garbage object: " + err.Error() + "[sha:" + storageSha + "]")
 		}
 		if result {
-			err := UnMarkObjectAsGarbage(pctx, storageSha, a)
+			ctx := context.WithoutCancel(pctx)
+			err := UnMarkObjectAsGarbage(ctx, storageSha, a)
 			if err != nil {
-				return errors.New("Error unmarking object as garbage:" + err.Error() + "[sha:" + storageSha + "]")
+				return errors.New("Error unmarking object as garbage: " + err.Error() + "[sha:" + storageSha + "]")
 			}
 		}
 	}
@@ -386,17 +390,18 @@ func IsObjectGarbage(pctx context.Context, ObjectID string, a *App) (
 	error,
 ) {
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
-	ctx, cancel := context.WithTimeout(pctx, 5*time.Second)
-	defer cancel()
 
-	objectCount, err := collection.CountDocuments(ctx,
+	ctx, cancel := context.WithTimeout(pctx, 10*time.Second)
+	defer cancel()
+	objectCount, err := collection.CountDocuments(
+		ctx,
 		bson.M{
 			"_id":     ObjectID,
 			"garbage": true,
 		},
 	)
 	if err != nil {
-		return false, errors.New("Error Finding Object:" + err.Error())
+		return false, errors.New("Error Finding Object: " + err.Error())
 	}
 	return (objectCount == 1), nil
 }
@@ -404,7 +409,7 @@ func IsObjectGarbage(pctx context.Context, ObjectID string, a *App) (
 // UnMarkObjectAsGarbage : to unmark object as garbage
 func UnMarkObjectAsGarbage(pctx context.Context, ObjectID string, a *App) error {
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
-	ctx, cancel := context.WithTimeout(pctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(pctx, 10*time.Second)
 	defer cancel()
 	updateResult, err := collection.UpdateOne(
 		ctx,

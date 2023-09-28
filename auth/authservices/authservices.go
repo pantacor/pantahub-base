@@ -169,7 +169,7 @@ func AuthenticatePayloadFactory(mongoClient *mongo.Client, jwtMiddleware *jwt.JW
 		}
 
 		if payload == nil {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			payload, err := apps.GetAppPayload(ctx, userId, mongoClient.Database(utils.MongoDb))
 			if err != nil {
@@ -214,7 +214,7 @@ func GetAccount(prnEmailNick string, mongoClient *mongo.Client) (accounts.Accoun
 	//  - id (pure and with prn format
 	//  - email
 	//  - nick
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if utils.IsEmail(prnEmailNick) {
 		err = c.FindOne(ctx, bson.M{"email": prnEmailNick}).Decode(&account)
@@ -287,7 +287,7 @@ func DeviceAuth(deviceID string, secret string, mongoClient *mongo.Client) bool 
 	}
 
 	device := devices.Device{}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	deviceObjectID, err := primitive.ObjectIDFromHex(mgoID.Hex())
 	if err != nil {
@@ -317,7 +317,7 @@ func DevicePayload(deviceID string, mongoClient *mongo.Client) map[string]interf
 	}
 
 	device := devices.Device{}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	deviceObjectID, err := primitive.ObjectIDFromHex(mgoID.Hex())
 	if err != nil {

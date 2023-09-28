@@ -70,7 +70,7 @@ func (a *App) handlePutStep(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	err := collection.FindOne(ctx,
 		bson.M{
@@ -149,7 +149,7 @@ func (a *App) SavePublicStep(ctx context.Context, step *trailmodels.Step, public
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_public_steps")
 
-	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctxC, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	updateOptions := options.Update()
@@ -170,7 +170,7 @@ func (a *App) MarkStepAsProcessed(ctx context.Context, ID string) error {
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
-	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctxC, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	_, err := collection.UpdateOne(
@@ -233,7 +233,7 @@ func (a *App) FindPublicStep(ctx context.Context, StepID string, publicStep *Pub
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_public_steps")
 
-	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctxC, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	err := collection.FindOne(ctxC, bson.M{
 		"step_id": StepID,
@@ -247,7 +247,7 @@ func (a *App) IsObjectExistsInDb(ctx context.Context, Sha string) (bool, error) 
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 
-	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctxC, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	count, err := collection.CountDocuments(ctxC, bson.M{

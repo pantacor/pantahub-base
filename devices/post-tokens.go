@@ -114,7 +114,7 @@ func (a *App) handlePostTokens(w rest.ResponseWriter, r *rest.Request) {
 	req.TimeModified = req.TimeCreated
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	_, err = collection.InsertOne(ctx, &req)
 

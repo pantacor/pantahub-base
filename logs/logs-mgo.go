@@ -277,7 +277,7 @@ func (s *mgoLogger) getLogs(parentCtx context.Context, start int64, page int64, 
 	} else {
 		findOptions.SetSort(bson.M{"time-created": -1})
 	}
-	ctx, cancel := context.WithTimeout(parentCtx, 30*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 	cur, err := collLogs.Find(ctx, findFilter, findOptions)
 	if err != nil {
@@ -295,7 +295,7 @@ func (s *mgoLogger) getLogs(parentCtx context.Context, start int64, page int64, 
 		}
 		entries = append(entries, result)
 	}
-	ctx, cancel = context.WithTimeout(parentCtx, 5*time.Second)
+	ctx, cancel = context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 	count, err := collLogs.CountDocuments(ctx, findFilter)
 	if err != nil {
@@ -324,7 +324,7 @@ func (s *mgoLogger) postLogs(parentCtx context.Context, e []Entry) error {
 	for i, v := range e {
 		arr[i] = v
 	}
-	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 
 	_, err := collLogs.InsertMany(

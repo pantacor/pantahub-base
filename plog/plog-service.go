@@ -99,7 +99,7 @@ func (a *App) handleGetPlogPosts(w rest.ResponseWriter, r *rest.Request) {
 	plogPosts := make([]Post, 0)
 	findOptions := options.Find()
 	findOptions.SetNoCursorTimeout(true)
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	cur, err := collPlogPosts.Find(ctx, bson.M{
 		"owner": owner,

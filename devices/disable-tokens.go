@@ -73,7 +73,7 @@ func (a *App) handleDisableTokens(w rest.ResponseWriter, r *rest.Request) {
 	tokenIDBson := bson.ObjectIdHex(tokenID)
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	updateOptions := options.Update()
 	updateOptions.SetUpsert(true)

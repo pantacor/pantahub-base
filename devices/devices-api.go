@@ -188,7 +188,7 @@ func MarkDeviceAsGarbage(
 
 // LookupDeviceNick : Lookup Device Nicks and return device id
 func (a *App) LookupDeviceNick(ctx context.Context, owner string, deviceID string) (*primitive.ObjectID, error) {
-	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctxC, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
@@ -214,7 +214,7 @@ func (a *App) LookupDeviceNick(ctx context.Context, owner string, deviceID strin
 // FindDeviceByID finds the device by id
 func (a *App) FindDeviceByID(ctx context.Context, ID primitive.ObjectID, device *Device) error {
 
-	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctxC, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {

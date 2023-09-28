@@ -146,7 +146,7 @@ func (a *App) handleGetSteps(w rest.ResponseWriter, r *rest.Request) {
 
 	querymongo.SetMongoPagination(query, sort, asp.Pagination, findOptions)
 
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	cur, err := coll.Find(ctx, query, findOptions)
 	if err != nil {

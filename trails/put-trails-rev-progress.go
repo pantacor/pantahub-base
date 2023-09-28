@@ -100,7 +100,7 @@ func (a *App) handlePutStepProgress(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	updateResult, err := coll.UpdateOne(
 		ctx,
@@ -125,7 +125,7 @@ func (a *App) handlePutStepProgress(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "Cannot update step progress "+err.Error(), http.StatusForbidden)
 		return
 	}
-	ctx, cancel = context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	trailObjectID, err := primitive.ObjectIDFromHex(trailID)
 	if err != nil {

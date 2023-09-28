@@ -75,7 +75,7 @@ func (a *App) handleGetTrail(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "Error getting trail public:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	trailObjectID, err := primitive.ObjectIDFromHex(getID)

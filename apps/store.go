@@ -55,7 +55,7 @@ func CreateOrUpdateApp(ctx context.Context, tpApp *TPApp, database *mongo.Databa
 	updateOptions := options.Update()
 	updateOptions.SetUpsert(true)
 
-	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctxC, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	_, err := collection.UpdateOne(
@@ -75,7 +75,7 @@ func LoginAsApp(serviceID, secret string, database *mongo.Database) (*TPApp, err
 		return nil, errors.New("error with Database connectivity")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	findQuery := bson.M{
@@ -140,7 +140,7 @@ func SearchApps(ctx context.Context, owner string, id string, database *mongo.Da
 		}
 	}
 
-	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctxC, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	cur, err := collection.Find(ctxC, findQuery)
@@ -177,7 +177,7 @@ func SearchExposedScopes(ctx context.Context, database *mongo.Database) ([]utils
 		},
 	}
 
-	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctxC, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	cur, err := collection.Find(ctxC, findQuery)

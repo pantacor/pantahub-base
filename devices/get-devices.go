@@ -87,7 +87,7 @@ func (a *App) handleGetDevices(w rest.ResponseWriter, r *rest.Request) {
 
 	findOptions := options.Find()
 	findOptions.SetNoCursorTimeout(true)
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	query := bson.M{
 		"garbage": bson.M{"$ne": true},
@@ -282,7 +282,7 @@ func (a *App) handleGetDevice(w rest.ResponseWriter, r *rest.Request) {
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	err = collection.FindOne(ctx, query).Decode(&device)
 	if err != nil {
@@ -315,7 +315,7 @@ func (a *App) handleGetDevice(w rest.ResponseWriter, r *rest.Request) {
 		// first check default accounts like user1, user2, etc...
 		ownerAccount, ok := accountsdata.DefaultAccounts[device.Owner]
 		if !ok {
-			ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+			ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 			defer cancel()
 			err := collectionAccounts.FindOne(ctx,
 				bson.M{"prn": device.Owner}).
@@ -348,7 +348,7 @@ func (a *App) GetUserAccountByNick(parentCtx context.Context, nick string) (acco
 
 		collectionAccounts := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
 
-		ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
+		ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 		defer cancel()
 		err := collectionAccounts.FindOne(ctx,
 			bson.M{"nick": nick}).
@@ -371,7 +371,7 @@ func (a *App) getProfileMetaData(parentCtx context.Context, prn string) (map[str
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_profiles")
-	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 
 	err := collection.FindOne(ctx, bson.M{"prn": prn}, &queryOptions).Decode(profile)

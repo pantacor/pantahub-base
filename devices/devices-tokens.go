@@ -55,7 +55,7 @@ func (a *App) getBase64AutoTokenInfo(ctx context.Context, tokenBase64 string) (*
 	res := utils.PantahubDevicesJoinToken{}
 
 	col := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
-	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctxC, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	err = col.FindOne(ctxC, bson.M{"tokensha": tokenSha}).Decode(&res)
 	if err != nil {

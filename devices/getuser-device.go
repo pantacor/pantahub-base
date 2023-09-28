@@ -98,7 +98,7 @@ func (a *App) handleGetUserDevice(w rest.ResponseWriter, r *rest.Request) {
 			return
 		}
 
-		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
 		err := collAccounts.FindOne(ctx,
 			bson.M{"nick": usernick}).
@@ -118,7 +118,7 @@ func (a *App) handleGetUserDevice(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	err := collDevices.FindOne(ctx, bson.M{
 		"owner":   account.Prn,

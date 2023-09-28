@@ -37,7 +37,7 @@ func getUserByEmail(ctx context.Context, email string, db *mongo.Collection) (*a
 		return nil, errors.New("error with Database connectivity")
 	}
 
-	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctxC, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	err := db.FindOne(ctxC,
@@ -90,7 +90,7 @@ func createUser(ctx context.Context, email, nick, password, challenge string, db
 		TimeModified:   createdAt,
 	}
 
-	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctxC, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	_, err = db.InsertOne(ctxC, newAccount)

@@ -41,7 +41,7 @@ func setup(t *testing.T) {
 
 	// Count all to check if we can talk to DB
 	collection := mongoClient.Database(utils.MongoDb).Collection(collectionSubscription)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_, err = collection.CountDocuments(ctx,
 		bson.M{},
@@ -53,7 +53,7 @@ func setup(t *testing.T) {
 		return
 	}
 
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	err = mongoClient.Database(utils.MongoDb).Collection(collectionSubscription).Drop(ctx)
 	if err != nil {

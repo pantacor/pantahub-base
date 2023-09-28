@@ -76,7 +76,7 @@ func (a *App) handlePostStepsObject(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "Unknown AuthType", http.StatusBadRequest)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	err := coll.FindOne(ctx, bson.M{
 		"_id":     trailID + "-" + rev,

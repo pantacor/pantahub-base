@@ -54,7 +54,7 @@ func (device *Device) save(ctx context.Context, collection *mongo.Collection) (*
 	if collection == nil {
 		return nil, errors.New("Error with Database connectivity")
 	}
-	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctxC, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	updateOptions := options.Update()
@@ -81,7 +81,7 @@ func GetDeviceByID(ctx context.Context, id string, collection *mongo.Collection)
 		return nil, err
 	}
 
-	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctxC, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	err = collection.FindOne(ctxC,

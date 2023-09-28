@@ -91,7 +91,7 @@ func (a *App) handleGetTrailStepSummary(w rest.ResponseWriter, r *rest.Request) 
 	}
 
 	summary := trailmodels.TrailSummary{}
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	err := summaryCol.FindOne(ctx, query).Decode(&summary)
 

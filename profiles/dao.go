@@ -63,7 +63,7 @@ func (a *App) setIndexes() error {
 // ExistsInProfiles : Check if a user details exists in profiles or not
 func (a *App) ExistsInProfiles(parentCtx context.Context, ID primitive.ObjectID) (bool, error) {
 	collection := a.mongoClient.Database(utils.MongoDb).Collection(CollectionName)
-	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 	count, err := collection.CountDocuments(ctx,
 		bson.M{
@@ -83,7 +83,7 @@ func (a *App) getProfile(parentCtx context.Context, prn string, projection map[s
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection(CollectionName)
-	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 
 	err := collection.FindOne(ctx, bson.M{"prn": prn}, &queryOptions).Decode(profile)
@@ -93,7 +93,7 @@ func (a *App) getProfile(parentCtx context.Context, prn string, projection map[s
 // HavePublicDevices : Check if a user have public devices or not
 func (a *App) HavePublicDevices(parentCtx context.Context, prn string) (bool, error) {
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
-	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 
 	count, err := collection.CountDocuments(ctx,
@@ -121,7 +121,7 @@ func (a *App) MakeUserProfile(parentCtx context.Context, account *accounts.Accou
 		Garbage:           false,
 	}
 	collection := a.mongoClient.Database(utils.MongoDb).Collection(CollectionName)
-	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 
 	_, err := collection.InsertOne(ctx, &profile)
@@ -136,7 +136,7 @@ func (a *App) getUserAccount(parentCtx context.Context, accountNick string, by s
 	}
 	account := &accounts.Account{}
 	col := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
-	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 
 	search := bson.M{}
@@ -150,7 +150,7 @@ func (a *App) getUserAccount(parentCtx context.Context, accountNick string, by s
 func (a *App) MarkProfileAsPrivate(parentCtx context.Context, prn string) error {
 	collection := a.mongoClient.Database(utils.MongoDb).Collection(CollectionName)
 
-	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 	_, err := collection.UpdateOne(
 		ctx,
@@ -173,7 +173,7 @@ func (a *App) updateProfile(parentCtx context.Context, accountPrn string, newPro
 	newProfile.Nick = account.Nick
 
 	col := a.mongoClient.Database(utils.MongoDb).Collection(CollectionName)
-	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 
 	err = col.FindOne(ctx, bson.M{"prn": accountPrn}).Decode(&profile)
@@ -187,7 +187,7 @@ func (a *App) updateProfile(parentCtx context.Context, accountPrn string, newPro
 		return profile, err
 	}
 
-	ctx, cancel = context.WithTimeout(parentCtx, 5*time.Second)
+	ctx, cancel = context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 	_, err = col.UpdateOne(
 		ctx,
@@ -212,7 +212,7 @@ func (a *App) updateProfileMeta(parentCtx context.Context, accountPrn string, me
 	}
 
 	col := a.mongoClient.Database(utils.MongoDb).Collection(CollectionName)
-	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 
 	err = col.FindOne(ctx, bson.M{"prn": accountPrn}).Decode(&profile)
@@ -220,7 +220,7 @@ func (a *App) updateProfileMeta(parentCtx context.Context, accountPrn string, me
 		return profile, err
 	}
 
-	ctx, cancel = context.WithTimeout(parentCtx, 5*time.Second)
+	ctx, cancel = context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 	_, err = col.UpdateOne(
 		ctx,

@@ -35,7 +35,7 @@ func (a *App) isTrailPublic(pctx context.Context, trailID string) (bool, error) 
 	}
 
 	trail := trailmodels.Trail{}
-	ctx, cancel := context.WithTimeout(pctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(pctx, 10*time.Second)
 	defer cancel()
 	trailObjectID, err := primitive.ObjectIDFromHex(trailID)
 	if err != nil {
@@ -57,7 +57,7 @@ func (a *App) isTrailPublic(pctx context.Context, trailID string) (bool, error) 
 	}
 
 	device := devices.Device{}
-	ctx, cancel = context.WithTimeout(pctx, 5*time.Second)
+	ctx, cancel = context.WithTimeout(pctx, 10*time.Second)
 	defer cancel()
 	err = collDevices.FindOne(ctx, bson.M{
 		"prn":     trail.Device,

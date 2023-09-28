@@ -128,7 +128,7 @@ func (a *App) MarkDeviceAsProcessed(ctx context.Context, ID primitive.ObjectID) 
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
-	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctxC, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	_, err := collection.UpdateOne(
@@ -151,7 +151,7 @@ func (a *App) MarkDeviceStepsPublicFlag(ctx context.Context, ID primitive.Object
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
-	ctxC, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctxC, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	updateResult, err := collection.UpdateMany(

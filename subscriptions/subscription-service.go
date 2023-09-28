@@ -128,7 +128,7 @@ func (i subscriptionService) New(
 	}
 
 	collection := i.mongoClient.Database(utils.MongoDb).Collection(collectionSubscription)
-	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 	_, err := collection.InsertOne(
 		ctx,
@@ -154,7 +154,7 @@ func (i subscriptionService) IsAdmin(user utils.Prn) bool {
 func (i subscriptionService) Load(pctx context.Context, ID string) (Subscription, error) {
 	s := SubscriptionMgo{}
 	collection := i.mongoClient.Database(utils.MongoDb).Collection(collectionSubscription)
-	ctx, cancel := context.WithTimeout(pctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(pctx, 10*time.Second)
 	defer cancel()
 	err := collection.FindOne(ctx, bson.M{
 		"_id": ID,
@@ -170,7 +170,7 @@ func (i subscriptionService) Load(pctx context.Context, ID string) (Subscription
 func (i subscriptionService) LoadBySubject(pctx context.Context, subject utils.Prn) (Subscription, error) {
 	s := SubscriptionMgo{}
 	collection := i.mongoClient.Database(utils.MongoDb).Collection(collectionSubscription)
-	ctx, cancel := context.WithTimeout(pctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(pctx, 10*time.Second)
 	defer cancel()
 	err := collection.FindOne(ctx, bson.M{
 		"subject": subject,
@@ -218,7 +218,7 @@ func (i subscriptionService) List(
 		findOptions.SetLimit(int64(page))
 	}
 	findOptions.SetNoCursorTimeout(true)
-	ctx, cancel := context.WithTimeout(pctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(pctx, 10*time.Second)
 	defer cancel()
 	cur, err := collection.Find(ctx, query, findOptions)
 	if err != nil {
@@ -234,7 +234,7 @@ func (i subscriptionService) List(
 		subs = append(subs, result)
 	}
 
-	ctx, cancel = context.WithTimeout(pctx, 5*time.Second)
+	ctx, cancel = context.WithTimeout(pctx, 10*time.Second)
 	defer cancel()
 	count, err := collection.CountDocuments(ctx, query)
 	if err != nil {
@@ -253,7 +253,7 @@ func (i subscriptionService) List(
 
 func (i subscriptionService) Delete(pctx context.Context, sub Subscription) error {
 	collection := i.mongoClient.Database(utils.MongoDb).Collection(collectionSubscription)
-	ctx, cancel := context.WithTimeout(pctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(pctx, 10*time.Second)
 	defer cancel()
 	_, err := collection.DeleteOne(ctx, bson.M{
 		"_id": sub.GetID(),
@@ -274,7 +274,7 @@ func (i subscriptionService) Save(pctx context.Context, sub Subscription) error 
 	}
 
 	collection := i.mongoClient.Database(utils.MongoDb).Collection(collectionSubscription)
-	ctx, cancel := context.WithTimeout(pctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(pctx, 10*time.Second)
 	defer cancel()
 	_, err := collection.UpdateOne(
 		ctx,

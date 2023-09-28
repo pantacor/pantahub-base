@@ -139,7 +139,7 @@ func (app *App) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Request)
 		return
 	}
 	// XXX: prototype: for production we need to prevent posting twice!!
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	_, err = collection.InsertOne(
 		ctx,

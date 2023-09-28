@@ -108,7 +108,7 @@ func (a *App) handleGetSummary(w rest.ResponseWriter, r *rest.Request) {
 	findOptions.SetSort(bson.M{"timestamp": -1})
 	findOptions.SetLimit(5)
 	findOptions.SetNoCursorTimeout(true)
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	cur, err := summaryCol.Find(ctx, bson.M{
 		"owner":   owner,
@@ -170,7 +170,7 @@ func (a *App) handleGetSummary(w rest.ResponseWriter, r *rest.Request) {
 		QuotaStats: copySubToDashMap(sub),
 	}
 
-	ctx, cancel = context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	deviceCount, err := dCol.CountDocuments(ctx,
 		bson.M{
@@ -190,7 +190,7 @@ func (a *App) handleGetSummary(w rest.ResponseWriter, r *rest.Request) {
 
 	// quota on disk
 	resp := DiskQuotaUsageResult{}
-	ctx, cancel = context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	pipeline := []bson.M{
 		{"$match": bson.M{

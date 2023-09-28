@@ -111,7 +111,7 @@ type CursorClaim struct {
 
 // ParseDeviceString : Parse Device Nicks & Device Id's from a string and replace them with device Prn
 func (a *App) ParseDeviceString(parentCtx context.Context, owner string, devicesString string) (string, error) {
-	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {

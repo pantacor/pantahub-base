@@ -97,7 +97,7 @@ func (a *App) handlePatchUserData(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	var device Device
 	err = collection.FindOne(ctx,
@@ -192,7 +192,7 @@ func (a *App) handlePutUserData(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	deviceObjectID, err := primitive.ObjectIDFromHex(deviceID)
 	if err != nil {

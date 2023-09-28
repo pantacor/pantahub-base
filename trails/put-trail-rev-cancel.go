@@ -101,7 +101,7 @@ func (a *App) handlePutStepProgressCancel(w rest.ResponseWriter, r *rest.Request
 	stepProgress.Progress = 100
 	stepProgress.StatusMsg = "Cancel as requested by owner"
 
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	updateResult, err := coll.UpdateOne(
 		ctx,
@@ -127,7 +127,7 @@ func (a *App) handlePutStepProgressCancel(w rest.ResponseWriter, r *rest.Request
 		utils.RestErrorWrapper(w, "Cannot canel step "+err.Error(), http.StatusForbidden)
 		return
 	}
-	ctx, cancel = context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	trailObjectID, err := primitive.ObjectIDFromHex(trailID)
 	if err != nil {

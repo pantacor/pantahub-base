@@ -51,7 +51,7 @@ type state map[string]interface{}
 // @Failure 500 {object} utils.RError
 // @Router /trails [post]
 func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
-
+	rContext := context.WithoutCancel(r.Context())
 	initialState := map[string]interface{}{}
 
 	r.DecodeJsonPayload(&initialState)
@@ -98,7 +98,9 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 		autoLink = false
 	}
 
-	objectList, err := ProcessObjectsInState(r.Context(), newTrail.Owner, initialState, autoLink, a)
+	ctx, cancel := context.WithTimeout(rContext, 10*time.Second)
+	defer cancel()
+	objectList, err := ProcessObjectsInState(ctx, newTrail.Owner, initialState, autoLink, a)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error processing trail objects in factory-state:"+err.Error(), http.StatusInternalServerError)
 		return
@@ -129,7 +131,9 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 	newStep.TimeModified = now
 	newStep.IsPublic = false
 
-	isDevicePublic, err := a.IsDevicePublic(r.Context(), newStep.TrailID)
+	ctx, cancel = context.WithTimeout(rContext, 10*time.Second)
+	defer cancel()
+	isDevicePublic, err := a.IsDevicePublic(ctx, newStep.TrailID)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error checking device is public or not:"+err.Error(), http.StatusInternalServerError)
 		return
@@ -143,7 +147,9 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	objectList, err = ProcessObjectsInState(r.Context(), newStep.Owner, initialState, autoLink, a)
+	ctx, cancel = context.WithTimeout(rContext, 10*time.Second)
+	defer cancel()
+	objectList, err = ProcessObjectsInState(ctx, newStep.Owner, initialState, autoLink, a)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error processing step objects in state: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -152,7 +158,7 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 	newStep.State = utils.BsonQuoteMap(&initialState)
 
 	// XXX: prototype: for production we need to prevent posting twice!!
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(rContext, 10*time.Second)
 	defer cancel()
 	_, err = collection.InsertOne(
 		ctx,
@@ -169,7 +175,7 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
-	ctx, cancel = context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(rContext, 10*time.Second)
 	defer cancel()
 	_, err = collection.InsertOne(
 		ctx,

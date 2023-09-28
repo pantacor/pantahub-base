@@ -139,7 +139,7 @@ func (a *App) handleGetStepsObject(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "Error getting trail public:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	if isPublic {
@@ -211,7 +211,7 @@ func (a *App) handleGetStepsObject(w rest.ResponseWriter, r *rest.Request) {
 		storageID := objects.MakeStorageID(step.Owner, sha)
 
 		var newObject objects.Object
-		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
 		err = collection.FindOne(ctx, bson.M{
 			"_id":     storageID,
@@ -298,7 +298,7 @@ func (a *App) handleGetStepsObjectFile(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "Error getting trail public:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	if isPublic {
@@ -370,7 +370,7 @@ func (a *App) handleGetStepsObjectFile(w rest.ResponseWriter, r *rest.Request) {
 		storageID := objects.MakeStorageID(step.Owner, sha)
 
 		var newObject objects.Object
-		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
 		err = collection.FindOne(ctx, bson.M{
 			"_id":     storageID,

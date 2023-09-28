@@ -62,7 +62,7 @@ func CalcUsageAfterPost(parentCtx context.Context, owner string, mongoClient *mo
 
 	oCol := mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 	resp := DiskQuotaUsageResult{}
-	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 	pipeline := []bson.M{
 		{
@@ -103,7 +103,7 @@ func CalcUsageAfterPut(parentCtx context.Context, owner string, mongoClient *mon
 	oCol := mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 	resp := DiskQuotaUsageResult{}
 	// match all objects, but leave out the one we replace
-	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 	pipeline := []bson.M{
 		{
@@ -142,7 +142,7 @@ func CalcUsageAfterPut(parentCtx context.Context, owner string, mongoClient *mon
 func (a *App) FindObjectByStorageID(parentCtx context.Context, storageID string, object *Object) error {
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
-	ctx, cancel := context.WithTimeout(parentCtx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 	err := collection.FindOne(ctx,
 		bson.M{

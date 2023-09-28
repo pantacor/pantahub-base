@@ -127,7 +127,7 @@ func (s *EService) GetUserAccountByNick(ctx context.Context, nick string) (accou
 	account, ok := accountsdata.DefaultAccounts["prn:pantahub.com:auth:/"+nick]
 	if !ok {
 		collectionAccounts := s.db.Collection("pantahub_accounts")
-		ctxi, cancel := context.WithTimeout(ctx, 5*time.Second)
+		ctxi, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 
 		err := collectionAccounts.FindOne(ctxi, bson.M{"nick": nick}).Decode(&account)
@@ -160,7 +160,7 @@ func (s *EService) GetDevice(ctx context.Context, nick, owner, tokenOwner string
 		query["ispublic"] = true
 	}
 
-	ctxi, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctxi, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	err := collection.FindOne(ctxi, query).Decode(&device)

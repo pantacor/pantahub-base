@@ -71,7 +71,7 @@ func (a *App) handleGetTokens(w rest.ResponseWriter, r *rest.Request) {
 	res := []utils.PantahubDevicesJoinToken{}
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
 	findOptions := options.Find()
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	cur, err := collection.Find(ctx, bson.M{
 		"owner": caller.(string),
