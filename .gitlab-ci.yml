@@ -95,7 +95,7 @@ deploy-prod:
     - chmod +x ./kubectl && mv ./kubectl /usr/local/bin/kubectl
     - mkdir -p $HOME/.kube
     - echo -n $KUBE_CONFIG_PROD | base64 -d > $HOME/.kube/config
-    - kubectl -n api set image deploy/pantahub-base pantahub-base=$CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
+    - kubectl set image deploy/pv-prod-pantahub-base pantahub-base=$CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
   only:
     - tags
 
