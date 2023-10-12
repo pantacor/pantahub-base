@@ -55,9 +55,12 @@ import (
 // @Failure 500 {object} utils.RError
 // @Router /logs [post]
 func (a *App) handlePostLogs(w rest.ResponseWriter, r *rest.Request) {
-
+	ctx := context.WithoutCancel(r.Context())
 	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
-
+	if !ok {
+		utils.RestErrorWrapper(w, "can't read token type", http.StatusForbidden)
+		return
+	}
 	if authType != "DEVICE" {
 		utils.RestErrorWrapper(w, "Need to be logged in as DEVICE to post logs", http.StatusForbidden)
 		return
@@ -77,7 +80,7 @@ func (a *App) handlePostLogs(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	entries, err := readLogsBody(r.Context(), r.Body)
+	entries, err := readLogsBody(ctx, r.Body)
 	if err != nil {
 		utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
 		return
@@ -100,7 +103,7 @@ func (a *App) handlePostLogs(w rest.ResponseWriter, r *rest.Request) {
 		newEntries = append(newEntries, v)
 	}
 
-	ctx, cancel := context.WithCancel(r.Context())
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	err = a.backend.postLogs(ctx, newEntries)
 	if err != nil {
