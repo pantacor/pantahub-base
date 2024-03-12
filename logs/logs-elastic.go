@@ -42,6 +42,8 @@ import (
 	"gopkg.in/resty.v1"
 )
 
+const defaultTimeoutSec = 30
+
 type elasticLogEntry struct {
 	*Entry
 
@@ -106,7 +108,7 @@ func (s *elasticLogger) register() error {
 		return err
 	}
 
-	response, err := s.r().SetBody(s.template).Put(registerTemplatesURL.String())
+	response, err := s.r(defaultTimeoutSec).SetBody(s.template).Put(registerTemplatesURL.String())
 
 	if err != nil {
 		return err
@@ -128,7 +130,7 @@ func (s *elasticLogger) unregister(deleteIndex bool) error {
 		return err
 	}
 
-	response, err := s.r().Delete(registerTemplatesURL.String())
+	response, err := s.r(defaultTimeoutSec).Delete(registerTemplatesURL.String())
 
 	if err != nil {
 		return err
@@ -149,7 +151,7 @@ func (s *elasticLogger) unregister(deleteIndex bool) error {
 		return err
 	}
 
-	response, err = s.r().Delete(allIndexURL.String())
+	response, err = s.r(defaultTimeoutSec).Delete(allIndexURL.String())
 
 	if err != nil {
 		return err
@@ -260,7 +262,7 @@ func (s *elasticLogger) getLogs(pctx context.Context, start int64, page int64, b
 		queryURI.RawQuery = q1.Encode()
 	}
 
-	response, err := s.r().SetContext(pctx).SetBody(searchBody).Post(queryURI.String())
+	response, err := s.r(defaultTimeoutSec).SetContext(pctx).SetBody(searchBody).Post(queryURI.String())
 	if err != nil {
 		return nil, err
 	}
@@ -340,7 +342,7 @@ func (s *elasticLogger) getLogsByCursor(pctx context.Context, nextCursor string)
 		return nil, err
 	}
 
-	response, err := s.r().SetContext(pctx).SetBody(searchBody).Post(queryURI.String())
+	response, err := s.r(defaultTimeoutSec).SetContext(pctx).SetBody(searchBody).Post(queryURI.String())
 	if err != nil {
 		return nil, err
 	}
@@ -435,7 +437,7 @@ func (s *elasticLogger) postLogs(parentCtx context.Context, e []Entry) error {
 		}
 	}
 
-	response, err := s.r(60).
+	response, err := s.r(defaultTimeoutSec).
 		SetContext(parentCtx).
 		SetBody(buf.String()).
 		SetHeader("Content-Type", "application/x-ndjson").
