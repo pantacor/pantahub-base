@@ -63,8 +63,11 @@ type elasticLogger struct {
 	syncWrites           bool
 }
 
-func (s *elasticLogger) r() *resty.Request {
-	request := utils.RT(15)
+func (s *elasticLogger) r(timeout int) *resty.Request {
+	if timeout == 0 {
+		timeout = 15
+	}
+	request := utils.RT(timeout)
 	if s.elasticBasicAuthUser != "" {
 		request.SetBasicAuth(s.elasticBasicAuthUser, s.elasticBasicAuthPass)
 	}
@@ -432,7 +435,7 @@ func (s *elasticLogger) postLogs(parentCtx context.Context, e []Entry) error {
 		}
 	}
 
-	response, err := s.r().
+	response, err := s.r(60).
 		SetContext(parentCtx).
 		SetBody(buf.String()).
 		SetHeader("Content-Type", "application/x-ndjson").
@@ -444,10 +447,6 @@ func (s *elasticLogger) postLogs(parentCtx context.Context, e []Entry) error {
 
 	if response.StatusCode() != http.StatusOK {
 		return errors.New("WARNING: elasticsearch log entry failed " + response.Status() + "\nReturned Body: " + string(response.Body()))
-	}
-
-	if err != nil {
-		return err
 	}
 
 	return nil

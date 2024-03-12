@@ -103,8 +103,6 @@ func (a *App) handlePostLogs(w rest.ResponseWriter, r *rest.Request) {
 		newEntries = append(newEntries, v)
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 	err = a.backend.postLogs(ctx, newEntries)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error posting logs "+err.Error(), http.StatusInternalServerError)
