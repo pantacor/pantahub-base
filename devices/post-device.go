@@ -28,6 +28,7 @@ import (
 	petname "github.com/dustinkirkland/golang-petname"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"gopkg.in/mgo.v2/bson"
@@ -152,6 +153,12 @@ func (a *App) handlePostDevice(w rest.ResponseWriter, r *rest.Request) {
 
 	if err != nil {
 		log.Print(newDevice)
+		if mongo.IsDuplicateKeyError(err) {
+			userMessage := "device already exists"
+			utils.RestErrorWrapperUser(w, err.Error(), userMessage, http.StatusConflict)
+			return
+		}
+
 		utils.RestErrorWrapper(w, "Error creating device "+err.Error(), http.StatusInternalServerError)
 		return
 	}

@@ -10,6 +10,7 @@ s3-storage/
 tmp
 vendor/
 .env.*
+.data
 .vscode
 *.test_data
 .chglog
