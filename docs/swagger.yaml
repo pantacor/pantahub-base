@@ -509,6 +509,67 @@ definitions:
       subject:
         type: string
     type: object
+  tokenmodels.AuthToken:
+    properties:
+      deleted:
+        type: boolean
+      deleted-at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      owner:
+        type: string
+      owner-nick:
+        type: string
+      prn:
+        type: string
+      scopes:
+        items:
+          $ref: '#/definitions/utils.Scope'
+        type: array
+      secret:
+        type: string
+      time-created:
+        type: string
+      time-modified:
+        type: string
+      type:
+        type: string
+    type: object
+  tokenservice.AuthTokenReqPayload:
+    properties:
+      name:
+        type: string
+      scopes:
+        items:
+          $ref: '#/definitions/utils.Scope'
+        type: array
+      type:
+        type: string
+    type: object
+  tokenservice.ListOfToken:
+    properties:
+      current_page:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/tokenmodels.AuthToken'
+        type: array
+      next:
+        type: string
+      page_offset:
+        type: integer
+      page_size:
+        type: integer
+      prev:
+        type: string
+      resource:
+        type: string
+      total:
+        type: integer
+    type: object
   trailmodels.DownloadProgress:
     properties:
       objects:
@@ -559,6 +620,9 @@ definitions:
         type: string
       pvr-spec:
         description: the pvr remote protocol spec available
+        type: string
+      step-get-url:
+        description: where to get the latest step status
         type: string
     type: object
   trailmodels.Step:
@@ -3043,6 +3107,185 @@ paths:
       summary: Add a new subscription as a admin
       tags:
       - subscriptions
+  /tokens:
+    get:
+      consumes:
+      - application/json
+      description: List tokens for a owner
+      parameters:
+      - description: Owner
+        in: query
+        name: owner
+        required: true
+        type: string
+      - description: Limit
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      - description: Sort
+        in: query
+        name: sort
+        type: string
+      - description: CreatedAt
+        in: query
+        name: createdAt
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/tokenservice.ListOfToken'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      summary: List tokens for a owner
+      tags:
+      - tokens
+  /tokens/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a token for a user
+      parameters:
+      - default: Bearer <Add access token here>
+        description: Insert your access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Token ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a token for a user
+      tags:
+      - tokens
+    get:
+      consumes:
+      - application/json
+      description: get a token for a user
+      parameters:
+      - default: Bearer <Add access token here>
+        description: Insert your access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Token ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/tokenmodels.AuthToken'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: get a token for a user
+      tags:
+      - tokens
+  /tokens/create:
+    post:
+      consumes:
+      - application/json
+      description: Create a new token for a user
+      parameters:
+      - default: Bearer <Add access token here>
+        description: Insert your access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Create Token Request
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/tokenservice.AuthTokenReqPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/tokenmodels.AuthToken'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new token for a user
+      tags:
+      - tokens
   /trails:
     get:
       consumes:

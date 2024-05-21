@@ -44,6 +44,7 @@ import (
 	"gitlab.com/pantacor/pantahub-base/plog"
 	"gitlab.com/pantacor/pantahub-base/profiles"
 	"gitlab.com/pantacor/pantahub-base/subscriptions"
+	"gitlab.com/pantacor/pantahub-base/tokens"
 	"gitlab.com/pantacor/pantahub-base/trails"
 	"gitlab.com/pantacor/pantahub-base/utils"
 
@@ -184,6 +185,10 @@ func DoInit() {
 	{
 		app := exports.New(defaultJwtMiddleware, mongoClient)
 		http.Handle("/exports/", http.StripPrefix("/exports", app.API.MakeHandler()))
+	}
+	{
+		app := tokens.New(defaultJwtMiddleware, mongoClient)
+		http.Handle("/tokens/", http.StripPrefix("/tokens", app.API.MakeHandler()))
 	}
 
 	var fservermux FileUploadServer

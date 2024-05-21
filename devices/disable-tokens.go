@@ -18,15 +18,16 @@ package devices
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
-
-	"gopkg.in/mgo.v2/bson"
 )
 
 // handleDisableTokens Disable a device token in order to be unable to used as authetication
@@ -70,14 +71,20 @@ func (a *App) handleDisableTokens(w rest.ResponseWriter, r *rest.Request) {
 
 	r.ParseForm()
 	tokenID := r.PathParam("id")
-	tokenIDBson := bson.ObjectIdHex(tokenID)
+	tokenIDBson, err := primitive.ObjectIDFromHex(tokenID)
+	if err != nil {
+		message := fmt.Sprintf("error decoding id to ObjectID: %s -- %s", tokenID, err.Error())
+		utils.RestErrorWrapper(w, message, http.StatusInternalServerError)
+		return
+	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
+
 	updateOptions := options.Update()
 	updateOptions.SetUpsert(true)
-	_, err := collection.UpdateOne(
+	_, err = collection.UpdateOne(
 		ctx,
 		bson.M{
 			"_id":   tokenIDBson,

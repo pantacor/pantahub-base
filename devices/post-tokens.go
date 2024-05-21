@@ -18,9 +18,9 @@ package devices
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
-	"math/rand"
 	"net/http"
 	"time"
 

@@ -65,7 +65,8 @@ func (a *App) handleGetDevices(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+	var authType accounts.AccountType
+	authTypeValue, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
 	if !ok {
 		err := ModelError{}
 		err.Code = http.StatusInternalServerError
@@ -74,6 +75,8 @@ func (a *App) handleGetDevices(w rest.ResponseWriter, r *rest.Request) {
 		w.WriteHeader(int(err.Code))
 		w.WriteJson(err)
 		return
+	} else {
+		authType = accounts.AccountType(authTypeValue.(string))
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
@@ -122,7 +125,7 @@ func (a *App) handleGetDevices(w rest.ResponseWriter, r *rest.Request) {
 		}
 
 	} else {
-		if authType == "USER" || authType == "SESSION" {
+		if authType == accounts.AccountTypeUser || authType == accounts.AccountTypeSessionUser {
 			query["owner"] = owner
 		} else {
 			query["prn"] = owner

@@ -1,37 +1,53 @@
-//
-// Copyright 2023  Pantacor Ltd.
+// Copyright 2024  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//   http://www.apache.org/licenses/LICENSE-2.0
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
-//   Unless required by applicable law or agreed to in writing, software
-//   distributed under the License is distributed on an "AS IS" BASIS,
-//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//   See the License for the specific language governing permissions and
-//   limitations under the License.
-//
+//	Unless required by applicable law or agreed to in writing, software
+//	distributed under the License is distributed on an "AS IS" BASIS,
+//	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	See the License for the specific language governing permissions and
+//	limitations under the License.
 
 package querymongo
 
 import (
+	"fmt"
 	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
+
+const DefaultPageSize = 100
+
+// Pagination paginable response
+type Pagination struct {
+	PageSizes   []int  `json:"-"`
+	ResourceURL string `json:"resource"`
+	PageSize    int    `json:"page_size"`
+	PageOffset  int    `json:"page_offset"`
+	CurrentPage int    `json:"current_page"`
+	Total       int    `json:"total"`
+	Next        string `json:"next"`
+	Prev        string `json:"prev"`
+}
 
 type ApiSearchPagination struct {
 	Filters    bson.M
 	Sort       bson.M
 	Fields     bson.M
 	Pagination bson.M
+	Url        url.URL
 }
 
 // MergeDefaultProjection merge projection with required values
@@ -60,7 +76,9 @@ func MergeDefaultProjection(p map[string]interface{}) map[string]interface{} {
 }
 
 func GetAllQueryPagination(url *url.URL, searchable map[string]bool) ApiSearchPagination {
-	asp := ApiSearchPagination{}
+	asp := ApiSearchPagination{
+		Url: *url,
+	}
 
 	asp.Filters = GetMongoQueryFromQuery(url.Query(), searchable)
 	asp.Sort = GetMongoSortingFromQuery(url.Query())
@@ -327,4 +345,94 @@ func processValue(v string) interface{} {
 	}
 
 	return r
+}
+
+func GetPaginationWithLink(u url.URL, total int64, last, first models.Datable) Pagination {
+	result := Pagination{
+		Total:     int(total),
+		PageSizes: []int{10, 20, 30, 50, 100},
+	}
+
+	finishTimestamp := last.GetCreatedAt().Format(time.RFC3339)
+	startTimetamp := first.GetCreatedAt().Format(time.RFC3339)
+	size := u.Query().Get("page[size]")
+	if size == "" {
+		size = strconv.Itoa(DefaultPageSize)
+	}
+
+	sizeInt, err := strconv.Atoi(size)
+	if err != nil {
+		sizeInt = DefaultPageSize
+	}
+	result.PageSize = sizeInt
+
+	newURL, err := url.Parse(
+		fmt.Sprintf(
+			"%s://%s:%s",
+			utils.GetEnv(utils.EnvPantahubScheme),
+			utils.GetEnv(utils.EnvPantahubHost),
+			utils.GetEnv(utils.EnvPantahubPort),
+		),
+	)
+	if err != nil {
+		newURL = &u
+	}
+	newURL.Path = u.Path
+
+	result.ResourceURL = newURL.String()
+
+	newURL.RawQuery = u.Query().Encode()
+
+	if u.Query().Get("page[offset]") == "" {
+		prevURL := *newURL
+		prevQuery := prevURL.Query()
+		prevQuery.Set("page[size]", size)
+		prevQuery.Set("page[before]", startTimetamp)
+		prevURL.RawQuery = prevQuery.Encode()
+		result.Prev = prevURL.String()
+
+		if int(result.Total) >= sizeInt {
+			nextURL := *newURL
+			nextQuery := nextURL.Query()
+			nextQuery.Set("page[size]", size)
+			nextQuery.Set("page[after]", finishTimestamp)
+			nextURL.RawQuery = nextQuery.Encode()
+			result.Next = nextURL.String()
+		}
+	} else {
+		offset, err := strconv.Atoi(u.Query().Get("page[offset]"))
+		if err != nil {
+			offset = 0
+		}
+
+		current := offset / sizeInt
+
+		result.PageOffset = offset
+		result.CurrentPage = current + 1
+
+		prevURL := *newURL
+		prevQuery := prevURL.Query()
+
+		prevOffsetInt := offset - sizeInt
+		if prevOffsetInt >= 0 {
+			prevQuery.Set("page[offset]", strconv.Itoa(prevOffsetInt))
+		}
+		prevQuery.Set("page[size]", size)
+		prevURL.RawQuery = prevQuery.Encode()
+		result.Prev = prevURL.String()
+
+		if int(result.Total) >= sizeInt*current {
+			nextOffset := strconv.Itoa(offset + sizeInt)
+
+			nextURL := *newURL
+			nextQuery := nextURL.Query()
+			nextQuery.Set("page[size]", size)
+			nextQuery.Set("page[offset]", nextOffset)
+			nextURL.RawQuery = nextQuery.Encode()
+
+			result.Next = nextURL.String()
+		}
+	}
+
+	return result
 }

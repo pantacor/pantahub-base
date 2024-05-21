@@ -1,5 +1,3 @@
-version: "3"
-
 services:
   base:
     networks:
@@ -110,7 +108,7 @@ services:
   fluentd:
     networks:
       - base
-    image: fluent/fluentd
+    image: fluent/fluentd:v1.16-debian
     ports:
       - 24224:24224
 

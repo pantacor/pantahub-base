@@ -233,7 +233,7 @@ func GetAppPayload(ctx context.Context, serviceID string, database *mongo.Databa
 	result["id"] = service.Prn
 	result["nick"] = service.Nick
 	result["prn"] = service.Prn
-	result["scopes"] = strings.Join(utils.ParseScopes(service.Scopes), ",")
+	result["scopes"] = strings.Join(utils.MarshalScopes(service.Scopes), ",")
 
 	return result, nil
 }

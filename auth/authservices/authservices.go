@@ -2,6 +2,7 @@ package authservices
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"log"
 	"net/http"
@@ -16,6 +17,9 @@ import (
 	"gitlab.com/pantacor/pantahub-base/apps"
 	"gitlab.com/pantacor/pantahub-base/auth/authmodels"
 	"gitlab.com/pantacor/pantahub-base/devices"
+	"gitlab.com/pantacor/pantahub-base/tokens/tokenmodels"
+	"gitlab.com/pantacor/pantahub-base/tokens/tokenrepo"
+	"gitlab.com/pantacor/pantahub-base/tokens/tokenservice"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -28,7 +32,7 @@ func CreateAnonToken(jwtMiddleware *jwt.JWTMiddleware) string {
 		Scope:    "prn:pantahub.com:apis:/base/all.readonly",
 	}
 
-	tokenString, err := CreateUserToken(payload, jwtMiddleware)
+	tokenString, err := CreateUserToken(payload, jwtMiddleware, nil)
 	if err != nil {
 		return ""
 	}
@@ -36,9 +40,10 @@ func CreateAnonToken(jwtMiddleware *jwt.JWTMiddleware) string {
 	return tokenString
 }
 
-func CreateUserToken(payload *authmodels.LoginRequestPayload, jwtMiddleware *jwt.JWTMiddleware) (tokenString string, rerr *utils.RError) {
+func CreateUserToken(payload *authmodels.LoginRequestPayload, jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) (tokenString string, rerr *utils.RError) {
 	var err error
 	var scopes []string
+
 	if payload.Scope != "" && payload.Username == accountsdata.AnonAccountDefaultUsername {
 		scopes = utils.ScopeStringFilterBy(strings.Fields(payload.Scope), ".readonly", "")
 	} else {
@@ -51,7 +56,7 @@ func CreateUserToken(payload *authmodels.LoginRequestPayload, jwtMiddleware *jwt
 			Error: "Authentication Failed",
 			Code:  http.StatusUnauthorized,
 		}
-		return
+		return tokenString, rerr
 	}
 
 	token := jwtgo.New(jwtgo.GetSigningMethod(jwtMiddleware.SigningAlgorithm))
@@ -69,6 +74,31 @@ func CreateUserToken(payload *authmodels.LoginRequestPayload, jwtMiddleware *jwt
 
 	claims["exp"] = time.Now().Add(jwtMiddleware.Timeout).Unix()
 
+	var authToken *tokenmodels.AuthToken
+	// validate if secret is a token
+	password, err := base64.RawStdEncoding.DecodeString(payload.Password)
+	if err == nil && mongoClient != nil {
+		splitPassword := strings.Split(string(password), ":")
+		if len(splitPassword) > 1 {
+			tokenid := splitPassword[0]
+			repo := tokenrepo.New(mongoClient)
+			service := tokenservice.New(repo)
+			authToken, err = service.GetToken(context.Background(), tokenid, "")
+			if err != nil {
+				return tokenString, rerr
+			}
+		}
+	}
+
+	if authToken != nil && !authToken.Deleted && authToken.ExpireAt.Unix() > time.Now().Unix() {
+		scopes = authToken.Scopes
+		claims["id"] = payload.Username
+		claims["nick"] = authToken.Name
+		claims["prn"] = authToken.Owner
+		claims["roles"] = strings.ToLower(string(authToken.Type))
+		claims["type"] = string(authToken.Type)
+	}
+
 	if len(scopes) > 0 {
 		claims["scopes"] = strings.Join(scopes, " ")
 	}
@@ -85,6 +115,7 @@ func CreateUserToken(payload *authmodels.LoginRequestPayload, jwtMiddleware *jwt
 	if jwtMiddleware.MaxRefresh != 0 {
 		claims["orig_iat"] = time.Now().Unix()
 	}
+
 	tokenString, err = token.SignedString(jwtMiddleware.Key)
 	if err != nil {
 		rerr = &utils.RError{
@@ -92,10 +123,10 @@ func CreateUserToken(payload *authmodels.LoginRequestPayload, jwtMiddleware *jwt
 			Error: "Error signing new token",
 			Code:  http.StatusInternalServerError,
 		}
-		return
+		return tokenString, rerr
 	}
 
-	return
+	return tokenString, rerr
 }
 
 func AuthWithUserPassFactory(mongoClient *mongo.Client) func(string, string) bool {
@@ -234,9 +265,22 @@ func AccountAuth(idEmailNick string, secret string, mongoClient *mongo.Client) b
 		account accounts.Account
 	)
 
-	account, err = GetAccount(idEmailNick, mongoClient)
+	// validate if secret is a token
+	password, err := base64.RawStdEncoding.DecodeString(secret)
+	if err == nil && mongoClient != nil {
+		splitPassword := strings.Split(string(password), ":")
+		if len(splitPassword) > 1 {
+			tokenid := splitPassword[0]
+			repo := tokenrepo.New(mongoClient)
+			service := tokenservice.New(repo)
+			authToken, err := service.GetToken(context.Background(), tokenid, account.Prn)
+			if err == nil && authToken != nil && !authToken.Deleted && authToken.Secret == secret && authToken.ExpireAt.Unix() > time.Now().Unix() && authToken.Name == idEmailNick {
+				return true
+			}
+		}
+	}
 
-	// error with db or not found -> log and fail
+	account, err = GetAccount(idEmailNick, mongoClient)
 	if err != nil {
 		return false
 	}
@@ -365,8 +409,8 @@ func AccountToPayload(account accounts.Account) map[string]interface{} {
 		result["roles"] = "service"
 		result["type"] = "SERVICE"
 	case accounts.AccountTypeClient:
-		result["roles"] = "service"
-		result["type"] = "SERVICE"
+		result["roles"] = "client"
+		result["type"] = accounts.AccountTypeClient
 	default:
 		log.Println("ERROR: AccountToPayload with invalid account type: " + account.Type)
 		return nil

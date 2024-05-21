@@ -3,9 +3,31 @@
 set -ex
 
 MONGO_PORT=${MONGO_PORT:-27017}
-mongod --keyFile /keys/mongokey.yaml --transitionToAuth --port ${MONGO_PORT} --replSet ${MONGO_RS} --bind_ip_all $@ &
+mongod --keyFile /keys/mongokey.yaml --transitionToAuth --port ${MONGO_PORT} --replSet ${MONGO_RS} --bind_ip_all $@
 
 sleep 5
+replicaSet="""{
+  \"_id\": \"${MONGO_RS}\",
+  \"members\": [
+    {
+      \"_id\": 0,
+      \"host\": \"mongo:27017\"
+    },
+    {
+      \"_id\": 1,
+      \"host\": \"mongo2:30002\"
+    },
+    {
+      \"_id\": 2,
+      \"host\": \"mongo3:30003\"
+    }
+  ]
+}"""
+
+until mongo --eval "rs.initiate($replicaSet).ok || rs.status().ok" --port ${MONGO_PORT} --quiet; do
+  echo "checking mongo replica set"
+  sleep 1
+done
 
 until mongo --eval 'rs.status().ok' --port ${MONGO_PORT} --quiet; do
   echo "checking mongo replica set"

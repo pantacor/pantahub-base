@@ -39,7 +39,7 @@ func (a *App) getTokenUsingPassword(writer rest.ResponseWriter, r *rest.Request)
 		return
 	}
 
-	tokenString, rerr := authservices.CreateUserToken(payload, a.jwtMiddleware)
+	tokenString, rerr := authservices.CreateUserToken(payload, a.jwtMiddleware, a.mongoClient)
 	if rerr != nil {
 		utils.RestErrorWrite(writer, rerr)
 		return

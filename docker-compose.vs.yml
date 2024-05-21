@@ -1,5 +1,3 @@
-version: "3"
-
 services:
   base:
     build:
@@ -41,7 +39,7 @@ services:
       - elasticsearch
 
   fluentd:
-    image: fluent/fluentd
+    image: fluent/fluentd:v1.16-debian
     ports:
       - "5140:5140"
       - "24224:24224"

@@ -39,7 +39,7 @@ type Scope struct {
 	ID          string `json:"id" bson:"id"`
 	Service     string `json:"service" bson:"service"`
 	Description string `json:"description" bson:"description"`
-	Required    bool   `json:"required" bson:"required"`
+	Required    bool   `json:"required,omitempty" bson:"required"`
 }
 
 // IScopes define every possible scope type
@@ -211,9 +211,9 @@ func InitScopeFilterMiddleware(filterTypes []Scope) *ScopeFilterMiddleware {
 	}
 }
 
-//ScopeFilter :  Scope Filter for end points
+// ScopeFilter :  Scope Filter for end points
 func ScopeFilter(filterScopes []Scope, handler rest.HandlerFunc) rest.HandlerFunc {
-	parsedFilterScopes := ParseScopes(filterScopes)
+	parsedFilterScopes := MarshalScopes(filterScopes)
 
 	return func(w rest.ResponseWriter, r *rest.Request) {
 		authInfo := GetAuthInfo(r)
@@ -266,11 +266,20 @@ func MatchAllScope(filterScopes []string, requestScopes []string) bool {
 	return allOnRequest
 }
 
-// ParseScopes covert array of scopes on array of string scopes
-func ParseScopes(scopes []Scope) []string {
+// MarshalScopes covert array of scopes on array of string scopes
+func MarshalScopes(scopes []Scope) []string {
 	parsedScopes := make([]string, len(scopes))
 	for k, scope := range scopes {
 		parsedScopes[k] = scope.Service + "/" + scope.ID
+	}
+	return parsedScopes
+}
+
+func ParseScopes(scopes []string) []Scope {
+	parsedScopes := []Scope{}
+	for _, s := range scopes {
+		id := strings.Split(s, PantahubServiceID+"/")[1]
+		parsedScopes = append(parsedScopes, PhScopesMap[id])
 	}
 	return parsedScopes
 }
