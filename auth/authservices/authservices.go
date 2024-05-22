@@ -97,6 +97,14 @@ func CreateUserToken(payload *authmodels.LoginRequestPayload, jwtMiddleware *jwt
 		claims["prn"] = authToken.Owner
 		claims["roles"] = strings.ToLower(string(authToken.Type))
 		claims["type"] = string(authToken.Type)
+		// Token can not be refreshed
+		claims["orig_iat"] = time.Now().Unix()
+		timeoutStr := utils.GetEnv(utils.EnvAnonJWTTimeoutMinutes)
+		timeout, err := strconv.Atoi(timeoutStr)
+		if err != nil {
+			timeout = 5
+		}
+		claims["exp"] = time.Now().Add(time.Minute * time.Duration(timeout)).Unix()
 	}
 
 	if len(scopes) > 0 {
