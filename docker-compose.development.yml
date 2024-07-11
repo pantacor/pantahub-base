@@ -82,10 +82,18 @@ services:
   fluentd:
     networks:
       - base
-    image: fluent/fluentd:v1.16-debian
+    image: registry.gitlab.com/pantacor/cloud/fluentd-ph:master
     ports:
       - "5140:5140"
       - "24224:24224"
+      - "24224:24224/udp"
+    environment:
+      - FLUENT_ELASTICSEARCH_HOST=elasticsearch
+      - FLUENT_ELASTICSEARCH_PORT=9200
+    volumes:
+      - ./fluentd.localhost.conf:/fluentd/etc/fluent.conf
+    depends_on:
+      - elasticsearch
 
   elasticsearch:
     networks:

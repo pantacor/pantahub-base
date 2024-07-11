@@ -14,7 +14,7 @@ services:
     ports:
       - 12365:12365
     env_file:
-      - ./env.default 
+      - ./env.default
       - ./.env.local
 
   mongo:
@@ -65,16 +65,22 @@ services:
       - "9300:9300"
 
   kibana:
+    networks:
+      - base
     image: docker.elastic.co/kibana/kibana:7.17.3
+    container_name: kibana
+    volumes:
+      - ./entrypoints/kibana.yml:/usr/share/kibana/config/kibana.yml
     environment:
       - SERVERNAME=kibana
-      - ELASTICSEARCH_HOSTS=https://elasticsearch:9200
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
       - cluster.name=docker-cluster
       - bootstrap.memory_lock=true
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
       - xpack.security.enabled=false
       - xpack.watcher.enabled=false
-      - "discovery.type=single-node"
+      - discovery.type=single-node
+      - XPACK_SECURITY_ENABLED=false
     ulimits:
       memlock:
         soft: -1
@@ -84,6 +90,7 @@ services:
       - elasticsearch
     ports:
       - "5601:5601"
+
   localstack:
     image: localstack/localstack:0.9.0
     environment:

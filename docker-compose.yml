@@ -9,7 +9,6 @@ services:
       - ${PWD}:/go/src/gitlab.com/pantacor/pantahub-base
       - ${PWD}/.data/local-s3/:/local-s3/
     links:
-      - www
       - pvr
     depends_on:
       - pvr
@@ -46,7 +45,6 @@ services:
       - fluentd
       - elasticsearch
       - phs
-      - www
       - localstack
     depends_on:
       - mongo
@@ -108,9 +106,18 @@ services:
   fluentd:
     networks:
       - base
-    image: fluent/fluentd:v1.16-debian
+    image: registry.gitlab.com/pantacor/cloud/fluentd-ph:master
     ports:
-      - 24224:24224
+      - "5140:5140"
+      - "24224:24224"
+      - "24224:24224/udp"
+    environment:
+      - FLUENT_ELASTICSEARCH_HOST=elasticsearch
+      - FLUENT_ELASTICSEARCH_PORT=9200
+    volumes:
+      - ./fluentd.localhost.conf:/fluentd/etc/fluent.conf
+    depends_on:
+      - elasticsearch
 
   elasticsearch:
     networks:
@@ -132,6 +139,33 @@ services:
         soft: -1
         hard: -1
     restart: always
+
+  kibana:
+    networks:
+      - base
+    image: docker.elastic.co/kibana/kibana:7.17.3
+    container_name: kibana
+    volumes:
+      - ./entrypoints/kibana.yml:/usr/share/kibana/config/kibana.yml
+    environment:
+      - SERVERNAME=kibana
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - cluster.name=docker-cluster
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+      - xpack.watcher.enabled=false
+      - discovery.type=single-node
+      - XPACK_SECURITY_ENABLED=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    restart: always
+    depends_on:
+      - elasticsearch
+    ports:
+      - "5601:5601"
 
   mongo:
     networks:
