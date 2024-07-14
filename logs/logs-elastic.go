@@ -36,6 +36,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fluent/fluent-logger-golang/fluent"
 	elastic "github.com/olivere/elastic/v7"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gopkg.in/mgo.v2/bson"
@@ -63,6 +64,25 @@ type elasticLogger struct {
 	works                bool
 	template             bson.M
 	syncWrites           bool
+}
+
+var logger *fluent.Fluent = nil
+
+func getLogger() *fluent.Fluent {
+	if logger == nil {
+		portStr := utils.GetEnv(utils.EnvFluentPort)
+		port, err := strconv.Atoi(portStr)
+		if err != nil {
+			log.Fatalln("FATAL: cannot read fluent logger settings: " + err.Error())
+		}
+		host := utils.GetEnv(utils.EnvFluentHost)
+		logger, err = fluent.New(fluent.Config{FluentPort: port, FluentHost: host})
+		if err != nil {
+			log.Fatalln("FATAL: cannot initialize fluent logger: " + err.Error())
+		}
+	}
+
+	return logger
 }
 
 func (s *elasticLogger) r(timeout int) *resty.Request {
@@ -380,6 +400,45 @@ func (s *elasticLogger) getLogsByCursor(pctx context.Context, nextCursor string)
 }
 
 func (s *elasticLogger) postLogs(parentCtx context.Context, e []Entry) error {
+	logsVersion := utils.GetEnv("PH_DEVICE_LOGS_VERSION")
+	if logsVersion == "v2" {
+		return s.postLogsv2(parentCtx, e)
+	}
+
+	return s.postLogsv1(parentCtx, e)
+}
+
+func (s *elasticLogger) postLogsv2(_ context.Context, e []Entry) error {
+	logger := getLogger()
+	for _, v := range e {
+		eventTime := time.Unix(v.LogTSec, v.LogTNano)
+		ve := elasticLogEntry{
+			Entry:      &v,
+			TimeEvent:  eventTime,
+			TimeRecord: v.TimeCreated,
+		}
+
+		datamap := map[string]interface{}{}
+		data, err := json.Marshal(ve)
+		if err != nil {
+			return err
+		}
+
+		err = json.Unmarshal(data, &datamap)
+		if err != nil {
+			return err
+		}
+
+		err = logger.Post("com.pantahub-base.logs", datamap)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *elasticLogger) postLogsv1(parentCtx context.Context, e []Entry) error {
 	if !s.works {
 		return errors.New("logger not initialized/works")
 	}

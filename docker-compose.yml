@@ -2,6 +2,7 @@ services:
   base:
     networks:
       - base
+    container_name: api
     build:
       context: .
       dockerfile: Dockerfile.development
@@ -14,6 +15,7 @@ services:
       - pvr
     ports:
       - 12365:12365
+      - 12366:12366
     env_file:
       - ./env.default 
       - ./.env.local
@@ -124,6 +126,8 @@ services:
       - base
     container_name: elasticsearch
     image: docker.elastic.co/elasticsearch/elasticsearch:7.17.3
+    volumes:
+      - ./.data/elasticsearch/:/usr/share/elasticsearch/data/
     environment:
       - cluster.name=docker-cluster
       - bootstrap.memory_lock=true
@@ -239,6 +243,8 @@ services:
       - ZOOKEEPER_CLIENT_PORT=2181
       - ZOOKEEPER_TICK_TIME=2000
       - ZOOKEEPER_SYNC_LIMIT=2
+    ports:
+      - 2181:2181
 
   kafka:
     networks:
@@ -302,7 +308,7 @@ services:
       - CONNECT_REST_ADVERTISED_HOST_NAME=kafka-connect
       - CONNECT_REST_PORT=8083
       - CONNECT_PLUGIN_PATH=/opt/plugins/,/usr/share/java/
-      - CONNECT_BOOTSTRAP_SERVERS=kafka:9092
+      - CONNECT_BOOTSTRAP_SERVERS=PLAINTEXT://kafka:9092
       - CONNECT_GROUP_ID=pantacor-dev
       - CONNECT_OFFSET_STORAGE_TOPIC=pantacor-cp-kafka-connect-offset-dev
       - CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR=1
