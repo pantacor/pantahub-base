@@ -10,7 +10,7 @@ RUN apk add -U --no-cache \
 WORKDIR /app/
 COPY . .
 
-RUN go get -d -v ./... \
+RUN go get -v ./... \
 	&& go install github.com/swaggo/swag/cmd/swag@v1.6.9 && swag init \
 	&& go install -v ./...
 

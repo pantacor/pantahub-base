@@ -20,7 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -74,13 +74,13 @@ func GithubAuthorize(redirectURI string, config *oauth2.Config, w rest.ResponseW
 func GithubCb(ctx context.Context, config *oauth2.Config, code string) (*ResponsePayload, error) {
 	data, err := getUserDataFromGithub(ctx, config, code)
 	if err != nil {
-		return nil, err
+		return &ResponsePayload{RedirectTo: ""}, err
 	}
 
 	payload := &githubPayload{}
 	err = json.Unmarshal(data, payload)
 	if err != nil {
-		return nil, err
+		return &ResponsePayload{RedirectTo: ""}, err
 	}
 
 	return &ResponsePayload{
@@ -127,7 +127,7 @@ func getUserDataFromGithub(ctx context.Context, config *oauth2.Config, code stri
 	}
 	defer response.Body.Close()
 
-	contents, err := ioutil.ReadAll(response.Body)
+	contents, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed read response: %s", err.Error())
 	}

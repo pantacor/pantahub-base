@@ -106,24 +106,29 @@ func AuthorizeByService(w rest.ResponseWriter, r *rest.Request) {
 
 // CbByService use service callback
 func CbByService(r *rest.Request) (*ResponsePayload, error) {
+	var err error
 	service := ServiceType(r.PathParam("service"))
 	getConfig, found := ServicesConfigs[service]
 	if !found {
-		return nil, fmt.Errorf("we can't connect to service: %s", service)
+		payload := &ResponsePayload{RedirectTo: ""}
+		return payload, fmt.Errorf("we can't connect to service: %s", service)
+	}
+
+	code := r.FormValue("code")
+	payload, err := ServicesCallback[service](r.Context(), getConfig(), code)
+	if err != nil {
+		return payload, fmt.Errorf("%s error -- %s", service, err)
 	}
 
 	oauthState, err := r.Cookie(oauthCookie)
 	if err != nil {
-		return nil, err
+		payload := &ResponsePayload{RedirectTo: ""}
+		return payload, fmt.Errorf("error reading cookie: %s", err)
 	}
 
 	if r.FormValue("state") != oauthState.Value {
-		return nil, errors.New("we can't validate the state")
-	}
-
-	payload, err := ServicesCallback[service](r.Context(), getConfig(), r.FormValue("code"))
-	if err != nil {
-		return nil, err
+		payload := &ResponsePayload{RedirectTo: ""}
+		return payload, errors.New("we can't validate the state")
 	}
 
 	redirectURI, _ := r.Cookie(redirectCookie)
@@ -142,18 +147,21 @@ func generateStateOauthCookie(redirectURL string, w http.ResponseWriter) string 
 	b := make([]byte, 16)
 	rand.Read(b)
 	state := base64.URLEncoding.EncodeToString(b)
+
 	cookie := &http.Cookie{
 		Name:    oauthCookie,
 		Value:   state,
 		Expires: expiration,
 		Path:    "/",
 	}
+
 	redirectURICookie := &http.Cookie{
 		Name:    redirectCookie,
 		Value:   redirectURL,
 		Expires: expiration,
 		Path:    "/",
 	}
+
 	http.SetCookie(w, cookie)
 	http.SetCookie(w, redirectURICookie)
 

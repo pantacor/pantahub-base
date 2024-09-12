@@ -20,7 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/ant0ine/go-json-rest/rest"
@@ -71,17 +71,17 @@ func GitlabAuthorize(redirectURI string, config *oauth2.Config, w rest.ResponseW
 func GitlabCb(ctx context.Context, config *oauth2.Config, code string) (*ResponsePayload, error) {
 	data, err := getUserDataFromGitlab(ctx, config, code)
 	if err != nil {
-		return nil, err
+		return &ResponsePayload{RedirectTo: ""}, err
 	}
 
 	payload := &gitlabPayload{}
 	err = json.Unmarshal(data, payload)
 	if err != nil {
-		return nil, err
+		return &ResponsePayload{RedirectTo: ""}, err
 	}
 
 	if payload.State != "active" {
-		return nil, fmt.Errorf("user is not active")
+		return &ResponsePayload{RedirectTo: ""}, fmt.Errorf("user is not active")
 	}
 
 	return &ResponsePayload{
@@ -103,7 +103,7 @@ func getUserDataFromGitlab(ctx context.Context, config *oauth2.Config, code stri
 	}
 	defer response.Body.Close()
 
-	contents, err := ioutil.ReadAll(response.Body)
+	contents, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed read response: %s", err.Error())
 	}

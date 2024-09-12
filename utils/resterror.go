@@ -94,6 +94,14 @@ func getLogger() *fluent.Fluent {
 	return logger
 }
 
+func LogError(errorMsg, userMsg string, code int) {
+	incidentID := time.Now().UnixNano()
+
+	incidentStr := fmt.Sprintf("REST-ERR-ID-%d", incidentID)
+	incidentDetails := fmt.Sprintf("ERROR| %s: %s", incidentStr, errorMsg)
+	log.Printf(incidentDetails)
+}
+
 func restErrorWrapperInternal(w rest.ResponseWriter, errorStr, userMsg string, code int) {
 	incidentID := time.Now().UnixNano()
 

@@ -21,7 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"net/http"
 	"regexp"
@@ -35,7 +35,9 @@ import (
 var (
 	googleClientID     = utils.GetEnv(utils.EnvGoogleOAuthClientID)
 	googleClientSecret = utils.GetEnv(utils.EnvGoogleOAuthClientSecret)
-	googleScopes       = []string{"https://www.googleapis.com/auth/userinfo.email"}
+	googleScopes       = []string{
+		"https://www.googleapis.com/auth/userinfo.email",
+	}
 )
 
 const oauthGoogleURLAPI = "https://www.googleapis.com/oauth2/v2/userinfo?access_token="
@@ -47,12 +49,23 @@ type googlePayload struct {
 
 // GetGoogleConfig get configuration from return URL
 func GetGoogleConfig() *oauth2.Config {
-	return &oauth2.Config{
-		RedirectURL: fmt.Sprintf(
-			"%s://%s/auth/oauth/callback/google",
+	port := utils.GetEnv(utils.EnvPantahubPort)
+	url := fmt.Sprintf(
+		"%s://%s/auth/oauth/callback/google",
+		utils.GetEnv(utils.EnvPantahubScheme),
+		utils.GetEnv(utils.EnvPantahubHost),
+	)
+
+	if port != "80" && port != "443" && port != "" {
+		url = fmt.Sprintf(
+			"%s://%s:%s/auth/oauth/callback/google",
 			utils.GetEnv(utils.EnvPantahubScheme),
 			utils.GetEnv(utils.EnvPantahubHost),
-		),
+			utils.GetEnv(utils.EnvPantahubPort),
+		)
+	}
+	return &oauth2.Config{
+		RedirectURL:  url,
 		ClientID:     googleClientID,
 		ClientSecret: googleClientSecret,
 		Scopes:       googleScopes,
@@ -70,19 +83,19 @@ func GoogleAuthorize(redirectURI string, config *oauth2.Config, w rest.ResponseW
 }
 
 // GoogleCb use code to retrive service user data
-func GoogleCb(ctx context.Context, config *oauth2.Config, code string) (*ResponsePayload, error) {
+func GoogleCb(ctx context.Context, config *oauth2.Config, code string) (payload *ResponsePayload, err error) {
 	data, err := getUserDataFromGoogle(ctx, config, code)
 	if err != nil {
-		return nil, err
+		return &ResponsePayload{RedirectTo: ""}, err
 	}
 	googlePayload := &googlePayload{}
 	err = json.Unmarshal(data, googlePayload)
 	if err != nil {
-		return nil, err
+		return &ResponsePayload{RedirectTo: ""}, err
 	}
 
 	if !googlePayload.VerifiedEmail {
-		return nil, errors.New("users email is not verified")
+		return &ResponsePayload{RedirectTo: ""}, errors.New("users email is not verified")
 	}
 
 	re := regexp.MustCompile(`@.*`)
@@ -105,13 +118,15 @@ func getUserDataFromGoogle(ctx context.Context, config *oauth2.Config, code stri
 		return nil, fmt.Errorf("code exchange wrong: %s", err.Error())
 	}
 
-	response, err := http.Get(oauthGoogleURLAPI + token.AccessToken)
+	client := config.Client(ctx, token)
+	response, err := client.Get(oauthGoogleURLAPI + token.AccessToken)
+	// response, err := http.Get(oauthGoogleURLAPI + token.AccessToken)
 	if err != nil {
 		return nil, fmt.Errorf("failed getting user info: %s", err.Error())
 	}
 	defer response.Body.Close()
 
-	contents, err := ioutil.ReadAll(response.Body)
+	contents, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed read response: %s", err.Error())
 	}

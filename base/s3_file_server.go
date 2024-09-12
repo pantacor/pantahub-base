@@ -203,6 +203,7 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
 		return
 	}
+	log.Printf("preSignedURL %s sha %s\n", preSignedURL, objClaims.Sha)
 
 	// avoid body close for later sha256 calc
 	hasher := sha256.New()
