@@ -207,6 +207,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		rest.Patch("/#id", utils.ScopeFilter(writeDevicesScopes, app.handlePatchDevice)),
 		rest.Put("/#id/public", utils.ScopeFilter(writeDevicesScopes, app.handlePutPublic)),
 		rest.Delete("/#id/public", utils.ScopeFilter(writeDevicesScopes, app.handleDeletePublic)),
+		rest.Get("/#id/user-meta", utils.ScopeFilter(readDevicesScopes, app.handleGetUserData)),
 		rest.Put("/#id/user-meta", utils.ScopeFilter(writeDevicesScopes, app.handlePutUserData)),
 		rest.Patch("/#id/user-meta", utils.ScopeFilter(writeDevicesScopes, app.handlePatchUserData)),
 		rest.Put("/#id/device-meta", utils.ScopeFilter(writeDevicesScopes, app.handlePutDeviceData)),

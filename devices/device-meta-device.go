@@ -115,7 +115,7 @@ func (a *App) handlePutDeviceData(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	w.WriteJson(utils.BsonUnquoteMap(&data))
+	w.WriteJson(map[string]string{"status": "ok"})
 }
 
 // handlePatchDeviceData Update device metadata using the device credentials:
@@ -222,5 +222,5 @@ func (a *App) handlePatchDeviceData(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	w.WriteJson(utils.BsonUnquoteMap(&device.DeviceMeta))
+	w.WriteJson(map[string]string{"status": "ok"})
 }

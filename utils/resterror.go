@@ -17,8 +17,10 @@
 package utils
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"strconv"
 	"time"
 
@@ -135,4 +137,41 @@ func RestErrorWrite(w rest.ResponseWriter, err *RError) {
 // RestErrorWrapper wrap the normal rest error in an struct
 func RestErrorWrapper(w rest.ResponseWriter, errorStr string, code int) {
 	restErrorWrapperInternal(w, errorStr, "", code)
+}
+
+func HttpErrorWrapper(w http.ResponseWriter, errorStr string, code int) {
+	incidentID := time.Now().UnixNano()
+
+	incidentStr := fmt.Sprintf("REST-ERR-ID-%d", incidentID)
+	incidentDetails := fmt.Sprintf("ERROR| %s: %s", incidentStr, errorStr)
+	log.Printf(incidentDetails)
+
+	rError := RError{
+		IncidentID: &incidentID,
+		Error:      incidentDetails,
+		Msg:        "",
+		Code:       code,
+	}
+
+	err := getLogger().Post("com.pantahub-base.incidents", structs.Map(&rError))
+	if err != nil {
+		log.Println(err)
+	}
+
+	w.WriteHeader(code)
+	body := RError{
+		Error: incidentStr,
+		Msg:   "",
+		Code:  code,
+	}
+	payload, err := json.Marshal(body)
+	if err != nil {
+		log.Println(err)
+		panic(err)
+	}
+	_, err = w.Write(payload)
+	if err != nil {
+		log.Println(err)
+		panic(err)
+	}
 }

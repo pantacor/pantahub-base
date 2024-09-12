@@ -131,8 +131,8 @@ func (a *App) handlePutObject(w rest.ResponseWriter, r *rest.Request) {
 	if newObject.ObjectName != "" {
 		object.ObjectName = newObject.ObjectName
 	}
-	err = a.SaveObject(r.Context(), object, false)
 
+	err = a.SaveObject(r.Context(), object, false)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Failed to save object: "+err.Error(), http.StatusInternalServerError)
 		return

@@ -26,7 +26,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"time"
@@ -110,7 +109,8 @@ func (a *App) handlePostLogs(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	w.WriteJson(newEntries)
+	response := map[string]string{"status": "ok"}
+	w.WriteJson(response)
 }
 
 func readLogsBody(ctx context.Context, buff io.ReadCloser) ([]Entry, error) {
@@ -120,7 +120,7 @@ func readLogsBody(ctx context.Context, buff io.ReadCloser) ([]Entry, error) {
 		defer span.End()
 	}
 
-	body, err := ioutil.ReadAll(buff)
+	body, err := io.ReadAll(buff)
 	if err != nil {
 		return nil, errors.New("error reading logs body")
 	}

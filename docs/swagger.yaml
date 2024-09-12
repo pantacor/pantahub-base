@@ -342,6 +342,10 @@ definitions:
         additionalProperties: true
         type: object
     type: object
+  devices.UserMeta:
+    additionalProperties:
+      type: string
+    type: object
   devices.challengePayload:
     properties:
       challenge:
@@ -515,6 +519,8 @@ definitions:
         type: boolean
       deleted-at:
         type: string
+      expire-at:
+        type: string
       id:
         type: string
       name:
@@ -523,11 +529,15 @@ definitions:
         type: string
       owner-nick:
         type: string
+      parse-scopes:
+        items:
+          $ref: '#/definitions/utils.Scope'
+        type: array
       prn:
         type: string
       scopes:
         items:
-          $ref: '#/definitions/utils.Scope'
+          type: string
         type: array
       secret:
         type: string
@@ -540,11 +550,13 @@ definitions:
     type: object
   tokenservice.AuthTokenReqPayload:
     properties:
+      expire-at:
+        type: string
       name:
         type: string
       scopes:
         items:
-          $ref: '#/definitions/utils.Scope'
+          type: string
         type: array
       type:
         type: string
@@ -2220,6 +2232,40 @@ paths:
       tags:
       - devices
   /devices/{id}/user-meta:
+    get:
+      consumes:
+      - application/json
+      description: get device user metadata
+      parameters:
+      - description: ID|PRN|NICK
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/devices.UserMeta'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: get device user metadata
+      tags:
+      - devices
     patch:
       consumes:
       - application/json
@@ -3162,6 +3208,48 @@ paths:
       summary: List tokens for a owner
       tags:
       - tokens
+  /tokens/:
+    post:
+      consumes:
+      - application/json
+      description: Create a new token for a user
+      parameters:
+      - default: Bearer <Add access token here>
+        description: Insert your access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Create Token Request
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/tokenservice.AuthTokenReqPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/tokenmodels.AuthToken'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new token for a user
+      tags:
+      - tokens
   /tokens/{id}:
     delete:
       consumes:
@@ -3242,48 +3330,6 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: get a token for a user
-      tags:
-      - tokens
-  /tokens/create:
-    post:
-      consumes:
-      - application/json
-      description: Create a new token for a user
-      parameters:
-      - default: Bearer <Add access token here>
-        description: Insert your access token
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: Create Token Request
-        in: body
-        name: req
-        required: true
-        schema:
-          $ref: '#/definitions/tokenservice.AuthTokenReqPayload'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/tokenmodels.AuthToken'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/utils.RError'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/utils.RError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/utils.RError'
-      security:
-      - ApiKeyAuth: []
-      summary: Create a new token for a user
       tags:
       - tokens
   /trails:

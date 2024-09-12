@@ -2445,6 +2445,59 @@ var doc = `{
             }
         },
         "/devices/{id}/user-meta": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "get device user metadata",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "devices"
+                ],
+                "summary": "get device user metadata",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID|PRN|NICK",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/devices.UserMeta"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            },
             "put": {
                 "security": [
                     {
@@ -3648,7 +3701,7 @@ var doc = `{
                 }
             }
         },
-        "/tokens/create": {
+        "/tokens/": {
             "post": {
                 "security": [
                     {
@@ -5498,6 +5551,12 @@ var doc = `{
                 }
             }
         },
+        "devices.UserMeta": {
+            "type": "object",
+            "additionalProperties": {
+                "type": "string"
+            }
+        },
         "devices.challengePayload": {
             "type": "object",
             "properties": {
@@ -5761,6 +5820,9 @@ var doc = `{
                 "deleted-at": {
                     "type": "string"
                 },
+                "expire-at": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "string"
                 },
@@ -5773,13 +5835,19 @@ var doc = `{
                 "owner-nick": {
                     "type": "string"
                 },
+                "parse-scopes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/utils.Scope"
+                    }
+                },
                 "prn": {
                     "type": "string"
                 },
                 "scopes": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/utils.Scope"
+                        "type": "string"
                     }
                 },
                 "secret": {
@@ -5799,13 +5867,16 @@ var doc = `{
         "tokenservice.AuthTokenReqPayload": {
             "type": "object",
             "properties": {
+                "expire-at": {
+                    "type": "string"
+                },
                 "name": {
                     "type": "string"
                 },
                 "scopes": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/utils.Scope"
+                        "type": "string"
                     }
                 },
                 "type": {

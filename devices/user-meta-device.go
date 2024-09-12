@@ -24,8 +24,11 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
+	"gitlab.com/pantacor/pantahub-base/accounts"
+	"gitlab.com/pantacor/pantahub-base/accounts/accountsdata"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -226,4 +229,156 @@ func (a *App) handlePutUserData(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	w.WriteJson(utils.BsonUnquoteMap(&data))
+}
+
+type UserMeta map[string]string
+
+// handleGetUserData get device user metadata
+// @Summary get device user metadata
+// @Description get device user metadata
+// @Accept  json
+// @Produce  json
+// @Security ApiKeyAuth
+// @Tags devices
+// @Param id path string true "ID|PRN|NICK"
+// @Success 200 {object} UserMeta
+// @Failure 400 {object} utils.RError
+// @Failure 404 {object} utils.RError
+// @Failure 500 {object} utils.RError
+// @Router /devices/{id}/user-meta [get]
+func (a *App) handleGetUserData(w rest.ResponseWriter, r *rest.Request) {
+	var device Device
+
+	authID, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	if !ok {
+		// XXX: find right error
+		utils.RestErrorWrapper(w, "You need to be logged in.", http.StatusForbidden)
+		return
+	}
+
+	ownerPtr := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["owner"]
+	if ownerPtr == nil {
+		ownerPtr = authID
+	}
+
+	owner, ok := ownerPtr.(string)
+	if !ok {
+		utils.RestErrorWrapper(w, "Session has no owner info", http.StatusBadRequest)
+		return
+	}
+
+	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+
+	if !ok {
+		// XXX: find right error
+		utils.RestErrorWrapper(w, "You need to be logged in with a known authentication type.", http.StatusForbidden)
+		return
+	}
+
+	callerIsUser := false
+	callerIsDevice := false
+
+	if authType == "DEVICE" {
+		callerIsDevice = true
+	} else {
+		callerIsUser = true
+	}
+
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
+
+	if collection == nil {
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+
+	collectionAccounts := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
+
+	if collectionAccounts == nil {
+		utils.RestErrorWrapper(w, "Error with Database (accounts) connectivity", http.StatusInternalServerError)
+		return
+	}
+
+	value, useOtherOwnerPrn := r.URL.Query()["owner"]
+	if useOtherOwnerPrn {
+		ok, err := utils.ValidateUserPrn(value[0])
+		if err != nil || !ok {
+			utils.RestErrorWrapper(w, "Invalid owner prn", http.StatusForbidden)
+			return
+		}
+		owner = value[0]
+	}
+
+	value, useOtherOwnerNick := r.URL.Query()["owner-nick"]
+	if useOtherOwnerNick {
+		account, err := a.GetUserAccountByNick(r.Context(), value[0])
+		if err != nil {
+			utils.RestErrorWrapper(w, "Error finding owner user account by nick:"+err.Error(), http.StatusForbidden)
+			return
+		}
+		owner = account.Prn
+	}
+
+	mgoid, err := a.ResolveDeviceIDOrNick(r.Context(), owner, r.PathParam("id"))
+	if err != nil {
+		utils.RestErrorWrapper(w, "Error Parsing Device ID or Nick:"+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	query := bson.M{
+		"_id":     mgoid,
+		"garbage": bson.M{"$ne": true},
+	}
+
+	if callerIsUser {
+		query["owner"] = authID.(string)
+	}
+	if callerIsDevice {
+		query["prn"] = authID.(string)
+	}
+
+	ops := options.FindOne()
+	ops.SetProjection(bson.M{
+		"prn":       1,
+		"owner":     1,
+		"garbage":   1,
+		"user-meta": 1,
+	})
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	err = collection.FindOne(ctx, query).Decode(&device)
+	if err != nil {
+		utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
+		return
+	}
+
+	if authID != device.Prn && authID != device.Owner {
+		utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
+		return
+	}
+
+	if device.Owner != "" {
+		var ownerAccount accounts.Account
+
+		// first check default accounts like user1, user2, etc...
+		ownerAccount, ok := accountsdata.DefaultAccounts[device.Owner]
+		if !ok {
+			ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+			defer cancel()
+			err := collectionAccounts.FindOne(ctx,
+				bson.M{"prn": device.Owner}).
+				Decode(&ownerAccount)
+
+			if err != nil {
+				utils.RestErrorWrapper(w, "Owner account not Found", http.StatusInternalServerError)
+				return
+			}
+		}
+
+		profileMeta, _ := a.getProfileMetaData(r.Context(), device.Owner)
+		device.UserMeta = utils.MergeMaps(profileMeta, device.UserMeta)
+		device.OwnerNick = ownerAccount.Nick
+	}
+
+	w.WriteJson(utils.BsonUnquoteMap(&device.UserMeta))
 }

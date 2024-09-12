@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -94,8 +93,9 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	tok, err := objects.NewFromValidToken(fileBase)
 	if err != nil {
-		log.Println("Invalid local-s3 request (" + fileBase + "): " + err.Error())
-		w.WriteHeader(http.StatusForbidden)
+		msg := "Invalid local-s3 request (" + fileBase + "): " + err.Error()
+		log.Println(msg)
+		utils.HttpErrorWrapper(w, msg, http.StatusForbidden)
 		return
 	}
 
@@ -106,15 +106,17 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	finalName, err := utils.MakeLocalS3PathForName(storageID)
 	if err != nil {
-		log.Println("ERROR: creating filepath for write: " + err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
+		msg := "ERROR: creating filepath for write: " + err.Error()
+		log.Println(msg)
+		utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
 		return
 	}
 
 	if r.Method == "GET" {
 		if objClaims.Method != http.MethodGet {
-			log.Println("Invalid objClaims Method; not GET (" + objClaims.Method + ")")
-			w.WriteHeader(http.StatusForbidden)
+			msg := "Invalid objClaims Method; not GET (" + objClaims.Method + ")"
+			log.Println(msg)
+			utils.HttpErrorWrapper(w, msg, http.StatusForbidden)
 			return
 		}
 
@@ -129,15 +131,17 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if selectedRegionConfig != nil {
 			downloadUrl, err = s.regionS3.DownloadURL(finalName)
 			if err != nil {
-				log.Printf("ERROR: getting download url, %v", err)
-				w.WriteHeader(http.StatusInternalServerError)
+				msg := fmt.Sprintf("ERROR: getting download url, %v", err)
+				log.Println(msg)
+				utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
 				return
 			}
 
 			s3resp, err = http.Get(downloadUrl)
 			if err != nil {
-				log.Printf("ERROR: requesting download file, %v\n", err)
-				w.WriteHeader(http.StatusInternalServerError)
+				msg := fmt.Sprintf("ERROR: requesting download file, %v\n", err)
+				log.Println(msg)
+				utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
 				return
 			}
 			region = s.regionS3.GetConnectionParams().Region
@@ -147,23 +151,26 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if downloadUrl == "" || (s3resp != nil && s3resp.StatusCode == http.StatusNotFound) {
 			downloadUrl, err = s.s3.DownloadURL(finalName)
 			if err != nil {
-				log.Printf("ERROR: getting download url, %v", err)
-				w.WriteHeader(http.StatusInternalServerError)
+				msg := fmt.Sprintf("ERROR: getting download url, %v", err)
+				log.Println(msg)
+				utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
 				return
 			}
 
 			s3resp, err = http.Get(downloadUrl)
 			if err != nil {
-				log.Printf("ERROR: requesting download file, %v\n", err)
-				w.WriteHeader(http.StatusInternalServerError)
+				msg := fmt.Sprintf("ERROR: requesting download file, %v\n", err)
+				log.Println(msg)
+				utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
 				return
 			}
 			region = s.s3.GetConnectionParams().Region
 		}
 
 		if s3resp.StatusCode != http.StatusOK {
-			log.Printf("ERROR: unexpected response from s3 server, status code %v\n", s3resp.StatusCode)
-			w.WriteHeader(s3resp.StatusCode)
+			msg := fmt.Sprintf("ERROR: unexpected response from s3 server, status code %v\n", s3resp.StatusCode)
+			log.Println(msg)
+			utils.HttpErrorWrapper(w, msg, s3resp.StatusCode)
 			return
 		}
 
@@ -173,14 +180,16 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if objClaims.Method != http.MethodPut {
-		log.Println("Invalid objClaims Method; not PUT (" + objClaims.Method + ")")
-		w.WriteHeader(http.StatusForbidden)
+		msg := "Invalid objClaims Method; not PUT (" + objClaims.Method + ")"
+		// log.Println(msg)
+		utils.HttpErrorWrapper(w, msg, http.StatusForbidden)
 		return
 	}
 
 	if objClaims.Sha == "" {
-		log.Println("Invalid objClaims Method; no Sha included")
-		w.WriteHeader(http.StatusBadRequest)
+		msg := "Invalid objClaims Method; no Sha included"
+		log.Println(msg)
+		utils.HttpErrorWrapper(w, msg, http.StatusBadRequest)
 		return
 	}
 
@@ -189,8 +198,9 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	tempName := path.Join(path.Dir(finalName), "_part"+path.Base(finalName))
 	preSignedURL, err := s.s3.UploadURL(tempName)
 	if err != nil {
-		log.Printf("ERROR: failed to generate upload url, %v\n", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		msg := fmt.Sprintf("ERROR: failed to generate upload url, %v\n", err)
+		log.Println(msg)
+		utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
 		return
 	}
 
@@ -221,16 +231,18 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		shaS := hex.EncodeToString(sha)
 
 		if shaS != objClaims.Sha {
-			log.Printf("WARNING: file upload sha mismatch with claim: "+shaS+" != "+objClaims.Sha+" readbytes=%d\n", countWriter.Total)
-			w.WriteHeader(http.StatusBadRequest)
+			msg := fmt.Sprintf("WARNING: file upload sha mismatch with claim: "+shaS+" != "+objClaims.Sha+" readbytes=%d\n", countWriter.Total)
+			log.Println(msg)
+			utils.HttpErrorWrapper(w, msg, http.StatusBadRequest)
 			return
 		}
 
 	} else {
 		s3req, err := http.NewRequest(http.MethodPut, preSignedURL, s3Body)
 		if err != nil {
-			log.Printf("ERROR: failed to generate s3 request, %v\n", err)
-			w.WriteHeader(http.StatusInternalServerError)
+			msg := fmt.Sprintf("ERROR: failed to generate s3 request, %v\n", err)
+			log.Println(msg)
+			utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
 			return
 		}
 
@@ -255,15 +267,24 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s3resp, err := httpClient.Do(s3req)
 		if err != nil {
 			defer s.s3.Delete(tempName)
-			log.Printf("ERROR: failed to upload to %s\n", preSignedURL)
-			w.WriteHeader(http.StatusInternalServerError)
+			msg := fmt.Sprintf("ERROR: failed to upload to %s\n", preSignedURL)
+			log.Println(msg)
+			utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
 			return
 		}
 
 		defer s3resp.Body.Close()
 		if s3resp.StatusCode != http.StatusOK {
-			log.Println("ERROR: unexpected response from remote S3 server")
-			w.WriteHeader(http.StatusInternalServerError)
+			var body []byte
+			_, err := s3resp.Body.Read(body)
+			msg := fmt.Sprintf("ERROR: unexpected response from remote S3 server")
+			if err != nil {
+				msg = fmt.Sprintf("ERROR: unexpected response from remote S3 server %d -- %s", s3resp.StatusCode, err.Error())
+			} else {
+				msg = fmt.Sprintf("ERROR: remote S3 server %d -- %s", s3resp.StatusCode, body)
+			}
+			log.Println(msg)
+			utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
 			return
 		}
 
@@ -271,15 +292,17 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		shaS := hex.EncodeToString(sha)
 
 		if shaS != objClaims.Sha {
-			log.Printf("WARNING: file upload sha mismatch with claim: "+shaS+" != "+objClaims.Sha+" readbytes=%d\n", countWriter.Total)
-			w.WriteHeader(http.StatusBadRequest)
+			msg := fmt.Sprintf("WARNING: file upload sha mismatch with claim: "+shaS+" != "+objClaims.Sha+" readbytes=%d\n", countWriter.Total)
+			log.Println(msg)
+			utils.HttpErrorWrapper(w, msg, http.StatusBadRequest)
 			return
 		}
 
 		err = s.s3.Rename(tempName, finalName)
 		if err != nil {
-			log.Printf("ERROR: failed to commit s3 upload, %v\n", err)
-			w.WriteHeader(http.StatusInternalServerError)
+			msg := fmt.Sprintf("ERROR: failed to commit s3 upload, %v\n", err)
+			log.Println(msg)
+			utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
 			return
 		}
 	}
@@ -295,7 +318,7 @@ func LoadDynamicS3ByRegion() error {
 
 	fmt.Println("parsing s3 from k8s -- stating")
 
-	token, err := ioutil.ReadFile("/run/secrets/kubernetes.io/serviceaccount/token")
+	token, err := os.ReadFile("/run/secrets/kubernetes.io/serviceaccount/token")
 	if err != nil {
 		return fmt.Errorf("token file can't be read %s -- %s", "/run/secrets/kubernetes.io/serviceaccount/token", err)
 	}
