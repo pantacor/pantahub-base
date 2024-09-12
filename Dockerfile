@@ -1,18 +1,18 @@
-FROM golang:1.21.1-alpine as builder
+FROM golang:1.23.1-alpine AS builder
 
 ENV GO111MODULE=on
 
 RUN apk add -U --no-cache \
-    git \
-    curl \
-    build-base
+	git \
+	curl \
+	build-base
 
 WORKDIR /app/
 COPY . .
 
 RUN go get -d -v ./... \
-    && go install github.com/swaggo/swag/cmd/swag@v1.6.9 && swag init \
-    && go install -v ./...
+	&& go install github.com/swaggo/swag/cmd/swag@v1.6.9 && swag init \
+	&& go install -v ./...
 
 FROM alpine
 
