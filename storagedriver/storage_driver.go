@@ -17,13 +17,15 @@
 package storagedriver
 
 import (
+	"context"
+
 	"gitlab.com/pantacor/pantahub-base/s3"
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
 
 // StorageDriver storage drive interface
 type StorageDriver interface {
-	Exists(key string) bool
+	Exists(ctx context.Context, key string) bool
 }
 
 // FromEnv get storage driver from environment
@@ -38,7 +40,7 @@ func FromEnv() StorageDriver {
 			Endpoint:  utils.GetEnv(utils.EnvPantahubS3Endpoint),
 		}
 
-		return s3.New(connParams)
+		return s3.New(context.TODO(), connParams)
 	default:
 		return NewLocalStorageDriver()
 	}

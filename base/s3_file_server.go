@@ -17,6 +17,7 @@
 package base
 
 import (
+	"context"
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/hex"
@@ -63,11 +64,11 @@ func NewS3FileServer() *S3FileServer {
 	}
 
 	server := &S3FileServer{
-		s3: s3.New(connParams),
+		s3: s3.New(context.TODO(), connParams),
 	}
 
 	if selectedRegionConfig != nil {
-		server.regionS3 = s3.New(*selectedRegionConfig)
+		server.regionS3 = s3.New(context.TODO(), *selectedRegionConfig)
 	}
 
 	return server
@@ -103,6 +104,7 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	storageID := objClaims.Audience
 	p, _ := url.Parse(path.Join(dirName, storageID))
 	r.URL = r.URL.ResolveReference(p)
+	defer r.Body.Close()
 
 	finalName, err := utils.MakeLocalS3PathForName(storageID)
 	if err != nil {
@@ -112,6 +114,7 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx := context.WithoutCancel(r.Context())
 	if r.Method == "GET" {
 		if objClaims.Method != http.MethodGet {
 			msg := "Invalid objClaims Method; not GET (" + objClaims.Method + ")"
@@ -129,7 +132,7 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		// If there is a selected region config load the downloadUrl
 		if selectedRegionConfig != nil {
-			downloadUrl, err = s.regionS3.DownloadURL(finalName)
+			downloadUrl, err = s.regionS3.DownloadURL(ctx, finalName)
 			if err != nil {
 				msg := fmt.Sprintf("ERROR: getting download url, %v", err)
 				log.Println(msg)
@@ -144,12 +147,12 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
 				return
 			}
-			region = s.regionS3.GetConnectionParams().Region
+			region = s.regionS3.GetConnectionParams(ctx).Region
 		}
 
 		// If the object is not found on the selected region try in default region
 		if downloadUrl == "" || (s3resp != nil && s3resp.StatusCode == http.StatusNotFound) {
-			downloadUrl, err = s.s3.DownloadURL(finalName)
+			downloadUrl, err = s.s3.DownloadURL(ctx, finalName)
 			if err != nil {
 				msg := fmt.Sprintf("ERROR: getting download url, %v", err)
 				log.Println(msg)
@@ -164,11 +167,11 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
 				return
 			}
-			region = s.s3.GetConnectionParams().Region
+			region = s.s3.GetConnectionParams(ctx).Region
 		}
 
 		if s3resp.StatusCode != http.StatusOK {
-			msg := fmt.Sprintf("ERROR: unexpected response from s3 server, status code %v\n", s3resp.StatusCode)
+			msg := fmt.Sprintf("ERROR: unexpected response from s3 server, status code %v\ndownloadUrl: %s\n", s3resp.StatusCode, downloadUrl)
 			log.Println(msg)
 			utils.HttpErrorWrapper(w, msg, s3resp.StatusCode)
 			return
@@ -193,17 +196,15 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	defer r.Body.Close()
-
-	tempName := path.Join(path.Dir(finalName), "_part"+path.Base(finalName))
-	preSignedURL, err := s.s3.UploadURL(tempName)
+	tempName := "_part_" + path.Base(finalName)
+	preSignedURL, err := s.s3.UploadURL(ctx, tempName)
 	if err != nil {
 		msg := fmt.Sprintf("ERROR: failed to generate upload url, %v\n", err)
 		log.Println(msg)
 		utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
 		return
 	}
-	log.Printf("preSignedURL %s sha %s\n", preSignedURL, objClaims.Sha)
+	// log.Printf("preSignedURL %s sha %s\n", preSignedURL, objClaims.Sha)
 
 	// avoid body close for later sha256 calc
 	hasher := sha256.New()
@@ -239,15 +240,37 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 	} else {
-		s3req, err := http.NewRequest(http.MethodPut, preSignedURL, s3Body)
-		if err != nil {
-			msg := fmt.Sprintf("ERROR: failed to generate s3 request, %v\n", err)
-			log.Println(msg)
-			utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
-			return
-		}
+		// s3req, err := http.NewRequest(http.MethodPut, preSignedURL, s3Body)
+		// if err != nil {
+		// 	msg := fmt.Sprintf("ERROR: failed to generate s3 request, %v\n", err)
+		// 	log.Println(msg)
+		// 	utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
+		// 	return
+		// }
 
-		transport := &http.Transport{
+		// transport := &http.Transport{
+		// 	Proxy: http.ProxyFromEnvironment,
+		// 	DialContext: (&net.Dialer{
+		// 		Timeout:   60 * time.Minute,
+		// 		KeepAlive: 30 * time.Second,
+		// 		DualStack: true,
+		// 	}).DialContext,
+		// 	MaxIdleConns:          100,
+		// 	IdleConnTimeout:       90 * time.Second,
+		// 	TLSHandshakeTimeout:   30 * time.Second,
+		// 	ExpectContinueTimeout: 15 * time.Second,
+		// }
+
+		// httpClient := &http.Client{Transport: transport}
+		// if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" {
+		// 	httpClient = &http.Client{Transport: }
+		// }
+		// s3resp, err := httpClient.Do(s3req)
+
+		httpClient := resty.New()
+		// httpClient.Debug = true
+
+		t := &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
 			DialContext: (&net.Dialer{
 				Timeout:   60 * time.Minute,
@@ -259,30 +282,33 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			TLSHandshakeTimeout:   30 * time.Second,
 			ExpectContinueTimeout: 15 * time.Second,
 		}
-
-		httpClient := &http.Client{Transport: transport}
 		if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" {
-			httpClient = &http.Client{Transport: otelhttp.NewTransport(transport)}
+			transport := otelhttp.NewTransport(t)
+			httpClient.SetTransport(transport)
+		} else {
+			httpClient.SetTransport(t)
 		}
 
-		s3resp, err := httpClient.Do(s3req)
+		s3req := httpClient.R().
+			SetBody(s3Body).
+			SetHeader("Content-Type", "application/octet-stream").
+			SetContentLength(true)
+		s3resp, err := s3req.Put(preSignedURL)
 		if err != nil {
-			defer s.s3.Delete(tempName)
+			defer s.s3.Delete(ctx, tempName)
 			msg := fmt.Sprintf("ERROR: failed to upload to %s\n", preSignedURL)
 			log.Println(msg)
 			utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
 			return
 		}
 
-		defer s3resp.Body.Close()
-		if s3resp.StatusCode != http.StatusOK {
-			var body []byte
-			_, err := s3resp.Body.Read(body)
+		if s3resp.StatusCode() != http.StatusOK {
+			body := s3resp.Body()
 			msg := fmt.Sprintf("ERROR: unexpected response from remote S3 server")
 			if err != nil {
-				msg = fmt.Sprintf("ERROR: unexpected response from remote S3 server %d -- %s", s3resp.StatusCode, err.Error())
+				msg = fmt.Sprintf("ERROR: unexpected response from remote S3 server %d -- %s", s3resp.StatusCode(), err.Error())
 			} else {
-				msg = fmt.Sprintf("ERROR: remote S3 server %d -- %s", s3resp.StatusCode, body)
+				msg = fmt.Sprintf("ERROR: remote S3 server %d -- %s", s3resp.StatusCode(), body)
 			}
 			log.Println(msg)
 			utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
@@ -299,7 +325,7 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err = s.s3.Rename(tempName, finalName)
+		err = s.s3.Rename(ctx, tempName, finalName)
 		if err != nil {
 			msg := fmt.Sprintf("ERROR: failed to commit s3 upload, %v\n", err)
 			log.Println(msg)

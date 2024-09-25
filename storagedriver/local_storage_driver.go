@@ -17,12 +17,13 @@
 package storagedriver
 
 import (
+	"context"
 	"os"
 )
 
 type localStorageDriver struct{}
 
-func (l *localStorageDriver) Exists(filepath string) bool {
+func (l *localStorageDriver) Exists(ctx context.Context, filepath string) bool {
 	_, err := os.Stat(filepath)
 	return err == nil
 }

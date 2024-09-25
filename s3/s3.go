@@ -17,58 +17,62 @@
 package s3
 
 import (
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
+	"context"
+	"fmt"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 // S3 application interface
 type S3 interface {
-	Exists(key string) bool
-	Delete(key string) error
-	Rename(oldKey, newKey string) error
-	UploadURL(key string) (string, error)
-	DownloadURL(key string) (string, error)
-	GetConnectionParams() ConnectionParameters
+	Exists(ctx context.Context, key string) bool
+	Delete(ctx context.Context, key string) error
+	Rename(ctx context.Context, oldKey, newKey string) error
+	UploadURL(ctx context.Context, key string) (string, error)
+	DownloadURL(ctx context.Context, key string) (string, error)
+	GetConnectionParams(ctx context.Context) ConnectionParameters
 }
 
 type s3impl struct {
 	connectionParams ConnectionParameters
-	session          *s3.S3
+	session          *s3.Client
+	presignClient    *s3.PresignClient
 }
 
-func (s *s3impl) GetConnectionParams() ConnectionParameters {
+func (s *s3impl) GetConnectionParams(ctx context.Context) ConnectionParameters {
 	return s.connectionParams
 }
 
-func (s *s3impl) Delete(key string) error {
+func (s *s3impl) Delete(ctx context.Context, key string) error {
 	deleteInput := &s3.DeleteObjectInput{
 		Bucket: aws.String(s.connectionParams.Bucket),
 		Key:    aws.String(key),
 	}
 
-	_, err := s.session.DeleteObject(deleteInput)
+	_, err := s.session.DeleteObject(ctx, deleteInput)
 	return err
 }
 
-func (s *s3impl) Rename(oldKey, newKey string) error {
+func (s *s3impl) Rename(ctx context.Context, oldKey, newKey string) error {
 	copyInput := &s3.CopyObjectInput{
 		Bucket:     aws.String(s.connectionParams.Bucket),
-		CopySource: aws.String(s.connectionParams.Bucket + oldKey),
+		CopySource: aws.String(s.connectionParams.Bucket + "/" + oldKey),
 		Key:        aws.String(newKey),
 	}
 
-	_, err := s.session.CopyObject(copyInput)
+	_, err := s.session.CopyObject(ctx, copyInput)
 	if err != nil {
 		return err
 	}
 
-	s.Delete(oldKey)
+	s.Delete(ctx, oldKey)
 	return nil
 }
 
-func (s *s3impl) Exists(key string) bool {
+func (s *s3impl) Exists(ctx context.Context, key string) bool {
 	if key == "" {
 		return false
 	}
@@ -77,50 +81,45 @@ func (s *s3impl) Exists(key string) bool {
 		key = key[1:]
 	}
 
-	listInput := &s3.ListObjectsInput{
+	input := &s3.HeadObjectInput{
 		Bucket: aws.String(s.connectionParams.Bucket),
-		Prefix: aws.String(key),
+		Key:    aws.String(key),
 	}
 
-	out, err := s.session.ListObjects(listInput)
+	head, err := s.session.HeadObject(context.TODO(), input)
 	if err != nil {
-		return false
+		return true
 	}
 
-	return len(out.Contents) > 0
+	return *head.ContentLength >= 0
 }
 
 // New create a new S3 application
-func New(params ConnectionParameters) S3 {
+func New(ctx context.Context, params ConnectionParameters) S3 {
 	if !params.IsValid() {
 		return nil
 	}
-
-	awsConfig := &aws.Config{
-		LogLevel:         aws.LogLevel(aws.LogDebugWithHTTPBody),
-		S3ForcePathStyle: aws.Bool(true),
-		Region:           aws.String(params.Region),
-	}
-
-	awsConfig.Credentials = credentials.NewStaticCredentials(
-		params.AccessKey,
-		params.SecretKey,
-		"", //
+	creds := credentials.NewStaticCredentialsProvider(params.AccessKey, params.SecretKey, "")
+	cfg, err := config.LoadDefaultConfig(ctx,
+		// config.WithClientLogMode(aws.LogRequest),
+		config.WithRegion(params.Region),
+		config.WithCredentialsProvider(creds),
 	)
 
-	if params.Endpoint != "" {
-		awsConfig.Endpoint = aws.String(params.Endpoint)
-	}
-
-	session, err := session.NewSession(awsConfig)
 	if err != nil {
-		return nil
+		fmt.Printf("error loading aws configuration -- %s\n", err)
 	}
 
-	s3session := s3.New(session)
+	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
+		o.BaseEndpoint = aws.String(params.Endpoint)
+		o.UsePathStyle = true
+	})
+
+	presignClient := s3.NewPresignClient(client)
 
 	return &s3impl{
-		session:          s3session,
+		session:          client,
+		presignClient:    presignClient,
 		connectionParams: params,
 	}
 }

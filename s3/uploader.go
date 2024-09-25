@@ -17,27 +17,28 @@
 package s3
 
 import (
+	"context"
+	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
-
-type inputS3Uploader interface {
-	Upload(input *s3manager.UploadInput, options ...func(*s3manager.Uploader)) (*s3manager.UploadOutput, error)
-}
 
 // Uploader Uploader interface
 type Uploader interface {
-	UploadURL(key string) (string, error)
+	UploadURL(ctx context.Context, key string) (string, error)
 }
 
-func (s *s3impl) UploadURL(key string) (string, error) {
-	resp, _ := s.session.PutObjectRequest(&s3.PutObjectInput{
+func (s *s3impl) UploadURL(ctx context.Context, key string) (string, error) {
+	input := &s3.PutObjectInput{
 		Bucket: aws.String(s.connectionParams.Bucket),
 		Key:    aws.String(key),
-	})
+	}
 
-	return resp.Presign(60 * time.Minute)
+	presignURL, err := s.presignClient.PresignPutObject(ctx, input, s3.WithPresignExpires(60*time.Minute))
+	if err != nil {
+		return "", fmt.Errorf("failed to presign GetObject request: %v", err)
+	}
+	return presignURL.URL, nil
 }

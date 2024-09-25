@@ -114,7 +114,7 @@ func (a *App) SaveObject(parentCtx context.Context, object *Object, localS3Check
 
 	if localS3Check {
 		sd := storagedriver.FromEnv()
-		if sd.Exists(filePath) {
+		if sd.Exists(ctx, filePath) {
 			return ErrObjectS3PathAlreadyExists
 		}
 	}
@@ -241,7 +241,7 @@ func HasBackingFile(object *Object) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if sd.Exists(filePath) {
+	if sd.Exists(context.TODO(), filePath) {
 		return true, nil
 	}
 	return false, nil
