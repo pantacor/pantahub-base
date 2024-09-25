@@ -122,6 +122,7 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
 		return
 	}
+	objectFinalName := path.Base(finalName)
 
 	ctx := context.WithoutCancel(r.Context())
 	if r.Method == "GET" {
@@ -141,7 +142,7 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		// If there is a selected region config load the downloadUrl
 		if selectedRegionConfig != nil {
-			downloadUrl, err = s.regionS3.DownloadURL(ctx, path.Base(finalName))
+			downloadUrl, err = s.regionS3.DownloadURL(ctx, objectFinalName)
 			if err != nil {
 				msg := fmt.Sprintf("ERROR: getting download url, %v", err)
 				log.Println(msg)
@@ -161,7 +162,7 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// If the object is not found on the selected region try in default region
 		if downloadUrl == "" || (s3resp != nil && s3resp.StatusCode == http.StatusNotFound) {
 			for _, provider := range s.providers {
-				downloadUrl, err = provider.DownloadURL(ctx, path.Base(finalName))
+				downloadUrl, err = provider.DownloadURL(ctx, objectFinalName)
 				if err != nil {
 					msg := fmt.Sprintf("ERROR: getting download url, %v", err)
 					log.Println(msg)
@@ -213,7 +214,7 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tempName := "_part_" + path.Base(finalName)
+	tempName := "_part_" + objectFinalName
 	preSignedURL, err := s.s3.UploadURL(ctx, tempName)
 	if err != nil {
 		msg := fmt.Sprintf("ERROR: failed to generate upload url, %v\n", err)
@@ -314,7 +315,7 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err = s.s3.Rename(ctx, tempName, finalName)
+		err = s.s3.Rename(ctx, tempName, objectFinalName)
 		if err != nil {
 			msg := fmt.Sprintf("ERROR: failed to commit s3 upload, %v\n", err)
 			log.Println(msg)
