@@ -100,6 +100,18 @@ func LogError(errorMsg, userMsg string, code int) {
 	incidentStr := fmt.Sprintf("REST-ERR-ID-%d", incidentID)
 	incidentDetails := fmt.Sprintf("ERROR| %s: %s", incidentStr, errorMsg)
 	log.Printf(incidentDetails)
+
+	rError := RError{
+		IncidentID: &incidentID,
+		Error:      incidentDetails,
+		Msg:        userMsg,
+		Code:       code,
+	}
+
+	err := getLogger().Post("com.pantahub-base.incidents", structs.Map(&rError))
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 func restErrorWrapperInternal(w rest.ResponseWriter, errorStr, userMsg string, code int) {

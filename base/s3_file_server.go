@@ -44,13 +44,16 @@ import (
 // selectedRegionConfig selected region configuration
 var selectedRegionConfig *s3.ConnectionParameters
 
+var s3Providers []s3.S3 = []s3.S3{}
+
 // ApiRegion k8s api region
 var apiRegion string
 
 // S3FileServer s3 file server definition
 type S3FileServer struct {
-	s3       s3.S3
-	regionS3 s3.S3
+	s3        s3.S3
+	regionS3  s3.S3
+	providers []s3.S3
 }
 
 // NewS3FileServer create new s3 file server
@@ -69,6 +72,12 @@ func NewS3FileServer() *S3FileServer {
 
 	if selectedRegionConfig != nil {
 		server.regionS3 = s3.New(context.TODO(), *selectedRegionConfig)
+	}
+
+	if len(s3Providers) > 1 {
+		server.providers = s3Providers
+	} else {
+		server.providers = []s3.S3{server.s3}
 	}
 
 	return server
@@ -143,7 +152,6 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			s3resp, err = http.Get(downloadUrl)
 			if err != nil {
 				msg := fmt.Sprintf("ERROR: requesting download file, %v\n", err)
-				log.Println(msg)
 				utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
 				return
 			}
@@ -152,27 +160,36 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		// If the object is not found on the selected region try in default region
 		if downloadUrl == "" || (s3resp != nil && s3resp.StatusCode == http.StatusNotFound) {
-			downloadUrl, err = s.s3.DownloadURL(ctx, finalName)
-			if err != nil {
-				msg := fmt.Sprintf("ERROR: getting download url, %v", err)
-				log.Println(msg)
-				utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
-				return
-			}
+			for _, provider := range s.providers {
+				downloadUrl, err = provider.DownloadURL(ctx, finalName)
+				if err != nil {
+					msg := fmt.Sprintf("ERROR: getting download url, %v", err)
+					log.Println(msg)
+					utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
+					return
+				}
 
-			s3resp, err = http.Get(downloadUrl)
-			if err != nil {
-				msg := fmt.Sprintf("ERROR: requesting download file, %v\n", err)
-				log.Println(msg)
-				utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
-				return
+				s3resp, err = http.Get(downloadUrl)
+				if err != nil {
+					msg := fmt.Sprintf("ERROR: requesting download file, %v\n", err)
+					log.Println(msg)
+					utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
+					return
+				}
+				region = provider.GetConnectionParams(ctx).Region
+
+				if s3resp.StatusCode < 300 {
+					break
+				} else {
+					msg := fmt.Sprintf("ERROR: unexpected response from s3 server, status code %v\ndownloadUrl: %s\n", s3resp.StatusCode, downloadUrl)
+					log.Println(msg)
+					utils.LogError(msg, msg, s3resp.StatusCode)
+				}
 			}
-			region = s.s3.GetConnectionParams(ctx).Region
 		}
 
 		if s3resp.StatusCode != http.StatusOK {
 			msg := fmt.Sprintf("ERROR: unexpected response from s3 server, status code %v\ndownloadUrl: %s\n", s3resp.StatusCode, downloadUrl)
-			log.Println(msg)
 			utils.HttpErrorWrapper(w, msg, s3resp.StatusCode)
 			return
 		}
@@ -240,36 +257,6 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 	} else {
-		// s3req, err := http.NewRequest(http.MethodPut, preSignedURL, s3Body)
-		// if err != nil {
-		// 	msg := fmt.Sprintf("ERROR: failed to generate s3 request, %v\n", err)
-		// 	log.Println(msg)
-		// 	utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
-		// 	return
-		// }
-
-		// transport := &http.Transport{
-		// 	Proxy: http.ProxyFromEnvironment,
-		// 	DialContext: (&net.Dialer{
-		// 		Timeout:   60 * time.Minute,
-		// 		KeepAlive: 30 * time.Second,
-		// 		DualStack: true,
-		// 	}).DialContext,
-		// 	MaxIdleConns:          100,
-		// 	IdleConnTimeout:       90 * time.Second,
-		// 	TLSHandshakeTimeout:   30 * time.Second,
-		// 	ExpectContinueTimeout: 15 * time.Second,
-		// }
-
-		// httpClient := &http.Client{Transport: transport}
-		// if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" {
-		// 	httpClient = &http.Client{Transport: }
-		// }
-		// s3resp, err := httpClient.Do(s3req)
-
-		httpClient := resty.New()
-		// httpClient.Debug = true
-
 		t := &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
 			DialContext: (&net.Dialer{
@@ -282,6 +269,8 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			TLSHandshakeTimeout:   30 * time.Second,
 			ExpectContinueTimeout: 15 * time.Second,
 		}
+		httpClient := resty.New()
+		// httpClient.Debug = true
 		if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" {
 			transport := otelhttp.NewTransport(t)
 			httpClient.SetTransport(transport)
@@ -338,11 +327,44 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func LoadDynamicS3ByRegion() error {
-	if utils.GetEnv(utils.EnvPantahubS3RegionSelection) != "k8s" ||
-		utils.GetEnv(utils.EnvPantahubStorageDriver) != "s3" {
+	if utils.GetEnv(utils.EnvPantahubS3RegionSelection) == "multiple" &&
+		utils.GetEnv(utils.EnvPantahubStorageDriver) == "s3" {
+		return parseS3MultiProvider()
+	}
+
+	if utils.GetEnv(utils.EnvPantahubS3RegionSelection) == "k8s" &&
+		utils.GetEnv(utils.EnvPantahubStorageDriver) == "s3" {
+		if err := parseS3ConfigFromK8s(); err != nil {
+			selectedRegionConfig = nil
+			fmt.Printf("parsing s3 from k8s -- failed %s\n", err)
+			return nil
+		}
+	}
+
+	return nil
+}
+
+func parseS3MultiProvider() error {
+	fmt.Println("parsing s3 multi provider -- stating")
+	src := utils.GetEnv(utils.EnvPantahubS3RegionalConfigMap)
+	fmt.Printf("parsing s3 multi provider -- parsing %s\n", src)
+
+	connections := map[string]s3.ConnectionParameters{}
+	if err := json.Unmarshal([]byte(src), &connections); err != nil {
+		fmt.Printf("parsing s3 multi provider -- failed %s\n", err)
 		return nil
 	}
 
+	for _, connection := range connections {
+		fmt.Printf("parsing s3 multi provider -- adding %s/%s\n", connection.Endpoint, connection.Bucket)
+		provider := s3.New(context.TODO(), connection)
+		s3Providers = append(s3Providers, provider)
+	}
+
+	return nil
+}
+
+func parseS3ConfigFromK8s() error {
 	fmt.Println("parsing s3 from k8s -- stating")
 
 	token, err := os.ReadFile("/run/secrets/kubernetes.io/serviceaccount/token")
@@ -424,7 +446,6 @@ func LoadDynamicS3ByRegion() error {
 
 	return nil
 }
-
 func GetSelectedRegionConfig() *s3.ConnectionParameters {
 	return selectedRegionConfig
 }
