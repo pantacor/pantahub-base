@@ -141,7 +141,7 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		// If there is a selected region config load the downloadUrl
 		if selectedRegionConfig != nil {
-			downloadUrl, err = s.regionS3.DownloadURL(ctx, finalName)
+			downloadUrl, err = s.regionS3.DownloadURL(ctx, path.Base(finalName))
 			if err != nil {
 				msg := fmt.Sprintf("ERROR: getting download url, %v", err)
 				log.Println(msg)
@@ -161,7 +161,7 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// If the object is not found on the selected region try in default region
 		if downloadUrl == "" || (s3resp != nil && s3resp.StatusCode == http.StatusNotFound) {
 			for _, provider := range s.providers {
-				downloadUrl, err = provider.DownloadURL(ctx, finalName)
+				downloadUrl, err = provider.DownloadURL(ctx, path.Base(finalName))
 				if err != nil {
 					msg := fmt.Sprintf("ERROR: getting download url, %v", err)
 					log.Println(msg)
@@ -181,9 +181,9 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				if s3resp.StatusCode < 300 {
 					break
 				} else {
-					msg := fmt.Sprintf("ERROR: unexpected response from s3 server, status code %v\ndownloadUrl: %s\n", s3resp.StatusCode, downloadUrl)
+					msg := fmt.Sprintf("ERROR: unexpected response from s3 server, status code %v\n", s3resp.StatusCode)
 					log.Println(msg)
-					utils.LogError(msg, msg, s3resp.StatusCode)
+					utils.LogError(msg, downloadUrl, s3resp.StatusCode)
 				}
 			}
 		}
@@ -347,7 +347,7 @@ func LoadDynamicS3ByRegion() error {
 func parseS3MultiProvider() error {
 	fmt.Println("parsing s3 multi provider -- stating")
 	src := utils.GetEnv(utils.EnvPantahubS3RegionalConfigMap)
-	fmt.Printf("parsing s3 multi provider -- parsing %s\n", src)
+	fmt.Printf("parsing s3 multi provider -- parsing\n")
 
 	connections := map[string]s3.ConnectionParameters{}
 	if err := json.Unmarshal([]byte(src), &connections); err != nil {
