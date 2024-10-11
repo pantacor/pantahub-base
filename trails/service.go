@@ -71,9 +71,6 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		return nil
 	}
 
-	// Indexing for the device,garbage fields in pantahub_trails
-	collection = app.mongoClient.Database(utils.MongoDb).Collection("pantahub_trails")
-
 	CreateIndexesOptions = options.CreateIndexesOptions{}
 	CreateIndexesOptions.SetMaxTime(10 * time.Second)
 
@@ -94,9 +91,6 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		log.Fatalln("Error setting up index for pantahub_trails: " + err.Error())
 		return nil
 	}
-
-	// Indexing for the owner,garbage fields in pantahub_steps
-	collection = app.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
 	CreateIndexesOptions = options.CreateIndexesOptions{}
 	CreateIndexesOptions.SetMaxTime(10 * time.Second)
@@ -119,9 +113,6 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		return nil
 	}
 
-	// Indexing for the device,garbage fields in pantahub_steps
-	collection = app.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
-
 	CreateIndexesOptions = options.CreateIndexesOptions{}
 	CreateIndexesOptions.SetMaxTime(10 * time.Second)
 
@@ -134,6 +125,80 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		Keys: bsonx.Doc{
 			{Key: "device", Value: bsonx.Int32(1)},
 			{Key: "garbage", Value: bsonx.Int32(1)},
+		},
+		Options: &indexOptions,
+	}
+	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
+	if err != nil {
+		log.Fatalln("Error setting up index for pantahub_steps: " + err.Error())
+		return nil
+	}
+
+	// INDEX FOR STEPS SEARCH BY OWNER
+	CreateIndexesOptions = options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+
+	indexOptions = options.IndexOptions{}
+	indexOptions.SetUnique(false)
+	indexOptions.SetSparse(true)
+	indexOptions.SetBackground(true)
+
+	index = mongo.IndexModel{
+		Keys: bsonx.Doc{
+			{Key: "trail-id", Value: bsonx.Int32(1)},
+			{Key: "owner", Value: bsonx.Int32(1)},
+			{Key: "progress.status", Value: bsonx.Int32(1)},
+			{Key: "garbage", Value: bsonx.Int32(1)},
+			{Key: "rev", Value: bsonx.Int32(1)},
+		},
+		Options: &indexOptions,
+	}
+	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
+	if err != nil {
+		log.Fatalln("Error setting up index for pantahub_steps: " + err.Error())
+		return nil
+	}
+
+	// INDEX FOR STEPS SEARCH BY Device
+	CreateIndexesOptions = options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+
+	indexOptions = options.IndexOptions{}
+	indexOptions.SetUnique(false)
+	indexOptions.SetSparse(true)
+	indexOptions.SetBackground(true)
+
+	index = mongo.IndexModel{
+		Keys: bsonx.Doc{
+			{Key: "trail-id", Value: bsonx.Int32(1)},
+			{Key: "device", Value: bsonx.Int32(1)},
+			{Key: "progress.status", Value: bsonx.Int32(1)},
+			{Key: "garbage", Value: bsonx.Int32(1)},
+			{Key: "rev", Value: bsonx.Int32(1)},
+		},
+		Options: &indexOptions,
+	}
+	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
+	if err != nil {
+		log.Fatalln("Error setting up index for pantahub_steps: " + err.Error())
+		return nil
+	}
+
+	// INDEX FOR STEPS SEARCH BY Public
+	CreateIndexesOptions = options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+
+	indexOptions = options.IndexOptions{}
+	indexOptions.SetUnique(false)
+	indexOptions.SetSparse(true)
+	indexOptions.SetBackground(true)
+
+	index = mongo.IndexModel{
+		Keys: bsonx.Doc{
+			{Key: "trail-id", Value: bsonx.Int32(1)},
+			{Key: "progress.status", Value: bsonx.Int32(1)},
+			{Key: "garbage", Value: bsonx.Int32(1)},
+			{Key: "rev", Value: bsonx.Int32(1)},
 		},
 		Options: &indexOptions,
 	}
