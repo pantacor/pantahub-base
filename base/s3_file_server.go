@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -104,7 +103,6 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	tok, err := objects.NewFromValidToken(fileBase)
 	if err != nil {
 		msg := "Invalid local-s3 request (" + fileBase + "): " + err.Error()
-		log.Println(msg)
 		utils.HttpErrorWrapper(w, msg, http.StatusForbidden)
 		return
 	}
@@ -118,7 +116,6 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	finalName, err := utils.MakeLocalS3PathForName(storageID)
 	if err != nil {
 		msg := "ERROR: creating filepath for write: " + err.Error()
-		log.Println(msg)
 		utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
 		return
 	}
@@ -128,7 +125,6 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		if objClaims.Method != http.MethodGet {
 			msg := "Invalid objClaims Method; not GET (" + objClaims.Method + ")"
-			log.Println(msg)
 			utils.HttpErrorWrapper(w, msg, http.StatusForbidden)
 			return
 		}
@@ -145,7 +141,6 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			downloadUrl, err = s.regionS3.DownloadURL(ctx, objectFinalName)
 			if err != nil {
 				msg := fmt.Sprintf("ERROR: getting download url, %v", err)
-				log.Println(msg)
 				utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
 				return
 			}
@@ -165,7 +160,6 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				downloadUrl, err = provider.DownloadURL(ctx, objectFinalName)
 				if err != nil {
 					msg := fmt.Sprintf("ERROR: getting download url, %v", err)
-					log.Println(msg)
 					utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
 					return
 				}
@@ -173,7 +167,6 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				s3resp, err = http.Get(downloadUrl)
 				if err != nil {
 					msg := fmt.Sprintf("ERROR: requesting download file, %v\n", err)
-					log.Println(msg)
 					utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
 					return
 				}
@@ -183,7 +176,6 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					break
 				} else {
 					msg := fmt.Sprintf("ERROR: unexpected response from s3 server, status code %v\n", s3resp.StatusCode)
-					log.Println(msg)
 					utils.LogError(msg, downloadUrl, s3resp.StatusCode)
 				}
 			}
@@ -202,14 +194,12 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if objClaims.Method != http.MethodPut {
 		msg := "Invalid objClaims Method; not PUT (" + objClaims.Method + ")"
-		// log.Println(msg)
 		utils.HttpErrorWrapper(w, msg, http.StatusForbidden)
 		return
 	}
 
 	if objClaims.Sha == "" {
 		msg := "Invalid objClaims Method; no Sha included"
-		log.Println(msg)
 		utils.HttpErrorWrapper(w, msg, http.StatusBadRequest)
 		return
 	}
@@ -218,7 +208,6 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	preSignedURL, err := s.s3.UploadURL(ctx, tempName)
 	if err != nil {
 		msg := fmt.Sprintf("ERROR: failed to generate upload url, %v\n", err)
-		log.Println(msg)
 		utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
 		return
 	}
@@ -252,7 +241,6 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		if shaS != objClaims.Sha {
 			msg := fmt.Sprintf("WARNING: file upload sha mismatch with claim: "+shaS+" != "+objClaims.Sha+" readbytes=%d\n", countWriter.Total)
-			log.Println(msg)
 			utils.HttpErrorWrapper(w, msg, http.StatusBadRequest)
 			return
 		}
@@ -287,7 +275,6 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			defer s.s3.Delete(ctx, tempName)
 			msg := fmt.Sprintf("ERROR: failed to upload to %s\n", preSignedURL)
-			log.Println(msg)
 			utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
 			return
 		}
@@ -300,7 +287,6 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			} else {
 				msg = fmt.Sprintf("ERROR: remote S3 server %d -- %s", s3resp.StatusCode(), body)
 			}
-			log.Println(msg)
 			utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
 			return
 		}
@@ -310,7 +296,6 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		if shaS != objClaims.Sha {
 			msg := fmt.Sprintf("WARNING: file upload sha mismatch with claim: "+shaS+" != "+objClaims.Sha+" readbytes=%d\n", countWriter.Total)
-			log.Println(msg)
 			utils.HttpErrorWrapper(w, msg, http.StatusBadRequest)
 			return
 		}
@@ -318,7 +303,6 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		err = s.s3.Rename(ctx, tempName, objectFinalName)
 		if err != nil {
 			msg := fmt.Sprintf("ERROR: failed to commit s3 upload, %v\n", err)
-			log.Println(msg)
 			utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
 			return
 		}
