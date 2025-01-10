@@ -76,6 +76,8 @@ func (w *tracerResponseWriter) WriteJson(v interface{}) error {
 		return err
 	}
 
+	w.Header().Add("Content-Length", fmt.Sprintf("%d", len(resp)))
+
 	_, err = w.Write(resp)
 	return err
 }

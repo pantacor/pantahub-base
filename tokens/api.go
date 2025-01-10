@@ -84,6 +84,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		AllowedHeaders: []string{
 			"Accept",
 			"Content-Type",
+			"Content-Length",
 			"X-Custom-Header",
 			"Origin",
 			"Authorization",

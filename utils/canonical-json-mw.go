@@ -15,7 +15,6 @@ package utils
 
 import (
 	"bufio"
-	"fmt"
 	"net"
 	"net/http"
 
@@ -55,8 +54,6 @@ func (w *canonicalJsonResponseWriter) WriteJson(v interface{}) error {
 	if err != nil {
 		return err
 	}
-
-	w.Header().Add("Content-Length", fmt.Sprintf("%d", len(b)))
 
 	_, err = w.Write(b)
 	if err != nil {

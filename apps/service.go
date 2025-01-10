@@ -131,6 +131,7 @@ func (app *App) setupAPI() {
 		AllowedHeaders: []string{
 			"Accept",
 			"Content-Type",
+			"Content-Length",
 			"X-Custom-Header",
 			"Origin",
 			"Authorization",

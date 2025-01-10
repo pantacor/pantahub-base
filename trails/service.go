@@ -225,9 +225,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		OriginValidator: func(origin string, request *rest.Request) bool {
 			return true
 		},
-		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{
-			"Accept", "Content-Type", "X-Custom-Header", "Origin", "Authorization"},
+		AllowedMethods:                []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:                []string{"Accept", "Content-Type", "X-Custom-Header", "Origin", "Authorization", "Content-Length"},
 		AccessControlAllowCredentials: true,
 		AccessControlMaxAge:           3600,
 	})
