@@ -45,11 +45,18 @@ type gitlabPayload struct {
 
 // GetGitlabConfig get configuration from return URL
 func GetGitlabConfig() *oauth2.Config {
+	scheme := utils.GetEnv(utils.EnvPantahubScheme)
+	host := utils.GetEnv(utils.EnvPantahubHost)
+	port := utils.GetEnv(utils.EnvPantahubPort)
+	if port != "80" && port != "443" && port != "" {
+		host = fmt.Sprintf("%s:%s", host, port)
+	}
+
 	return &oauth2.Config{
 		RedirectURL: fmt.Sprintf(
 			"%s://%s/auth/oauth/callback/gitlab",
-			utils.GetEnv(utils.EnvPantahubScheme),
-			utils.GetEnv(utils.EnvPantahubHost),
+			scheme,
+			host,
 		),
 		ClientID:     gitlabClientID,
 		ClientSecret: gitlabClientSecret,

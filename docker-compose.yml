@@ -13,11 +13,12 @@ services:
       - pvr
     depends_on:
       - pvr
+      - elasticsearch
     ports:
       - 12365:12365
       - 12366:12366
     env_file:
-      - ./env.default 
+      - ./env.default
       - ./.env.local
 
   gc:
@@ -25,7 +26,7 @@ services:
       - base
     image: registry.gitlab.com/pantacor/pantahub-gc:develop
     env_file:
-      - ./env.default 
+      - ./env.default
       - ./.env.local
     environment:
       - PANTAHUB_GC_UNCLAIMED_EXPIRY="P5D"
@@ -125,29 +126,40 @@ services:
     networks:
       - base
     container_name: elasticsearch
-    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.3
-    volumes:
-      - ./.data/elasticsearch/:/usr/share/elasticsearch/data/
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.2
     environment:
       - cluster.name=docker-cluster
       - bootstrap.memory_lock=true
       - discovery.type=single-node
-      - discovery.seed_hosts="localhost, 127.0.0.1"
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m -XX:-UseContainerSupport
       - xpack.security.enabled=false
       - xpack.watcher.enabled=false
-    ports:
-      - 9200:9200
+      - xpack.security.transport.ssl.enabled=false
+      - xpack.security.http.ssl.enabled=false
     ulimits:
       memlock:
         soft: -1
         hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    security_opt:
+      - seccomp=unconfined
+    mem_limit: 1g
+    cap_add:
+      - IPC_LOCK
     restart: always
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - ./.data/elasticsearch/:/usr/share/elasticsearch/data/
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
 
   kibana:
     networks:
       - base
-    image: docker.elastic.co/kibana/kibana:7.17.3
+    image: docker.elastic.co/kibana/kibana:8.17.2
     container_name: kibana
     volumes:
       - ./entrypoints/kibana.yml:/usr/share/kibana/config/kibana.yml

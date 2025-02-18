@@ -319,6 +319,12 @@ const (
 	// EnvGitlabOAuthClientSecret GITLAB_OAUTH_CLIENT_SECRET
 	EnvGitlabOAuthClientSecret = "GITLAB_OAUTH_CLIENT_SECRET"
 
+	// EnvEntraidOAuthClientID ENTRAID_OAUTH_CLIENT_ID
+	EnvEntraidOAuthClientID = "ENTRAID_OAUTH_CLIENT_ID"
+
+	// EnvEntraidOAuthClientSecret ENTRAID_OAUTH_CLIENT_SECRET
+	EnvEntraidOAuthClientSecret = "ENTRAID_OAUTH_CLIENT_SECRET"
+
 	// EnvPantahubElasticShards PANTAHUB_ELASTIC_SHARDS
 	EnvPantahubElasticShards = "PANTAHUB_ELASTIC_SHARDS"
 
@@ -490,6 +496,8 @@ var defaultEnvs = map[string]string{
 	EnvGithubOAuthClientSecret:     "CHANGE THIS",
 	EnvGitlabOAuthClientID:         "CHANGE THIS",
 	EnvGitlabOAuthClientSecret:     "CHANGE THIS",
+	EnvEntraidOAuthClientID:        "CHANGE THIS",
+	EnvEntraidOAuthClientSecret:    "CHANGE THIS",
 	EnvPantahub3rdAppLogoMaxSizeKb: "15",
 }
 

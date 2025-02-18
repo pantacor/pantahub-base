@@ -7,8 +7,8 @@ services:
       dockerfile: Dockerfile.development
     links:
       - mongo
-      - fluentd
       - localstack
+      - fluentd
       - elasticsearch
     volumes:
       - ${PWD}:/go/src/gitlab.com/pantacor/pantahub-base
@@ -99,27 +99,37 @@ services:
     networks:
       - base
     container_name: elasticsearch
-    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.3
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.2
     environment:
       - cluster.name=docker-cluster
       - bootstrap.memory_lock=true
       - discovery.type=single-node
-      - discovery.seed_hosts="localhost, 127.0.0.1"
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m -XX:-UseContainerSupport
       - xpack.security.enabled=false
       - xpack.watcher.enabled=false
       - xpack.security.transport.ssl.enabled=false
       - xpack.security.http.ssl.enabled=false
-    volumes:
-      - esdata:/usr/share/elasticsearch/data
+      - NODE_LOCK_PATH=/usr/share/elasticsearch/data/node.lock
+      - MUST_BE_WRITABLE=true
     ulimits:
       memlock:
         soft: -1
         hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    security_opt:
+      - seccomp=unconfined
+    mem_limit: 1g
+    cap_add:
+      - IPC_LOCK
     restart: always
     ports:
       - "9200:9200"
       - "9300:9300"
+    volumes:
+      - ${PWD}/.data/elasticsearch/:/usr/share/elasticsearch/data/
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
 
   localstack:
     networks:
@@ -135,7 +145,7 @@ services:
   kibana:
     networks:
       - base
-    image: docker.elastic.co/kibana/kibana:7.17.3
+    image: docker.elastic.co/kibana/kibana:8.17.2
     container_name: kibana
     volumes:
       - ./entrypoints/kibana.yml:/usr/share/kibana/config/kibana.yml
@@ -178,4 +188,3 @@ networks:
 
 volumes:
   esdata:
-

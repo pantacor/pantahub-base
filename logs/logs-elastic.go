@@ -69,7 +69,9 @@ type elasticLogger struct {
 var logger *fluent.Fluent = nil
 
 func getLogger() *fluent.Fluent {
-	if logger == nil {
+	portStr := utils.GetEnv(utils.EnvFluentPort)
+
+	if logger == nil && portStr != "" {
 		portStr := utils.GetEnv(utils.EnvFluentPort)
 		port, err := strconv.Atoi(portStr)
 		if err != nil {
@@ -121,7 +123,6 @@ func (s *elasticLogger) getAllIndexURL() (*url.URL, error) {
 }
 
 func (s *elasticLogger) register() error {
-
 	registerTemplatesURL, err := s.getTemplateURL()
 
 	if err != nil {
@@ -187,7 +188,7 @@ func (s *elasticLogger) unregister(deleteIndex bool) error {
 
 func (s *elasticLogger) getLogs(pctx context.Context, start int64, page int64, before *time.Time,
 	after *time.Time, query Filters, sort Sorts, cursor bool) (*Pager, error) {
-	queryFmt := fmt.Sprintf(s.elasticIndexPrefix + "-*/_search")
+	queryFmt := fmt.Sprintf("%s-*/_search", s.elasticIndexPrefix)
 
 	queryURL, err := url.Parse(queryFmt)
 

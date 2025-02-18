@@ -41,7 +41,7 @@ type RError struct {
 	IncidentID *int64 `json:"incident,omitempty"`
 	Error      string `json:"error"`
 	Msg        string `json:"msg,omitempty"`
-	Code       int    `json:"cod,omitemptye"`
+	Code       int    `json:"code,omitempty"`
 }
 
 func (userError *UserError) Error() string {
@@ -78,8 +78,12 @@ func RestError(w rest.ResponseWriter, err error, message string, statusCode int)
 }
 
 func getLogger() *fluent.Fluent {
+	portStr := GetEnv(EnvFluentPort)
+	if portStr == "" {
+		return nil
+	}
+
 	if logger == nil {
-		portStr := GetEnv(EnvFluentPort)
 		port, err := strconv.Atoi(portStr)
 		if err != nil {
 			log.Fatalln("FATAL: cannot read fluent logger settings: " + err.Error())
@@ -99,7 +103,7 @@ func LogError(errorMsg, userMsg string, code int) {
 
 	incidentStr := fmt.Sprintf("REST-ERR-ID-%d", incidentID)
 	incidentDetails := fmt.Sprintf("ERROR| %s: %s", incidentStr, errorMsg)
-	log.Printf(incidentDetails)
+	log.Printf("ERROR: %s", incidentDetails)
 
 	rError := RError{
 		IncidentID: &incidentID,
@@ -119,7 +123,7 @@ func restErrorWrapperInternal(w rest.ResponseWriter, errorStr, userMsg string, c
 
 	incidentStr := fmt.Sprintf("REST-ERR-ID-%d", incidentID)
 	incidentDetails := fmt.Sprintf("ERROR| %s: %s", incidentStr, errorStr)
-	log.Printf(incidentDetails)
+	log.Printf("ERROR: %s", incidentDetails)
 
 	rError := RError{
 		IncidentID: &incidentID,
@@ -164,7 +168,7 @@ func HttpErrorWrapper(w http.ResponseWriter, errorStr string, code int) {
 
 	incidentStr := fmt.Sprintf("REST-ERR-ID-%d", incidentID)
 	incidentDetails := fmt.Sprintf("ERROR| %s: %s", incidentStr, errorStr)
-	log.Printf(incidentDetails)
+	log.Printf("ERROR: %s", incidentDetails)
 
 	rError := RError{
 		IncidentID: &incidentID,

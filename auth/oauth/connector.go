@@ -65,29 +65,35 @@ const (
 	// ServiceGitlab gitlab service enum
 	ServiceGitlab = ServiceType("gitlab")
 
+	// ServiceEntraid entraid service enum
+	ServiceEntraid = ServiceType("entraid")
+
 	oauthCookie    = "oauthstate"
 	redirectCookie = "redirecturi"
 )
 
 // ServicesConfigs get service config
 var ServicesConfigs = map[ServiceType]GetServiceConfigFunc{
-	ServiceGoogle: GetGoogleConfig,
-	ServiceGithub: GetGithubConfig,
-	ServiceGitlab: GetGitlabConfig,
+	ServiceGoogle:  GetGoogleConfig,
+	ServiceGithub:  GetGithubConfig,
+	ServiceGitlab:  GetGitlabConfig,
+	ServiceEntraid: GetEntraidConfig,
 }
 
 // ServicesAutorize get service config
 var ServicesAutorize = map[ServiceType]AuthorizeServiceFunc{
-	ServiceGoogle: GoogleAuthorize,
-	ServiceGithub: GithubAuthorize,
-	ServiceGitlab: GitlabAuthorize,
+	ServiceGoogle:  GoogleAuthorize,
+	ServiceGithub:  GithubAuthorize,
+	ServiceGitlab:  GitlabAuthorize,
+	ServiceEntraid: EntraidAuthorize,
 }
 
 // ServicesCallback callback process by service
 var ServicesCallback = map[ServiceType]CallbackServiceFunc{
-	ServiceGoogle: GoogleCb,
-	ServiceGithub: GithubCb,
-	ServiceGitlab: GitlabCb,
+	ServiceGoogle:  GoogleCb,
+	ServiceGithub:  GithubCb,
+	ServiceGitlab:  GitlabCb,
+	ServiceEntraid: EntraidCb,
 }
 
 // AuthorizeByService use service to autorize
@@ -119,6 +125,8 @@ func CbByService(r *rest.Request) (*ResponsePayload, error) {
 	if err != nil {
 		return payload, fmt.Errorf("%s error -- %s", service, err)
 	}
+
+	fmt.Println("payload", payload)
 
 	oauthState, err := r.Cookie(oauthCookie)
 	if err != nil {

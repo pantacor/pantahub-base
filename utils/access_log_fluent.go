@@ -96,6 +96,12 @@ func (mw *AccessLogFluentMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.Han
 		var host string
 
 		portStr := GetEnv(EnvFluentPort)
+		if portStr == "" {
+			return func(w rest.ResponseWriter, r *rest.Request) {
+				h(w, r)
+			}
+		}
+
 		port, err = strconv.Atoi(portStr)
 		if err != nil {
 			log.Fatalln("FATAL: cannot read fluent logger settings: " + err.Error())

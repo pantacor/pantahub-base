@@ -49,21 +49,18 @@ type googlePayload struct {
 
 // GetGoogleConfig get configuration from return URL
 func GetGoogleConfig() *oauth2.Config {
+	scheme := utils.GetEnv(utils.EnvPantahubScheme)
+	host := utils.GetEnv(utils.EnvPantahubHost)
 	port := utils.GetEnv(utils.EnvPantahubPort)
+	if port != "80" && port != "443" && port != "" {
+		host = fmt.Sprintf("%s:%s", host, port)
+	}
 	url := fmt.Sprintf(
 		"%s://%s/auth/oauth/callback/google",
-		utils.GetEnv(utils.EnvPantahubScheme),
-		utils.GetEnv(utils.EnvPantahubHost),
+		scheme,
+		host,
 	)
 
-	if port != "80" && port != "443" && port != "" {
-		url = fmt.Sprintf(
-			"%s://%s:%s/auth/oauth/callback/google",
-			utils.GetEnv(utils.EnvPantahubScheme),
-			utils.GetEnv(utils.EnvPantahubHost),
-			utils.GetEnv(utils.EnvPantahubPort),
-		)
-	}
 	return &oauth2.Config{
 		RedirectURL:  url,
 		ClientID:     googleClientID,
