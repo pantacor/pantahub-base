@@ -25,6 +25,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -95,6 +96,21 @@ func (a *App) handlePutDeviceData(w rest.ResponseWriter, r *rest.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
+
+	var device Device
+	err = collection.FindOne(ctx, bson.M{
+		"_id": deviceObjectID,
+		"prn": owner.(string),
+	}).Decode(&device)
+	if err != nil && mongoutils.IsNotFound(err) {
+		utils.RestErrorWrapper(w, "Device not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
+		return
+	}
+
 	updateResult, err := collection.UpdateOne(
 		ctx,
 		bson.M{
@@ -203,6 +219,20 @@ func (a *App) handlePatchDeviceData(w rest.ResponseWriter, r *rest.Request) {
 	}
 	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
+
+	err = collection.FindOne(ctx, bson.M{
+		"prn":     callerStr,
+		"garbage": bson.M{"$ne": true},
+	}).Decode(&device)
+	if err != nil && mongoutils.IsNotFound(err) {
+		utils.RestErrorWrapper(w, "Device not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
+		return
+	}
+
 	updateResult, err := collection.UpdateOne(
 		ctx,
 		bson.M{

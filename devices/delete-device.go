@@ -25,6 +25,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gopkg.in/mgo.v2/bson"
@@ -73,6 +74,10 @@ func (a *App) handleDeleteDevice(w rest.ResponseWriter, r *rest.Request) {
 		"_id":     deviceObjectID,
 		"garbage": bson.M{"$ne": true},
 	}).Decode(&device)
+	if err != nil && mongoutils.IsNotFound(err) {
+		utils.RestErrorWrapper(w, "Device not found", http.StatusNotFound)
+		return
+	}
 	if err != nil {
 		if err != mongo.ErrNoDocuments {
 			log.Println("Error deleting device: " + err.Error())

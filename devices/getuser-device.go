@@ -27,6 +27,7 @@ import (
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/accounts/accountsdata"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -125,6 +126,10 @@ func (a *App) handleGetUserDevice(w rest.ResponseWriter, r *rest.Request) {
 		"nick":    devicenick,
 		"garbage": bson.M{"$ne": true},
 	}).Decode(&device)
+	if err != nil && mongoutils.IsNotFound(err) {
+		utils.RestErrorWrapper(w, "Device not found", http.StatusNotFound)
+		return
+	}
 
 	if err != nil {
 		log.Println("ERROR: error getting device by nick: " + err.Error())

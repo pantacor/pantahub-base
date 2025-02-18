@@ -27,6 +27,7 @@ import (
 	jwtgo "github.com/dgrijalva/jwt-go"
 	petname "github.com/dustinkirkland/golang-petname"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/mgo.v2/bson"
@@ -96,6 +97,11 @@ func (a *App) handlePutDevice(w rest.ResponseWriter, r *rest.Request) {
 	err = collection.FindOne(ctx,
 		bson.M{"_id": deviceObjectID}).
 		Decode(&newDevice)
+
+	if err != nil && mongoutils.IsNotFound(err) {
+		utils.RestErrorWrapper(w, "Device not found", http.StatusNotFound)
+		return
+	}
 
 	if err != nil {
 		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)

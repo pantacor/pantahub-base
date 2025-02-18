@@ -24,6 +24,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/mgo.v2/bson"
@@ -84,6 +85,10 @@ func (a *App) handlePutPublic(w rest.ResponseWriter, r *rest.Request) {
 		"garbage": bson.M{"$ne": true},
 	}).Decode(&newDevice)
 
+	if err != nil && mongoutils.IsNotFound(err) {
+		utils.RestErrorWrapper(w, "Device not found", http.StatusNotFound)
+		return
+	}
 	if err != nil {
 		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
@@ -170,6 +175,10 @@ func (a *App) handleDeletePublic(w rest.ResponseWriter, r *rest.Request) {
 		"_id":     deviceObjectID,
 		"garbage": bson.M{"$ne": true},
 	}).Decode(&newDevice)
+	if err != nil && mongoutils.IsNotFound(err) {
+		utils.RestErrorWrapper(w, "Device not found", http.StatusNotFound)
+		return
+	}
 	if err != nil {
 		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
