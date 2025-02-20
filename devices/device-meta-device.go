@@ -199,7 +199,10 @@ func (a *App) handlePatchDeviceData(w rest.ResponseWriter, r *rest.Request) {
 		"prn":     callerStr,
 		"garbage": bson.M{"$ne": true},
 	}).Decode(&device)
-
+	if err != nil && mongoutils.IsNotFound(err) {
+		utils.RestErrorWrapper(w, "Device not found", http.StatusNotFound)
+		return
+	}
 	if err != nil {
 		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
@@ -216,21 +219,6 @@ func (a *App) handlePatchDeviceData(w rest.ResponseWriter, r *rest.Request) {
 		if v == nil {
 			delete(device.DeviceMeta, k)
 		}
-	}
-	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
-	defer cancel()
-
-	err = collection.FindOne(ctx, bson.M{
-		"prn":     callerStr,
-		"garbage": bson.M{"$ne": true},
-	}).Decode(&device)
-	if err != nil && mongoutils.IsNotFound(err) {
-		utils.RestErrorWrapper(w, "Device not found", http.StatusNotFound)
-		return
-	}
-	if err != nil {
-		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
-		return
 	}
 
 	updateResult, err := collection.UpdateOne(
