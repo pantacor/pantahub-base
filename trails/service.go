@@ -281,6 +281,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		rest.Put("/#id/steps/#rev/state", utils.ScopeFilter(writeTrailsScopes, app.handlePutStepState)),
 		rest.Put("/#id/steps/#rev/progress", utils.ScopeFilter(writeTrailsScopes, app.handlePutStepProgress)),
 		rest.Put("/#id/steps/#rev/cancel", utils.ScopeFilter(writeTrailsScopes, app.handlePutStepProgressCancel)),
+		rest.Put("/#id/steps/#rev/wontgo", utils.ScopeFilter(writeTrailsScopes, app.handlePutStepProgressWontgo)),
 		rest.Get("/#id/summary", utils.ScopeFilter(readTrailsScopes, app.handleGetTrailStepSummary)),
 	)
 	app.API.Use(&tracer.OtelMiddleware{
