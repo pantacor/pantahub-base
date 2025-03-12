@@ -84,7 +84,7 @@ deploy-devel:
         - echo -n $KUBE_CONFIG_DEV | base64 -d > $HOME/.kube/config
         - kubectl set image deploy/pv-pantahub-base pantahub-base=$CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
     only:
-        - master
+        - develop
 
 deploy-prod:
     stage: deploy
