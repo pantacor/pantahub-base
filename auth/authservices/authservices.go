@@ -63,7 +63,8 @@ func CreateUserToken(payload *authmodels.LoginRequestPayload, jwtMiddleware *jwt
 	claims := token.Claims.(jwtgo.MapClaims)
 
 	if jwtMiddleware.PayloadFunc != nil {
-		for key, value := range jwtMiddleware.PayloadFunc(payload.Username) {
+		acc := jwtMiddleware.PayloadFunc(payload.Username)
+		for key, value := range acc {
 			claims[key] = value
 		}
 	}
@@ -85,7 +86,7 @@ func CreateUserToken(payload *authmodels.LoginRequestPayload, jwtMiddleware *jwt
 			service := tokenservice.New(repo)
 			authToken, err = service.GetToken(context.Background(), tokenid, "")
 			if err != nil {
-				return tokenString, rerr
+				log.Printf("ERROR: service.GetToken: %s", err.Error())
 			}
 		}
 	}

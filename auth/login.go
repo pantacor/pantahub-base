@@ -17,6 +17,7 @@
 package auth
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/ant0ine/go-json-rest/rest"
@@ -41,6 +42,16 @@ func (a *App) getTokenUsingPassword(writer rest.ResponseWriter, r *rest.Request)
 
 	tokenString, rerr := authservices.CreateUserToken(payload, a.jwtMiddleware, a.mongoClient)
 	if rerr != nil {
+		utils.RestErrorWrite(writer, rerr)
+		return
+	}
+
+	if tokenString == "" {
+		rerr = &utils.RError{
+			Msg:   fmt.Sprintf("can get token for %s", payload.Username),
+			Error: "Authentication Failed",
+			Code:  http.StatusUnauthorized,
+		}
 		utils.RestErrorWrite(writer, rerr)
 		return
 	}
