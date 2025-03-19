@@ -28,7 +28,11 @@ func bsonQuoteMap(m *map[string]interface{}) map[string]interface{} {
 	escapedMap := map[string]interface{}{}
 	for k, v := range *m {
 		nk := BsonQuoteAndDollar(k)
-		escapedMap[nk] = v
+		if strVal, ok := v.(string); ok {
+			escapedMap[nk] = quoteDollar(strVal)
+		} else {
+			escapedMap[nk] = v
+		}
 	}
 	return escapedMap
 }
@@ -38,7 +42,11 @@ func bsonUnquoteMap(m *map[string]interface{}) map[string]interface{} {
 	escapedMap := map[string]interface{}{}
 	for k, v := range *m {
 		nk := BsonUnquoteAndDollar(k)
-		escapedMap[nk] = v
+		if strVal, ok := v.(string); ok {
+			escapedMap[nk] = unquoteDollar(strVal)
+		} else {
+			escapedMap[nk] = v
+		}
 	}
 	return escapedMap
 }
