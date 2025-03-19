@@ -17,11 +17,14 @@
 package utils
 
 import (
+	"fmt"
 	"strings"
+
+	cjson "github.com/gibson042/canonicaljson-go"
+	"github.com/microcosm-cc/bluemonday"
 )
 
-// BsonQuoteMap create a new map of quotes with escaped indexes
-func BsonQuoteMap(m *map[string]interface{}) map[string]interface{} {
+func bsonQuoteMap(m *map[string]interface{}) map[string]interface{} {
 	escapedMap := map[string]interface{}{}
 	for k, v := range *m {
 		nk := BsonQuoteAndDollar(k)
@@ -31,12 +34,58 @@ func BsonQuoteMap(m *map[string]interface{}) map[string]interface{} {
 }
 
 // BsonUnquoteMap create a new map of quotes with unescaped indexes
-func BsonUnquoteMap(m *map[string]interface{}) map[string]interface{} {
+func bsonUnquoteMap(m *map[string]interface{}) map[string]interface{} {
 	escapedMap := map[string]interface{}{}
 	for k, v := range *m {
 		nk := BsonUnquoteAndDollar(k)
 		escapedMap[nk] = v
 	}
+	return escapedMap
+}
+
+// BsonQuoteMap create a new map of quotes with escaped indexes
+func BsonQuoteMap(m *map[string]interface{}) map[string]interface{} {
+	quoted := bsonQuoteMap(m)
+	b, err := cjson.Marshal(quoted)
+	if err != nil {
+		fmt.Println("error marshal on BsonQuoteMap")
+		fmt.Println(err.Error())
+
+		return bsonQuoteMap(m)
+	}
+
+	escapedMap := map[string]interface{}{}
+	err = cjson.Unmarshal([]byte(quoteDollar(string(b))), &escapedMap)
+	if err != nil {
+		fmt.Println("error Unmarshal on BsonQuoteMap")
+		fmt.Println(err.Error())
+
+		return bsonQuoteMap(m)
+	}
+
+	return escapedMap
+}
+
+// BsonUnquoteMap create a new map of quotes with unescaped indexes
+func BsonUnquoteMap(m *map[string]interface{}) map[string]interface{} {
+	unquoted := bsonUnquoteMap(m)
+	b, err := cjson.Marshal(unquoted)
+	if err != nil {
+		fmt.Println("error marshal on BsonUnquoteMap")
+		fmt.Println(err.Error())
+
+		return bsonUnquoteMap(m)
+	}
+
+	escapedMap := map[string]interface{}{}
+	err = cjson.Unmarshal([]byte(unquoteDollar(string(b))), &escapedMap)
+	if err != nil {
+		fmt.Println("error Unmarshal on BsonUnquoteMap")
+		fmt.Println(err.Error())
+
+		return bsonUnquoteMap(m)
+	}
+
 	return escapedMap
 }
 
@@ -63,5 +112,10 @@ func unquoteDollar(s string) string {
 }
 
 func quoteDollar(s string) string {
-	return strings.Replace(s, "$", "\uFFE0", -1)
+	return sanitizeInput(strings.Replace(s, "$", "\uFFE0", -1))
+}
+
+func sanitizeInput(input string) string {
+	p := bluemonday.UGCPolicy() // Allows safe HTML but removes scripts
+	return p.Sanitize(input)
 }
