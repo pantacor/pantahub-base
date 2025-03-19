@@ -24,7 +24,7 @@ import (
 func BsonQuoteMap(m *map[string]interface{}) map[string]interface{} {
 	escapedMap := map[string]interface{}{}
 	for k, v := range *m {
-		nk := strings.Replace(k, ".", "\uFF2E", -1)
+		nk := BsonQuoteAndDollar(k)
 		escapedMap[nk] = v
 	}
 	return escapedMap
@@ -34,8 +34,34 @@ func BsonQuoteMap(m *map[string]interface{}) map[string]interface{} {
 func BsonUnquoteMap(m *map[string]interface{}) map[string]interface{} {
 	escapedMap := map[string]interface{}{}
 	for k, v := range *m {
-		nk := strings.Replace(k, "\uFF2E", ".", -1)
+		nk := BsonUnquoteAndDollar(k)
 		escapedMap[nk] = v
 	}
 	return escapedMap
+}
+
+func BsonUnquoteAndDollar(s string) string {
+	return BsonUnquote(unquoteDollar(s))
+}
+
+func BsonQuoteAndDollar(s string) string {
+	return BsonQuote(quoteDollar(s))
+}
+
+// BsonUnquote unquote a string
+func BsonUnquote(s string) string {
+	return strings.Replace(s, "\uFF2E", ".", -1)
+}
+
+// BsonQuote quote a string
+func BsonQuote(s string) string {
+	return strings.Replace(s, ".", "\uFF2E", -1)
+}
+
+func unquoteDollar(s string) string {
+	return strings.Replace(s, "\uFFE0", "$", -1)
+}
+
+func quoteDollar(s string) string {
+	return strings.Replace(s, "$", "\uFFE0", -1)
 }
