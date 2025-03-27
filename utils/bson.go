@@ -59,7 +59,7 @@ func BsonQuoteMap(m *map[string]interface{}) map[string]interface{} {
 		fmt.Println("error marshal on BsonQuoteMap")
 		fmt.Println(err.Error())
 
-		return bsonQuoteMap(m)
+		return quoted
 	}
 
 	escapedMap := map[string]interface{}{}
@@ -68,7 +68,7 @@ func BsonQuoteMap(m *map[string]interface{}) map[string]interface{} {
 		fmt.Println("error Unmarshal on BsonQuoteMap")
 		fmt.Println(err.Error())
 
-		return bsonQuoteMap(m)
+		return quoted
 	}
 
 	return escapedMap
@@ -82,7 +82,7 @@ func BsonUnquoteMap(m *map[string]interface{}) map[string]interface{} {
 		fmt.Println("error marshal on BsonUnquoteMap")
 		fmt.Println(err.Error())
 
-		return bsonUnquoteMap(m)
+		return unquoted
 	}
 
 	escapedMap := map[string]interface{}{}
@@ -91,7 +91,7 @@ func BsonUnquoteMap(m *map[string]interface{}) map[string]interface{} {
 		fmt.Println("error Unmarshal on BsonUnquoteMap")
 		fmt.Println(err.Error())
 
-		return bsonUnquoteMap(m)
+		return unquoted
 	}
 
 	return escapedMap
@@ -120,10 +120,10 @@ func unquoteDollar(s string) string {
 }
 
 func quoteDollar(s string) string {
-	return sanitizeInput(strings.Replace(s, "$", "\uFFE0", -1))
+	return strings.Replace(s, "$", "\uFFE0", -1)
 }
 
-func sanitizeInput(input string) string {
+func SanitizeInput(input string) string {
 	p := bluemonday.UGCPolicy() // Allows safe HTML but removes scripts
 	return p.Sanitize(input)
 }

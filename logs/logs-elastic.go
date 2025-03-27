@@ -453,6 +453,7 @@ func (s *elasticLogger) postLogsv1(parentCtx context.Context, e []Entry) error {
 	if s.syncWrites {
 		buildURLStr = buildURLStr + "?refresh=wait_for"
 	}
+
 	bulkPostURL, err := url.Parse(buildURLStr)
 	if err != nil {
 		return err
