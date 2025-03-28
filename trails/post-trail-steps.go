@@ -29,10 +29,11 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
+	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"gopkg.in/mgo.v2/bson"
 )
 
 // handlePostStep Post a new step to the head of the trail.
@@ -60,11 +61,10 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["owner"]
 
-	// if not a device there wont be an owner; so we use the caller (aka prn)
+	// if not a device there won't be an owner; so we use the caller (aka prn)
 	if !ok {
 		owner, ok = r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 		if !ok {
-			// XXX: find right error
 			utils.RestErrorWrapper(w, "You need to be logged in as user or device", http.StatusForbidden)
 			return
 		}
@@ -82,8 +82,6 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 	trailID := r.PathParam("id")
 	trail := trailmodels.Trail{}
 
-	ctx, cancel := context.WithTimeout(rContext, 10*time.Second)
-	defer cancel()
 	trailObjectID, err := primitive.ObjectIDFromHex(trailID)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
@@ -91,10 +89,14 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if authType == "USER" || authType == "DEVICE" || authType == "SESSION" {
-		err = collTrails.FindOne(ctx, bson.M{
+		ctx, cancel := context.WithTimeout(rContext, 10*time.Second)
+		defer cancel()
+
+		query := bson.M{
 			"_id":     trailObjectID,
 			"garbage": bson.M{"$ne": true},
-		}).Decode(&trail)
+		}
+		err = collTrails.FindOne(ctx, query).Decode(&trail)
 	} else {
 		utils.RestErrorWrapper(w, "Need to be logged in as USER to post trail steps", http.StatusForbidden)
 		return
@@ -111,9 +113,23 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	collSteps := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
-
 	if collSteps == nil {
 		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+
+	collDevices := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
+	if collDevices == nil {
+		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
+		return
+	}
+
+	var device devices.Device
+	ctx, cancel := context.WithTimeout(rContext, 10*time.Second)
+	defer cancel()
+	err = collDevices.FindOne(ctx, bson.M{"_id": trail.ID}).Decode(&device)
+	if err != nil {
+		utils.RestErrorWrapper(w, "device doesn't exist", http.StatusInternalServerError)
 		return
 	}
 
@@ -122,38 +138,32 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 	r.DecodeJsonPayload(&newStep)
 
 	if newStep.Rev == -1 {
-		trailObjectID, err := primitive.ObjectIDFromHex(trailID)
-		if err != nil {
-			utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
-			return
-		}
 		ctx, cancel := context.WithTimeout(rContext, 10*time.Second)
 		defer cancel()
+
 		newStep.Rev, err = a.getLatestStepRev(ctx, trailObjectID)
 		if err != nil {
 			utils.RestErrorWrapper(w, "Error with getLatestStepRev: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+
 		newStep.Rev++
 	}
 
-	if err != nil {
-		utils.RestErrorWrapper(w, "Error auto appending step 1 "+err.Error(), http.StatusInternalServerError)
-		return
-	}
+	if newStep.Rev > 0 {
+		previousStepID := trailID + "-" + strconv.Itoa(newStep.Rev-1)
+		ctx, cancel = context.WithTimeout(rContext, 10*time.Second)
+		defer cancel()
 
-	stepID := trailID + "-" + strconv.Itoa(newStep.Rev-1)
-	ctx, cancel = context.WithTimeout(rContext, 10*time.Second)
-	defer cancel()
-	err = collSteps.FindOne(ctx, bson.M{
-		"_id":     stepID,
-		"garbage": bson.M{"$ne": true},
-	}).Decode(&previousStep)
-
-	if err != nil {
-		// XXX: figure how to be better on error cases here...
-		utils.RestErrorWrapper(w, "No access to resource or bad step "+stepID, http.StatusInternalServerError)
-		return
+		query := bson.M{
+			"_id":     previousStepID,
+			"garbage": bson.M{"$ne": true},
+		}
+		err = collSteps.FindOne(ctx, query).Decode(&previousStep)
+		if err != nil {
+			utils.RestErrorWrapper(w, "No access to resource or bad step "+previousStepID, http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// XXX: introduce step diffs here and store them precalced
@@ -170,7 +180,6 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 	newStep.ProgressTime = time.Unix(0, 0)
 	newStep.TimeCreated = now
 	newStep.TimeModified = now
-	newStep.IsPublic = previousStep.IsPublic
 
 	ctx, cancel = context.WithTimeout(rContext, 10*time.Second)
 	defer cancel()
@@ -221,7 +230,6 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 	)
 
 	if err != nil {
-		// XXX: figure how to be better on error cases here...
 		utils.RestErrorWrapper(w, "No access to resource or bad step rev1 "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -242,7 +250,6 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 	if err != nil {
-		// XXX: figure how to be better on error cases here...
 		log.Printf("Error updating last-touched for trail in poststep; not failing because step was written: %s\n  => ERROR: %s\n ", trail.ID.Hex(), err.Error())
 	}
 
