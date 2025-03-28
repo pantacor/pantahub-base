@@ -313,7 +313,7 @@ func (s *mgoLogger) getLogsByCursor(parentCtx context.Context, nextCursor string
 	return nil, ErrCursorNotImplemented
 }
 
-func (s *mgoLogger) postLogs(parentCtx context.Context, e []Entry) error {
+func (s *mgoLogger) postLogs(parentCtx context.Context, e []Entry, debug bool) error {
 	collLogs := s.mongoClient.Database(utils.MongoDb).Collection(s.mgoCollection)
 
 	if collLogs == nil {

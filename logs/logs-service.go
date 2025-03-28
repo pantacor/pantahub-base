@@ -92,7 +92,7 @@ type Backend interface {
 	getLogs(ctx context.Context, start int64, page int64, before *time.Time, after *time.Time,
 		query Filters, sort Sorts, cursor bool) (*Pager, error)
 	getLogsByCursor(ctx context.Context, nextCursor string) (*Pager, error)
-	postLogs(parentCtx context.Context, e []Entry) error
+	postLogs(parentCtx context.Context, e []Entry, debug bool) error
 	register() error
 	unregister(deleteIndices bool) error
 }

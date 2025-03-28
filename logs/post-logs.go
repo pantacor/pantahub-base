@@ -86,6 +86,7 @@ func (a *App) handlePostLogs(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	newEntries := []Entry{}
+	debug := false
 
 	for _, v := range entries {
 		v.ID, err = primitive.ObjectIDFromHex(bson.NewObjectId().Hex())
@@ -102,7 +103,7 @@ func (a *App) handlePostLogs(w rest.ResponseWriter, r *rest.Request) {
 		newEntries = append(newEntries, v)
 	}
 
-	err = a.backend.postLogs(ctx, newEntries)
+	err = a.backend.postLogs(ctx, newEntries, debug)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error posting logs "+err.Error(), http.StatusInternalServerError)
 		log.Println("ERROR: Error posting logs " + err.Error())

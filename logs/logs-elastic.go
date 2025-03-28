@@ -87,11 +87,11 @@ func getLogger() *fluent.Fluent {
 	return logger
 }
 
-func (s *elasticLogger) r(timeout int) *resty.Request {
+func (s *elasticLogger) r(timeout int, debug bool) *resty.Request {
 	if timeout == 0 {
 		timeout = 15
 	}
-	request := utils.RT(timeout)
+	request := utils.RT(timeout, debug)
 	if s.elasticBasicAuthUser != "" {
 		request.SetBasicAuth(s.elasticBasicAuthUser, s.elasticBasicAuthPass)
 	}
@@ -129,7 +129,7 @@ func (s *elasticLogger) register() error {
 		return err
 	}
 
-	response, err := s.r(defaultTimeoutSec).SetBody(s.template).Put(registerTemplatesURL.String())
+	response, err := s.r(defaultTimeoutSec, false).SetBody(s.template).Put(registerTemplatesURL.String())
 
 	if err != nil {
 		return err
@@ -151,7 +151,7 @@ func (s *elasticLogger) unregister(deleteIndex bool) error {
 		return err
 	}
 
-	response, err := s.r(defaultTimeoutSec).Delete(registerTemplatesURL.String())
+	response, err := s.r(defaultTimeoutSec, false).Delete(registerTemplatesURL.String())
 
 	if err != nil {
 		return err
@@ -172,7 +172,7 @@ func (s *elasticLogger) unregister(deleteIndex bool) error {
 		return err
 	}
 
-	response, err = s.r(defaultTimeoutSec).Delete(allIndexURL.String())
+	response, err = s.r(defaultTimeoutSec, false).Delete(allIndexURL.String())
 
 	if err != nil {
 		return err
@@ -283,7 +283,7 @@ func (s *elasticLogger) getLogs(pctx context.Context, start int64, page int64, b
 		queryURI.RawQuery = q1.Encode()
 	}
 
-	response, err := s.r(defaultTimeoutSec).SetContext(pctx).SetBody(searchBody).Post(queryURI.String())
+	response, err := s.r(defaultTimeoutSec, false).SetContext(pctx).SetBody(searchBody).Post(queryURI.String())
 	if err != nil {
 		return nil, err
 	}
@@ -363,7 +363,7 @@ func (s *elasticLogger) getLogsByCursor(pctx context.Context, nextCursor string)
 		return nil, err
 	}
 
-	response, err := s.r(defaultTimeoutSec).SetContext(pctx).SetBody(searchBody).Post(queryURI.String())
+	response, err := s.r(defaultTimeoutSec, false).SetContext(pctx).SetBody(searchBody).Post(queryURI.String())
 	if err != nil {
 		return nil, err
 	}
@@ -400,16 +400,20 @@ func (s *elasticLogger) getLogsByCursor(pctx context.Context, nextCursor string)
 	return &pagerResult, nil
 }
 
-func (s *elasticLogger) postLogs(parentCtx context.Context, e []Entry) error {
+func (s *elasticLogger) postLogs(parentCtx context.Context, e []Entry, debug bool) error {
 	logsVersion := utils.GetEnv("PH_DEVICE_LOGS_VERSION")
-	if logsVersion == "v2" {
-		return s.postLogsv2(parentCtx, e)
+	if debug {
+		fmt.Printf("PH_DEVICE_LOGS_VERSION %s\n", logsVersion)
 	}
 
-	return s.postLogsv1(parentCtx, e)
+	if logsVersion == "v2" {
+		return s.postLogsv2(parentCtx, e, debug)
+	}
+
+	return s.postLogsv1(parentCtx, e, debug)
 }
 
-func (s *elasticLogger) postLogsv2(_ context.Context, e []Entry) error {
+func (s *elasticLogger) postLogsv2(_ context.Context, e []Entry, _ bool) error {
 	logger := getLogger()
 	for _, v := range e {
 		eventTime := time.Unix(v.LogTSec, v.LogTNano)
@@ -439,7 +443,7 @@ func (s *elasticLogger) postLogsv2(_ context.Context, e []Entry) error {
 	return nil
 }
 
-func (s *elasticLogger) postLogsv1(parentCtx context.Context, e []Entry) error {
+func (s *elasticLogger) postLogsv1(parentCtx context.Context, e []Entry, debug bool) error {
 	if !s.works {
 		return errors.New("logger not initialized/works")
 	}
@@ -460,6 +464,9 @@ func (s *elasticLogger) postLogsv1(parentCtx context.Context, e []Entry) error {
 	}
 
 	postURL := s.elasticURL.ResolveReference(bulkPostURL)
+	if debug {
+		fmt.Printf("postURL %s\n", postURL)
+	}
 
 	for _, v := range e {
 		// write the bulkd op)
@@ -498,14 +505,22 @@ func (s *elasticLogger) postLogsv1(parentCtx context.Context, e []Entry) error {
 		}
 	}
 
-	response, err := s.r(defaultTimeoutSec).
+	payload := buf.String()
+	if debug {
+		fmt.Printf("request to elastic is %s\n", payload)
+	}
+
+	response, err := s.r(defaultTimeoutSec, debug).
 		SetContext(parentCtx).
-		SetBody(buf.String()).
+		SetBody(payload).
 		SetHeader("Content-Type", "application/x-ndjson").
 		Post(postURL.String())
-
 	if err != nil {
 		return err
+	}
+
+	if debug {
+		fmt.Printf("elastic response %s\n", string(response.Body()))
 	}
 
 	if response.StatusCode() != http.StatusOK {

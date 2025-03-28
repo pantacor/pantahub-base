@@ -29,7 +29,7 @@ func bsonQuoteMap(m *map[string]interface{}) map[string]interface{} {
 	for k, v := range *m {
 		nk := BsonQuoteAndDollar(k)
 		if strVal, ok := v.(string); ok {
-			escapedMap[nk] = quoteDollar(strVal)
+			escapedMap[nk] = QuoteDollar(strVal)
 		} else {
 			escapedMap[nk] = v
 		}
@@ -43,7 +43,7 @@ func bsonUnquoteMap(m *map[string]interface{}) map[string]interface{} {
 	for k, v := range *m {
 		nk := BsonUnquoteAndDollar(k)
 		if strVal, ok := v.(string); ok {
-			escapedMap[nk] = unquoteDollar(strVal)
+			escapedMap[nk] = UnquoteDollar(strVal)
 		} else {
 			escapedMap[nk] = v
 		}
@@ -63,7 +63,7 @@ func BsonQuoteMap(m *map[string]interface{}) map[string]interface{} {
 	}
 
 	escapedMap := map[string]interface{}{}
-	err = cjson.Unmarshal([]byte(quoteDollar(string(b))), &escapedMap)
+	err = cjson.Unmarshal([]byte(QuoteDollar(string(b))), &escapedMap)
 	if err != nil {
 		fmt.Println("error Unmarshal on BsonQuoteMap")
 		fmt.Println(err.Error())
@@ -86,7 +86,7 @@ func BsonUnquoteMap(m *map[string]interface{}) map[string]interface{} {
 	}
 
 	escapedMap := map[string]interface{}{}
-	err = cjson.Unmarshal([]byte(unquoteDollar(string(b))), &escapedMap)
+	err = cjson.Unmarshal([]byte(UnquoteDollar(string(b))), &escapedMap)
 	if err != nil {
 		fmt.Println("error Unmarshal on BsonUnquoteMap")
 		fmt.Println(err.Error())
@@ -98,11 +98,11 @@ func BsonUnquoteMap(m *map[string]interface{}) map[string]interface{} {
 }
 
 func BsonUnquoteAndDollar(s string) string {
-	return BsonUnquote(unquoteDollar(s))
+	return BsonUnquote(UnquoteDollar(s))
 }
 
 func BsonQuoteAndDollar(s string) string {
-	return BsonQuote(quoteDollar(s))
+	return BsonQuote(QuoteDollar(s))
 }
 
 // BsonUnquote unquote a string
@@ -115,11 +115,11 @@ func BsonQuote(s string) string {
 	return strings.Replace(s, ".", "\uFF2E", -1)
 }
 
-func unquoteDollar(s string) string {
+func UnquoteDollar(s string) string {
 	return strings.Replace(s, "\uFFE0", "$", -1)
 }
 
-func quoteDollar(s string) string {
+func QuoteDollar(s string) string {
 	return strings.Replace(s, "$", "\uFFE0", -1)
 }
 

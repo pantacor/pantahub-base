@@ -46,13 +46,12 @@ func init() {
 // R create a *resty.Request honouring global client settings configurable
 // through environments.
 func R() *resty.Request {
-	return RT(60)
+	return RT(60, debugEnabled)
 }
 
-func RT(timeout int) *resty.Request {
-
+func RT(timeout int, debug bool) *resty.Request {
 	return resty.
 		SetTimeout(time.Duration(timeout) * time.Second).
-		SetDebug(debugEnabled).
+		SetDebug(debug || debugEnabled).
 		SetAllowGetMethodPayload(true).R()
 }

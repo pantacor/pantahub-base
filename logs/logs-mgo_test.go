@@ -78,7 +78,7 @@ func doLog() error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	err := mgoTestLogger.postLogs(ctx, logs)
+	err := mgoTestLogger.postLogs(ctx, logs, false)
 	return err
 }
 
@@ -129,7 +129,7 @@ func testMongoDoGetLogs(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	err := mgoTestLogger.postLogs(ctx, logs)
+	err := mgoTestLogger.postLogs(ctx, logs, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
@@ -187,7 +187,7 @@ func testMongoDoGetLogsAfter(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	err := mgoTestLogger.postLogs(ctx, logs)
+	err := mgoTestLogger.postLogs(ctx, logs, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())

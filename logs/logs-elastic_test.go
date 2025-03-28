@@ -38,7 +38,7 @@ func testElasticDoLog(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	err := elasticTestLogger.postLogs(ctx, logs)
+	err := elasticTestLogger.postLogs(ctx, logs, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
@@ -60,7 +60,7 @@ func testElasticDoGetLogs(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	err := elasticTestLogger.postLogs(ctx, logs)
+	err := elasticTestLogger.postLogs(ctx, logs, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
@@ -120,7 +120,7 @@ func testElasticDoGetLogsAfter(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	err := elasticTestLogger.postLogs(ctx, logs)
+	err := elasticTestLogger.postLogs(ctx, logs, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())

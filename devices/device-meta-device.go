@@ -25,6 +25,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/decoder"
 	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"gopkg.in/mgo.v2/bson"
@@ -81,7 +82,7 @@ func (a *App) handlePutDeviceData(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	data := map[string]interface{}{}
-	err = r.DecodeJsonPayload(&data)
+	err = decoder.DecodeJsonPayload(r, &data)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error parsing data: "+err.Error(), http.StatusBadRequest)
 		return
