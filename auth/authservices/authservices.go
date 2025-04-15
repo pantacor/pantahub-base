@@ -270,9 +270,12 @@ func GetAccount(prnEmailNick string, mongoClient *mongo.Client) (accounts.Accoun
 func AccountAuth(idEmailNick string, secret string, mongoClient *mongo.Client) bool {
 
 	var (
-		err     error
-		account accounts.Account
+		err       error
+		account   accounts.Account
+		authToken *tokenmodels.AuthToken
 	)
+
+	authTokenValid := false
 
 	// validate if secret is a token
 	password, err := base64.RawStdEncoding.DecodeString(secret)
@@ -282,11 +285,16 @@ func AccountAuth(idEmailNick string, secret string, mongoClient *mongo.Client) b
 			tokenid := splitPassword[0]
 			repo := tokenrepo.New(mongoClient)
 			service := tokenservice.New(repo)
-			authToken, err := service.GetToken(context.Background(), tokenid, account.Prn)
-			if err == nil && authToken != nil && !authToken.Deleted && authToken.Secret == secret && authToken.ExpireAt.Unix() > time.Now().Unix() && authToken.Name == idEmailNick {
-				return true
+			authToken, err = service.GetToken(context.Background(), tokenid, account.Prn)
+			if err == nil && authToken != nil && !authToken.Deleted && authToken.Secret == secret && authToken.ExpireAt.Unix() > time.Now().Unix() {
+				authTokenValid = true
 			}
 		}
+	}
+
+	// if token is valid and the username for login is the token name login true
+	if authToken != nil && authTokenValid && authToken.Name == idEmailNick {
+		return true
 	}
 
 	account, err = GetAccount(idEmailNick, mongoClient)
@@ -297,6 +305,11 @@ func AccountAuth(idEmailNick string, secret string, mongoClient *mongo.Client) b
 	// account has still a challenge -> not activated -> fail to login
 	if account.Challenge != "" {
 		return false
+	}
+
+	// if the token is validated and the username to login is the email or nick it should be true is the token owner is the same
+	if authToken != nil && authTokenValid && authToken.Owner == account.Prn {
+		return true
 	}
 
 	// account has same password as the secret provided to func call -> success
