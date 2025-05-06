@@ -74,7 +74,8 @@ func (a *App) handleGetTokens(w rest.ResponseWriter, r *rest.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	cur, err := collection.Find(ctx, bson.M{
-		"owner": caller.(string),
+		"owner":    caller.(string),
+		"disabled": false,
 	}, findOptions)
 
 	if err != nil {

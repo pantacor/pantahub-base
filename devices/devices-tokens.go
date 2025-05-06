@@ -69,6 +69,7 @@ func (a *App) getBase64AutoTokenInfo(ctx context.Context, tokenBase64 string) (*
 	result := autoTokenInfo{}
 	result.Owner = res.Owner
 	result.UserMeta = utils.BsonQuoteMap(&res.DefaultUserMeta)
+	result.OVMode = res.OVMode
 
 	return &result, nil
 }
@@ -101,7 +102,29 @@ func (a *App) EnsureTokenIndices() error {
 	CreateIndexesOptions.SetMaxTime(10 * time.Second)
 
 	indexOptions = options.IndexOptions{}
-	indexOptions.SetUnique(true)
+	indexOptions.SetUnique(false)
+	indexOptions.SetSparse(false)
+	indexOptions.SetBackground(true)
+
+	index = mongo.IndexModel{
+		Keys: bsonx.Doc{
+			{Key: "nick", Value: bsonx.Int32(1)},
+			{Key: "owner", Value: bsonx.Int32(1)},
+		},
+		Options: &indexOptions,
+	}
+	collection = a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
+	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
+	if err != nil {
+		log.Fatalln("Error setting up index for pantahub_devices_tokens: " + err.Error())
+		return nil
+	}
+
+	CreateIndexesOptions = options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+
+	indexOptions = options.IndexOptions{}
+	indexOptions.SetUnique(false)
 	indexOptions.SetSparse(false)
 	indexOptions.SetBackground(true)
 

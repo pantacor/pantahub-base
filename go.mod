@@ -1,8 +1,8 @@
 module gitlab.com/pantacor/pantahub-base
 
-go 1.22
+go 1.23
 
-toolchain go1.22.6
+toolchain go1.23.8
 
 require (
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751
@@ -23,7 +23,7 @@ require (
 	github.com/pantacor/go-json-rest-middleware-jwt v0.0.0-20190329235955-213479ac018c
 	github.com/prometheus/client_golang v1.12.1
 	github.com/rs/cors v1.8.2
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/swaggo/http-swagger v1.2.5
 	github.com/swaggo/swag v1.8.1
 	github.com/tiaguinho/gosoap v1.4.4

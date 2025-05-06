@@ -19,6 +19,7 @@ package utils
 import (
 	"time"
 
+	"gitlab.com/pantacor/pantahub-base/utils/models"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -34,4 +35,6 @@ type PantahubDevicesJoinToken struct {
 	Disabled        bool                   `json:"disabled"`
 	TimeCreated     time.Time              `json:"time-created"`
 	TimeModified    time.Time              `json:"time-modified"`
+
+	OVMode *models.OVModeExtension `json:"ovmode,omitempty" bson:"ovmode,omitempty"`
 }

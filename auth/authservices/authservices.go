@@ -21,6 +21,7 @@ import (
 	"gitlab.com/pantacor/pantahub-base/tokens/tokenrepo"
 	"gitlab.com/pantacor/pantahub-base/tokens/tokenservice"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/models"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gopkg.in/mgo.v2/bson"
@@ -404,7 +405,11 @@ func DevicePayload(deviceID string, mongoClient *mongo.Client) map[string]interf
 		"type":   "DEVICE",
 		"prn":    device.Prn,
 		"owner":  device.Owner,
-		"scopes": "prn:pantahub.com:apis:/base/all",
+		"scopes": utils.Scopes.API.String(),
+	}
+
+	if device.OVMode != nil && device.OVMode.Mode == models.TLSVerification && device.OVMode.Status != models.Completed {
+		val["scopes"] = utils.Scopes.APIReadOnly.String() + " " + utils.Scopes.ValidateDevices.String()
 	}
 
 	return val
@@ -441,7 +446,7 @@ func AccountToPayload(account accounts.Account) map[string]interface{} {
 	result["id"] = account.Prn
 	result["nick"] = account.Nick
 	result["prn"] = account.Prn
-	result["scopes"] = "prn:pantahub.com:apis:/base/all"
+	result["scopes"] = utils.Scopes.API.String()
 
 	return result
 }

@@ -28,6 +28,7 @@ import (
 	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-base/utils/caclient"
+	"gitlab.com/pantacor/pantahub-base/utils/models"
 	"gitlab.com/pantacor/pantahub-base/utils/tracer"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -76,11 +77,15 @@ type Device struct {
 	DeviceMeta          map[string]interface{} `json:"device-meta" bson:"device-meta"`
 	Garbage             bool                   `json:"garbage" bson:"garbage"`
 	MarkPublicProcessed bool                   `json:"mark_public_processed" bson:"mark_public_processed"`
+
+	OwnershipUnverify bool                    `json:"ownership_unverified" bson:"ownership_unverified"`
+	OVMode            *models.OVModeExtension `json:"ovmode,omitempty" bson:"ovmode,omitempty"`
 }
 
 type autoTokenInfo struct {
 	Owner    string
 	UserMeta map[string]interface{}
+	OVMode   *models.OVModeExtension
 }
 
 // New create devices web app
@@ -144,6 +149,10 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 			"uber-trace-id",
 			"traceparent",
 			"tracestate",
+			"Ssl-Client-Verify",
+			"Ssl-Client-Cert",
+			"ssl-client-verify",
+			"ssl-client-cert",
 		},
 		AccessControlAllowCredentials: true,
 		AccessControlMaxAge:           3600,
@@ -187,6 +196,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	}
 	readDevicesScopes := []utils.Scope{
 		utils.Scopes.API,
+		utils.Scopes.APIReadOnly,
 		utils.Scopes.Devices,
 		utils.Scopes.ReadDevices,
 	}
@@ -195,11 +205,20 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		utils.Scopes.Devices,
 		utils.Scopes.UpdateDevices,
 	}
+	validateDeviceScopes := []utils.Scope{
+		utils.Scopes.API,
+		utils.Scopes.Devices,
+		utils.Scopes.UpdateDevices,
+		utils.Scopes.ValidateDevices,
+	}
 
 	// /auth_status endpoints
 	apiRouter, _ := rest.MakeRouter(
 		// TPM auto enroll register
 		rest.Post("/register", app.handleRegister),
+
+		// Device Ownership validation
+		rest.Post("/#id/ownership/validate", utils.ScopeFilter(validateDeviceScopes, app.handleValidateOwnership)),
 
 		// token api
 		rest.Post("/tokens", utils.ScopeFilter(readDevicesScopes, app.handlePostTokens)),

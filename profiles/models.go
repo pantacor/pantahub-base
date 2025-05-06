@@ -18,6 +18,7 @@ package profiles
 import (
 	"time"
 
+	"gitlab.com/pantacor/pantahub-base/utils/models"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -28,14 +29,16 @@ type Profile struct {
 	Nick  string             `json:"nick" bson:"-"`
 	Email string             `json:"email" bson:"-"`
 
+	// extensions
+	OVMode *models.OVModeExtension `json:"ovmode,omitempty" bson:"ovmode,omitempty"`
+
 	*UpdateableProfile `json:",inline" bson:",inline"`
-	Meta               map[string]interface{} `json:"meta" bson:"meta"`
 
-	Public  bool `json:"-" bson:"public"`
-	Garbage bool `json:"-" bson:"garbage"`
-
-	TimeCreated  time.Time `json:"time-created,omitempty" bson:"time-created"`
-	TimeModified time.Time `json:"time-modified,omitempty" bson:"time-modified"`
+	Meta         map[string]interface{} `json:"meta" bson:"meta"`
+	Public       bool                   `json:"-" bson:"public"`
+	Garbage      bool                   `json:"-" bson:"garbage"`
+	TimeCreated  time.Time              `json:"time-created,omitempty" bson:"time-created"`
+	TimeModified time.Time              `json:"time-modified,omitempty" bson:"time-modified"`
 }
 
 // UpdateableProfile updateable part of a Profile

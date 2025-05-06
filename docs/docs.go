@@ -4976,6 +4976,68 @@ var doc = `{
                 }
             }
         },
+        "/trails/{id}/steps/{rev}/wontgo": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Mark as WONTGO a step still in INPROGRESS.\nMark as WONTGO a step still in INPROGRESS.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "trails"
+                ],
+                "summary": "Mark as WONTGO a step still in INPROGRESS.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID|NICK|PRN",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "REV_ID",
+                        "name": "rev",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/trailmodels.StepProgress"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
         "/trails/{id}/summary": {
             "get": {
                 "security": [
@@ -5524,11 +5586,17 @@ var doc = `{
                 "nick": {
                     "type": "string"
                 },
+                "ovmode": {
+                    "$ref": "#/definitions/models.OVModeExtension"
+                },
                 "owner": {
                     "type": "string"
                 },
                 "owner-nick": {
                     "type": "string"
+                },
+                "ownership_unverified": {
+                    "type": "boolean"
                 },
                 "prn": {
                     "type": "string"
@@ -5666,6 +5734,23 @@ var doc = `{
                 }
             }
         },
+        "models.OVModeExtension": {
+            "type": "object",
+            "properties": {
+                "mode": {
+                    "description": "Owner Verification Mode",
+                    "type": "string"
+                },
+                "root_of_trust": {
+                    "description": "root of trust is used when the mode is TLS for device verification",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Status represents the current state of verification",
+                    "type": "string"
+                }
+            }
+        },
         "objects.Object": {
             "type": "object",
             "properties": {
@@ -5778,6 +5863,10 @@ var doc = `{
                 },
                 "nick": {
                     "type": "string"
+                },
+                "ovmode": {
+                    "description": "extensions",
+                    "$ref": "#/definitions/models.OVModeExtension"
                 },
                 "picture": {
                     "type": "string"
@@ -6214,6 +6303,9 @@ var doc = `{
                 "nick": {
                     "type": "string"
                 },
+                "ovmode": {
+                    "$ref": "#/definitions/models.OVModeExtension"
+                },
                 "owner": {
                     "type": "string"
                 },
@@ -6240,7 +6332,7 @@ var doc = `{
         "utils.RError": {
             "type": "object",
             "properties": {
-                "cod": {
+                "code": {
                     "type": "integer"
                 },
                 "error": {

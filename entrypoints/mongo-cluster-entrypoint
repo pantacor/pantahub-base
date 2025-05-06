@@ -3,7 +3,11 @@
 set -ex
 
 MONGO_PORT=${MONGO_PORT:-27017}
-mongod --keyFile /keys/mongokey.yaml --transitionToAuth  --port ${MONGO_PORT} --replSet ${MONGO_RS} --bind_ip_all $@ & 
+
+# make sure the permissions for the mongokey is correct
+chmod 600 /keys/mongokey.yaml
+
+mongod --keyFile /keys/mongokey.yaml --transitionToAuth  --port ${MONGO_PORT} --replSet ${MONGO_RS} --bind_ip_all $@ &
 sleep 5
 
 replicaSet="""{
@@ -63,6 +67,6 @@ if ! mongo --eval 'db.getUsers()' "mongodb://phskafkaconnectsink:pass@localhost:
     echo "checking phskafkaconnectsink done"
     sleep 1
   done
-fi 
+fi
 
 tail -f /proc/$(pidof mongod)/fd/1
