@@ -340,6 +340,7 @@ func (a *App) handleGetDevice(w rest.ResponseWriter, r *rest.Request) {
 		device.OwnerNick = ownerAccount.Nick
 	}
 
+	device.Secret = ""
 	device.UserMeta = utils.BsonUnquoteMap(&device.UserMeta)
 	device.DeviceMeta = utils.BsonUnquoteMap(&device.DeviceMeta)
 
