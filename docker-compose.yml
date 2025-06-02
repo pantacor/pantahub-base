@@ -137,6 +137,8 @@ services:
             - xpack.watcher.enabled=false
             - xpack.security.transport.ssl.enabled=false
             - xpack.security.http.ssl.enabled=false
+            - NODE_LOCK_PATH=/usr/share/elasticsearch/data/node.lock
+            - MUST_BE_WRITABLE=true
         ulimits:
             memlock:
                 soft: -1
@@ -150,12 +152,8 @@ services:
         cap_add:
             - IPC_LOCK
         restart: always
-        ports:
-            - "9200:9200"
-            - "9300:9300"
         volumes:
-            - ./.data/elasticsearch/:/usr/share/elasticsearch/data/
-            - /sys/fs/cgroup:/sys/fs/cgroup:ro
+            - elastic-data:/usr/share/elasticsearch/data
 
     kibana:
         networks:
@@ -409,3 +407,10 @@ services:
 networks:
     base:
         driver: bridge
+
+volumes:
+    elastic-data:
+        driver_opts:
+            type: none
+            device: ${PWD}/.data/elasticsearch
+            o: bind
