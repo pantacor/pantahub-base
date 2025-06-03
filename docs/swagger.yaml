@@ -167,6 +167,15 @@ definitions:
       type:
         type: string
     type: object
+  authmodels.LoginRequestPayload:
+    properties:
+      password:
+        type: string
+      scope:
+        type: string
+      username:
+        type: string
+    type: object
   authmodels.PasswordReset:
     properties:
       password:
@@ -177,6 +186,19 @@ definitions:
   authmodels.PasswordResetRequest:
     properties:
       email:
+        type: string
+    type: object
+  authmodels.TokenResponse:
+    properties:
+      redirect_uri:
+        type: string
+      scopes:
+        type: string
+      state:
+        type: string
+      token:
+        type: string
+      token_type:
         type: string
     type: object
   callbacks.ProcessDeviceResult:
@@ -1286,6 +1308,48 @@ paths:
       summary: Gets authentication code using OAuth 2.0
       tags:
       - auth
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Get login token using username and password
+      parameters:
+      - description: Login credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/authmodels.LoginRequestPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/authmodels.TokenResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      summary: Get login token using username and password
+      tags:
+      - auth
   /auth/oauth/callback/{service}:
     get:
       consumes:
@@ -2179,6 +2243,37 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: 'Update device metadata using the device credentials:'
+      tags:
+      - devices
+  /devices/{id}/ownership/validate:
+    get:
+      consumes:
+      - application/json
+      description: |-
+        Validates device ownership based on the configured OVMode (TLS, Manual, etc.).
+        If OVMode is TLS, the client must use the 'root_of_trust' as the client TLS connection.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Ownership validation successful. Returns OVMode details.
+          schema:
+            $ref: '#/definitions/models.OVModeExtension'
+        "400":
+          description: Invalid request or parameters.
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Device not found or ownership not verifiable.
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal server error.
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Validates device ownership based on OVMode.
       tags:
       - devices
   /devices/{id}/public:

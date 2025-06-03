@@ -699,6 +699,70 @@ var doc = `{
                 }
             }
         },
+        "/auth/login": {
+            "post": {
+                "description": "Get login token using username and password",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Get login token using username and password",
+                "parameters": [
+                    {
+                        "description": "Login credentials",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.LoginRequestPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.TokenResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/oauth/callback/{service}": {
             "get": {
                 "security": [
@@ -2326,6 +2390,52 @@ var doc = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/devices/{id}/ownership/validate": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Validates device ownership based on the configured OVMode (TLS, Manual, etc.).\nIf OVMode is TLS, the client must use the 'root_of_trust' as the client TLS connection.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "devices"
+                ],
+                "summary": "Validates device ownership based on OVMode.",
+                "responses": {
+                    "200": {
+                        "description": "Ownership validation successful. Returns OVMode details.",
+                        "schema": {
+                            "$ref": "#/definitions/models.OVModeExtension"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or parameters.",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Device not found or ownership not verifiable.",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error.",
                         "schema": {
                             "$ref": "#/definitions/utils.RError"
                         }
@@ -5345,6 +5455,20 @@ var doc = `{
                 }
             }
         },
+        "authmodels.LoginRequestPayload": {
+            "type": "object",
+            "properties": {
+                "password": {
+                    "type": "string"
+                },
+                "scope": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
         "authmodels.PasswordReset": {
             "type": "object",
             "properties": {
@@ -5360,6 +5484,26 @@ var doc = `{
             "type": "object",
             "properties": {
                 "email": {
+                    "type": "string"
+                }
+            }
+        },
+        "authmodels.TokenResponse": {
+            "type": "object",
+            "properties": {
+                "redirect_uri": {
+                    "type": "string"
+                },
+                "scopes": {
+                    "type": "string"
+                },
+                "state": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                },
+                "token_type": {
                     "type": "string"
                 }
             }

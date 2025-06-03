@@ -26,6 +26,19 @@ import (
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
 
+// @Summary Get login token using username and password
+// @Description Get login token using username and password
+// @Accept  json
+// @Produce  json
+// @Tags auth
+// @Param body body authmodels.LoginRequestPayload true "Login credentials"
+// @Success 200 {object} authmodels.TokenResponse
+// @Failure 400 {object} utils.RError
+// @Failure 401 {object} utils.RError
+// @Failure 403 {object} utils.RError
+// @Failure 404 {object} utils.RError
+// @Failure 500 {object} utils.RError
+// @Router /auth/login [post]
 func (a *App) getTokenUsingPassword(writer rest.ResponseWriter, r *rest.Request) {
 	userAgent := r.Header.Get("User-Agent")
 	if userAgent == "" {
