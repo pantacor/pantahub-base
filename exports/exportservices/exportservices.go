@@ -130,7 +130,14 @@ func (s *EService) GetUserAccountByNick(ctx context.Context, nick string) (accou
 		ctxi, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 
-		err := collectionAccounts.FindOne(ctxi, bson.M{"nick": nick}).Decode(&account)
+		var err error
+		if bson.IsObjectIdHex(nick) {
+			objID := bson.ObjectIdHex(nick)
+			err = collectionAccounts.FindOne(ctxi, bson.M{"_id": objID}).Decode(&account)
+		} else {
+			err = collectionAccounts.FindOne(ctxi, bson.M{"nick": nick}).Decode(&account)
+		}
+
 		if err != nil {
 			return account, err
 		}
