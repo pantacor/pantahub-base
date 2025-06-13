@@ -494,8 +494,8 @@ func (a *App) handleVerify(w rest.ResponseWriter, r *rest.Request) {
 }
 
 // handlePasswordReset gets the recovery token and validate it in order to overwrite the user password
-// @Summary send email with token to user in order to reset password to given user
-// @Description send email with token to user in order to reset password to given user
+// @Summary gets the recovery token and validate it in order to overwrite the user password
+// @Description gets the recovery token and validate it in order to overwrite the user password
 // @Accept  json
 // @Produce  json
 // @Tags auth
