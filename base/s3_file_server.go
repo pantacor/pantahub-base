@@ -268,6 +268,7 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		s3req := httpClient.R().
+			SetContext(ctx).
 			SetBody(s3Body).
 			SetHeader("Content-Type", "application/octet-stream").
 			SetContentLength(true)
@@ -281,12 +282,7 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		if s3resp.StatusCode() != http.StatusOK {
 			body := s3resp.Body()
-			msg := fmt.Sprintf("ERROR: unexpected response from remote S3 server")
-			if err != nil {
-				msg = fmt.Sprintf("ERROR: unexpected response from remote S3 server %d -- %s", s3resp.StatusCode(), err.Error())
-			} else {
-				msg = fmt.Sprintf("ERROR: remote S3 server %d -- %s", s3resp.StatusCode(), body)
-			}
+			msg := fmt.Sprintf("ERROR: remote S3 server %d -- %s", s3resp.StatusCode(), body)
 			utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
 			return
 		}

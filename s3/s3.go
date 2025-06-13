@@ -18,12 +18,14 @@ package s3
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/smithy-go"
 )
 
 // S3 application interface
@@ -77,8 +79,18 @@ func (s *s3impl) Exists(ctx context.Context, key string) bool {
 		return false
 	}
 
+	// Check for nil session
+	if s.session == nil {
+		return false
+	}
+
 	if string(key[0]) == `/` {
 		key = key[1:]
+	}
+
+	// Check for empty bucket name
+	if s.connectionParams.Bucket == "" {
+		return false
 	}
 
 	input := &s3.HeadObjectInput{
@@ -86,12 +98,30 @@ func (s *s3impl) Exists(ctx context.Context, key string) bool {
 		Key:    aws.String(key),
 	}
 
-	head, err := s.session.HeadObject(context.TODO(), input)
+	head, err := s.session.HeadObject(ctx, input)
 	if err != nil {
-		return true
+		var aerr smithy.APIError
+		if errors.As(err, &aerr) {
+			// Log the full error details for debugging
+			switch aerr.ErrorCode() {
+			case "NotFound", "BadRequest", "NoSuchBucket", "NoSuchKey", "Forbidden":
+				return false
+			default:
+				fmt.Printf("Unexpected error checking if object exists: %v\n", aerr)
+				return false
+			}
+		}
+		// Log non-API errors
+		fmt.Printf("Non-API error checking if object exists: %v\n", err)
+		return false
 	}
 
-	return *head.ContentLength >= 0
+	// Verify we have a valid head response
+	if head == nil {
+		return false
+	}
+
+	return head.ContentLength != nil && *head.ContentLength >= 0
 }
 
 // New create a new S3 application

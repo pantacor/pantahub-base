@@ -158,7 +158,7 @@ func (a *App) ResolveObjectWithBacking(pctx context.Context, owner string, sha s
 		return nil, errors.New("Unable to find Object by Storage id: " + storageID + " - " + err.Error())
 	}
 
-	hasBackingFile, err = HasBackingFile(&object)
+	hasBackingFile, err = HasBackingFile(pctx, &object)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +196,7 @@ func (a *App) ResolveObjectWithLinks(ctx context.Context, owner string, sha stri
 	err = a.FindObjectByStorageID(ctx, storageID, object)
 
 	if err == nil && object.LinkedObject == "" {
-		hasBackingFile, err = HasBackingFile(object)
+		hasBackingFile, err = HasBackingFile(ctx, object)
 		if err != nil {
 			return nil, err
 		}
@@ -235,13 +235,13 @@ func (a *App) ResolveObjectWithLinks(ctx context.Context, owner string, sha stri
 	return object, nil
 }
 
-func HasBackingFile(object *Object) (bool, error) {
+func HasBackingFile(ctx context.Context, object *Object) (bool, error) {
 	sd := storagedriver.FromEnv()
 	filePath, err := utils.MakeLocalS3PathForName(object.StorageID)
 	if err != nil {
 		return false, err
 	}
-	if sd.Exists(context.TODO(), filePath) {
+	if sd.Exists(ctx, filePath) {
 		return true, nil
 	}
 	return false, nil
