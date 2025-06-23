@@ -194,7 +194,6 @@ func (a *App) ResolveObjectWithLinks(ctx context.Context, owner string, sha stri
 	storageID := MakeStorageID(owner, shaBytes)
 	object = new(Object)
 	err = a.FindObjectByStorageID(ctx, storageID, object)
-
 	if err == nil && object.LinkedObject == "" {
 		hasBackingFile, err = HasBackingFile(ctx, object)
 		if err != nil {
@@ -252,21 +251,20 @@ func (a *App) LinkifyObject(ctx context.Context, object *Object) (
 	linked bool,
 	err error) {
 
-	notOwnedBy := object.Owner
-
-	// Find public object owner from public objects pool
-	publicObjectOwner, err := a.FindPublicObjectOwner(ctx, object.Sha, notOwnedBy)
-	if err == mongo.ErrNoDocuments {
-		return false, err
-	} else if err != nil {
-		return false, errors.New("Error finding public object owner: " + err.Error())
-	}
-
 	publicObject := Object{}
-	err = a.FindObjectByShaByOwner(ctx, object.Sha, publicObjectOwner, &publicObject)
+	err = a.FindPrimeObject(ctx, object.Sha, &publicObject)
 	if err != nil {
-		return false, errors.New("Error finding object by sha '" + object.Sha + "' & by owner: '" + publicObjectOwner + "'" + err.Error())
+		return false, fmt.Errorf("error finding prime object by sha '%s': %w", object.Sha, err)
 	}
+
+	isPublic, err := a.PrimeObjectIsPublic(ctx, object.Sha, publicObject.Owner)
+	if err != nil {
+		return false, fmt.Errorf("error finding public object for sha '%s': %w", object.Sha, err)
+	}
+	if !isPublic {
+		return false, ErrNoLinkTargetAvail
+	}
+
 	// Link the Object storage-id
 	object.LinkedObject = publicObject.StorageID
 	object.Size = publicObject.Size
@@ -310,6 +308,51 @@ func (a *App) FindPublicObjectOwner(parentCtx context.Context, sha string, notOw
 	}
 
 	return publicStep["owner"].(string), nil
+}
+
+func (a *App) PrimeObjectIsPublic(parentCtx context.Context, sha string, owner string) (
+	isPublic bool,
+	err error,
+) {
+
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_public_steps")
+
+	ctx, cancel := context.WithTimeout(parentCtx, 1*time.Minute)
+	defer cancel()
+
+	publicStep := map[string]interface{}{}
+	query := bson.M{
+		"object_sha": sha,
+		"owner":      owner,
+		"ispublic":   true,
+	}
+	err = collection.FindOne(ctx, query).Decode(&publicStep)
+	if err == mongo.ErrNoDocuments {
+		return false, fmt.Errorf("object %s is not public", sha)
+	}
+	if err != nil {
+		return false, err
+	}
+
+	return publicStep["ispublic"].(bool), nil
+}
+
+func (a *App) FindPrimeObject(parentCtx context.Context, sha string, obj *Object) error {
+
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
+
+	ctx, cancel := context.WithTimeout(parentCtx, 1*time.Minute)
+	defer cancel()
+
+	err := collection.FindOne(ctx, bson.M{
+		"id": sha,
+		"$or": []bson.M{
+			{"linked_object": nil},
+			{"linked_object": ""},
+		},
+	}).Decode(&obj)
+
+	return err
 }
 
 // FindObjectByShaByOwner is to find object by sha & by owner
