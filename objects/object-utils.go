@@ -216,8 +216,10 @@ func (a *App) ResolveObjectWithLinks(ctx context.Context, owner string, sha stri
 	if autoLink && object.LinkedObject == "" && (err == mongo.ErrNoDocuments || !hasBackingFile) {
 		// Link object if there is any public object available
 		linked, err2 := a.LinkifyObject(ctx, object)
-		if err2 == mongo.ErrNoDocuments {
+		if err2 == ErrNoLinkTargetAvail {
 			return nil, ErrNoLinkTargetAvail
+		} else if err2 == ErrNoBackingFile {
+			return nil, ErrNoBackingFile
 		} else if err2 != nil {
 			return nil, errors.New("Error linking object:" + err2.Error())
 		} else if !linked {
@@ -231,6 +233,7 @@ func (a *App) ResolveObjectWithLinks(ctx context.Context, owner string, sha stri
 	} else if object.LinkedObject == "" && !hasBackingFile {
 		return nil, ErrNoBackingFile
 	}
+
 	return object, nil
 }
 
@@ -252,14 +255,17 @@ func (a *App) LinkifyObject(ctx context.Context, object *Object) (
 	err error) {
 
 	publicObject := Object{}
-	err = a.FindPrimeObject(ctx, object.Sha, &publicObject)
+	err = a.FindLinkTarget(ctx, object.Sha, &publicObject)
+	if err == mongo.ErrNoDocuments {
+		return false, ErrNoBackingFile
+	}
 	if err != nil {
-		return false, fmt.Errorf("error finding prime object by sha '%s': %w", object.Sha, err)
+		return false, fmt.Errorf("error finding link target for sha '%s': %w", object.Sha, err)
 	}
 
-	isPublic, err := a.PrimeObjectIsPublic(ctx, object.Sha, publicObject.Owner)
+	isPublic, err := a.LinkTargetIsPublic(ctx, object.Sha, publicObject.Owner)
 	if err != nil {
-		return false, fmt.Errorf("error finding public object for sha '%s': %w", object.Sha, err)
+		return false, fmt.Errorf("error finding if link target sha is public '%s': %w", object.Sha, err)
 	}
 	if !isPublic {
 		return false, ErrNoLinkTargetAvail
@@ -310,7 +316,7 @@ func (a *App) FindPublicObjectOwner(parentCtx context.Context, sha string, notOw
 	return publicStep["owner"].(string), nil
 }
 
-func (a *App) PrimeObjectIsPublic(parentCtx context.Context, sha string, owner string) (
+func (a *App) LinkTargetIsPublic(parentCtx context.Context, sha string, owner string) (
 	isPublic bool,
 	err error,
 ) {
@@ -328,8 +334,9 @@ func (a *App) PrimeObjectIsPublic(parentCtx context.Context, sha string, owner s
 	}
 	err = collection.FindOne(ctx, query).Decode(&publicStep)
 	if err == mongo.ErrNoDocuments {
-		return false, fmt.Errorf("object %s is not public", sha)
+		return false, nil
 	}
+
 	if err != nil {
 		return false, err
 	}
@@ -337,7 +344,7 @@ func (a *App) PrimeObjectIsPublic(parentCtx context.Context, sha string, owner s
 	return publicStep["ispublic"].(bool), nil
 }
 
-func (a *App) FindPrimeObject(parentCtx context.Context, sha string, obj *Object) error {
+func (a *App) FindLinkTarget(parentCtx context.Context, sha string, obj *Object) error {
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 
