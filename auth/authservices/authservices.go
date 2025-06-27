@@ -303,6 +303,10 @@ func AccountAuth(idEmailNick string, secret string, mongoClient *mongo.Client) b
 		return false
 	}
 
+	if !IsEmailDomainAllowed(account.Email) {
+		return false
+	}
+
 	// account has still a challenge -> not activated -> fail to login
 	if account.Challenge != "" {
 		return false

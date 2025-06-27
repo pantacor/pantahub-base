@@ -28,6 +28,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/accounts"
+	"gitlab.com/pantacor/pantahub-base/auth/authservices"
 	"gitlab.com/pantacor/pantahub-base/auth/oauth"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -85,6 +86,12 @@ func (a *App) HandleGetThirdPartyCallback(w rest.ResponseWriter, r *rest.Request
 
 	if payload.Email == "" {
 		errMg := fmt.Sprintf("You need to validate your email or make it public on %s", payload.Service)
+		processErr(w, r.Request, err, errMg, http.StatusForbidden, payload.RedirectTo)
+		return
+	}
+
+	if !authservices.IsEmailDomainAllowed(payload.Email) {
+		errMg := fmt.Sprintf("Email domain not allowed: %s", payload.Email)
 		processErr(w, r.Request, err, errMg, http.StatusForbidden, payload.RedirectTo)
 		return
 	}

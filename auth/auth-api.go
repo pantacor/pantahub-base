@@ -221,6 +221,11 @@ func (a *App) handlePostAccount(w rest.ResponseWriter, r *rest.Request) {
 
 	r.DecodeJsonPayload(&newAccount)
 
+	if utils.GetEnv(utils.EnvPantahubDisableSignup) == "true" {
+		utils.RestError(w, nil, "User signup is currently disabled", http.StatusForbidden)
+		return
+	}
+
 	// if encrypted account data exist decryted and continue with validation
 	if newAccount.EncryptedAccount != "" {
 		err := utils.ParseJWE(newAccount.EncryptedAccount, &newAccount.Account)

@@ -336,6 +336,12 @@ const (
 
 	// EnvAnonJWTTimeoutMinutes anonimous token timeout
 	EnvAnonJWTTimeoutMinutes = "PANTAHUB_ANON_JWT_TIMEOUT"
+
+	// EnvPantahubDisableSignup disable signup and email/password login
+	EnvPantahubDisableSignup = "PANTAHUB_DISABLE_SIGN_UP"
+
+	// EnvPantahubAuthAllowedDomains allowed domains to login and connect viua oauth
+	EnvPantahubAuthAllowedDomains = "PANTAHUB_AUTH_ALLOWED_DOMAINS"
 )
 
 var defaultEnvs = map[string]string{
@@ -353,6 +359,8 @@ var defaultEnvs = map[string]string{
 	EnvPantahubRecoverJWTTimeoutMinutes:     "60",
 	EnvPantahubJWTMaxRefreshMinutes:         "1440",
 	EnvAnonJWTTimeoutMinutes:                "5",
+	EnvPantahubDisableSignup:                "false",
+	EnvPantahubAuthAllowedDomains:           "",
 
 	EnvPantahubCaCert:          "",
 	EnvPantahubCaRaUser:        "",
