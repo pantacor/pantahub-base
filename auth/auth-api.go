@@ -618,6 +618,11 @@ func (a *App) handlePasswordReset(writer rest.ResponseWriter, r *rest.Request) {
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /auth/recover [post]
 func (a *App) handlePasswordRecovery(writer rest.ResponseWriter, r *rest.Request) {
+	if utils.GetEnv(utils.EnvPantahubDisableForgotPassword) == "true" {
+		utils.RestError(writer, nil, "Recover password feature is disabled", http.StatusForbidden)
+		return
+	}
+
 	data := authmodels.PasswordResetRequest{}
 
 	r.DecodeJsonPayload(&data)

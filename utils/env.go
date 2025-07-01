@@ -342,6 +342,12 @@ const (
 
 	// EnvPantahubAuthAllowedDomains allowed domains to login and connect viua oauth
 	EnvPantahubAuthAllowedDomains = "PANTAHUB_AUTH_ALLOWED_DOMAINS"
+
+	// EnvPantahubDisableForgotPassword disable forgot password functionality
+	EnvPantahubDisableForgotPassword = "PANTAHUB_DISABLE_FORGOT_PASSWORD"
+
+	// EnvPantahubDisableEmailPasswordLogin disable email/password login
+	EnvPantahubDisableEmailPasswordLogin = "PANTAHUB_DISABLE_EMAIL_PASSWORD_LOGIN"
 )
 
 var defaultEnvs = map[string]string{
@@ -361,6 +367,8 @@ var defaultEnvs = map[string]string{
 	EnvAnonJWTTimeoutMinutes:                "5",
 	EnvPantahubDisableSignup:                "false",
 	EnvPantahubAuthAllowedDomains:           "",
+	EnvPantahubDisableForgotPassword:        "false",
+	EnvPantahubDisableEmailPasswordLogin:    "false",
 
 	EnvPantahubCaCert:          "",
 	EnvPantahubCaRaUser:        "",
@@ -477,9 +485,9 @@ var defaultEnvs = map[string]string{
 	EnvPantahubGCRemoveGarbage: "false",
 
 	/* Pantahub GC UnClaimed expiry for device to mark it as garbage:
-	   If a device is unclaimed for 5 Days then it will be marked as garbage
+	If a device is unclaimed for 5 Days then it will be marked as garbage
 
-	   Format:ISO_8601: https://en.wikipedia.org/wiki/ISO_8601?oldformat=true#Durations
+	Format:ISO_8601: https://en.wikipedia.org/wiki/ISO_8601?oldformat=true#Durations
 	*/
 	EnvPantahubGCUnclaimedExpiry: "P5D", // => 5 Days
 

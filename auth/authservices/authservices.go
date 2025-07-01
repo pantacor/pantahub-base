@@ -298,6 +298,10 @@ func AccountAuth(idEmailNick string, secret string, mongoClient *mongo.Client) b
 		return true
 	}
 
+	if utils.GetEnv(utils.EnvPantahubDisableForgotPassword) == "true" {
+		return false
+	}
+
 	account, err = GetAccount(idEmailNick, mongoClient)
 	if err != nil {
 		return false
