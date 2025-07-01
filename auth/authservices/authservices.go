@@ -298,7 +298,7 @@ func AccountAuth(idEmailNick string, secret string, mongoClient *mongo.Client) b
 		return true
 	}
 
-	if utils.GetEnv(utils.EnvPantahubDisableForgotPassword) == "true" {
+	if utils.GetEnv(utils.EnvPantahubDisableEmailPasswordLogin) == "true" {
 		return false
 	}
 
