@@ -137,6 +137,8 @@ func (a *App) handlePutDeviceData(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(map[string]string{"status": "ok"})
 }
 
+var parsingErrorKey = "hub_parsing"
+
 // handlePatchDeviceData Update device metadata using the device credentials:
 // @Summary Update device metadata using the device credentials:
 // @Description Update device metadata using the device credentials:
@@ -225,13 +227,13 @@ func (a *App) handlePatchDeviceData(w rest.ResponseWriter, r *rest.Request) {
 
 	err = json.Unmarshal(content, &data)
 	if err != nil {
-		device.DeviceMeta["parsing"] = map[string]string{
+		device.DeviceMeta[parsingErrorKey] = map[string]string{
 			"error":     err.Error(),
 			"content":   string(content),
 			"timestamp": time.Now().Format(time.RFC3339),
 		}
 	} else {
-		delete(device.DeviceMeta, "parsing")
+		delete(device.DeviceMeta, parsingErrorKey)
 		for k, v := range data {
 			device.DeviceMeta[k] = v
 			if v == nil {
