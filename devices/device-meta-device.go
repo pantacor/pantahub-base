@@ -19,7 +19,6 @@ package devices
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -226,16 +225,20 @@ func (a *App) handlePatchDeviceData(w rest.ResponseWriter, r *rest.Request) {
 
 	err = json.Unmarshal(content, &data)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error parsing device-meta JSON: "+err.Error(), http.StatusBadRequest)
-		fmt.Printf("deviceID: %s -- device-meta: %s\n", device.ID.Hex(), content)
-		return
-	}
-
-	for k, v := range data {
-		device.DeviceMeta[k] = v
-		if v == nil {
-			delete(device.DeviceMeta, k)
+		device.DeviceMeta["parsing"] = map[string]string{
+			"error":     err.Error(),
+			"content":   string(content),
+			"timestamp": time.Now().Format(time.RFC3339),
 		}
+	} else {
+		delete(device.DeviceMeta, "parsing")
+		for k, v := range data {
+			device.DeviceMeta[k] = v
+			if v == nil {
+				delete(device.DeviceMeta, k)
+			}
+		}
+
 	}
 
 	updateResult, err := collection.UpdateOne(
