@@ -233,7 +233,6 @@ func (a *App) handlePatchDeviceData(w rest.ResponseWriter, r *rest.Request) {
 			"timestamp": time.Now().Format(time.RFC3339),
 		}
 	} else {
-		delete(device.DeviceMeta, parsingErrorKey)
 		for k, v := range data {
 			device.DeviceMeta[k] = v
 			if v == nil {
