@@ -57,18 +57,18 @@ func (a *App) handleValidateOwnership(w rest.ResponseWriter, r *rest.Request) {
 	id := r.PathParam("id")
 	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
 	if !ok {
-		utils.RestErrorWrapper(w, "JWT Payload is not valid", http.StatusBadRequest)
+		utils.RestErrorWrapperUser(w, "JWT Payload is not valid", "JWT Payload is not valid", http.StatusBadRequest)
 		return
 	}
 
 	if id == "" {
-		utils.RestErrorWrapper(w, "Invalid device ID", http.StatusBadRequest)
+		utils.RestErrorWrapperUser(w, "Invalid device ID", "Invalid device ID", http.StatusBadRequest)
 		return
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
+		utils.RestErrorWrapperUser(w, "Error with Database connectivity", "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
 
@@ -78,7 +78,7 @@ func (a *App) handleValidateOwnership(w rest.ResponseWriter, r *rest.Request) {
 	device := Device{}
 	mDeviceId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Invalid device ID format", http.StatusBadRequest)
+		utils.RestErrorWrapperUser(w, "Invalid device ID format", "Invalid device ID format", http.StatusBadRequest)
 		return
 	}
 	err = collection.FindOne(
@@ -88,15 +88,15 @@ func (a *App) handleValidateOwnership(w rest.ResponseWriter, r *rest.Request) {
 
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			utils.RestErrorWrapper(w, "Device not found", http.StatusNotFound)
+			utils.RestErrorWrapperUser(w, "Device not found", "Device not found", http.StatusNotFound)
 		} else {
-			utils.RestErrorWrapper(w, "Error finding device: "+err.Error(), http.StatusInternalServerError)
+			utils.RestErrorWrapperUser(w, err.Error(), "Error finding device: "+err.Error(), http.StatusInternalServerError)
 		}
 		return
 	}
 
 	if device.OVMode == nil {
-		utils.RestErrorWrapper(w, "Device does not have OVMode configured", http.StatusNotFound)
+		utils.RestErrorWrapperUser(w, "Device does not have OVMode configured", "Device does not have OVMode configured", http.StatusNotFound)
 		return
 	}
 
@@ -106,7 +106,7 @@ func (a *App) handleValidateOwnership(w rest.ResponseWriter, r *rest.Request) {
 	case models.TLSVerification:
 		a.validateTLSOwnership(w, r, ctx, &device, jwtPayload)
 	default:
-		utils.RestErrorWrapper(w, "Unsupported OVMode", http.StatusBadRequest)
+		utils.RestErrorWrapperUser(w, "Unsupported OVMode", "Unsupported OVMode", http.StatusBadRequest)
 	}
 }
 
@@ -114,65 +114,65 @@ func (a *App) validateTLSOwnership(w rest.ResponseWriter, r *rest.Request, ctx c
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	jwtPayloadIface, ok := jwtPayload.(jwtgo.MapClaims)
 	if !ok {
-		utils.RestErrorWrapper(w, "JWT Payload is not valid", http.StatusBadRequest)
+		utils.RestErrorWrapperUser(w, "JWT Payload is not valid", "JWT Payload is not valid", http.StatusBadRequest)
 		return
 	}
 
 	tokenType, ok := jwtPayloadIface["type"].(string)
 	if !ok {
-		utils.RestErrorWrapper(w, "JWT Type is not valid", http.StatusBadRequest)
+		utils.RestErrorWrapperUser(w, "JWT Type is not valid", "JWT Type is not valid", http.StatusBadRequest)
 		return
 	}
 
 	if tokenType != "DEVICE" {
-		utils.RestErrorWrapper(w, "Device can only validate ownership with TLS mode", http.StatusBadRequest)
+		utils.RestErrorWrapperUser(w, "Device can only validate ownership with TLS mode", "Device can only validate ownership with TLS mode", http.StatusBadRequest)
 		return
 	}
 
 	if device.OVMode.Mode.IsTLS() && device.OVMode.RootOfTrust == "" {
-		utils.RestErrorWrapper(w, "Root of trust is not configured for TLS OVMode", http.StatusInternalServerError)
+		utils.RestErrorWrapperUser(w, "Root of trust is not configured for TLS OVMode", "Root of trust is not configured for TLS OVMode", http.StatusInternalServerError)
 		return
 	}
 
 	sslClientCert := r.Header.Get("ssl-client-cert")
 	if sslClientCert == "" {
-		utils.RestErrorWrapper(w, "ssl-client-cert header is required for TLS OVMode", http.StatusBadRequest)
+		utils.RestErrorWrapperUser(w, "ssl-client-cert header is required for TLS OVMode", "ssl-client-cert header is required for TLS OVMode", http.StatusBadRequest)
 		return
 	}
 
 	decodedCert, err := url.QueryUnescape(sslClientCert)
 	if err != nil {
-		utils.RestErrorWrapper(w, "failed to URL decode ssl-client-cert: "+err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapperUser(w, err.Error(), "failed to URL decode ssl-client-cert: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	block, _ := pem.Decode([]byte(decodedCert))
 	if block == nil {
-		utils.RestErrorWrapper(w, "failed to decode PEM block from ssl-client-cert", http.StatusBadRequest)
+		utils.RestErrorWrapperUser(w, "failed to decode PEM block from ssl-client-cert", "failed to decode PEM block from ssl-client-cert", http.StatusBadRequest)
 		return
 	}
 	cert, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
-		utils.RestErrorWrapper(w, "failed to parse certificate: "+err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapperUser(w, err.Error(), "failed to parse certificate: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	// Load the root certificate (RootOfTrust)
 	decodedRootOfTrustBytes, err := base64.StdEncoding.DecodeString(device.OVMode.RootOfTrust)
 	if err != nil {
-		utils.RestErrorWrapper(w, "failed to decode RootOfTrust from base64: "+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapperUser(w, err.Error(), "failed to decode RootOfTrust from base64: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	rootBlock, _ := pem.Decode(decodedRootOfTrustBytes)
 	if rootBlock == nil {
-		utils.RestErrorWrapper(w, "failed to decode PEM block from RootOfTrust", http.StatusInternalServerError)
+		utils.RestErrorWrapperUser(w, "failed to decode PEM block from RootOfTrust", "failed to decode PEM block from RootOfTrust", http.StatusInternalServerError)
 		return
 	}
 
 	rootCert, err := x509.ParseCertificate(rootBlock.Bytes)
 	if err != nil {
-		utils.RestErrorWrapper(w, "failed to parse RootOfTrust certificate: "+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapperUser(w, err.Error(), "failed to parse RootOfTrust certificate: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -185,7 +185,7 @@ func (a *App) validateTLSOwnership(w rest.ResponseWriter, r *rest.Request, ctx c
 	}
 
 	if _, err := cert.Verify(opts); err != nil {
-		utils.RestErrorWrapper(w, "failed to verify certificate: "+err.Error(), http.StatusForbidden)
+		utils.RestErrorWrapperUser(w, err.Error(), "failed to verify certificate: "+err.Error(), http.StatusForbidden)
 		return
 	}
 
@@ -198,7 +198,7 @@ func (a *App) validateTLSOwnership(w rest.ResponseWriter, r *rest.Request, ctx c
 	)
 
 	if err != nil {
-		utils.RestErrorWrapper(w, "failed to update device status: "+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapperUser(w, err.Error(), "failed to update device status: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -212,12 +212,12 @@ func (a *App) validateManualOwnership(w rest.ResponseWriter, r *rest.Request, ct
 	ownerPrn, ok := jwtPayload.(jwtgo.MapClaims)["prn"].(string)
 
 	if !ok {
-		utils.RestErrorWrapper(w, "Owner PRN not found in JWT payload", http.StatusBadRequest)
+		utils.RestErrorWrapperUser(w, "Owner PRN not found in JWT payload", "Owner PRN not found in JWT payload", http.StatusBadRequest)
 		return
 	}
 
 	if device.Owner != ownerPrn {
-		utils.RestErrorWrapper(w, "Token PRN does not match device owner", http.StatusForbidden)
+		utils.RestErrorWrapperUser(w, "Token PRN does not match device owner", "Token PRN does not match device owner", http.StatusForbidden)
 		return
 	}
 
@@ -230,12 +230,12 @@ func (a *App) validateManualOwnership(w rest.ResponseWriter, r *rest.Request, ct
 	)
 
 	if err != nil {
-		utils.RestErrorWrapper(w, "failed to update device status: "+err.Error(), http.StatusInternalServerError)
+		utils.RestErrorWrapperUser(w, err.Error(), "failed to update device status: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	if updateResult.ModifiedCount == 0 {
-		utils.RestErrorWrapper(w, "failed to update device status: no document updated", http.StatusInternalServerError)
+		utils.RestErrorWrapperUser(w, "failed to update device status: no document updated", "failed to update device status: no document updated", http.StatusInternalServerError)
 		return
 	}
 
