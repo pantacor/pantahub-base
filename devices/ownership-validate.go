@@ -124,8 +124,20 @@ func (a *App) validateTLSOwnership(w rest.ResponseWriter, r *rest.Request, ctx c
 		return
 	}
 
+	authID, ok := jwtPayloadIface["prn"].(string)
+	if !ok {
+		// XXX: find right error
+		utils.RestErrorWrapper(w, "You need to be logged in.", http.StatusForbidden)
+		return
+	}
+
 	if tokenType != "DEVICE" {
 		utils.RestErrorWrapperUser(w, "Device can only validate ownership with TLS mode", "Device can only validate ownership with TLS mode", http.StatusBadRequest)
+		return
+	}
+
+	if authID != device.Prn {
+		utils.RestErrorWrapperUser(w, "Device can only validate ownership of it self", "Device can only validate ownership of it self", http.StatusBadRequest)
 		return
 	}
 
@@ -151,6 +163,7 @@ func (a *App) validateTLSOwnership(w rest.ResponseWriter, r *rest.Request, ctx c
 		utils.RestErrorWrapperUser(w, "failed to decode PEM block from ssl-client-cert", "failed to decode PEM block from ssl-client-cert", http.StatusBadRequest)
 		return
 	}
+
 	cert, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
 		utils.RestErrorWrapperUser(w, err.Error(), "failed to parse certificate: "+err.Error(), http.StatusBadRequest)
@@ -163,22 +176,37 @@ func (a *App) validateTLSOwnership(w rest.ResponseWriter, r *rest.Request, ctx c
 		utils.RestErrorWrapperUser(w, err.Error(), "failed to decode RootOfTrust from base64: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	rootBlock, _ := pem.Decode(decodedRootOfTrustBytes)
-	if rootBlock == nil {
-		utils.RestErrorWrapperUser(w, "failed to decode PEM block from RootOfTrust", "failed to decode PEM block from RootOfTrust", http.StatusInternalServerError)
-		return
-	}
-
-	rootCert, err := x509.ParseCertificate(rootBlock.Bytes)
-	if err != nil {
-		utils.RestErrorWrapperUser(w, err.Error(), "failed to parse RootOfTrust certificate: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Verify the client certificate's signature using the root certificate
 	certPool := x509.NewCertPool()
-	certPool.AddCert(rootCert)
+
+	currentPEMBytes := decodedRootOfTrustBytes
+	foundAnyCA := false
+
+	for {
+		block, rest := pem.Decode(currentPEMBytes)
+		if block == nil {
+			break
+		}
+
+		if block.Type == "CERTIFICATE" {
+			caCert, err := x509.ParseCertificate(block.Bytes)
+			if err != nil {
+				utils.RestErrorWrapperUser(w, err.Error(), "failed to parse a certificate from CA chain", http.StatusBadRequest)
+				return
+			} else {
+				certPool.AddCert(caCert)
+				foundAnyCA = true
+			}
+		} else {
+			utils.RestErrorWrapperUser(w, "invalid root of trust format", "non-certificate PEM block of type '"+block.Type+"' found in CA file.", http.StatusBadRequest)
+			return
+		}
+		currentPEMBytes = rest
+	}
+
+	if !foundAnyCA {
+		utils.RestErrorWrapperUser(w, "root of trust contains no valid certificates", "failed to find any valid CERTIFICATE PEM block in CA file (RootOfTrust)", http.StatusInternalServerError)
+		return
+	}
 
 	opts := x509.VerifyOptions{
 		Roots: certPool,
