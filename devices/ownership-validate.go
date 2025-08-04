@@ -96,21 +96,75 @@ func (a *App) handleValidateOwnership(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if device.OVMode == nil {
-		utils.RestErrorWrapperUser(w, "Device does not have OVMode configured", "Device does not have OVMode configured", http.StatusNotFound)
+		a.defaultOwnership(w, r, ctx, &device, jwtPayload)
 		return
 	}
 
 	switch device.OVMode.Mode {
 	case models.ManualVerification:
 		a.validateManualOwnership(w, r, ctx, &device, jwtPayload)
+		return
 	case models.TLSVerification:
 		a.validateTLSOwnership(w, r, ctx, &device, jwtPayload)
+		return
+	case models.DefaultVerification:
+		a.defaultOwnership(w, r, ctx, &device, jwtPayload)
+		return
 	default:
 		utils.RestErrorWrapperUser(w, "Unsupported OVMode", "Unsupported OVMode", http.StatusBadRequest)
 	}
 }
 
+func (a *App) defaultOwnership(w rest.ResponseWriter, r *rest.Request, ctx context.Context, device *Device, jwtPayload any) {
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
+
+	jwtPayloadIface, ok := jwtPayload.(jwtgo.MapClaims)
+	if !ok {
+		utils.RestErrorWrapperUser(w, "JWT Payload is not valid", "JWT Payload is not valid", http.StatusBadRequest)
+		return
+	}
+
+	authID, ok := jwtPayloadIface["prn"].(string)
+	if !ok {
+		utils.RestErrorWrapper(w, "You need to be logged in.", http.StatusForbidden)
+		return
+	}
+
+	tokenType, ok := jwtPayloadIface["type"].(string)
+	if !ok {
+		utils.RestErrorWrapperUser(w, "JWT Type is not valid", "JWT Type is not valid", http.StatusBadRequest)
+		return
+	}
+
+	if device.OVMode == nil && device.Owner != "" && tokenType == "DEVICE" && device.Prn == authID {
+		device.OVMode = &models.OVModeExtension{
+			Status: models.Completed,
+			Mode:   models.DefaultVerification,
+		}
+
+		if device.OwnershipUnverify {
+			collection.UpdateOne(
+				ctx,
+				bson.M{"prn": device.Prn},
+				bson.M{"$set": bson.M{"ovmode": device.OVMode}},
+			)
+		}
+		w.WriteJson(device.OVMode)
+		return
+	}
+
+	if device.OVMode == nil {
+		utils.RestErrorWrapperUser(w, "Device is not claimed yet", "Device is not claimed yet", http.StatusNotFound)
+		return
+	}
+}
+
 func (a *App) validateTLSOwnership(w rest.ResponseWriter, r *rest.Request, ctx context.Context, device *Device, jwtPayload any) {
+	if device.OVMode == nil {
+		utils.RestErrorWrapperUser(w, "Device does not have OVMode configured", "Device does not have OVMode configured", http.StatusNotFound)
+		return
+	}
+
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	jwtPayloadIface, ok := jwtPayload.(jwtgo.MapClaims)
 	if !ok {
@@ -236,6 +290,11 @@ func (a *App) validateTLSOwnership(w rest.ResponseWriter, r *rest.Request, ctx c
 }
 
 func (a *App) validateManualOwnership(w rest.ResponseWriter, r *rest.Request, ctx context.Context, device *Device, jwtPayload any) {
+	if device.OVMode == nil {
+		utils.RestErrorWrapperUser(w, "Device does not have OVMode configured", "Device does not have OVMode configured", http.StatusNotFound)
+		return
+	}
+
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	ownerPrn, ok := jwtPayload.(jwtgo.MapClaims)["prn"].(string)
 
