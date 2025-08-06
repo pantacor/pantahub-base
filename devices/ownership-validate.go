@@ -96,7 +96,12 @@ func (a *App) handleValidateOwnership(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if device.OVMode == nil {
-		a.defaultOwnership(w, r, ctx, &device, jwtPayload)
+		a.noOvm(w, r, ctx, &device, jwtPayload)
+		return
+	}
+
+	if device.OVMode.Status == models.ValidationNotNeeded || device.OVMode.Status == models.Completed {
+		w.WriteJson(device.OVMode)
 		return
 	}
 
@@ -107,15 +112,12 @@ func (a *App) handleValidateOwnership(w rest.ResponseWriter, r *rest.Request) {
 	case models.TLSVerification:
 		a.validateTLSOwnership(w, r, ctx, &device, jwtPayload)
 		return
-	case models.DefaultVerification:
-		a.defaultOwnership(w, r, ctx, &device, jwtPayload)
-		return
 	default:
 		utils.RestErrorWrapperUser(w, "Unsupported OVMode", "Unsupported OVMode", http.StatusBadRequest)
 	}
 }
 
-func (a *App) defaultOwnership(w rest.ResponseWriter, r *rest.Request, ctx context.Context, device *Device, jwtPayload any) {
+func (a *App) noOvm(w rest.ResponseWriter, r *rest.Request, ctx context.Context, device *Device, jwtPayload any) {
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
 	jwtPayloadIface, ok := jwtPayload.(jwtgo.MapClaims)
@@ -138,7 +140,7 @@ func (a *App) defaultOwnership(w rest.ResponseWriter, r *rest.Request, ctx conte
 
 	if device.OVMode == nil && device.Owner != "" && tokenType == "DEVICE" && device.Prn == authID {
 		device.OVMode = &models.OVModeExtension{
-			Status: models.Completed,
+			Status: models.ValidationNotNeeded,
 			Mode:   models.DefaultVerification,
 		}
 

@@ -46,11 +46,12 @@ func ParseOVT(s string) OVMode {
 type Status string
 
 const (
-	Pending    Status = "pending"
-	InProgress Status = "in_progress"
-	Completed  Status = "completed"
-	Failed     Status = "failed"
-	Unknown    Status = "unknown"
+	Pending             Status = "pending"
+	InProgress          Status = "in_progress"
+	Completed           Status = "completed"
+	ValidationNotNeeded Status = "validation_not_needed"
+	Failed              Status = "failed"
+	Unknown             Status = "unknown"
 )
 
 func (s Status) String() string {
