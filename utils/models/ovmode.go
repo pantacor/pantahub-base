@@ -42,50 +42,50 @@ func ParseOVT(s string) OVMode {
 	}
 }
 
-// Status represents the current state of owner verification
-type Status string
+// OvModeStatus represents the current state of owner verification
+type OvModeStatus string
 
 const (
-	Pending             Status = "pending"
-	InProgress          Status = "in_progress"
-	Completed           Status = "completed"
-	ValidationNotNeeded Status = "validation_not_needed"
-	Failed              Status = "failed"
-	Unknown             Status = "unknown"
+	Pending             OvModeStatus = "pending"
+	InProgress          OvModeStatus = "in_progress"
+	Completed           OvModeStatus = "completed"
+	ValidationNotNeeded OvModeStatus = "validation_not_needed"
+	Failed              OvModeStatus = "failed"
+	Unknown             OvModeStatus = "unknown"
 )
 
-func (s Status) String() string {
+func (s OvModeStatus) String() string {
 	return string(s)
 }
 
-func (s Status) IsPending() bool {
+func (s OvModeStatus) IsPending() bool {
 	return s == Pending
 }
 
-func (s Status) IsInProgress() bool {
+func (s OvModeStatus) IsInProgress() bool {
 	return s == InProgress
 }
 
-func (s Status) IsCompleted() bool {
+func (s OvModeStatus) IsCompleted() bool {
 	return s == Completed
 }
 
-func (s Status) IsFailed() bool {
+func (s OvModeStatus) IsFailed() bool {
 	return s == Failed
 }
 
-func (s Status) IsUnknown() bool {
+func (s OvModeStatus) IsUnknown() bool {
 	return s == Unknown
 }
 
-func ParseStatus(s string) Status {
+func ParseStatus(s string) OvModeStatus {
 	switch s {
 	case string(Pending),
 		string(InProgress),
 		string(Completed),
 		string(Failed),
 		string(Unknown):
-		return Status(s)
+		return OvModeStatus(s)
 	default:
 		return Unknown
 	}
@@ -96,7 +96,7 @@ type OVModeExtension struct {
 	Mode OVMode `json:"mode,omitempty" bson:"mode,omitempty"`
 
 	// Status represents the current state of verification
-	Status Status `json:"status,omitempty" bson:"status,omitempty"`
+	Status OvModeStatus `json:"status,omitempty" bson:"status,omitempty"`
 
 	// root of trust is used when the mode is TLS for device verification
 	RootOfTrust string `json:"root_of_trust,omitempty" bson:"root_of_trust,omitempty"`

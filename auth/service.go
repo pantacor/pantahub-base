@@ -217,6 +217,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		rest.Post("/x509/login", app.handleAuthUsingDeviceCert),
 		rest.Get("/oauth/login/#service", app.HandleGetThirdPartyLogin),
 		rest.Get("/oauth/callback/#service", app.HandleGetThirdPartyCallback),
+		rest.Post("/oauth/token", app.HandlePKCEToken),
+		rest.Get("/oauth/authorize", app.HandlePKCEAuthorize),
 	)
 	app.API.Use(&tracer.OtelMiddleware{
 		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
@@ -301,16 +303,55 @@ func (a *App) accessCodePayload(userIDEmailNick string, serviceIDEmailNick strin
 
 	return accessCodePayload
 }
-
 func isWhiteListedForAuthentication(request *rest.Request) bool {
-	return request.URL.Path != "/login" &&
-		!(request.URL.Path == "/accounts" && request.Method == "POST") &&
-		!(request.URL.Path == "/sessions" && request.Method == "POST") &&
-		!(request.URL.Path == "/verify" && request.Method == "GET") &&
-		!(request.URL.Path == "/recover" && request.Method == "POST") &&
-		!(request.URL.Path == "/password" && request.Method == "POST") &&
-		!(request.URL.Path == "/signature/verify" && request.Method == "POST") &&
-		!(request.URL.Path == "/x509/login" && request.Method == "POST") &&
-		!(strings.HasPrefix(request.URL.Path, "/oauth/login/") && request.Method == "GET") &&
-		!(strings.HasPrefix(request.URL.Path, "/oauth/callback/") && request.Method == "GET")
+	// This function determines if authentication middleware should be applied.
+	// It returns `true` if authentication is REQUIRED for the request.
+	// It returns `false` if authentication is NOT REQUIRED (i.e., the path is whitelisted for skipping authentication).
+
+	// List of conditions where authentication is NOT required (i.e., the path is whitelisted).
+	// If any of these conditions are met, we return false, indicating no authentication is needed.
+
+	// Exact path and method matches
+	if request.URL.Path == "/login" {
+		return false
+	}
+	if request.URL.Path == "/accounts" && request.Method == "POST" {
+		return false
+	}
+	if request.URL.Path == "/sessions" && request.Method == "POST" {
+		return false
+	}
+	if request.URL.Path == "/verify" && request.Method == "GET" {
+		return false
+	}
+	if request.URL.Path == "/recover" && request.Method == "POST" {
+		return false
+	}
+	if request.URL.Path == "/password" && request.Method == "POST" {
+		return false
+	}
+	if request.URL.Path == "/signature/verify" && request.Method == "POST" {
+		return false
+	}
+	if request.URL.Path == "/x509/login" && request.Method == "POST" {
+		return false
+	}
+
+	// Path prefix and method matches for OAuth endpoints
+	if strings.HasPrefix(request.URL.Path, "/oauth/token") && request.Method == "POST" {
+		return false
+	}
+	if strings.HasPrefix(request.URL.Path, "/oauth/authorize") && request.Method == "GET" {
+		return false
+	}
+	if strings.HasPrefix(request.URL.Path, "/oauth/login/") && request.Method == "GET" {
+		return false
+	}
+	if strings.HasPrefix(request.URL.Path, "/oauth/callback/") && request.Method == "GET" {
+		return false
+	}
+
+	// If none of the above conditions are met, then the request is NOT whitelisted
+	// for skipping authentication. Therefore, authentication IS required.
+	return true
 }

@@ -347,7 +347,7 @@ func processValue(v string) interface{} {
 	return r
 }
 
-func GetPaginationWithLink(u url.URL, total int64, last, first models.Datable) Pagination {
+func GetPaginationWithLink(u url.URL, total int64, last, first models.DatableSimple) Pagination {
 	result := Pagination{
 		Total:     int(total),
 		PageSizes: []int{10, 20, 30, 50, 100},

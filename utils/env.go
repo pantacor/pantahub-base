@@ -526,3 +526,12 @@ func GetEnv(key string) string {
 
 	return v
 }
+
+func GetEnvDefault(key, defaultValue string) string {
+	v, f := os.LookupEnv(key)
+	if !f {
+		return defaultValue
+	}
+
+	return v
+}

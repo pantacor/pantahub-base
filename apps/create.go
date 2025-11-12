@@ -144,6 +144,8 @@ func parseType(typeofApp string) (string, error) {
 		return AppTypePublic, nil
 	case AppTypeConfidential:
 		return AppTypeConfidential, nil
+	case AppTypePKCE:
+		return AppTypePKCE, nil
 	default:
 		return "", errors.New("Invalid app type")
 	}
