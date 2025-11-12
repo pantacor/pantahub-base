@@ -43,6 +43,7 @@ type codeRequest struct {
 	State        string `json:"state"`
 	RedirectURI  string `json:"redirect_uri"`
 	ResponseType string `json:"response_type"`
+	AuthCode     string `json:"auth_code"`
 }
 
 type codeResponse struct {
@@ -54,7 +55,6 @@ type codeResponse struct {
 type implicitTokenRequest struct {
 	codeRequest
 	RedirectURI string `json:"redirect_uri"`
-	AuthCode    string `json:"auth_code"`
 }
 
 // handlePostAuthorizeToken authorize a thridparty application using OAuth 2.0
@@ -166,6 +166,7 @@ func (app *App) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Request)
 		pkceAuthCode = req.AuthCode
 		pkceRedirectURI = req.RedirectURI
 	}
+
 	if pkceRedirectURI != "" && pkceAuthCode != "" && isValidCallbackURL(pkceRedirectURI) {
 		utils.DeleteCookie(w, r, "pkce_redirect_uri")
 		utils.DeleteCookie(w, r, "pkce_auth_code")
@@ -263,6 +264,11 @@ func (app *App) handlePostCode(w rest.ResponseWriter, r *rest.Request) {
 
 	pkceAuthCode := utils.GetCookie(r, "pkce_auth_code")
 	pkceRedirectURI := utils.GetCookie(r, "pkce_redirect_uri")
+
+	if req.AuthCode != "" {
+		pkceAuthCode = req.AuthCode
+		pkceRedirectURI = req.RedirectURI
+	}
 
 	if pkceRedirectURI != "" && pkceAuthCode != "" && isValidCallbackURL(pkceRedirectURI) {
 		utils.DeleteCookie(w, r, "pkce_redirect_uri")
