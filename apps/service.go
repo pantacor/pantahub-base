@@ -35,6 +35,9 @@ import (
 )
 
 const (
+	// AppTypePKCE define a pkce client for oauth
+	AppTypePKCE = "pkce"
+
 	// AppTypeConfidential define a confidential client for oauth
 	AppTypeConfidential = "confidential"
 

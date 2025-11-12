@@ -205,7 +205,7 @@ func AccessCodePayload(ctx context.Context, owner, serviceName, responseType, sc
 		return nil, err
 	}
 
-	if responseType == "code" && service.Type != AppTypeConfidential {
+	if responseType == "code" && service.Type == AppTypePublic {
 		return nil, errors.New("Application can respond with code because the application is public")
 	}
 

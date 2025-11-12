@@ -55,6 +55,8 @@ type TokenRequest struct {
 	Scope        string `json:"scope"`
 	Code         string `json:"access-code"`
 	Comment      string `json:"comment"`
+	CodeVerifier string `json:"code_verifier"`
+	RedirectURI  string `json:"redirect_uri"`
 }
 
 type TokenStore struct {

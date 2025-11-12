@@ -126,8 +126,6 @@ func CbByService(r *rest.Request) (*ResponsePayload, error) {
 		return payload, fmt.Errorf("%s error -- %s", service, err)
 	}
 
-	fmt.Println("payload", payload)
-
 	oauthState, err := r.Cookie(oauthCookie)
 	if err != nil {
 		payload := &ResponsePayload{RedirectTo: ""}

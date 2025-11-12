@@ -29,6 +29,7 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/auth/oauth"
+	"gitlab.com/pantacor/pantahub-base/auth/pkceservice"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -116,6 +117,18 @@ func (a *App) HandleGetThirdPartyCallback(w rest.ResponseWriter, r *rest.Request
 		return
 	}
 
+	pkceAuthCode := utils.GetCookie(r, "pkce_auth_code")
+	pkceRedirectURI := utils.GetCookie(r, "pkce_redirect_uri")
+	if pkceRedirectURI != "" && pkceAuthCode != "" && isValidCallbackURL(pkceRedirectURI) {
+		utils.DeleteCookie(w, r, "pkce_redirect_uri")
+		utils.DeleteCookie(w, r, "pkce_auth_code")
+
+		pks, found := pkceservice.GetPKCEState(r.Context(), pkceAuthCode)
+		if found {
+			pkceservice.UpdatePKCEStateUserID(r.Context(), pks.AuthCode, account.Prn)
+		}
+	}
+
 	token, err := createAccountToken(account)
 	if err != nil {
 		processErr(w, r.Request, err, err.Error(), http.StatusInternalServerError, payload.RedirectTo)
@@ -177,4 +190,29 @@ func createAccountToken(account *accounts.Account) (*TokenPayload, error) {
 func isDubplicateKey(key string, err error) bool {
 	return strings.Contains(err.Error(), "duplicate key error collection") &&
 		strings.Contains(err.Error(), "index: "+key)
+}
+
+// isValidCallbackURL checks if the provided URL is a valid localhost callback URL.
+func isValidCallbackURL(callbackURL string) bool {
+	u, err := url.Parse(callbackURL)
+	if err != nil {
+		return false
+	}
+
+	// Only allow http or https schemes
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return false
+	}
+
+	// Only allow localhost or 127.0.0.1 as hostname for security
+	if u.Hostname() != "localhost" && u.Hostname() != "127.0.0.1" {
+		return false
+	}
+
+	// Ensure there's a path, typically /callback
+	if !strings.HasPrefix(u.Path, "/callback") {
+		return false
+	}
+
+	return true
 }

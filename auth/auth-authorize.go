@@ -31,6 +31,7 @@ import (
 	"gitlab.com/pantacor/pantahub-base/apps"
 	"gitlab.com/pantacor/pantahub-base/auth/authmodels"
 	"gitlab.com/pantacor/pantahub-base/auth/authservices"
+	"gitlab.com/pantacor/pantahub-base/auth/pkceservice"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -157,6 +158,18 @@ func (app *App) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Request)
 	params.Add("scope", req.Scopes)
 	params.Add("state", req.State)
 
+	pkceAuthCode := utils.GetCookie(r, "pkce_auth_code")
+	pkceRedirectURI := utils.GetCookie(r, "pkce_redirect_uri")
+	if pkceRedirectURI != "" && pkceAuthCode != "" && isValidCallbackURL(pkceRedirectURI) {
+		utils.DeleteCookie(w, r, "pkce_redirect_uri")
+		utils.DeleteCookie(w, r, "pkce_auth_code")
+
+		pks, found := pkceservice.GetPKCEState(r.Context(), pkceAuthCode)
+		if found {
+			pkceservice.UpdatePKCEStateUserID(r.Context(), pks.AuthCode, caller)
+		}
+	}
+
 	response := authmodels.TokenResponse{
 		Token:       tokenString,
 		RedirectURI: req.RedirectURI + "#" + params.Encode(),
@@ -241,6 +254,20 @@ func (app *App) handlePostCode(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 	response.Scopes = req.Scopes
+
+	pkceAuthCode := utils.GetCookie(r, "pkce_auth_code")
+	pkceRedirectURI := utils.GetCookie(r, "pkce_redirect_uri")
+
+	if pkceRedirectURI != "" && pkceAuthCode != "" && isValidCallbackURL(pkceRedirectURI) {
+		utils.DeleteCookie(w, r, "pkce_redirect_uri")
+		utils.DeleteCookie(w, r, "pkce_auth_code")
+
+		pks, found := pkceservice.GetPKCEState(r.Context(), pkceAuthCode)
+		if found {
+			pkceservice.UpdatePKCEStateUserID(r.Context(), pks.AuthCode, caller)
+			response.Code = pks.AuthCode
+		}
+	}
 
 	params := url.Values{}
 	params.Add("code", response.Code)
