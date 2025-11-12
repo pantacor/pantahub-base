@@ -132,12 +132,17 @@ func SearchApps(ctx context.Context, owner string, id string, database *mongo.Da
 	}
 
 	if id != "" {
-		ObjectID, _ := primitive.ObjectIDFromHex(id)
-		findQuery["$or"] = []bson.M{
-			{"_id": ObjectID},
+		orArray := []bson.M{
 			{"prn": id},
 			{"nick": id},
 		}
+		if ObjectID, err := primitive.ObjectIDFromHex(id); err == nil {
+			orArray = append(
+				orArray,
+				bson.M{"_id": ObjectID},
+			)
+		}
+		findQuery["$or"] = orArray
 	}
 
 	ctxC, cancel := context.WithTimeout(ctx, 10*time.Second)
