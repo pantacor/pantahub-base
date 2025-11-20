@@ -1,102 +1,102 @@
 stages:
-    - build
-    - deploy
+  - build
+  - deploy
 
-image: docker:stable
-
+image: docker:27.3.1-cli # Use a modern client
 services:
-    - docker:dind
+  - name: docker:27.3.1-dind # Use a matching server
+    alias: docker
 
 variables:
-    CONTAINER_IMAGE: registry.gitlab.com/$CI_PROJECT_PATH
-    DOCKER_DRIVER: overlay2
-    GIT_SUBMODULE_STRATEGY: recursive
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_TLS_CERTDIR: ""
+  CONTAINER_IMAGE: registry.gitlab.com/$CI_PROJECT_PATH
+  DOCKER_DRIVER: overlay2
+  GIT_SUBMODULE_STRATEGY: recursive
+  DOCKER_HOST: tcp://docker:2375
+  DOCKER_TLS_CERTDIR: ""
 
 build-branch:
-    stage: build
-    before_script:
-        - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
-        - docker run --rm --privileged multiarch/qemu-user-static:register || true
-    script:
-        - docker pull $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG || true
-        - docker build -f Dockerfile --build-arg NS=branch --cache-from $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG --tag $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA --tag $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG .
-        - test -n "$CI_BUILD_TAG" && docker tag $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA $CONTAINER_IMAGE:$CI_BUILD_TAG || true
-        - docker push $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
-        - docker push $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG
-        - test -n "$CI_BUILD_TAG" && docker push $CONTAINER_IMAGE:$CI_BUILD_TAG || true
-    except:
-        - develop
-        - master
-        - tags
+  stage: build
+  before_script:
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
+    - docker run --rm --privileged multiarch/qemu-user-static:register || true
+  script:
+    - docker pull $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG || true
+    - docker build -f Dockerfile --build-arg NS=branch --cache-from $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG --tag $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA --tag $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG .
+    - test -n "$CI_BUILD_TAG" && docker tag $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA $CONTAINER_IMAGE:$CI_BUILD_TAG || true
+    - docker push $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
+    - docker push $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG
+    - test -n "$CI_BUILD_TAG" && docker push $CONTAINER_IMAGE:$CI_BUILD_TAG || true
+  except:
+    - develop
+    - master
+    - tags
 
 build-devel:
-    stage: build
-    before_script:
-        - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
-        - docker run --rm --privileged multiarch/qemu-user-static:register || true
-    script:
-        - docker pull $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG || true
-        - docker build -f Dockerfile --build-arg NS=api2 --cache-from $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG --tag $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA --tag $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG .
-        - test -n "$CI_BUILD_TAG" && docker tag $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA $CONTAINER_IMAGE:$CI_BUILD_TAG || true
-        - docker push $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
-        - docker push $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG
-        - test -n "$CI_BUILD_TAG" && docker push $CONTAINER_IMAGE:$CI_BUILD_TAG || true
-    only:
-        - develop
+  stage: build
+  before_script:
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
+    - docker run --rm --privileged multiarch/qemu-user-static:register || true
+  script:
+    - docker pull $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG || true
+    - docker build -f Dockerfile --build-arg NS=api2 --cache-from $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG --tag $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA --tag $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG .
+    - test -n "$CI_BUILD_TAG" && docker tag $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA $CONTAINER_IMAGE:$CI_BUILD_TAG || true
+    - docker push $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
+    - docker push $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG
+    - test -n "$CI_BUILD_TAG" && docker push $CONTAINER_IMAGE:$CI_BUILD_TAG || true
+  only:
+    - develop
 
 build-master:
-    stage: build
-    before_script:
-        - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
-        - docker run --rm --privileged multiarch/qemu-user-static:register || true
-    script:
-        - docker pull $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG || true
-        - docker build -f Dockerfile --build-arg NS=api --cache-from $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG --tag $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA --tag $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG .
-        - docker push $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
-        - docker push $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG
-        - test -n "$CI_BUILD_TAG" && docker push $CONTAINER_IMAGE:$CI_BUILD_TAG || true
-    only:
-        - master
+  stage: build
+  before_script:
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
+    - docker run --rm --privileged multiarch/qemu-user-static:register || true
+  script:
+    - docker pull $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG || true
+    - docker build -f Dockerfile --build-arg NS=api --cache-from $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG --tag $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA --tag $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG .
+    - docker push $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
+    - docker push $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG
+    - test -n "$CI_BUILD_TAG" && docker push $CONTAINER_IMAGE:$CI_BUILD_TAG || true
+  only:
+    - master
 
 build-tags:
-    stage: build
-    before_script:
-        - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
-        - docker run --rm --privileged multiarch/qemu-user-static:register || true
-    script:
-        - docker pull $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG || true
-        - docker build -f Dockerfile --build-arg NS=master --cache-from $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG --tag $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA --tag $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG .
-        - docker tag $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA $CONTAINER_IMAGE:$CI_COMMIT_TAG
-        - docker push $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
-        - docker push $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG
-        - docker push $CONTAINER_IMAGE:$CI_COMMIT_TAG
-    only:
-        - tags
+  stage: build
+  before_script:
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
+    - docker run --rm --privileged multiarch/qemu-user-static:register || true
+  script:
+    - docker pull $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG || true
+    - docker build -f Dockerfile --build-arg NS=master --cache-from $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG --tag $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA --tag $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG .
+    - docker tag $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA $CONTAINER_IMAGE:$CI_COMMIT_TAG
+    - docker push $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
+    - docker push $CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG
+    - docker push $CONTAINER_IMAGE:$CI_COMMIT_TAG
+  only:
+    - tags
 
 deploy-devel:
-    stage: deploy
-    image: alpine:3.7
-    script:
-        - apk update  && apk add --no-cache curl
-        - curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
-        - chmod +x ./kubectl && mv ./kubectl /usr/local/bin/kubectl
-        - mkdir -p $HOME/.kube
-        - echo -n $KUBE_CONFIG_DEV | base64 -d > $HOME/.kube/config
-        - kubectl set image deploy/pv-pantahub-base pantahub-base=$CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
-    only:
-        - develop
+  stage: deploy
+  image: alpine:3.7
+  script:
+    - apk update  && apk add --no-cache curl
+    - curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+    - chmod +x ./kubectl && mv ./kubectl /usr/local/bin/kubectl
+    - mkdir -p $HOME/.kube
+    - echo -n $KUBE_CONFIG_DEV | base64 -d > $HOME/.kube/config
+    - kubectl set image deploy/pv-pantahub-base pantahub-base=$CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
+  only:
+    - develop
 
 deploy-prod:
-    stage: deploy
-    image: alpine:3.7
-    script:
-        - apk update  && apk add --no-cache curl
-        - curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
-        - chmod +x ./kubectl && mv ./kubectl /usr/local/bin/kubectl
-        - mkdir -p $HOME/.kube
-        - echo -n $KUBE_CONFIG_PROD | base64 -d > $HOME/.kube/config
-        - kubectl set image deploy/pv-prod-pantahub-base pantahub-base=$CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
-    only:
-        - tags
+  stage: deploy
+  image: alpine:3.7
+  script:
+    - apk update  && apk add --no-cache curl
+    - curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+    - chmod +x ./kubectl && mv ./kubectl /usr/local/bin/kubectl
+    - mkdir -p $HOME/.kube
+    - echo -n $KUBE_CONFIG_PROD | base64 -d > $HOME/.kube/config
+    - kubectl set image deploy/pv-prod-pantahub-base pantahub-base=$CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
+  only:
+    - tags
