@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017-2023 Pantacor Ltd.
+// Copyright (c) 2017-2025 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -83,6 +83,7 @@ type Device struct {
 }
 
 type autoTokenInfo struct {
+	TokenID  string
 	Owner    string
 	UserMeta map[string]interface{}
 	OVMode   *models.OVModeExtension
@@ -223,6 +224,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		// token api
 		rest.Post("/tokens", utils.ScopeFilter(readDevicesScopes, app.handlePostTokens)),
 		rest.Delete("/tokens/#id", utils.ScopeFilter(updateDevicesScopes, app.handleDisableTokens)),
+		rest.Patch("/tokens/#id", utils.ScopeFilter(updateDevicesScopes, app.handlePatchTokens)),
+		rest.Get("/tokens/#id", utils.ScopeFilter(readDevicesScopes, app.handleGetToken)),
 		rest.Get("/tokens", utils.ScopeFilter(readDevicesScopes, app.handleGetTokens)),
 
 		// default api

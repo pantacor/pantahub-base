@@ -1,5 +1,5 @@
 //
-// Copyright 2020  Pantacor Ltd.
+// Copyright 2025  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -108,9 +108,9 @@ func (a *App) handlePostDevice(w rest.ResponseWriter, r *rest.Request) {
 
 			if autoInfo.OVMode != nil && autoInfo.OVMode.Mode.IsTLS() {
 				newDevice.OVMode = &models.OVModeExtension{
-					Mode:        autoInfo.OVMode.Mode,
-					Status:      models.Pending,
-					RootOfTrust: autoInfo.OVMode.RootOfTrust,
+					TokenID: autoInfo.TokenID,
+					Mode:    autoInfo.OVMode.Mode,
+					Status:  models.Pending,
 				}
 				newDevice.OwnershipUnverify = true
 			}

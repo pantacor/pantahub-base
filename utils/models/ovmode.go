@@ -92,6 +92,9 @@ func ParseStatus(s string) OvModeStatus {
 }
 
 type OVModeExtension struct {
+	// Set the TokenID with own this
+	TokenID string `json:"-" bson:"token_id"`
+
 	// Owner Verification Mode
 	Mode OVMode `json:"mode,omitempty" bson:"mode,omitempty"`
 

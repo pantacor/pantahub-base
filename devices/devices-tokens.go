@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017-2023 Pantacor Ltd.
+// Copyright (c) 2017-2025 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -67,6 +67,7 @@ func (a *App) getBase64AutoTokenInfo(ctx context.Context, tokenBase64 string) (*
 	}
 
 	result := autoTokenInfo{}
+	result.TokenID = res.ID.Hex()
 	result.Owner = res.Owner
 	result.UserMeta = utils.BsonQuoteMap(&res.DefaultUserMeta)
 	result.OVMode = res.OVMode

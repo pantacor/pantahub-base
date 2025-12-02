@@ -386,9 +386,11 @@ services:
             - DATA_DIR=/data
             - DEBUG=1
         expose:
-            - "4566-4599"
+            - "4566"
+            - "4599"
         ports:
-            - "4566-4599:4566-4599"
+            - "4566:4566"
+            - "4599:4599"
         volumes:
             - "/var/run/docker.sock:/var/run/docker.sock"
             - ${PWD}/.data/localstack:/tmp/localstack/data

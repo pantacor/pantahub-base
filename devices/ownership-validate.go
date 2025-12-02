@@ -167,6 +167,8 @@ func (a *App) validateTLSOwnership(w rest.ResponseWriter, r *rest.Request, ctx c
 		return
 	}
 
+	deviceTokensCollection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
+
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	jwtPayloadIface, ok := jwtPayload.(jwtgo.MapClaims)
 	if !ok {
@@ -197,7 +199,7 @@ func (a *App) validateTLSOwnership(w rest.ResponseWriter, r *rest.Request, ctx c
 		return
 	}
 
-	if device.OVMode.Mode.IsTLS() && device.OVMode.RootOfTrust == "" {
+	if device.OVMode.Mode.IsTLS() && (device.OVMode.TokenID == "" && device.OVMode.RootOfTrust == "") {
 		utils.RestErrorWrapperUser(w, "Root of trust is not configured for TLS OVMode", "Root of trust is not configured for TLS OVMode", http.StatusInternalServerError)
 		return
 	}
@@ -226,8 +228,31 @@ func (a *App) validateTLSOwnership(w rest.ResponseWriter, r *rest.Request, ctx c
 		return
 	}
 
+	rootOfTrust := ""
+	if device.OVMode.RootOfTrust != "" {
+		rootOfTrust = device.OVMode.RootOfTrust
+	} else {
+		tokenID, err := primitive.ObjectIDFromHex(device.OVMode.TokenID)
+		if err != nil {
+			utils.RestErrorWrapperUser(w, err.Error(), "failed to parse TokenID to ObjectID: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		query := map[string]interface{}{"_id": tokenID}
+		deviceToken := utils.PantahubDevicesJoinToken{}
+		err = deviceTokensCollection.FindOne(r.Context(), query).Decode(&deviceToken)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				utils.RestErrorWrapperUser(w, "Device token not found", "Device token not found for RootOfTrust", http.StatusNotFound)
+			} else {
+				utils.RestErrorWrapperUser(w, err.Error(), "Error finding device token for RootOfTrust: "+err.Error(), http.StatusInternalServerError)
+			}
+			return
+		}
+		rootOfTrust = deviceToken.OVMode.RootOfTrust
+	}
+
 	// Load the root certificate (RootOfTrust)
-	decodedRootOfTrustBytes, err := base64.StdEncoding.DecodeString(device.OVMode.RootOfTrust)
+	decodedRootOfTrustBytes, err := base64.StdEncoding.DecodeString(rootOfTrust)
 	if err != nil {
 		utils.RestErrorWrapperUser(w, err.Error(), "failed to decode RootOfTrust from base64: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -274,6 +299,7 @@ func (a *App) validateTLSOwnership(w rest.ResponseWriter, r *rest.Request, ctx c
 	}
 
 	device.OVMode.Status = models.Completed
+	device.OVMode.RootOfTrust = rootOfTrust
 
 	_, err = collection.UpdateOne(
 		ctx,
