@@ -27,6 +27,7 @@ import (
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/accounts/accountsdata"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/decoder"
 	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -188,7 +189,7 @@ func (a *App) handlePutUserData(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	data := map[string]interface{}{}
-	err := r.DecodeJsonPayload(&data)
+	err := decoder.DecodeJsonPayload(r, &data)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error parsing data: "+err.Error(), http.StatusBadRequest)
 		return

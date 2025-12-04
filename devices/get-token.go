@@ -1,5 +1,5 @@
 //
-// Copyright 2020  Pantacor Ltd.
+// Copyright 2025  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,24 +24,25 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/utils"
-	"go.mongodb.org/mongo-driver/mongo/options"
-
+	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"gopkg.in/mgo.v2/bson"
 )
 
-// handleGetTokens Get all device tokens
-// @Summary Get all device tokens
-// @Description Get all device tokens
+// handleGetToken Get a device token by ID
+// @Summary Get a device token by ID
+// @Description Get a device token by ID
 // @Accept  json
 // @Produce  json
 // @Security ApiKeyAuth
 // @Tags devices
+// @Param id path string true "ID"
 // @Success 200 {object} utils.PantahubDevicesJoinToken
 // @Failure 400 {object} utils.RError
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
-// @Router /devices/tokens [get]
-func (a *App) handleGetTokens(w rest.ResponseWriter, r *rest.Request) {
+// @Router /devices/tokens/{id} [get]
+func (a *App) handleGetToken(w rest.ResponseWriter, r *rest.Request) {
 
 	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
 	if !ok {
@@ -64,38 +65,39 @@ func (a *App) handleGetTokens(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if authType != "USER" && authType != "SESSION" {
-		utils.RestErrorWrapper(w, "Can only be updated by Device: handle_posttoken", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Can only be accessed by User or Session", http.StatusBadRequest)
 		return
 	}
 
-	res := []utils.PantahubDevicesJoinToken{}
+	tokenID := r.PathParam("id")
+	tokenIDBson, err := primitive.ObjectIDFromHex(tokenID)
+	if err != nil {
+		utils.RestErrorWrapper(w, "Invalid token ID format: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
-	findOptions := options.Find()
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
-	cur, err := collection.Find(ctx, bson.M{
-		"owner":    caller.(string),
-		"disabled": false,
-	}, findOptions)
+
+	var result utils.PantahubDevicesJoinToken
+	err = collection.FindOne(ctx, bson.M{
+		"_id":   tokenIDBson,
+		"owner": caller.(string),
+	}).Decode(&result)
 
 	if err != nil {
-		utils.RestErrorWrapper(w, "error getting device tokens for user:"+err.Error(), http.StatusForbidden)
+		if mongoutils.IsNotFound(err) {
+			utils.RestErrorWrapper(w, "Device token not found", http.StatusNotFound)
+			return
+		}
+		utils.RestErrorWrapper(w, "Error getting device token: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	defer cur.Close(ctx)
-	for cur.Next(ctx) {
-		result := utils.PantahubDevicesJoinToken{}
-		err := cur.Decode(&result)
-		if err != nil {
-			utils.RestErrorWrapper(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
-			return
-		}
-		// lets not reveal details about token when collection gets queried
-		result.TokenSha = nil
-		result.Token = ""
-		res = append(res, result)
-	}
+	// lets not reveal details about token when collection gets queried
+	result.TokenSha = nil
+	result.Token = ""
 
-	w.WriteJson(res)
+	w.WriteJson(result)
 }

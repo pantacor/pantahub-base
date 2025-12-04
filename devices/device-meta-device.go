@@ -18,6 +18,8 @@ package devices
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -25,6 +27,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/decoder"
 	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"gopkg.in/mgo.v2/bson"
@@ -81,7 +84,7 @@ func (a *App) handlePutDeviceData(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	data := map[string]interface{}{}
-	err = r.DecodeJsonPayload(&data)
+	err = decoder.DecodeJsonPayload(r, &data)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error parsing data: "+err.Error(), http.StatusBadRequest)
 		return
@@ -133,6 +136,8 @@ func (a *App) handlePutDeviceData(w rest.ResponseWriter, r *rest.Request) {
 
 	w.WriteJson(map[string]string{"status": "ok"})
 }
+
+var parsingErrorKey = "hub_parsing"
 
 // handlePatchDeviceData Update device metadata using the device credentials:
 // @Summary Update device metadata using the device credentials:
@@ -209,16 +214,32 @@ func (a *App) handlePatchDeviceData(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	data := map[string]interface{}{}
-	err = r.DecodeJsonPayload(&data)
+	content, err := io.ReadAll(r.Body)
+	r.Body.Close()
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error parsing data: "+err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error reading request device-meta body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	for k, v := range data {
-		device.DeviceMeta[k] = v
-		if v == nil {
-			delete(device.DeviceMeta, k)
+	if len(content) == 0 {
+		utils.RestErrorWrapper(w, "Request device-meta body is empty", http.StatusBadRequest)
+		return
+	}
+
+	err = json.Unmarshal(content, &data)
+	if err != nil {
+		device.DeviceMeta[parsingErrorKey] = map[string]string{
+			"error":     err.Error(),
+			"content":   string(content),
+			"timestamp": time.Now().Format(time.RFC3339),
 		}
+	} else {
+		for k, v := range data {
+			device.DeviceMeta[k] = v
+			if v == nil {
+				delete(device.DeviceMeta, k)
+			}
+		}
+
 	}
 
 	updateResult, err := collection.UpdateOne(

@@ -221,6 +221,11 @@ func (a *App) handlePostAccount(w rest.ResponseWriter, r *rest.Request) {
 
 	r.DecodeJsonPayload(&newAccount)
 
+	if utils.GetEnv(utils.EnvPantahubDisableSignup) == "true" {
+		utils.RestError(w, nil, "User signup is currently disabled", http.StatusForbidden)
+		return
+	}
+
 	// if encrypted account data exist decryted and continue with validation
 	if newAccount.EncryptedAccount != "" {
 		err := utils.ParseJWE(newAccount.EncryptedAccount, &newAccount.Account)
@@ -494,8 +499,8 @@ func (a *App) handleVerify(w rest.ResponseWriter, r *rest.Request) {
 }
 
 // handlePasswordReset gets the recovery token and validate it in order to overwrite the user password
-// @Summary send email with token to user in order to reset password to given user
-// @Description send email with token to user in order to reset password to given user
+// @Summary gets the recovery token and validate it in order to overwrite the user password
+// @Description gets the recovery token and validate it in order to overwrite the user password
 // @Accept  json
 // @Produce  json
 // @Tags auth
@@ -613,6 +618,11 @@ func (a *App) handlePasswordReset(writer rest.ResponseWriter, r *rest.Request) {
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /auth/recover [post]
 func (a *App) handlePasswordRecovery(writer rest.ResponseWriter, r *rest.Request) {
+	if utils.GetEnv(utils.EnvPantahubDisableForgotPassword) == "true" {
+		utils.RestError(writer, nil, "Recover password feature is disabled", http.StatusForbidden)
+		return
+	}
+
 	data := authmodels.PasswordResetRequest{}
 
 	r.DecodeJsonPayload(&data)

@@ -32,6 +32,8 @@ import (
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
 
+var maxPagination = int64(500)
+
 // ## GET /logs/
 //
 //	  Post one or many log entries as an error of LogEntry
@@ -117,6 +119,10 @@ func (a *App) handleGetLogs(w rest.ResponseWriter, r *rest.Request) {
 		var p int
 		p, err = strconv.Atoi(pageParam)
 		pageParamInt = int64(p)
+	}
+
+	if pageParamInt > maxPagination {
+		pageParamInt = maxPagination
 	}
 	if err != nil {
 		utils.RestErrorWrapper(w, "Bad 'page' parameter", http.StatusBadRequest)

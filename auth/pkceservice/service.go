@@ -2,7 +2,6 @@ package pkceservice
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"gitlab.com/pantacor/pantahub-base/auth/storage"
@@ -88,8 +87,6 @@ func UpdatePKCEStateUserID(ctx context.Context, authCode, userID string) bool {
 	if err != nil {
 		return false
 	}
-
-	fmt.Println("collection ", pkceRepo.Repo.GetCollectionName())
 
 	pks.UserID = userID
 	err = pkceRepo.Update(ctx, pks)

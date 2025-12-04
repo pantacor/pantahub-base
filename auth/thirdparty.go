@@ -28,6 +28,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/accounts"
+	"gitlab.com/pantacor/pantahub-base/auth/authservices"
 	"gitlab.com/pantacor/pantahub-base/auth/oauth"
 	"gitlab.com/pantacor/pantahub-base/auth/pkceservice"
 	"gitlab.com/pantacor/pantahub-base/utils"
@@ -86,6 +87,12 @@ func (a *App) HandleGetThirdPartyCallback(w rest.ResponseWriter, r *rest.Request
 
 	if payload.Email == "" {
 		errMg := fmt.Sprintf("You need to validate your email or make it public on %s", payload.Service)
+		processErr(w, r.Request, err, errMg, http.StatusForbidden, payload.RedirectTo)
+		return
+	}
+
+	if !authservices.IsEmailDomainAllowed(payload.Email) {
+		errMg := fmt.Sprintf("Email domain not allowed: %s", payload.Email)
 		processErr(w, r.Request, err, errMg, http.StatusForbidden, payload.RedirectTo)
 		return
 	}
@@ -164,7 +171,7 @@ func createAccountToken(account *accounts.Account) (*TokenPayload, error) {
 	jwtSecretBase64 := utils.GetEnv(utils.EnvPantahubJWTAuthSecret)
 	jwtSecretPem, err := base64.StdEncoding.DecodeString(jwtSecretBase64)
 	if err != nil {
-		return nil, fmt.Errorf("No valid JWT secret (PANTAHUB_JWT_AUTH_SECRET) in base64 format: %s", err.Error())
+		return nil, fmt.Errorf("No valid JWT secret (PANTAHUB_JWT_SECRET) in base64 format: %s", err.Error())
 	}
 	jwtSecret, err := jwt.ParseRSAPrivateKeyFromPEM(jwtSecretPem)
 	if err != nil {

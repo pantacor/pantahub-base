@@ -79,7 +79,6 @@ func (a *App) handleGetLogsCursor(w rest.ResponseWriter, r *rest.Request) {
 	if nextCursorJWT == "" {
 		r.ParseForm()
 		nextCursorJWT = r.FormValue("next-cursor")
-
 	}
 
 	token, err := jwtgo.ParseWithClaims(nextCursorJWT, &CursorClaim{}, func(token *jwtgo.Token) (interface{}, error) {

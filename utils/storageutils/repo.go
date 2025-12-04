@@ -190,25 +190,6 @@ func (db *Repo) UpdateOne(ctx context.Context, data models.Datable, upsert bool)
 		"$set": data,
 	}
 
-	// // Marshal query and update for logging
-	// q, err := json.Marshal(query)
-	// if err != nil {
-	// 	fmt.Printf("Error marshaling query: %v\n", err)
-	// }
-	// s, err := json.Marshal(update)
-	// if err != nil {
-	// 	fmt.Printf("Error marshaling update: %v\n", err)
-	// }
-
-	// // Check for logDeployments
-	// for _, ld := range logDeployments {
-	// 	if strings.Contains(string(q), ld) {
-	// 		fmt.Printf("UpdateOne Query: %s\n", q)
-	// 		fmt.Printf("UpdateOne Update: %s\n", s)
-	// 		break
-	// 	}
-	// }
-
 	_, err := db.Collection.UpdateOne(
 		ctx,
 		query,
@@ -253,8 +234,7 @@ func (db *Repo) SoftDeleteMany(ctx context.Context, q bson.M) error {
 
 	updateWith := bson.M{
 		"$set": bson.M{
-			"deleted_at":   now,
-			"status.state": models.StatusDeleted,
+			"deleted_at": now,
 		},
 	}
 

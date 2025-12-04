@@ -1,8 +1,8 @@
 module gitlab.com/pantacor/pantahub-base
 
-go 1.22
+go 1.23
 
-toolchain go1.22.6
+toolchain go1.23.8
 
 require (
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751
@@ -23,7 +23,7 @@ require (
 	github.com/pantacor/go-json-rest-middleware-jwt v0.0.0-20190329235955-213479ac018c
 	github.com/prometheus/client_golang v1.12.1
 	github.com/rs/cors v1.8.2
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/swaggo/http-swagger v1.2.5
 	github.com/swaggo/swag v1.8.1
 	github.com/tiaguinho/gosoap v1.4.4
@@ -272,6 +272,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.31.1 // indirect
 	github.com/aws/smithy-go v1.21.0 // indirect
 	github.com/aybabtme/rgbterm v0.0.0-20170906152045-cc83f3b3ce59 // indirect
+	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/benbjohnson/clock v1.3.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bgentry/speakeasy v0.1.0 // indirect
@@ -462,6 +463,7 @@ require (
 	github.com/goreleaser/goreleaser v0.134.0 // indirect
 	github.com/goreleaser/nfpm v1.2.1 // indirect
 	github.com/gorilla/context v1.1.1 // indirect
+	github.com/gorilla/css v1.0.1 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/gosimple/unidecode v1.0.1 // indirect
@@ -566,6 +568,7 @@ require (
 	github.com/mattn/go-zglob v0.0.1 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
+	github.com/microcosm-cc/bluemonday v1.0.27 // indirect
 	github.com/miekg/dns v1.1.29 // indirect
 	github.com/miekg/pkcs11 v1.0.3 // indirect
 	github.com/minio/asm2plan9s v0.0.0-20200509001527-cdd76441f9d8 // indirect

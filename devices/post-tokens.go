@@ -116,6 +116,7 @@ func (a *App) handlePostTokens(w rest.ResponseWriter, r *rest.Request) {
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
+
 	_, err = collection.InsertOne(ctx, &req)
 
 	if err != nil {
@@ -126,6 +127,11 @@ func (a *App) handlePostTokens(w rest.ResponseWriter, r *rest.Request) {
 	// do not return TokenSha, return encoded key
 	req.Token = base64.StdEncoding.EncodeToString(key)
 	req.TokenSha = nil
+
+	// Don't echo the root of trust
+	if req.OVMode != nil {
+		req.OVMode.RootOfTrust = ""
+	}
 
 	w.WriteJson(&req)
 }

@@ -10,7 +10,7 @@ package utils
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"log"
 	"math"
 	"net/http"
@@ -153,21 +153,22 @@ func (mw *AccessLogFluentMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.Han
 
 		// only read body if the content is json to avoid read binary or uploaded files
 		if ct == "application/json" && GetEnv(EnvPantahubLogBody) == "true" {
-			responseWrapper := NewResponseWriterWrapper(w)
-
-			// read blocks of 64k
-			for {
-				readBuf := make([]byte, readBlockSize)
-				n, _ := r.Request.Body.Read(readBuf)
-				requestBody = append(requestBody, readBuf[:n]...)
-				if n < readBlockSize {
-					break
-				}
+			// Read the entire body
+			bodyBytes, err := io.ReadAll(r.Request.Body)
+			if err != nil {
+				// Handle error
+				log.Printf("Error reading body: %v", err)
+				// You might want to return or handle the error appropriately
 			}
 
-			r.Request.Body = ioutil.NopCloser(bytes.NewBuffer(requestBody))
+			// Restore the body for future reads
+			r.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+			// Your logging or processing logic
+			requestBody = bodyBytes
 
 			// call the handler
+			responseWrapper := NewResponseWriterWrapper(w)
 			h(responseWrapper, r)
 
 			responseBody = responseWrapper.ResponseBody
@@ -181,15 +182,15 @@ func (mw *AccessLogFluentMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.Han
 			return
 		}
 
-		// limit response size to MAX_READ_BODY_SIZE
-		if len(responseBody) > maxReadBodySize {
-			responseBody = responseBody[:maxReadBodySize]
-		}
+		// // limit response size to MAX_READ_BODY_SIZE
+		// if len(responseBody) > maxReadBodySize {
+		// 	responseBody = responseBody[:maxReadBodySize]
+		// }
 
-		// limit request size to MAX_READ_BODY_SIZE
-		if len(requestBody) > maxReadBodySize {
-			requestBody = requestBody[:maxReadBodySize]
-		}
+		// // limit request size to MAX_READ_BODY_SIZE
+		// if len(requestBody) > maxReadBodySize {
+		// 	requestBody = requestBody[:maxReadBodySize]
+		// }
 
 		logRec := mw.makeAccessLogFluentRecord(w, responseBody, r, requestBody)
 

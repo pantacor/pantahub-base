@@ -167,6 +167,15 @@ definitions:
       type:
         type: string
     type: object
+  authmodels.LoginRequestPayload:
+    properties:
+      password:
+        type: string
+      scope:
+        type: string
+      username:
+        type: string
+    type: object
   authmodels.PasswordReset:
     properties:
       password:
@@ -177,6 +186,19 @@ definitions:
   authmodels.PasswordResetRequest:
     properties:
       email:
+        type: string
+    type: object
+  authmodels.TokenResponse:
+    properties:
+      redirect_uri:
+        type: string
+      scopes:
+        type: string
+      state:
+        type: string
+      token:
+        type: string
+      token_type:
         type: string
     type: object
   callbacks.ProcessDeviceResult:
@@ -324,10 +346,14 @@ definitions:
         type: boolean
       nick:
         type: string
+      ovmode:
+        $ref: '#/definitions/models.OVModeExtension'
       owner:
         type: string
       owner-nick:
         type: string
+      ownership_unverified:
+        type: boolean
       prn:
         type: string
       public:
@@ -417,6 +443,18 @@ definitions:
       start:
         type: integer
     type: object
+  models.OVModeExtension:
+    properties:
+      mode:
+        description: Owner Verification Mode
+        type: string
+      root_of_trust:
+        description: root of trust is used when the mode is TLS for device verification
+        type: string
+      status:
+        description: Status represents the current state of verification
+        type: string
+    type: object
   objects.Object:
     properties:
       id:
@@ -492,6 +530,9 @@ definitions:
         type: object
       nick:
         type: string
+      ovmode:
+        $ref: '#/definitions/models.OVModeExtension'
+        description: extensions
       picture:
         type: string
       time-created:
@@ -789,6 +830,8 @@ definitions:
         type: string
       nick:
         type: string
+      ovmode:
+        $ref: '#/definitions/models.OVModeExtension'
       owner:
         type: string
       prn:
@@ -806,7 +849,7 @@ definitions:
     type: object
   utils.RError:
     properties:
-      cod:
+      code:
         type: integer
       error:
         type: string
@@ -1263,6 +1306,48 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Gets authentication code using OAuth 2.0
+      tags:
+      - auth
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Get login token using username and password
+      parameters:
+      - description: Login credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/authmodels.LoginRequestPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/authmodels.TokenResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      summary: Get login token using username and password
       tags:
       - auth
   /auth/oauth/callback/{service}:
@@ -2158,6 +2243,37 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: 'Update device metadata using the device credentials:'
+      tags:
+      - devices
+  /devices/{id}/ownership/validate:
+    get:
+      consumes:
+      - application/json
+      description: |-
+        Validates device ownership based on the configured OVMode (TLS, Manual, etc.).
+        If OVMode is TLS, the client must use the 'root_of_trust' as the client TLS connection.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Ownership validation successful. Returns OVMode details.
+          schema:
+            $ref: '#/definitions/models.OVModeExtension'
+        "400":
+          description: Invalid request or parameters.
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Device not found or ownership not verifiable.
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal server error.
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Validates device ownership based on OVMode.
       tags:
       - devices
   /devices/{id}/public:
@@ -4033,6 +4149,48 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Put step state (only if not yet consumed)
+      tags:
+      - trails
+  /trails/{id}/steps/{rev}/wontgo:
+    put:
+      consumes:
+      - application/json
+      description: |-
+        Mark as WONTGO a step still in INPROGRESS.
+        Mark as WONTGO a step still in INPROGRESS.
+      parameters:
+      - description: ID|NICK|PRN
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: REV_ID
+        in: path
+        name: rev
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/trailmodels.StepProgress'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.RError'
+      security:
+      - ApiKeyAuth: []
+      summary: Mark as WONTGO a step still in INPROGRESS.
       tags:
       - trails
   /trails/{id}/summary:

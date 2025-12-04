@@ -21,6 +21,7 @@ import (
 	"gitlab.com/pantacor/pantahub-base/tokens/tokenrepo"
 	"gitlab.com/pantacor/pantahub-base/tokens/tokenservice"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/models"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gopkg.in/mgo.v2/bson"
@@ -63,7 +64,8 @@ func CreateUserToken(payload *authmodels.LoginRequestPayload, jwtMiddleware *jwt
 	claims := token.Claims.(jwtgo.MapClaims)
 
 	if jwtMiddleware.PayloadFunc != nil {
-		for key, value := range jwtMiddleware.PayloadFunc(payload.Username) {
+		acc := jwtMiddleware.PayloadFunc(payload.Username)
+		for key, value := range acc {
 			claims[key] = value
 		}
 	}
@@ -85,7 +87,7 @@ func CreateUserToken(payload *authmodels.LoginRequestPayload, jwtMiddleware *jwt
 			service := tokenservice.New(repo)
 			authToken, err = service.GetToken(context.Background(), tokenid, "")
 			if err != nil {
-				return tokenString, rerr
+				log.Printf("ERROR: service.GetToken: %s", err.Error())
 			}
 		}
 	}
@@ -269,9 +271,12 @@ func GetAccount(prnEmailNick string, mongoClient *mongo.Client) (accounts.Accoun
 func AccountAuth(idEmailNick string, secret string, mongoClient *mongo.Client) bool {
 
 	var (
-		err     error
-		account accounts.Account
+		err       error
+		account   accounts.Account
+		authToken *tokenmodels.AuthToken
 	)
+
+	authTokenValid := false
 
 	// validate if secret is a token
 	password, err := base64.RawStdEncoding.DecodeString(secret)
@@ -281,11 +286,20 @@ func AccountAuth(idEmailNick string, secret string, mongoClient *mongo.Client) b
 			tokenid := splitPassword[0]
 			repo := tokenrepo.New(mongoClient)
 			service := tokenservice.New(repo)
-			authToken, err := service.GetToken(context.Background(), tokenid, account.Prn)
-			if err == nil && authToken != nil && !authToken.Deleted && authToken.Secret == secret && authToken.ExpireAt.Unix() > time.Now().Unix() && authToken.Name == idEmailNick {
-				return true
+			authToken, err = service.GetToken(context.Background(), tokenid, account.Prn)
+			if err == nil && authToken != nil && !authToken.Deleted && authToken.Secret == secret && authToken.ExpireAt.Unix() > time.Now().Unix() {
+				authTokenValid = true
 			}
 		}
+	}
+
+	// if token is valid and the username for login is the token name login true
+	if authToken != nil && authTokenValid && authToken.Name == idEmailNick {
+		return true
+	}
+
+	if utils.GetEnv(utils.EnvPantahubDisableEmailPasswordLogin) == "true" {
+		return false
 	}
 
 	account, err = GetAccount(idEmailNick, mongoClient)
@@ -293,9 +307,18 @@ func AccountAuth(idEmailNick string, secret string, mongoClient *mongo.Client) b
 		return false
 	}
 
+	if !IsEmailDomainAllowed(account.Email) {
+		return false
+	}
+
 	// account has still a challenge -> not activated -> fail to login
 	if account.Challenge != "" {
 		return false
+	}
+
+	// if the token is validated and the username to login is the email or nick it should be true is the token owner is the same
+	if authToken != nil && authTokenValid && authToken.Owner == account.Prn {
+		return true
 	}
 
 	// account has same password as the secret provided to func call -> success
@@ -390,7 +413,11 @@ func DevicePayload(deviceID string, mongoClient *mongo.Client) map[string]interf
 		"type":   "DEVICE",
 		"prn":    device.Prn,
 		"owner":  device.Owner,
-		"scopes": "prn:pantahub.com:apis:/base/all",
+		"scopes": utils.Scopes.API.String(),
+	}
+
+	if device.OVMode != nil && device.OVMode.Mode == models.TLSVerification && device.OVMode.Status != models.Completed {
+		val["scopes"] = utils.Scopes.APIReadOnly.String() + " " + utils.Scopes.ValidateDevices.String()
 	}
 
 	return val
@@ -427,7 +454,7 @@ func AccountToPayload(account accounts.Account) map[string]interface{} {
 	result["id"] = account.Prn
 	result["nick"] = account.Nick
 	result["prn"] = account.Prn
-	result["scopes"] = "prn:pantahub.com:apis:/base/all"
+	result["scopes"] = utils.Scopes.API.String()
 
 	return result
 }

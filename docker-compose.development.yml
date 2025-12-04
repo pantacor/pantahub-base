@@ -33,51 +33,12 @@ services:
       MONGO_RS: rs0
       MONGO_PORT: 27017
     volumes:
-      - ${PWD}/entrypoints/mongo-cluster-entrypoint:/docker-entrypoint
+      - ${PWD}/entrypoints/mongo-single-entrypoint:/docker-entrypoint
       - ${PWD}/.data/mongo-1:/data/db
-      - ${PWD}/entrypoints/mongokey.yaml:/keys/mongokey.yaml:ro
+      # - ${PWD}/entrypoints/mongokey.yaml:/keys/mongokey.yaml:ro
     command: /docker-entrypoint
     ports:
       - 27017:27017
-    links:
-      - mongo2
-      - mongo3
-
-  mongo2:
-    networks:
-      - base
-    image: mongo:4.4.3
-    container_name: mongo2
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: admin
-      MONGO_RS: rs0
-      MONGO_PORT: 30002
-    command: ["/docker-entrypoint"]
-    volumes:
-      - ${PWD}/entrypoints/mongo-cluster-secondary-entrypoint:/docker-entrypoint
-      - ${PWD}/.data/mongo-2:/data/db
-      - ${PWD}/entrypoints/mongokey.yaml:/keys/mongokey.yaml:ro
-    ports:
-      - 30002:30002
-
-  mongo3:
-    networks:
-      - base
-    image: mongo:4.4.3
-    container_name: mongo3
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: admin
-      MONGO_RS: rs0
-      MONGO_PORT: 30003
-    command: ["/docker-entrypoint"]
-    volumes:
-      - ${PWD}/entrypoints/mongo-cluster-secondary-entrypoint:/docker-entrypoint
-      - ${PWD}/.data/mongo-3:/data/db
-      - ${PWD}/entrypoints/mongokey.yaml:/keys/mongokey.yaml:ro
-    ports:
-      - 30003:30003
 
   fluentd:
     networks:

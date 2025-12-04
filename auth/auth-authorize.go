@@ -43,6 +43,7 @@ type codeRequest struct {
 	State        string `json:"state"`
 	RedirectURI  string `json:"redirect_uri"`
 	ResponseType string `json:"response_type"`
+	AuthCode     string `json:"auth_code"`
 }
 
 type codeResponse struct {
@@ -160,6 +161,12 @@ func (app *App) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Request)
 
 	pkceAuthCode := utils.GetCookie(r, "pkce_auth_code")
 	pkceRedirectURI := utils.GetCookie(r, "pkce_redirect_uri")
+
+	if req.AuthCode != "" {
+		pkceAuthCode = req.AuthCode
+		pkceRedirectURI = req.RedirectURI
+	}
+
 	if pkceRedirectURI != "" && pkceAuthCode != "" && isValidCallbackURL(pkceRedirectURI) {
 		utils.DeleteCookie(w, r, "pkce_redirect_uri")
 		utils.DeleteCookie(w, r, "pkce_auth_code")
@@ -257,6 +264,11 @@ func (app *App) handlePostCode(w rest.ResponseWriter, r *rest.Request) {
 
 	pkceAuthCode := utils.GetCookie(r, "pkce_auth_code")
 	pkceRedirectURI := utils.GetCookie(r, "pkce_redirect_uri")
+
+	if req.AuthCode != "" {
+		pkceAuthCode = req.AuthCode
+		pkceRedirectURI = req.RedirectURI
+	}
 
 	if pkceRedirectURI != "" && pkceAuthCode != "" && isValidCallbackURL(pkceRedirectURI) {
 		utils.DeleteCookie(w, r, "pkce_redirect_uri")

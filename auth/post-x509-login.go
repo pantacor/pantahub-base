@@ -96,7 +96,7 @@ func createToken(device *devices.Device) (*TokenPayload, error) {
 	jwtSecretBase64 := utils.GetEnv(utils.EnvPantahubJWTAuthSecret)
 	jwtSecretPem, err := base64.StdEncoding.DecodeString(jwtSecretBase64)
 	if err != nil {
-		return nil, fmt.Errorf("No valid JWT secret (PANTAHUB_JWT_AUTH_SECRET) in base64 format: %s", err.Error())
+		return nil, fmt.Errorf("No valid JWT secret (PANTAHUB_JWT_SECRET) in base64 format: %s", err.Error())
 	}
 	jwtSecret, err := jwt.ParseRSAPrivateKeyFromPEM(jwtSecretPem)
 	if err != nil {

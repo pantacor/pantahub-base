@@ -42,29 +42,36 @@ type Scope struct {
 	Required    bool   `json:"required,omitempty" bson:"required"`
 }
 
+// String convert scope to string
+func (s *Scope) String() string {
+	return s.Service + "/" + s.ID
+}
+
 // IScopes define every possible scope type
 type IScopes struct {
-	API           Scope
-	Profile       Scope
-	ReadProfile   Scope
-	ReadUser      Scope
-	WriteUser     Scope
-	Devices       Scope
-	ReadDevices   Scope
-	WriteDevices  Scope
-	UpdateDevices Scope
-	Objects       Scope
-	ReadObjects   Scope
-	WriteObjects  Scope
-	UpdateObjects Scope
-	Trails        Scope
-	ReadTrails    Scope
-	WriteTrails   Scope
-	UpdateTrails  Scope
-	Metrics       Scope
-	ReadMetrics   Scope
-	WriteMetrics  Scope
-	UpdateMetrics Scope
+	API             Scope
+	APIReadOnly     Scope
+	Profile         Scope
+	ReadProfile     Scope
+	ReadUser        Scope
+	WriteUser       Scope
+	Devices         Scope
+	ReadDevices     Scope
+	WriteDevices    Scope
+	ValidateDevices Scope
+	UpdateDevices   Scope
+	Objects         Scope
+	ReadObjects     Scope
+	WriteObjects    Scope
+	UpdateObjects   Scope
+	Trails          Scope
+	ReadTrails      Scope
+	WriteTrails     Scope
+	UpdateTrails    Scope
+	Metrics         Scope
+	ReadMetrics     Scope
+	WriteMetrics    Scope
+	UpdateMetrics   Scope
 }
 
 // Scopes variable with all the posible scopes
@@ -73,6 +80,11 @@ var Scopes = &IScopes{
 		ID:          "all",
 		Service:     PantahubServiceID,
 		Description: "Complete Access",
+	},
+	APIReadOnly: Scope{
+		ID:          "all.readonly",
+		Service:     PantahubServiceID,
+		Description: "Complete Read only Access",
 	},
 	Profile: Scope{
 		ID:          "profile",
@@ -98,6 +110,11 @@ var Scopes = &IScopes{
 		ID:          "devices.write",
 		Service:     PantahubServiceID,
 		Description: "Write only devices",
+	},
+	ValidateDevices: Scope{
+		ID:          "devices.validate",
+		Service:     PantahubServiceID,
+		Description: "Validate devices ownership only",
 	},
 	UpdateDevices: Scope{
 		ID:          "devices.change",

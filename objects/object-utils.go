@@ -158,7 +158,7 @@ func (a *App) ResolveObjectWithBacking(pctx context.Context, owner string, sha s
 		return nil, errors.New("Unable to find Object by Storage id: " + storageID + " - " + err.Error())
 	}
 
-	hasBackingFile, err = HasBackingFile(&object)
+	hasBackingFile, err = HasBackingFile(pctx, &object)
 	if err != nil {
 		return nil, err
 	}
@@ -194,9 +194,8 @@ func (a *App) ResolveObjectWithLinks(ctx context.Context, owner string, sha stri
 	storageID := MakeStorageID(owner, shaBytes)
 	object = new(Object)
 	err = a.FindObjectByStorageID(ctx, storageID, object)
-
 	if err == nil && object.LinkedObject == "" {
-		hasBackingFile, err = HasBackingFile(object)
+		hasBackingFile, err = HasBackingFile(ctx, object)
 		if err != nil {
 			return nil, err
 		}
@@ -217,8 +216,10 @@ func (a *App) ResolveObjectWithLinks(ctx context.Context, owner string, sha stri
 	if autoLink && object.LinkedObject == "" && (err == mongo.ErrNoDocuments || !hasBackingFile) {
 		// Link object if there is any public object available
 		linked, err2 := a.LinkifyObject(ctx, object)
-		if err2 == mongo.ErrNoDocuments {
+		if err2 == ErrNoLinkTargetAvail {
 			return nil, ErrNoLinkTargetAvail
+		} else if err2 == ErrNoBackingFile {
+			return nil, ErrNoBackingFile
 		} else if err2 != nil {
 			return nil, errors.New("Error linking object:" + err2.Error())
 		} else if !linked {
@@ -232,16 +233,17 @@ func (a *App) ResolveObjectWithLinks(ctx context.Context, owner string, sha stri
 	} else if object.LinkedObject == "" && !hasBackingFile {
 		return nil, ErrNoBackingFile
 	}
+
 	return object, nil
 }
 
-func HasBackingFile(object *Object) (bool, error) {
+func HasBackingFile(ctx context.Context, object *Object) (bool, error) {
 	sd := storagedriver.FromEnv()
 	filePath, err := utils.MakeLocalS3PathForName(object.StorageID)
 	if err != nil {
 		return false, err
 	}
-	if sd.Exists(context.TODO(), filePath) {
+	if sd.Exists(ctx, filePath) {
 		return true, nil
 	}
 	return false, nil
@@ -252,21 +254,23 @@ func (a *App) LinkifyObject(ctx context.Context, object *Object) (
 	linked bool,
 	err error) {
 
-	notOwnedBy := object.Owner
-
-	// Find public object owner from public objects pool
-	publicObjectOwner, err := a.FindPublicObjectOwner(ctx, object.Sha, notOwnedBy)
-	if err == mongo.ErrNoDocuments {
-		return false, err
-	} else if err != nil {
-		return false, errors.New("Error finding public object owner: " + err.Error())
-	}
-
 	publicObject := Object{}
-	err = a.FindObjectByShaByOwner(ctx, object.Sha, publicObjectOwner, &publicObject)
-	if err != nil {
-		return false, errors.New("Error finding object by sha '" + object.Sha + "' & by owner: '" + publicObjectOwner + "'" + err.Error())
+	err = a.FindLinkTarget(ctx, object.Sha, &publicObject)
+	if err == mongo.ErrNoDocuments {
+		return false, ErrNoBackingFile
 	}
+	if err != nil {
+		return false, fmt.Errorf("error finding link target for sha '%s': %w", object.Sha, err)
+	}
+
+	isPublic, err := a.LinkTargetIsPublic(ctx, object.Sha, publicObject.Owner)
+	if err != nil {
+		return false, fmt.Errorf("error finding if link target sha is public '%s': %w", object.Sha, err)
+	}
+	if !isPublic {
+		return false, ErrNoLinkTargetAvail
+	}
+
 	// Link the Object storage-id
 	object.LinkedObject = publicObject.StorageID
 	object.Size = publicObject.Size
@@ -310,6 +314,52 @@ func (a *App) FindPublicObjectOwner(parentCtx context.Context, sha string, notOw
 	}
 
 	return publicStep["owner"].(string), nil
+}
+
+func (a *App) LinkTargetIsPublic(parentCtx context.Context, sha string, owner string) (
+	isPublic bool,
+	err error,
+) {
+
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_public_steps")
+
+	ctx, cancel := context.WithTimeout(parentCtx, 1*time.Minute)
+	defer cancel()
+
+	publicStep := map[string]interface{}{}
+	query := bson.M{
+		"object_sha": sha,
+		"owner":      owner,
+		"ispublic":   true,
+	}
+	err = collection.FindOne(ctx, query).Decode(&publicStep)
+	if err == mongo.ErrNoDocuments {
+		return false, nil
+	}
+
+	if err != nil {
+		return false, err
+	}
+
+	return publicStep["ispublic"].(bool), nil
+}
+
+func (a *App) FindLinkTarget(parentCtx context.Context, sha string, obj *Object) error {
+
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
+
+	ctx, cancel := context.WithTimeout(parentCtx, 1*time.Minute)
+	defer cancel()
+
+	err := collection.FindOne(ctx, bson.M{
+		"id": sha,
+		"$or": []bson.M{
+			{"linked_object": nil},
+			{"linked_object": ""},
+		},
+	}).Decode(&obj)
+
+	return err
 }
 
 // FindObjectByShaByOwner is to find object by sha & by owner

@@ -1,37 +1,17 @@
 #!/bin/sh
 
-set -ex
+set -x
 
-MONGO_PORT=${MONGO_PORT:-27017}
+mongod --bind_ip_all --port 27017 &
+# mongod --auth --replSet ${MONGO_RS} --bind_ip_all --port 27017 &
 
-# make sure the permissions for the mongokey is correct
-chmod 600 /keys/mongokey.yaml
-
-mongod --keyFile /keys/mongokey.yaml --transitionToAuth  --port ${MONGO_PORT} --replSet ${MONGO_RS} --bind_ip_all $@ &
 sleep 5
 
-replicaSet="""{
-  \"_id\": \"${MONGO_RS}\",
-  \"members\": [
-    {
-      \"_id\": 0,
-      \"host\": \"mongo:27017\"
-    },
-    {
-      \"_id\": 1,
-      \"host\": \"mongo2:30002\"
-    },
-    {
-      \"_id\": 2,
-      \"host\": \"mongo3:30003\"
-    }
-  ]
-}"""
+# until mongo --eval "rs.initiate().ok || rs.status().ok"; do
+#   echo "checking replica set"
+#   sleep 1
+# done
 
-until mongo --eval "rs.initiate($replicaSet).ok || rs.status().ok" --port 27017 --quiet; do
-  echo "checking mongo replica set"
-  sleep 1
-done
 
 if ! mongo --eval 'db.getUsers()' "mongodb://admin:admin@localhost:27017/admin?authSource=admin&authMechanism=SCRAM-SHA-1&replicaSet=rs0"; then
   until mongo --eval 'db.createUser({user: "admin", pwd: "admin", roles: [{role: "readWrite", db:"admin"}], mechanisms: ["SCRAM-SHA-1"]})' "mongodb://localhost:27017/admin?replicaSet=rs0"; do

@@ -1,5 +1,5 @@
 //
-// Copyright 2020  Pantacor Ltd.
+// Copyright 2025  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import (
 	jwtgo "github.com/dgrijalva/jwt-go"
 	petname "github.com/dustinkirkland/golang-petname"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/models"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -105,6 +106,14 @@ func (a *App) handlePostDevice(w rest.ResponseWriter, r *rest.Request) {
 				newDevice.UserMeta = autoInfo.UserMeta
 			}
 
+			if autoInfo.OVMode != nil && autoInfo.OVMode.Mode.IsTLS() {
+				newDevice.OVMode = &models.OVModeExtension{
+					TokenID: autoInfo.TokenID,
+					Mode:    autoInfo.OVMode.Mode,
+					Status:  models.Pending,
+				}
+				newDevice.OwnershipUnverify = true
+			}
 		} else {
 			newDevice.Challenge = petname.Generate(3, "-")
 		}

@@ -17,6 +17,7 @@
 package auth
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/ant0ine/go-json-rest/rest"
@@ -25,6 +26,19 @@ import (
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
 
+// @Summary Get login token using username and password
+// @Description Get login token using username and password
+// @Accept  json
+// @Produce  json
+// @Tags auth
+// @Param body body authmodels.LoginRequestPayload true "Login credentials"
+// @Success 200 {object} authmodels.TokenResponse
+// @Failure 400 {object} utils.RError
+// @Failure 401 {object} utils.RError
+// @Failure 403 {object} utils.RError
+// @Failure 404 {object} utils.RError
+// @Failure 500 {object} utils.RError
+// @Router /auth/login [post]
 func (a *App) getTokenUsingPassword(writer rest.ResponseWriter, r *rest.Request) {
 	userAgent := r.Header.Get("User-Agent")
 	if userAgent == "" {
@@ -41,6 +55,16 @@ func (a *App) getTokenUsingPassword(writer rest.ResponseWriter, r *rest.Request)
 
 	tokenString, rerr := authservices.CreateUserToken(payload, a.jwtMiddleware, a.mongoClient)
 	if rerr != nil {
+		utils.RestErrorWrite(writer, rerr)
+		return
+	}
+
+	if tokenString == "" {
+		rerr = &utils.RError{
+			Msg:   fmt.Sprintf("can get token for %s", payload.Username),
+			Error: "Authentication Failed",
+			Code:  http.StatusUnauthorized,
+		}
 		utils.RestErrorWrite(writer, rerr)
 		return
 	}

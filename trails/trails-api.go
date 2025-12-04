@@ -94,25 +94,32 @@ func (a *App) getLatestStepRev(pctx context.Context, trailID primitive.ObjectID)
 		return -1, errors.New("bad database connetivity")
 	}
 
-	step := &trailmodels.Step{}
+	steps := []trailmodels.Step{}
 	ctx, cancel := context.WithTimeout(pctx, 10*time.Second)
 	defer cancel()
-	findOneOptions := options.FindOne()
-	findOneOptions.SetSort(bson.M{"rev": -1})
 
-	err := collSteps.FindOne(ctx, bson.M{
+	findOptions := options.Find()
+	findOptions.SetSort(bson.M{"rev": -1})
+
+	query := bson.M{
 		"trail-id": trailID,
 		"garbage":  bson.M{"$ne": true},
-	}, findOneOptions).
-		Decode(&step)
-
+	}
+	cursor, err := collSteps.Find(ctx, query, findOptions)
 	if err != nil {
 		return -1, err
 	}
-	if step == nil {
+
+	err = cursor.All(ctx, &steps)
+	if err != nil {
+		return -1, err
+	}
+
+	if len(steps) == 0 {
 		return -1, errors.New("no step found for trail: " + trailID.Hex())
 	}
-	return step.Rev, err
+
+	return steps[0].Rev, err
 }
 
 func (a *App) handlePutStepsObject(w rest.ResponseWriter, r *rest.Request) {

@@ -24,6 +24,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
@@ -92,6 +93,12 @@ func EntraidCb(ctx context.Context, config *oauth2.Config, code string) (*Respon
 	err = json.Unmarshal(data, payload)
 	if err != nil {
 		return &ResponsePayload{RedirectTo: ""}, err
+	}
+
+	// Split the email address to get the part before the '@'
+	parts := strings.Split(payload.Email, "@")
+	if len(parts) > 1 {
+		payload.DisplayName = parts[0]
 	}
 
 	return &ResponsePayload{

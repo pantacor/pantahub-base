@@ -61,21 +61,21 @@ func DoInit() {
 	jwtSecretBase64 := utils.GetEnv(utils.EnvPantahubJWTAuthSecret)
 	jwtSecretPem, err := base64.StdEncoding.DecodeString(jwtSecretBase64)
 	if err != nil {
-		panic(fmt.Errorf("no valid JWT secret (PANTAHUB_JWT_AUTH_SECRET) in base64 format: %s", err.Error()))
+		panic(fmt.Errorf("no valid JWT secret (PANTAHUB_JWT_SECRET) in base64 format: %s", err.Error()))
 	}
 	jwtSecret, err := jwtgo.ParseRSAPrivateKeyFromPEM(jwtSecretPem)
 	if err != nil {
-		panic(fmt.Errorf("no valid JWT secret (PANTAHUB_JWT_AUTH_SECRET); must be rsa private key in PEM format: %s", err.Error()))
+		panic(fmt.Errorf("no valid JWT secret (PANTAHUB_JWT_SECRET); must be rsa private key in PEM format: %s", err.Error()))
 	}
 
 	jwtPubBase64 := utils.GetEnv(utils.EnvPantahubJWTAuthPub)
 	jwtPubPem, err := base64.StdEncoding.DecodeString(jwtPubBase64)
 	if err != nil {
-		panic(fmt.Errorf("no valid JWT PUB KEY (PANTAHUB_JWT_AUTH_PUB) in base64 format: %s", err.Error()))
+		panic(fmt.Errorf("no valid JWT PUB KEY (PANTAHUB_JWT_PUB) in base64 format: %s", err.Error()))
 	}
 	jwtPub, err := jwtgo.ParseRSAPublicKeyFromPEM(jwtPubPem)
 	if err != nil {
-		panic(fmt.Errorf("no valid JWT pub key (PANTAHUB_JWT_AUTH_PUB); must be rsa private key in PEM format: %s", err.Error()))
+		panic(fmt.Errorf("no valid JWT pub key (PANTAHUB_JWT_PUB); must be rsa private key in PEM format: %s", err.Error()))
 	}
 
 	mongoClient, _ := utils.GetMongoClient()
