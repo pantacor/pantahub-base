@@ -48,6 +48,7 @@ type challengePayload struct {
 // @Param body body challengePayload true "Device payload"
 // @Success 200 {object} Device
 // @Failure 400 {object} utils.RError
+// @Failure 403 {object} utils.RError
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /devices/{id} [put]
