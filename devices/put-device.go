@@ -169,6 +169,21 @@ func (a *App) handlePutDevice(w rest.ResponseWriter, r *rest.Request) {
 	/* in case someone claims the device like this, update owner */
 	if len(challenge) > 0 {
 		if challenge == challengeVal {
+			// Check device quota before claiming device if it's currently unowned
+			if owner == "" {
+				quotaResult, err := CheckDeviceQuota(r.Context(), authID.(string), a.mongoClient, a.subService)
+				if err != nil {
+					utils.RestErrorWrapper(w, "Error checking device quota: "+err.Error(), http.StatusInternalServerError)
+					return
+				}
+				if quotaResult.Exceeded {
+					utils.RestErrorWrapperUser(w, "device quota exceeded",
+						"Device quota exceeded; delete some devices or request a quota bump from team@pantahub.com",
+						http.StatusForbidden)
+					return
+				}
+			}
+
 			newDevice.Owner = authID.(string)
 			newDevice.Challenge = ""
 			// if device had no proper nick, we assign one.

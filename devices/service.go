@@ -26,6 +26,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/metrics"
+	"gitlab.com/pantacor/pantahub-base/subscriptions"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-base/utils/caclient"
 	"gitlab.com/pantacor/pantahub-base/utils/models"
@@ -46,12 +47,14 @@ type App struct {
 	jwtMiddleware *jwt.JWTMiddleware
 	API           *rest.Api
 	mongoClient   *mongo.Client
+	subService    subscriptions.SubscriptionService
 }
 
 // Build factory a new Device App only with mongoClient
-func Build(mongoClient *mongo.Client) *App {
+func Build(mongoClient *mongo.Client, subService subscriptions.SubscriptionService) *App {
 	return &App{
 		mongoClient: mongoClient,
+		subService:  subService,
 	}
 }
 
@@ -90,10 +93,11 @@ type autoTokenInfo struct {
 }
 
 // New create devices web app
-func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
+func New(jwtMiddleware *jwt.JWTMiddleware, subService subscriptions.SubscriptionService, mongoClient *mongo.Client) *App {
 	app := new(App)
 	app.jwtMiddleware = jwtMiddleware
 	app.mongoClient = mongoClient
+	app.subService = subService
 
 	_, err := caclient.GetDefaultCAClient()
 	if err != nil {

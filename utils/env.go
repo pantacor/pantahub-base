@@ -348,6 +348,9 @@ const (
 
 	// EnvPantahubDisableEmailPasswordLogin disable email/password login
 	EnvPantahubDisableEmailPasswordLogin = "PANTAHUB_DISABLE_EMAIL_PASSWORD_LOGIN"
+
+	// EnvPantahubDisableQuota disable quota enforcement
+	EnvPantahubDisableQuota = "PANTAHUB_DISABLE_QUOTA"
 )
 
 var defaultEnvs = map[string]string{
@@ -369,6 +372,7 @@ var defaultEnvs = map[string]string{
 	EnvPantahubAuthAllowedDomains:           "",
 	EnvPantahubDisableForgotPassword:        "false",
 	EnvPantahubDisableEmailPasswordLogin:    "false",
+	EnvPantahubDisableQuota:                 "false",
 
 	EnvPantahubCaCert:          "",
 	EnvPantahubCaRaUser:        "",

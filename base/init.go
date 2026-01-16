@@ -129,7 +129,7 @@ func DoInit() {
 		http.Handle("/changes/", http.StripPrefix("/changes", app.API.MakeHandler()))
 	}
 	{
-		app := devices.New(defaultJwtMiddleware, mongoClient)
+		app := devices.New(defaultJwtMiddleware, subService, mongoClient)
 		http.Handle("/devices/", http.StripPrefix("/devices", app.API.MakeHandler()))
 	}
 	{

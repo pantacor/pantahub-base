@@ -7,5 +7,5 @@ until curl http://kafka-connect:8083/connectors/pantabase; do
 done
 sleep 5
 
-cd /target && java -jar devicesummary.jar
+cd /target && exec java $JAVA_OPTS -jar devicesummary.jar
 

@@ -80,6 +80,20 @@ func (a *App) handlePostDevice(w rest.ResponseWriter, r *rest.Request) {
 	if ok {
 		// user registering here...
 		newDevice.Owner = owner.(string)
+
+		// Check device quota before creating device
+		quotaResult, err := CheckDeviceQuota(r.Context(), newDevice.Owner, a.mongoClient, a.subService)
+		if err != nil {
+			utils.RestErrorWrapper(w, "Error checking device quota: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if quotaResult.Exceeded {
+			utils.RestErrorWrapperUser(w, "device quota exceeded",
+				"Device quota exceeded; delete some devices or request a quota bump from team@pantahub.com",
+				http.StatusForbidden)
+			return
+		}
+
 		newDevice.UserMeta = utils.BsonQuoteMap(&newDevice.UserMeta)
 		newDevice.DeviceMeta = map[string]interface{}{}
 	} else {
@@ -104,6 +118,19 @@ func (a *App) handlePostDevice(w rest.ResponseWriter, r *rest.Request) {
 			newDevice.Owner = autoInfo.Owner
 			if autoInfo.UserMeta != nil {
 				newDevice.UserMeta = autoInfo.UserMeta
+			}
+
+			// Check device quota for auto-token owner
+			quotaResult, err := CheckDeviceQuota(r.Context(), newDevice.Owner, a.mongoClient, a.subService)
+			if err != nil {
+				utils.RestErrorWrapper(w, "Error checking device quota: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if quotaResult.Exceeded {
+				utils.RestErrorWrapperUser(w, "device quota exceeded",
+					"Device quota exceeded; delete some devices or request a quota bump from team@pantahub.com",
+					http.StatusForbidden)
+				return
 			}
 
 			if autoInfo.OVMode != nil && autoInfo.OVMode.Mode.IsTLS() {

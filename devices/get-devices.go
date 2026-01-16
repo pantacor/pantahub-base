@@ -112,7 +112,7 @@ func (a *App) handleGetDevices(w rest.ResponseWriter, r *rest.Request) {
 		}
 
 	} else if ok2 {
-		//To get devices of any user who have public devices by using owner nick
+		// To get devices of any user who have public devices by using owner nick
 		account, err := a.GetUserAccountByNick(r.Context(), ownerNickvalue[0])
 		if err != nil {
 			utils.RestErrorWrapper(w, "Error finding owner user account by nick:"+err.Error(), http.StatusForbidden)
@@ -328,7 +328,6 @@ func (a *App) handleGetDevice(w rest.ResponseWriter, r *rest.Request) {
 			err := collectionAccounts.FindOne(ctx,
 				bson.M{"prn": device.Owner}).
 				Decode(&ownerAccount)
-
 			if err != nil {
 				utils.RestErrorWrapper(w, "Owner account not Found", http.StatusInternalServerError)
 				return
@@ -349,7 +348,6 @@ func (a *App) handleGetDevice(w rest.ResponseWriter, r *rest.Request) {
 
 // GetUserAccountByNick : Get User Account By Nick
 func (a *App) GetUserAccountByNick(parentCtx context.Context, nick string) (accounts.Account, error) {
-
 	var account accounts.Account
 
 	account, ok := accountsdata.DefaultAccounts["prn:pantahub.com:auth:/"+nick]
@@ -362,7 +360,6 @@ func (a *App) GetUserAccountByNick(parentCtx context.Context, nick string) (acco
 		err := collectionAccounts.FindOne(ctx,
 			bson.M{"nick": nick}).
 			Decode(&account)
-
 		if err != nil {
 			return account, err
 		}

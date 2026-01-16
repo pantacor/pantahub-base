@@ -1,23 +1,28 @@
 #!/bin/sh
 
-sh -c '
-set -x
+# Background process to upload connector configs once Kafka Connect is ready
+(
+  set -x
+  echo "Connector Configurator: Waiting for Kafka Connect to be ready..."
+  
+  while true; do
+    if curl -s -f http://localhost:8083 > /dev/null; then
+      echo "Connector Configurator: Kafka Connect is up!"
+      break
+    fi
+    echo "Connector Configurator: waiting for kafka connect..."
+    sleep 10
+  done
 
-while true; do
-	if ! curl kafka-connect:8083; then
-		echo \"waiting for kafka connect\"
-		sleep 10
-       		continue
- 	fi		
-	echo \"found kafka-connect\"
-	break
-done
+  echo "Connector Configurator: UPLOADING CONFIGS FOR CONNECTORS"
+  for file in /opt/kafka-connect-configs/*; do
+    if [ -f "$file" ]; then
+      echo "Connector Configurator: Uploading $file"
+      curl -X POST -H "Content-Type: application/json" -T "$file" http://localhost:8083/connectors
+    fi
+  done
+  echo "Connector Configurator: Done."
+) &
 
-echo UPLOADING CONFIGS FOR CONNECTORS
-for file in /opt/kafka-connect-configs/*; do
-	curl -XPOST -H "Content-Type: application/json" -T $file http://kafka-connect:8083/connectors
-done
-' &
-
-
-/etc/confluent/docker/run
+# Execute the main Kafka Connect process
+exec /etc/confluent/docker/run

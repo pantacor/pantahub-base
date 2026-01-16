@@ -439,7 +439,7 @@ func UnMarkObjectAsGarbage(pctx context.Context, ObjectID string, a *App) error 
 // IsDevicePublic checks if a device is public or not
 func (a *App) IsDevicePublic(ctx context.Context, ID primitive.ObjectID) (bool, error) {
 
-	devicesApp := devices.Build(a.mongoClient)
+	devicesApp := devices.Build(a.mongoClient, nil)
 	device := devices.Device{}
 
 	err := devicesApp.FindDeviceByID(ctx, ID, &device)
