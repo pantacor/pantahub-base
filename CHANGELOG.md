@@ -1,8 +1,24 @@
 
+<a name="047"></a>
+## [047](https://gitlab.com/pantacor/pantahub-base/compare/046...047)
+
+> 2026-02-09
+
+### Feature
+
+* **devices:** enforce quota on device claiming
+* **devices:** enforce quota on device claiming
+
+### Fix
+
+* correct entraid UserPrincipalName instead of email
+* trails progress logs had incorrect json key
+
+
 <a name="046"></a>
 ## [046](https://gitlab.com/pantacor/pantahub-base/compare/045...046)
 
-> 2025-12-02
+> 2025-12-04
 
 ### Feature
 
