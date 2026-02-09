@@ -1,5 +1,19 @@
 #!/bin/sh
 
+# Wait for Kafka to be ready
+echo "Waiting for Kafka to be ready..."
+if command -v cub > /dev/null; then
+  cub kafka-ready -b kafka:9092 1 120
+else
+  until nc -z kafka 9092; do
+    echo "Waiting for Kafka..."
+    sleep 2
+  done
+fi
+echo "Kafka is ready."
+# Additional wait for topics
+sleep 10
+
 # Background process to upload connector configs once Kafka Connect is ready
 (
   set -x

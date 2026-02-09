@@ -2,6 +2,7 @@ services:
     base:
         networks:
             - base
+            - external
         container_name: api
         build:
             context: .
@@ -410,6 +411,9 @@ services:
 
 networks:
     base:
+        driver: bridge
+        internal: true
+    external:
         driver: bridge
 
 volumes:
