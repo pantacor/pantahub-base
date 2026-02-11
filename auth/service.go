@@ -219,6 +219,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		rest.Get("/oauth/callback/#service", app.HandleGetThirdPartyCallback),
 		rest.Post("/oauth/token", app.HandlePKCEToken),
 		rest.Get("/oauth/authorize", app.HandlePKCEAuthorize),
+		rest.Post("/oauth/authorize", app.HandlePostPKCEAuthorize),
+		rest.Post("/oauth/pkce/init", app.HandlePostPKCEInit),
 	)
 	app.API.Use(&tracer.OtelMiddleware{
 		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
@@ -339,6 +341,9 @@ func isWhiteListedForAuthentication(request *rest.Request) bool {
 
 	// Path prefix and method matches for OAuth endpoints
 	if strings.HasPrefix(request.URL.Path, "/oauth/token") && request.Method == "POST" {
+		return false
+	}
+	if strings.HasPrefix(request.URL.Path, "/oauth/pkce/init") && request.Method == "POST" {
 		return false
 	}
 	if strings.HasPrefix(request.URL.Path, "/oauth/authorize") && request.Method == "GET" {

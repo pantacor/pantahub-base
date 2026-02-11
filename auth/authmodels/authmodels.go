@@ -17,6 +17,7 @@ type TokenResponse struct {
 	State       string `json:"state,omitempty"`
 	TokenType   string `json:"token_type,omitempty"`
 	Scopes      string `json:"scopes,omitempty"`
+	ExpiresIn   int    `json:"expires_in,omitempty"`
 }
 
 type PasswordResetRequest struct {
