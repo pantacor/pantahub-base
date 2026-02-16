@@ -104,9 +104,13 @@ services:
             - kafka-schema-registry
             - kafka-connect
         depends_on:
-            - kafka
-            - kafka-schema-registry
-            - kafka-connect
+            kafka:
+                condition: service_started
+            kafka-schema-registry:
+                condition: service_started
+            kafka-connect:
+                condition: service_healthy
+        restart: on-failure
         command: /docker-entrypoint
 
     fluentd:
