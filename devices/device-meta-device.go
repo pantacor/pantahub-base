@@ -243,15 +243,37 @@ func (a *App) handlePatchDeviceData(w rest.ResponseWriter, r *rest.Request) {
 
 	}
 
+	// Build atomic updates for each field to avoid race conditions
+	// Use $set for new/modified fields and $unset for deleted fields (nil values)
+	setFields := bson.M{}
+	unsetFields := bson.M{}
+
+	for k, v := range data {
+		if v == nil {
+			unsetFields["device-meta."+k] = ""
+		} else {
+			setFields["device-meta."+k] = v
+		}
+	}
+
+	// Always update timemodified
+	setFields["timemodified"] = time.Now()
+
+	updateDoc := bson.M{}
+	if len(setFields) > 0 {
+		updateDoc["$set"] = setFields
+	}
+	if len(unsetFields) > 0 {
+		updateDoc["$unset"] = unsetFields
+	}
+
 	updateResult, err := collection.UpdateOne(
 		ctx,
 		bson.M{
-			"prn": callerStr,
+			"prn":     callerStr,
+			"garbage": bson.M{"$ne": true},
 		},
-		bson.M{"$set": bson.M{
-			"device-meta":  device.DeviceMeta,
-			"timemodified": time.Now(),
-		}},
+		updateDoc,
 	)
 	if updateResult.MatchedCount == 0 {
 		utils.RestErrorWrapper(w, "Error updating device-meta: not found", http.StatusBadRequest)

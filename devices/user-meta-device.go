@@ -120,8 +120,28 @@ func (a *App) handlePatchUserData(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "error finding device "+err.Error(), http.StatusBadRequest)
 		return
 	}
+	// Build atomic updates for each field to avoid race conditions
+	// Use $set for new/modified fields and $unset for deleted fields (nil values)
+	setFields := bson.M{}
+	unsetFields := bson.M{}
+
 	for k, v := range data {
-		device.UserMeta[k] = v
+		if v == nil {
+			unsetFields["user-meta."+k] = ""
+		} else {
+			setFields["user-meta."+k] = v
+		}
+	}
+
+	// Always update timemodified
+	setFields["timemodified"] = time.Now()
+
+	updateDoc := bson.M{}
+	if len(setFields) > 0 {
+		updateDoc["$set"] = setFields
+	}
+	if len(unsetFields) > 0 {
+		updateDoc["$unset"] = unsetFields
 	}
 
 	updateResult, err := collection.UpdateOne(
@@ -130,10 +150,7 @@ func (a *App) handlePatchUserData(w rest.ResponseWriter, r *rest.Request) {
 			"_id":   deviceID,
 			"owner": owner.(string),
 		},
-		bson.M{"$set": bson.M{
-			"user-meta":    device.UserMeta,
-			"timemodified": time.Now(),
-		}},
+		updateDoc,
 	)
 	if updateResult.MatchedCount == 0 {
 		utils.RestErrorWrapper(w, "Error updating device user-meta: not found", http.StatusBadRequest)
