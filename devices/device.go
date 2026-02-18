@@ -170,3 +170,30 @@ func CheckDeviceQuota(
 
 	return result, nil
 }
+
+// flattenMap flattens a nested map into dot-notation keys for MongoDB atomic updates
+func flattenMap(prefix string, m map[string]interface{}, setFields bson.M, unsetFields bson.M) {
+	for k, v := range m {
+		key := k
+		if prefix != "" {
+			key = prefix + "." + k
+		}
+
+		if v == nil {
+			unsetFields[key] = ""
+			continue
+		}
+
+		// If it's a map, recurse to flatten further
+		// We handle both map[string]interface{} and bson.M
+		if nestedMap, ok := v.(map[string]interface{}); ok {
+			flattenMap(key, nestedMap, setFields, unsetFields)
+		} else if nestedMap, ok := v.(bson.M); ok {
+			flattenMap(key, map[string]interface{}(nestedMap), setFields, unsetFields)
+		} else {
+			// BSON-quote the leaf key part to handle dots in the metadata key name
+			// while preserving the path dots used for deep update.
+			setFields[key] = v
+		}
+	}
+}

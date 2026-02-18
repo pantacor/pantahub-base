@@ -28,7 +28,6 @@ import (
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-base/utils/decoder"
-	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -100,20 +99,9 @@ func (a *App) handlePutDeviceData(w rest.ResponseWriter, r *rest.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	var device Device
-	err = collection.FindOne(ctx, bson.M{
-		"_id": deviceObjectID,
-		"prn": owner.(string),
-	}).Decode(&device)
-	if err != nil && mongoutils.IsNotFound(err) {
-		utils.RestErrorWrapper(w, "Device not found", http.StatusNotFound)
-		return
-	}
-	if err != nil {
-		utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
-		return
-	}
-
+	// For PUT, we replace the whole metadata object.
+	// To do this atomically without clobbering other fields in the device document,
+	// we still use $set but on the whole "device-meta" field.
 	updateResult, err := collection.UpdateOne(
 		ctx,
 		bson.M{
@@ -126,11 +114,11 @@ func (a *App) handlePutDeviceData(w rest.ResponseWriter, r *rest.Request) {
 		}},
 	)
 	if updateResult.MatchedCount == 0 {
-		utils.RestErrorWrapper(w, "Error updating device user-meta: not found", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error updating device metadata: not found", http.StatusBadRequest)
 		return
 	}
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error updating device metadata: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -160,7 +148,6 @@ func (a *App) handlePatchDeviceData(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
 		return
 	}
-	device := Device{}
 
 	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
 	if !ok {
@@ -190,26 +177,12 @@ func (a *App) handlePatchDeviceData(w rest.ResponseWriter, r *rest.Request) {
 	callerStr, ok := caller.(string)
 	if !ok {
 		utils.RestErrorWrapper(w, "Owner state not set.", http.StatusInternalServerError)
+		return
 	}
 
 	deviceID := r.PathParam("id")
 	if deviceID == "" || !strings.HasSuffix(callerStr, "/"+deviceID) {
 		utils.RestErrorWrapper(w, "Calling Device "+callerStr+"and Device ID "+deviceID+" in url mismatch.", http.StatusBadRequest)
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-	defer cancel()
-	err := collection.FindOne(ctx, bson.M{
-		"prn":     callerStr,
-		"garbage": bson.M{"$ne": true},
-	}).Decode(&device)
-	if err != nil && mongoutils.IsNotFound(err) {
-		utils.RestErrorWrapper(w, "Device not found", http.StatusNotFound)
-		return
-	}
-	if err != nil {
-		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
 		return
 	}
 
@@ -225,63 +198,67 @@ func (a *App) handlePatchDeviceData(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
 	err = json.Unmarshal(content, &data)
 	if err != nil {
-		device.DeviceMeta[parsingErrorKey] = map[string]string{
-			"error":     err.Error(),
-			"content":   string(content),
-			"timestamp": time.Now().Format(time.RFC3339),
+		// handle parsing error as before
+		updateResult, err := collection.UpdateOne(
+			ctx,
+			bson.M{
+				"prn": callerStr,
+			},
+			bson.M{"$set": bson.M{
+				"device-meta." + parsingErrorKey: map[string]string{
+					"error":     err.Error(),
+					"content":   string(content),
+					"timestamp": time.Now().Format(time.RFC3339),
+				},
+				"timemodified": time.Now(),
+			}},
+		)
+		if updateResult.MatchedCount == 0 {
+			utils.RestErrorWrapper(w, "Error updating device-meta (parsing error log): not found", http.StatusBadRequest)
+			return
+		}
+		if err != nil {
+			utils.RestErrorWrapper(w, "Error updating device-meta (parsing error log): "+err.Error(), http.StatusBadRequest)
+			return
 		}
 	} else {
-		data = utils.BsonQuoteMap(&data)
-		for k, v := range data {
-			device.DeviceMeta[k] = v
-			if v == nil {
-				delete(device.DeviceMeta, k)
-			}
+		// Deep flatten the incoming data to allow atomic nested updates
+		setFields := bson.M{}
+		unsetFields := bson.M{}
+		flattenMap("device-meta", data, setFields, unsetFields)
+
+		// Always update timemodified
+		setFields["timemodified"] = time.Now()
+
+		updateDoc := bson.M{}
+		if len(setFields) > 0 {
+			updateDoc["$set"] = setFields
+		}
+		if len(unsetFields) > 0 {
+			updateDoc["$unset"] = unsetFields
 		}
 
-	}
-
-	// Build atomic updates for each field to avoid race conditions
-	// Use $set for new/modified fields and $unset for deleted fields (nil values)
-	setFields := bson.M{}
-	unsetFields := bson.M{}
-
-	for k, v := range data {
-		if v == nil {
-			unsetFields["device-meta."+k] = ""
-		} else {
-			setFields["device-meta."+k] = v
+		updateResult, err := collection.UpdateOne(
+			ctx,
+			bson.M{
+				"prn":     callerStr,
+				"garbage": bson.M{"$ne": true},
+			},
+			updateDoc,
+		)
+		if updateResult.MatchedCount == 0 {
+			utils.RestErrorWrapper(w, "Error updating device-meta: not found", http.StatusBadRequest)
+			return
 		}
-	}
-
-	// Always update timemodified
-	setFields["timemodified"] = time.Now()
-
-	updateDoc := bson.M{}
-	if len(setFields) > 0 {
-		updateDoc["$set"] = setFields
-	}
-	if len(unsetFields) > 0 {
-		updateDoc["$unset"] = unsetFields
-	}
-
-	updateResult, err := collection.UpdateOne(
-		ctx,
-		bson.M{
-			"prn":     callerStr,
-			"garbage": bson.M{"$ne": true},
-		},
-		updateDoc,
-	)
-	if updateResult.MatchedCount == 0 {
-		utils.RestErrorWrapper(w, "Error updating device-meta: not found", http.StatusBadRequest)
-		return
-	}
-	if err != nil {
-		utils.RestErrorWrapper(w, "Error updating device-meta: "+err.Error(), http.StatusBadRequest)
-		return
+		if err != nil {
+			utils.RestErrorWrapper(w, "Error updating device-meta: "+err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
 
 	w.WriteJson(map[string]string{"status": "ok"})

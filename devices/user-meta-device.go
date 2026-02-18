@@ -94,7 +94,6 @@ func (a *App) handlePatchUserData(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "Error parsing data: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	data = utils.BsonQuoteMap(&data)
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
@@ -104,34 +103,12 @@ func (a *App) handlePatchUserData(w rest.ResponseWriter, r *rest.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
-	var device Device
-	err = collection.FindOne(ctx,
-		bson.M{
-			"_id":     deviceID,
-			"garbage": bson.M{"$ne": true},
-		}).
-		Decode(&device)
 
-	if err != nil && mongoutils.IsNotFound(err) {
-		utils.RestErrorWrapper(w, "Device not found", http.StatusNotFound)
-		return
-	}
-	if err != nil {
-		utils.RestErrorWrapper(w, "error finding device "+err.Error(), http.StatusBadRequest)
-		return
-	}
-	// Build atomic updates for each field to avoid race conditions
-	// Use $set for new/modified fields and $unset for deleted fields (nil values)
 	setFields := bson.M{}
 	unsetFields := bson.M{}
 
-	for k, v := range data {
-		if v == nil {
-			unsetFields["user-meta."+k] = ""
-		} else {
-			setFields["user-meta."+k] = v
-		}
-	}
+	// Deep flatten the incoming data to allow atomic nested updates
+	flattenMap("user-meta", data, setFields, unsetFields)
 
 	// Always update timemodified
 	setFields["timemodified"] = time.Now()
@@ -234,17 +211,9 @@ func (a *App) handlePutUserData(w rest.ResponseWriter, r *rest.Request) {
 		query["owner"] = owner.(string)
 	}
 
-	var device Device
-	err = collection.FindOne(ctx, query).Decode(&device)
-	if err != nil && mongoutils.IsNotFound(err) {
-		utils.RestErrorWrapper(w, "Device not found", http.StatusNotFound)
-		return
-	}
-	if err != nil {
-		utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
-		return
-	}
-
+	// For PUT, we replace the whole user-meta object.
+	// We do this via $set on the specific field to avoid Read-Modify-Write races
+	// on the rest of the device document.
 	updateResult, err := collection.UpdateOne(
 		ctx,
 		query,
