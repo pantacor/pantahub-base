@@ -227,7 +227,10 @@ func (a *App) handlePatchDeviceData(w rest.ResponseWriter, r *rest.Request) {
 			return
 		}
 	} else {
-		// Deep flatten the incoming data to allow atomic nested updates
+		// 1. Quote the BSON keys first to handle dots in key names (e.g. "lo.ipv4")
+		data = utils.BsonQuoteMap(&data)
+
+		// 2. Deep flatten the quoted data to allow atomic nested updates
 		setFields := bson.M{}
 		unsetFields := bson.M{}
 		flattenMap("device-meta", data, setFields, unsetFields)

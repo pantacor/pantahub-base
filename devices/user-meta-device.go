@@ -95,6 +95,9 @@ func (a *App) handlePatchUserData(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
+	// 1. Quote the BSON keys first to handle dots in key names (e.g. "lo.ipv4")
+	data = utils.BsonQuoteMap(&data)
+
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
 		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
@@ -107,7 +110,7 @@ func (a *App) handlePatchUserData(w rest.ResponseWriter, r *rest.Request) {
 	setFields := bson.M{}
 	unsetFields := bson.M{}
 
-	// Deep flatten the incoming data to allow atomic nested updates
+	// 2. Deep flatten the quoted data to allow atomic nested updates
 	flattenMap("user-meta", data, setFields, unsetFields)
 
 	// Always update timemodified
