@@ -28,7 +28,6 @@ import (
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -127,13 +126,13 @@ func (a *App) handlePatchDevice(w rest.ResponseWriter, r *rest.Request) {
 
 	if patched {
 		newDevice.TimeModified = time.Now()
-		updateOptions := options.Update()
-		updateOptions.SetUpsert(true)
 		_, err = collection.UpdateOne(
 			ctx,
 			bson.M{"_id": newDevice.ID},
-			bson.M{"$set": newDevice},
-			updateOptions,
+			bson.M{"$set": bson.M{
+				"nick":         newDevice.Nick,
+				"timemodified": newDevice.TimeModified,
+			}},
 		)
 		if err != nil {
 			utils.RestErrorWrapper(w, "Error updating patched device state", http.StatusForbidden)

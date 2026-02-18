@@ -26,7 +26,6 @@ import (
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -104,13 +103,13 @@ func (a *App) handlePutPublic(w rest.ResponseWriter, r *rest.Request) {
 
 	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
-	updateOptions := options.Update()
-	updateOptions.SetUpsert(true)
 	_, err = collection.UpdateOne(
 		ctx,
 		bson.M{"_id": newDevice.ID},
-		bson.M{"$set": newDevice},
-		updateOptions,
+		bson.M{"$set": bson.M{
+			"ispublic":     newDevice.IsPublic,
+			"timemodified": newDevice.TimeModified,
+		}},
 	)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error updating device public state", http.StatusForbidden)
@@ -194,13 +193,13 @@ func (a *App) handleDeletePublic(w rest.ResponseWriter, r *rest.Request) {
 
 	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
-	updateOptions := options.Update()
-	updateOptions.SetUpsert(true)
 	_, err = collection.UpdateOne(
 		ctx,
 		bson.M{"_id": newDevice.ID},
-		bson.M{"$set": newDevice},
-		updateOptions,
+		bson.M{"$set": bson.M{
+			"ispublic":     newDevice.IsPublic,
+			"timemodified": newDevice.TimeModified,
+		}},
 	)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error updating device public state", http.StatusForbidden)

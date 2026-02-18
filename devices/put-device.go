@@ -29,7 +29,6 @@ import (
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -210,13 +209,31 @@ func (a *App) handlePutDevice(w rest.ResponseWriter, r *rest.Request) {
 	newDevice.TimeModified = time.Now()
 	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
-	updateOptions := options.Update()
-	updateOptions.SetUpsert(true)
+
+	// Build update document to avoid overwriting sensitive fields accidentally
+	// and to ensure we don't clobber metadata we didn't intend to change.
+	updateDoc := bson.M{
+		"$set": bson.M{
+			"nick":         newDevice.Nick,
+			"secret":       newDevice.Secret,
+			"ispublic":     newDevice.IsPublic,
+			"timemodified": newDevice.TimeModified,
+			"challenge":    newDevice.Challenge,
+			"owner":        newDevice.Owner,
+		},
+	}
+
+	// Only update metadata if we are the authorized party for that metadata
+	if callerIsDevice {
+		updateDoc["$set"].(bson.M)["device-meta"] = newDevice.DeviceMeta
+	} else {
+		updateDoc["$set"].(bson.M)["user-meta"] = newDevice.UserMeta
+	}
+
 	_, err = collection.UpdateOne(
 		ctx,
 		bson.M{"_id": newDevice.ID},
-		bson.M{"$set": newDevice},
-		updateOptions,
+		updateDoc,
 	)
 	if err != nil {
 		utils.RestErrorWrapper(w, "error updating device: "+err.Error(), http.StatusBadRequest)
