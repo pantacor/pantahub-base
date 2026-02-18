@@ -22,11 +22,12 @@ import (
 	"os"
 	"time"
 
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readconcern"
+	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 	"go.opentelemetry.io/contrib/instrumentation/go.mongodb.org/mongo-driver/mongo/otelmongo"
 	"gopkg.in/mgo.v2"
-
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // MongoDb : Holds Mongo Db Name
@@ -84,6 +85,12 @@ func GetMongoClient() (*mongo.Client, error) {
 	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" {
 		clientOptions.SetMonitor(otelmongo.NewMonitor())
 	}
+
+	// Configure connection pool and consistency settings
+	clientOptions.SetMaxPoolSize(100)
+	clientOptions.SetMinPoolSize(10)
+	clientOptions.SetReadConcern(readconcern.Majority())
+	clientOptions.SetWriteConcern(writeconcern.New(writeconcern.WMajority()))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

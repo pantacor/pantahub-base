@@ -29,6 +29,7 @@ import (
 	"gitlab.com/pantacor/pantahub-base/profiles"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"gopkg.in/mgo.v2/bson"
@@ -288,7 +289,18 @@ func (a *App) handleGetDevice(w rest.ResponseWriter, r *rest.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
-	err = collection.FindOne(ctx, query).Decode(&device)
+
+	// Start a session with causal consistency to ensure read-after-write consistency
+	session, err := a.mongoClient.StartSession()
+	if err != nil {
+		utils.RestErrorWrapper(w, "Error starting database session: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer session.EndSession(ctx)
+
+	err = mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
+		return collection.FindOne(sc, query).Decode(&device)
+	})
 	if err != nil && mongoutils.IsNotFound(err) {
 		utils.RestErrorWrapper(w, "Device not found", http.StatusNotFound)
 		return

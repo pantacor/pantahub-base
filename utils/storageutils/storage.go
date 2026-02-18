@@ -25,6 +25,8 @@ import (
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readconcern"
+	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 	"go.opentelemetry.io/contrib/instrumentation/go.mongodb.org/mongo-driver/mongo/otelmongo"
 	"go.opentelemetry.io/otel"
 )
@@ -135,7 +137,11 @@ func GetMongoClient() (*mongo.Client, error) {
 	if mongoRs != "" {
 		clientOptions = clientOptions.SetReplicaSet(mongoRs)
 	}
-	clientOptions.SetMaxPoolSize(6)
+	clientOptions.SetMaxPoolSize(100)
+	clientOptions.SetMinPoolSize(10)
+	// Ensure strong consistency for read-after-write scenarios
+	clientOptions.SetReadConcern(readconcern.Majority())
+	clientOptions.SetWriteConcern(writeconcern.New(writeconcern.WMajority()))
 	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" {
 		clientOptions.SetMonitor(otelmongo.NewMonitor(
 			otelmongo.WithCommandAttributeDisabled(false),
