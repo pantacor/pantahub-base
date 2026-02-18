@@ -91,7 +91,12 @@ func (a *App) handleDeleteDevice(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if device.Owner == owner {
-		result, res := MarkDeviceAsGarbage(w, delID)
+		result, res, err := MarkDeviceAsGarbage(delID)
+		if err != nil {
+			utils.RestErrorWrapper(w, "Error calling GC API for Marking Device Garbage: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
 		if res.StatusCode() != 200 {
 			log.Print(res)
 			log.Print(result)
