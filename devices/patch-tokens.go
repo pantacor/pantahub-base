@@ -36,7 +36,7 @@ import (
 type patchDeviceTokenRequest struct {
 	Nick            string                  `json:"nick,omitempty"`
 	OVMode          *models.OVModeExtension `json:"ovmode,omitempty"`
-	DefaultUserMeta map[string]interface{}  `json:"default-user-meta,omitempty"`
+	DefaultUserMeta map[string]string       `json:"default-user-meta,omitempty"`
 }
 
 // handlePatchTokens Update a device token (Nick and OVMode only)
@@ -108,7 +108,7 @@ func (a *App) handlePatchTokens(w rest.ResponseWriter, r *rest.Request) {
 		for key, val := range patchReq.DefaultUserMeta {
 			update[key] = val
 		}
-		updateFields["default-user-meta"] = update
+		updateFields["defaultusermeta"] = update
 	}
 
 	if len(updateFields) == 0 {
