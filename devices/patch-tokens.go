@@ -34,8 +34,9 @@ import (
 
 // patchDeviceTokenRequest defines the fields that can be updated for a device token.
 type patchDeviceTokenRequest struct {
-	Nick   string                  `json:"nick,omitempty"`
-	OVMode *models.OVModeExtension `json:"ovmode,omitempty"`
+	Nick            string                  `json:"nick,omitempty"`
+	OVMode          *models.OVModeExtension `json:"ovmode,omitempty"`
+	DefaultUserMeta map[string]interface{}  `json:"default-user-meta,omitempty"`
 }
 
 // handlePatchTokens Update a device token (Nick and OVMode only)
@@ -101,6 +102,13 @@ func (a *App) handlePatchTokens(w rest.ResponseWriter, r *rest.Request) {
 	}
 	if patchReq.OVMode != nil {
 		updateFields["ovmode"] = patchReq.OVMode
+	}
+	if patchReq.DefaultUserMeta != nil {
+		update := map[string]interface{}{}
+		for key, val := range patchReq.DefaultUserMeta {
+			update[key] = val
+		}
+		updateFields["default-user-meta"] = update
 	}
 
 	if len(updateFields) == 0 {
