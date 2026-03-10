@@ -257,13 +257,13 @@ func (a *App) handlePutStepsObject(w rest.ResponseWriter, r *rest.Request) {
 		bson.M{"$set": newObject},
 		updateOptions,
 	)
-	if updateResult.MatchedCount == 0 {
-		w.WriteHeader(http.StatusConflict)
-		w.Header().Add("X-PH-Error", "Error inserting object into database ")
-	}
 	if err != nil {
 		w.WriteHeader(http.StatusConflict)
 		w.Header().Add("X-PH-Error", "Error inserting object into database "+err.Error())
+	}
+	if updateResult.MatchedCount == 0 {
+		w.WriteHeader(http.StatusConflict)
+		w.Header().Add("X-PH-Error", "Error inserting object into database ")
 	}
 
 	issuerURL := utils.GetAPIEndpoint("/trails")
@@ -427,11 +427,11 @@ func UnMarkObjectAsGarbage(pctx context.Context, ObjectID string, a *App) error 
 			"garbage": false,
 		}},
 	)
-	if updateResult.MatchedCount == 0 {
-		return errors.New("unmark_object_as_garbage:Error updating object: not found")
-	}
 	if err != nil {
 		return errors.New("unmark_object_as_garbage:Error updating object:" + err.Error())
+	}
+	if updateResult.MatchedCount == 0 {
+		return errors.New("unmark_object_as_garbage:Error updating object: not found")
 	}
 	return nil
 }

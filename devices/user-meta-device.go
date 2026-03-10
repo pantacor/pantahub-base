@@ -132,12 +132,12 @@ func (a *App) handlePatchUserData(w rest.ResponseWriter, r *rest.Request) {
 		},
 		updateDoc,
 	)
-	if updateResult.MatchedCount == 0 {
-		utils.RestErrorWrapper(w, "Error updating device user-meta: not found", http.StatusBadRequest)
-		return
-	}
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if updateResult.MatchedCount == 0 {
+		utils.RestErrorWrapper(w, "Error updating device user-meta: not found", http.StatusBadRequest)
 		return
 	}
 
@@ -225,12 +225,12 @@ func (a *App) handlePutUserData(w rest.ResponseWriter, r *rest.Request) {
 			"timemodified": time.Now(),
 		}},
 	)
-	if updateResult.MatchedCount == 0 {
-		utils.RestErrorWrapper(w, "Error updating device user-meta: not found", http.StatusBadRequest)
-		return
-	}
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if updateResult.MatchedCount == 0 {
+		utils.RestErrorWrapper(w, "Error updating device user-meta: not found", http.StatusBadRequest)
 		return
 	}
 

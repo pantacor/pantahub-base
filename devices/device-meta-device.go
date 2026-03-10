@@ -113,12 +113,12 @@ func (a *App) handlePutDeviceData(w rest.ResponseWriter, r *rest.Request) {
 			"timemodified": time.Now(),
 		}},
 	)
-	if updateResult.MatchedCount == 0 {
-		utils.RestErrorWrapper(w, "Error updating device metadata: not found", http.StatusBadRequest)
-		return
-	}
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error updating device metadata: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if updateResult.MatchedCount == 0 {
+		utils.RestErrorWrapper(w, "Error updating device metadata: not found", http.StatusBadRequest)
 		return
 	}
 
@@ -218,12 +218,12 @@ func (a *App) handlePatchDeviceData(w rest.ResponseWriter, r *rest.Request) {
 				"timemodified": time.Now(),
 			}},
 		)
-		if updateResult.MatchedCount == 0 {
-			utils.RestErrorWrapper(w, "Error updating device-meta (parsing error log): not found", http.StatusBadRequest)
-			return
-		}
 		if err != nil {
 			utils.RestErrorWrapper(w, "Error updating device-meta (parsing error log): "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		if updateResult.MatchedCount == 0 {
+			utils.RestErrorWrapper(w, "Error updating device-meta (parsing error log): not found", http.StatusBadRequest)
 			return
 		}
 	} else {
@@ -254,12 +254,12 @@ func (a *App) handlePatchDeviceData(w rest.ResponseWriter, r *rest.Request) {
 			},
 			updateDoc,
 		)
-		if updateResult.MatchedCount == 0 {
-			utils.RestErrorWrapper(w, "Error updating device-meta: not found", http.StatusBadRequest)
-			return
-		}
 		if err != nil {
 			utils.RestErrorWrapper(w, "Error updating device-meta: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		if updateResult.MatchedCount == 0 {
+			utils.RestErrorWrapper(w, "Error updating device-meta: not found", http.StatusBadRequest)
 			return
 		}
 	}

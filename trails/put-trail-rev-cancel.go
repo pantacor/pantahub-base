@@ -118,13 +118,13 @@ func (a *App) handlePutStepProgressCancel(w rest.ResponseWriter, r *rest.Request
 			"ispublic":      isDevicePublic,
 		}},
 	)
-	if updateResult.MatchedCount == 0 {
-		utils.RestErrorWrapper(w, "Error cancelling step. A step in state NEW was not found", http.StatusBadRequest)
+	if err != nil {
+		utils.RestErrorWrapper(w, "Cannot canel step "+err.Error(), http.StatusForbidden)
 		return
 	}
 
-	if err != nil {
-		utils.RestErrorWrapper(w, "Cannot canel step "+err.Error(), http.StatusForbidden)
+	if updateResult.MatchedCount == 0 {
+		utils.RestErrorWrapper(w, "Error cancelling step. A step in state NEW was not found", http.StatusBadRequest)
 		return
 	}
 	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
@@ -142,14 +142,14 @@ func (a *App) handlePutStepProgressCancel(w rest.ResponseWriter, r *rest.Request
 		},
 		bson.M{"$set": bson.M{"last-touched": progressTime}},
 	)
-	if updateResult.MatchedCount == 0 {
-		utils.RestErrorWrapper(w, "Error updating trail last-touch for cancelled step: not found", http.StatusBadRequest)
-		return
-	}
-
 	if err != nil {
 		// XXX: figure how to be better on error cases here...
 		log.Printf("Error updating last-touched for trail of cancelled step; not failing because step got written successfully: %s\n", trailID)
+	}
+
+	if updateResult.MatchedCount == 0 {
+		utils.RestErrorWrapper(w, "Error updating trail last-touch for cancelled step: not found", http.StatusBadRequest)
+		return
 	}
 
 	w.WriteJson(stepProgress)
@@ -239,13 +239,13 @@ func (a *App) handlePutStepProgressWontgo(w rest.ResponseWriter, r *rest.Request
 			"ispublic":      isDevicePublic,
 		}},
 	)
-	if updateResult.MatchedCount == 0 {
-		utils.RestErrorWrapper(w, "Error cancelling step. A step in state INPROGRESS was not found", http.StatusBadRequest)
+	if err != nil {
+		utils.RestErrorWrapper(w, "Cannot canel step "+err.Error(), http.StatusForbidden)
 		return
 	}
 
-	if err != nil {
-		utils.RestErrorWrapper(w, "Cannot canel step "+err.Error(), http.StatusForbidden)
+	if updateResult.MatchedCount == 0 {
+		utils.RestErrorWrapper(w, "Error cancelling step. A step in state INPROGRESS was not found", http.StatusBadRequest)
 		return
 	}
 	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
@@ -263,14 +263,14 @@ func (a *App) handlePutStepProgressWontgo(w rest.ResponseWriter, r *rest.Request
 		},
 		bson.M{"$set": bson.M{"last-touched": progressTime}},
 	)
-	if updateResult.MatchedCount == 0 {
-		utils.RestErrorWrapper(w, "Error updating trail last-touch for cancelled step: not found", http.StatusBadRequest)
-		return
-	}
-
 	if err != nil {
 		// XXX: figure how to be better on error cases here...
 		log.Printf("Error updating last-touched for trail of cancelled step; not failing because step got written successfully: %s\n", trailID)
+	}
+
+	if updateResult.MatchedCount == 0 {
+		utils.RestErrorWrapper(w, "Error updating trail last-touch for cancelled step: not found", http.StatusBadRequest)
+		return
 	}
 
 	w.WriteJson(stepProgress)

@@ -116,13 +116,13 @@ func (a *App) handlePutStepProgress(w rest.ResponseWriter, r *rest.Request) {
 			"ispublic":      isDevicePublic,
 		}},
 	)
-	if updateResult.MatchedCount == 0 {
-		utils.RestErrorWrapper(w, "Error updating trail: not found", http.StatusBadRequest)
+	if err != nil {
+		utils.RestErrorWrapper(w, "Cannot update step progress "+err.Error(), http.StatusForbidden)
 		return
 	}
 
-	if err != nil {
-		utils.RestErrorWrapper(w, "Cannot update step progress "+err.Error(), http.StatusForbidden)
+	if updateResult.MatchedCount == 0 {
+		utils.RestErrorWrapper(w, "Error updating trail: not found", http.StatusBadRequest)
 		return
 	}
 	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
@@ -140,14 +140,14 @@ func (a *App) handlePutStepProgress(w rest.ResponseWriter, r *rest.Request) {
 		},
 		bson.M{"$set": bson.M{"last-touched": progressTime}},
 	)
-	if updateResult.MatchedCount == 0 {
-		utils.RestErrorWrapper(w, "Error updating trail: not found", http.StatusBadRequest)
-		return
-	}
-
 	if err != nil {
 		// XXX: figure how to be better on error cases here...
 		log.Printf("Error updating last-touched for trail in poststepprogress; not failing because step was written: %s\n", trailID)
+	}
+
+	if updateResult.MatchedCount == 0 {
+		utils.RestErrorWrapper(w, "Error updating trail: not found", http.StatusBadRequest)
+		return
 	}
 
 	w.WriteJson(stepProgress)

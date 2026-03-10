@@ -245,12 +245,12 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 			"last-touched": newStep.StepTime,
 		}},
 	)
+	if err != nil {
+		log.Printf("Error updating last-touched for trail in poststep; not failing because step was written: %s\n  => ERROR: %s\n ", trail.ID.Hex(), err.Error())
+	}
 	if updateResult.MatchedCount == 0 {
 		utils.RestErrorWrapper(w, "Trail not found", http.StatusBadRequest)
 		return
-	}
-	if err != nil {
-		log.Printf("Error updating last-touched for trail in poststep; not failing because step was written: %s\n  => ERROR: %s\n ", trail.ID.Hex(), err.Error())
 	}
 
 	newStep.State = utils.BsonUnquoteMap(&newStep.State)
