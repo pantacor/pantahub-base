@@ -2,15 +2,14 @@
 
 set -x
 
-mongod --bind_ip_all --port 27017 &
-# mongod --auth --replSet ${MONGO_RS} --bind_ip_all --port 27017 &
+mongod --replSet ${MONGO_RS:-rs0} --bind_ip_all --port 27017 &
 
 sleep 5
 
-# until mongo --eval "rs.initiate().ok || rs.status().ok"; do
-#   echo "checking replica set"
-#   sleep 1
-# done
+until mongo --eval "rs.initiate().ok || rs.status().ok"; do
+  echo "checking replica set"
+  sleep 1
+done
 
 
 if ! mongo --eval 'db.getUsers()' "mongodb://admin:admin@localhost:27017/admin?authSource=admin&authMechanism=SCRAM-SHA-1&replicaSet=rs0"; then

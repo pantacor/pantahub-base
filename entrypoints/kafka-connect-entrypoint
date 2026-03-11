@@ -18,7 +18,7 @@ sleep 10
 (
   set -x
   echo "Connector Configurator: Waiting for Kafka Connect to be ready..."
-  
+
   while true; do
     if curl -s -f http://localhost:8083 > /dev/null; then
       echo "Connector Configurator: Kafka Connect is up!"
@@ -32,7 +32,22 @@ sleep 10
   for file in /opt/kafka-connect-configs/*; do
     if [ -f "$file" ]; then
       echo "Connector Configurator: Uploading $file"
-      curl -X POST -H "Content-Type: application/json" -T "$file" http://localhost:8083/connectors
+      # Extract connector name from the JSON file
+      CONNECTOR_NAME=$(cat "$file" | python -c "import sys,json; print(json.load(sys.stdin)['name'])" 2>/dev/null)
+      if [ -z "$CONNECTOR_NAME" ]; then
+        echo "Connector Configurator: ERROR - could not extract 'name' from $file, skipping"
+        continue
+      fi
+      # Extract just the config object
+      CONFIG=$(cat "$file" | python -c "import sys,json; print(json.dumps(json.load(sys.stdin)['config']))" 2>/dev/null)
+      if [ -z "$CONFIG" ]; then
+        echo "Connector Configurator: ERROR - could not extract 'config' from $file, skipping"
+        continue
+      fi
+      # Use PUT for idempotent create-or-update
+      echo "Connector Configurator: PUT /connectors/$CONNECTOR_NAME/config"
+      curl -X PUT -H "Content-Type: application/json" -d "$CONFIG" "http://localhost:8083/connectors/$CONNECTOR_NAME/config"
+      echo ""
     fi
   done
   echo "Connector Configurator: Done."

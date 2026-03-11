@@ -1,5 +1,14 @@
 #!/bin/sh
 
+# Fix cluster ID mismatch: if Zookeeper was recreated but Kafka data persists,
+# the stored cluster ID in meta.properties won't match the new Zookeeper cluster ID.
+# Remove stale meta.properties so Kafka re-registers with the current cluster.
+META_PROPS="/var/lib/kafka/data/meta.properties"
+if [ -f "$META_PROPS" ]; then
+  echo "Kafka entrypoint: Found existing $META_PROPS, removing to avoid cluster ID mismatch."
+  rm -f "$META_PROPS"
+fi
+
 # Background process to create topics once Kafka is ready
 (
   echo "Topic creator: Waiting for Zookeeper..."
@@ -21,10 +30,9 @@
   TOPICS="
 pantacor-cp-kafka-connect-offset-dev
 pantacor-cp-kafka-connect-config-dev
-pantabase-mongo.pantabase-serv.pantahub_devices
-pantabase-mongo.pantabase-serv.pantahub_trails
-pantabase-mongo.pantabase-serv.pantahub_steps
-ph-device-summary
+pantabase1.pantabase-serv.pantahub_devices
+pantabase1.pantabase-serv.pantahub_trails
+pantabase1.pantabase-serv.pantahub_steps
 ph-device-summary-short
 ph-device-summary-flat
 fluentd-api

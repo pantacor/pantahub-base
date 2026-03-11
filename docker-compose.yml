@@ -42,6 +42,7 @@ services:
     pvr:
         networks:
             - base
+            - external
         image: registry.gitlab.com/pantacor/pantahub-pvr:latest
         environment:
             - PANTAHUB_API_HOST=http://base:12365
@@ -318,6 +319,12 @@ services:
         networks:
             - base
         image: registry.gitlab.com/pantacor/kafka-connect-with-plugins:5.4.3
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8083/"]
+            interval: 10s
+            timeout: 5s
+            retries: 12
+            start_period: 30s
         ulimits:
             nofile:
                 soft: 65536
@@ -358,7 +365,7 @@ services:
     kafka-rest:
         networks:
             - base
-        image: confluentinc/cp-kafka-rest
+        image: confluentinc/cp-kafka-rest:5.4.3
         ulimits:
             nofile:
                 soft: 65536
@@ -367,7 +374,7 @@ services:
             - KAFKA_REST_BOOTSTRAP_SERVERS=kafka:9092
             - KAFKA_REST_HOST_NAME=kafka-rest
             - KAFKA_REST_ZOOKEEPER_CONNECT=zookeeper:2181
-            - KAFKA_REST_LISTENERS=http://0.0.0.0:8083
+            - KAFKA_REST_LISTENERS=http://0.0.0.0:8082
         links:
             - kafka
             - zookeeper

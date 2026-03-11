@@ -1,14 +1,14 @@
 {
-  "name": "pantabase",
-  "config": {
-    "connector.class": "io.debezium.connector.mongodb.MongoDbConnector",
-    "mongodb.hosts": "rs0/mongo:27017",
-    "mongodb.name": "pantabase1",
-    "mongodb.user": "phskafkaconnectsource",
-    "mongodb.password": "pass",
-    "mongodb.authsource": "admin",
-    "database.whitelist": "pantabase-serv",
-    "collection.whitelist": ".*pantahub_.*",
-    "snapshot.mode": "always"
-  }
+	"name": "pantabase",
+	"config": {
+		"connector.class": "io.debezium.connector.mongodb.MongoDbConnector",
+		"mongodb.hosts": "rs0/mongo:27017",
+		"mongodb.name": "pantabase1",
+		"mongodb.user": "phskafkaconnectsource",
+		"mongodb.password": "pass",
+		"mongodb.authsource": "admin",
+		"database.whitelist": "pantabase-serv",
+		"collection.whitelist": ".*pantahub_.*",
+		"snapshot.mode": "intitial"
+	}
 }

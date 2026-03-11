@@ -2,10 +2,37 @@
 
 set -x
 
-until curl http://kafka-connect:8083/connectors/pantabase; do
+# Wait for the pantabase Debezium connector to exist
+echo "PHS: Waiting for pantabase connector to be registered..."
+until curl -s -f http://kafka-connect:8083/connectors/pantabase > /dev/null 2>&1; do
+	echo "PHS: pantabase connector not ready yet..."
 	sleep 5
 done
-sleep 5
+echo "PHS: pantabase connector is registered."
+
+# Wait for the Debezium snapshot to finish registering schemas for the topics PHS needs.
+# PHS reads from pantahub_devices, pantahub_trails, and pantahub_steps via Avro,
+# so their value schemas must exist in the Schema Registry before PHS starts.
+SCHEMA_REGISTRY_URL="${PANTAHUB_SCHEMAREGISTRY_URL:-http://kafka-schema-registry:8081}"
+TOPIC_PREFIX="${PANTAHUB_KAFKA_TOPIC_PREFIX:-pantabase1.pantabase-serv}"
+
+REQUIRED_SUBJECTS="
+${TOPIC_PREFIX}.pantahub_devices-value
+${TOPIC_PREFIX}.pantahub_trails-value
+${TOPIC_PREFIX}.pantahub_steps-value
+"
+
+for subject in $REQUIRED_SUBJECTS; do
+	echo "PHS: Waiting for schema subject '$subject' to be registered..."
+	until curl -s -f "${SCHEMA_REGISTRY_URL}/subjects/${subject}/versions/latest" > /dev/null 2>&1; do
+		echo "PHS: schema '$subject' not available yet..."
+		sleep 5
+	done
+	echo "PHS: schema '$subject' is available."
+done
+
+# Extra grace period for the Schema Registry to settle after the snapshot
+echo "PHS: All required schemas registered. Waiting for Schema Registry to settle..."
+sleep 10
 
 cd /target && exec java $JAVA_OPTS -jar devicesummary.jar
-
