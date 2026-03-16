@@ -63,9 +63,13 @@ func CreateUserToken(payload *authmodels.LoginRequestPayload, jwtMiddleware *jwt
 	token := jwtgo.New(jwtgo.GetSigningMethod(jwtMiddleware.SigningAlgorithm))
 	claims := token.Claims.(jwtgo.MapClaims)
 
+	accExpires := time.Now().Add(jwtMiddleware.Timeout).Unix()
 	if jwtMiddleware.PayloadFunc != nil {
 		acc := jwtMiddleware.PayloadFunc(payload.Username)
 		for key, value := range acc {
+			if key == "exp" {
+				accExpires = value.(int64)
+			}
 			claims[key] = value
 		}
 	}
@@ -74,7 +78,7 @@ func CreateUserToken(payload *authmodels.LoginRequestPayload, jwtMiddleware *jwt
 		claims["id"] = payload.Username
 	}
 
-	claims["exp"] = time.Now().Add(jwtMiddleware.Timeout).Unix()
+	claims["exp"] = accExpires
 
 	var authToken *tokenmodels.AuthToken
 	// validate if secret is a token
@@ -418,6 +422,7 @@ func DevicePayload(deviceID string, mongoClient *mongo.Client) map[string]interf
 
 	if device.OVMode != nil && device.OVMode.Mode == models.TLSVerification && device.OVMode.Status != models.Completed {
 		val["scopes"] = utils.Scopes.APIReadOnly.String() + " " + utils.Scopes.ValidateDevices.String()
+		val["exp"] = time.Now().Add(60 * time.Second).Unix()
 	}
 
 	return val
