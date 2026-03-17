@@ -422,7 +422,12 @@ func DevicePayload(deviceID string, mongoClient *mongo.Client) map[string]interf
 
 	if device.OVMode != nil && device.OVMode.Mode == models.TLSVerification && device.OVMode.Status != models.Completed {
 		val["scopes"] = utils.Scopes.APIReadOnly.String() + " " + utils.Scopes.ValidateDevices.String()
-		val["exp"] = time.Now().Add(60 * time.Second).Unix()
+		timeoutStr := utils.GetEnv(utils.EnvPendingOVModeJWTTimeoutMinutes)
+		timeout, err := strconv.Atoi(timeoutStr)
+		if err != nil {
+			timeout = 5
+		}
+		val["exp"] = time.Now().Add(time.Minute * time.Duration(timeout)).Unix()
 	}
 
 	return val
