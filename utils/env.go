@@ -340,6 +340,10 @@ const (
 	// EnvPendingOVModeJWTTimeoutMinutes JWT timeout for devices with pending OVMode
 	EnvPendingOVModeJWTTimeoutMinutes = "PANTAHUB_PENDING_OVMODE_JWT_TIMEOUT"
 
+	// EnvPantahubAuthorizeJWTTimeoutMinutes JWT timeout for authorize tokens in Minutes
+	// default: 1920 (32 hours)
+	EnvPantahubAuthorizeJWTTimeoutMinutes = "PANTAHUB_AUTHORIZE_JWT_TIMEOUT_MINUTES"
+
 	// EnvPantahubDisableSignup disable signup and email/password login
 	EnvPantahubDisableSignup = "PANTAHUB_DISABLE_SIGN_UP"
 
@@ -372,6 +376,7 @@ var defaultEnvs = map[string]string{
 	EnvPantahubJWTMaxRefreshMinutes:         "1440",
 	EnvAnonJWTTimeoutMinutes:                "5",
 	EnvPendingOVModeJWTTimeoutMinutes:       "5",
+	EnvPantahubAuthorizeJWTTimeoutMinutes:   "1920",
 	EnvPantahubDisableSignup:                "false",
 	EnvPantahubAuthAllowedDomains:           "",
 	EnvPantahubDisableForgotPassword:        "false",

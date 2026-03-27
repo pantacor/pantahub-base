@@ -105,10 +105,10 @@ func CreateUserToken(payload *authmodels.LoginRequestPayload, jwtMiddleware *jwt
 		claims["type"] = string(authToken.Type)
 		// Token can not be refreshed
 		claims["orig_iat"] = time.Now().Unix()
-		timeoutStr := utils.GetEnv(utils.EnvAnonJWTTimeoutMinutes)
+		timeoutStr := utils.GetEnv(utils.EnvPantahubJWTTimeoutMinutes)
 		timeout, err := strconv.Atoi(timeoutStr)
 		if err != nil {
-			timeout = 5
+			timeout = 60
 		}
 		claims["exp"] = time.Now().Add(time.Minute * time.Duration(timeout)).Unix()
 	}

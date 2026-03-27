@@ -272,10 +272,10 @@ func (app *App) HandlePKCEToken(w rest.ResponseWriter, r *rest.Request) {
 			claims[key] = value
 		}
 
-		timeoutStr := utils.GetEnv(utils.EnvAnonJWTTimeoutMinutes)
+		timeoutStr := utils.GetEnv(utils.EnvPantahubJWTTimeoutMinutes)
 		timeout, err := strconv.Atoi(timeoutStr)
 		if err != nil {
-			timeout = 5
+			timeout = 60
 		}
 		claims["exp"] = time.Now().Add(time.Minute * time.Duration(timeout)).Unix()
 
@@ -358,10 +358,10 @@ func (app *App) HandlePKCEToken(w rest.ResponseWriter, r *rest.Request) {
 		claims[key] = value
 	}
 
-	timeoutStr := utils.GetEnv(utils.EnvAnonJWTTimeoutMinutes)
+	timeoutStr := utils.GetEnv(utils.EnvPantahubJWTTimeoutMinutes)
 	timeout, err := strconv.Atoi(timeoutStr)
 	if err != nil {
-		timeout = 5
+		timeout = 60
 	}
 	claims["exp"] = time.Now().Add(time.Minute * time.Duration(timeout)).Unix()
 
