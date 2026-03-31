@@ -79,6 +79,7 @@ type StepProgress struct {
 	Data      interface{}      `json:"data,omitempty" bson:"data"`  // data field that can hold things the device wants to remember
 	Status    string           `json:"status"`                      // status code
 	Logs      string           `json:"logs"`                        // log if available
+	Retries   int              `json:"retries" bson:"retries"`      // number of retries attempted
 }
 
 // DownloadProgress holds info about total and individual download progress
