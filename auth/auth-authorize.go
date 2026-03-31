@@ -117,6 +117,7 @@ func (app *App) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Request)
 	tokenClaims["aud"] = req.Service
 	tokenClaims["scopes"] = req.Scopes
 	tokenClaims["prn"] = caller
+	tokenClaims["orig_iat"] = time.Now().Unix()
 	tokenClaims["exp"] = time.Now().Add(app.jwtMiddleware.Timeout)
 	tokenString, err := token.SignedString(app.jwtMiddleware.Key)
 
