@@ -1,4 +1,38 @@
 
+<a name="048"></a>
+## [048](https://gitlab.com/pantacor/pantahub-base/compare/047...048)
+
+> 2026-04-01
+
+### Feat
+
+* add retries field to StepProgress model
+
+### Feature
+
+* the JWT timeout of pending ovmode devices is configurable via environment variables
+* device with pending ovmode we should send a short live token
+* add polling to pkce oauth method
+* add support to pkce oauth authorization flow for cli
+
+### Fix
+
+* add default-user-meta to the patch of device tokens
+* make the refresh handle safe by catching the panic
+* correct the timeouts for the pkce token and the authorization token
+* docker kafka and kafka stability
+* validating response before the error
+* db field for default-user-meta is defaultusermeta
+* Add orig_iat to JWT claims
+* patches only update necessary data
+* make device-meta and user-meta patch atomic
+* flatten values to generate atomic update of user-meta or device-meta
+* make sure the keys of the device-meta and user-meta as bsonquoted
+* reading consistency for devices
+* make sure phs start correctly when docker compose up -d base
+* **devices:** prevent double response in delete device endpoint by refactoring MarkDeviceAsGarbage error handling
+
+
 <a name="047"></a>
 ## [047](https://gitlab.com/pantacor/pantahub-base/compare/046...047)
 
