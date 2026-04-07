@@ -21,6 +21,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -87,6 +88,18 @@ func (app *App) safeRefreshHandler(w rest.ResponseWriter, r *rest.Request) {
 			rest.Error(w, "Token is not refreshable", http.StatusUnauthorized)
 		}
 	}()
+
+	originalTimeout := app.jwtMiddleware.Timeout
+	timeoutStr := utils.GetEnv(utils.EnvPantahubAuthorizeJWTTimeoutMinutes)
+	authorizeTimeout, err := strconv.Atoi(timeoutStr)
+	if err != nil {
+		authorizeTimeout = 1920
+	}
+	app.jwtMiddleware.Timeout = time.Minute * time.Duration(authorizeTimeout)
+	defer func() {
+		app.jwtMiddleware.Timeout = originalTimeout
+	}()
+
 	app.jwtMiddleware.RefreshHandler(w, r)
 }
 
