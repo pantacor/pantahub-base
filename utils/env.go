@@ -376,7 +376,7 @@ var defaultEnvs = map[string]string{
 	EnvPantahubJWTMaxRefreshMinutes:         "1440",
 	EnvAnonJWTTimeoutMinutes:                "5",
 	EnvPendingOVModeJWTTimeoutMinutes:       "5",
-	EnvPantahubAuthorizeJWTTimeoutMinutes:   "1920",
+	EnvPantahubAuthorizeJWTTimeoutMinutes:   "7200",
 	EnvPantahubDisableSignup:                "false",
 	EnvPantahubAuthAllowedDomains:           "",
 	EnvPantahubDisableForgotPassword:        "false",
