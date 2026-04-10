@@ -155,7 +155,7 @@ func (a *App) handlePostDevice(w rest.ResponseWriter, r *rest.Request) {
 	// device gets associated with owner
 	// if we have an owner, we assign proper nick
 	if newDevice.Owner != "" && newDevice.Nick == "" {
-		newDevice.Nick = petname.Generate(3, "_")
+		newDevice.Nick = petname.Generate(3, "_") + "_" + utils.RandStringLower(4)
 	} else if newDevice.Nick == "" {
 		newDevice.Nick = "__unregistered__" + petname.Generate(1, "_") + "_" + utils.RandStringLower(10)
 	}
