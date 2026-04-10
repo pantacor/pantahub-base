@@ -31,6 +31,12 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
+// GenerateDeviceNick generates a unique device nick using a 3-word petname
+// with a 4-character random suffix to avoid collisions on the owner+nick unique index.
+func GenerateDeviceNick() string {
+	return petname.Generate(3, "_") + "_" + utils.RandStringLower(4)
+}
+
 func createDevice(id, secret, owner string) (*Device, error) {
 	newDevice := &Device{}
 
@@ -47,7 +53,7 @@ func createDevice(id, secret, owner string) (*Device, error) {
 	newDevice.DeviceMeta = map[string]interface{}{}
 	newDevice.TimeCreated = time.Now()
 	newDevice.TimeModified = newDevice.TimeCreated
-	newDevice.Nick = petname.Generate(3, "_")
+	newDevice.Nick = GenerateDeviceNick()
 
 	return newDevice, nil
 }

@@ -25,7 +25,6 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
-	petname "github.com/dustinkirkland/golang-petname"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -188,7 +187,7 @@ func (a *App) handlePutDevice(w rest.ResponseWriter, r *rest.Request) {
 			newDevice.Challenge = ""
 			// if device had no proper nick, we assign one.
 			if strings.HasPrefix(newDevice.Nick, "__unregistered__") {
-				newDevice.Nick = petname.Generate(3, "_")
+				newDevice.Nick = GenerateDeviceNick()
 			}
 		} else {
 			utils.RestErrorWrapper(w, "No Access to Device", http.StatusForbidden)

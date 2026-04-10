@@ -156,7 +156,7 @@ func (a *App) handlePostDevice(w rest.ResponseWriter, r *rest.Request) {
 	// device gets associated with owner
 	// if we have an owner, we assign proper nick
 	if newDevice.Owner != "" && newDevice.Nick == "" {
-		newDevice.Nick = petname.Generate(3, "_") + "_" + utils.RandStringLower(4)
+		newDevice.Nick = GenerateDeviceNick()
 		nickGenerated = true
 	} else if newDevice.Nick == "" {
 		newDevice.Nick = "__unregistered__" + petname.Generate(1, "_") + "_" + utils.RandStringLower(10)
@@ -199,7 +199,7 @@ func (a *App) handlePostDevice(w rest.ResponseWriter, r *rest.Request) {
 		if mongo.IsDuplicateKeyError(err) && nickGenerated && attempt < maxNickRetries {
 			// nick collision: regenerate and retry
 			if newDevice.Owner != "" {
-				newDevice.Nick = petname.Generate(3, "_") + "_" + utils.RandStringLower(4)
+				newDevice.Nick = GenerateDeviceNick()
 			} else {
 				newDevice.Nick = "__unregistered__" + petname.Generate(1, "_") + "_" + utils.RandStringLower(10)
 			}
