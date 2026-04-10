@@ -150,14 +150,17 @@ func (a *App) handlePostDevice(w rest.ResponseWriter, r *rest.Request) {
 	newDevice.TimeModified = newDevice.TimeCreated
 	newDevice.IsPublic = false
 
+	nickGenerated := false
 	// wecreate a random name for unregistered devices;
 	// registry controllers are expected to change these when
 	// device gets associated with owner
 	// if we have an owner, we assign proper nick
 	if newDevice.Owner != "" && newDevice.Nick == "" {
 		newDevice.Nick = petname.Generate(3, "_") + "_" + utils.RandStringLower(4)
+		nickGenerated = true
 	} else if newDevice.Nick == "" {
 		newDevice.Nick = "__unregistered__" + petname.Generate(1, "_") + "_" + utils.RandStringLower(10)
+		nickGenerated = true
 	}
 
 	isValidNick, err := regexp.MatchString(DeviceNickRule, newDevice.Nick)
@@ -176,18 +179,35 @@ func (a *App) handlePostDevice(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-	defer cancel()
-	updateOptions := options.Update()
-	updateOptions.SetUpsert(true)
-	_, err = collection.UpdateOne(
-		ctx,
-		bson.M{"_id": ObjectID},
-		bson.M{"$set": newDevice},
-		updateOptions,
-	)
+	const maxNickRetries = 5
+	for attempt := 0; ; attempt++ {
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		updateOptions := options.Update()
+		updateOptions.SetUpsert(true)
+		_, err = collection.UpdateOne(
+			ctx,
+			bson.M{"_id": ObjectID},
+			bson.M{"$set": newDevice},
+			updateOptions,
+		)
 
-	if err != nil {
+		if err == nil {
+			break
+		}
+
+		if mongo.IsDuplicateKeyError(err) && nickGenerated && attempt < maxNickRetries {
+			// nick collision: regenerate and retry
+			if newDevice.Owner != "" {
+				newDevice.Nick = petname.Generate(3, "_") + "_" + utils.RandStringLower(4)
+			} else {
+				newDevice.Nick = "__unregistered__" + petname.Generate(1, "_") + "_" + utils.RandStringLower(10)
+			}
+			log.Printf("Device nick collision for owner %s, retrying with nick %s (attempt %d/%d)",
+				newDevice.Owner, newDevice.Nick, attempt+1, maxNickRetries)
+			continue
+		}
+
 		log.Print(newDevice)
 		if mongo.IsDuplicateKeyError(err) {
 			userMessage := "device already exists"
