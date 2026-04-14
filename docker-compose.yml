@@ -16,6 +16,7 @@ services:
             - pvr
             - elasticsearch
             - fluentd
+            - gc
         ports:
             - 12365:12365
             - 12366:12366
@@ -408,6 +409,24 @@ services:
         volumes:
             - "/var/run/docker.sock:/var/run/docker.sock"
             - ${PWD}/.data/localstack:/tmp/localstack/data
+
+    cronjobs:
+        networks:
+            - base
+            - external
+        image: alpine:3.19
+        entrypoint: /entrypoint
+        depends_on:
+            - base
+            - gc
+        volumes:
+            - ${PWD}/entrypoints/cronjobs-entrypoint:/entrypoint:ro
+        env_file:
+            - ./env.default
+            - ./.env.local
+        environment:
+            - PANTAHUB_GC_API=http://gc:2000
+        restart: unless-stopped
 
     nginx:
         image: nginx:alpine
