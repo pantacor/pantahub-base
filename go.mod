@@ -12,7 +12,7 @@ require (
 	github.com/aws/aws-sdk-go v1.55.5
 	github.com/cloudflare/cfssl v1.6.1
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
-	github.com/dustinkirkland/golang-petname v0.0.0-20191129215211-8e5a1ed0cff0
+	github.com/dustinkirkland/golang-petname v0.0.0-20260215035315-f0c533e9ce9b
 	github.com/fatih/structs v1.1.0
 	github.com/fluent/fluent-logger-golang v1.9.0
 	github.com/gibson042/canonicaljson-go v1.0.3
