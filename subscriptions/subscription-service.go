@@ -49,8 +49,8 @@ type SubscriptionService interface {
 		Type utils.Prn,
 		schema map[string]interface{}) (Subscription, error)
 
-	// Check if user prn is in admins set for this instance
-	IsAdmin(user utils.Prn) bool
+	// Check if user is an admin
+	IsAdmin(authInfo *utils.AuthInfo) bool
 
 	// Load subscription by ID
 	Load(pctx context.Context, ID string) (Subscription, error)
@@ -142,9 +142,17 @@ func (i subscriptionService) New(
 	return s, nil
 }
 
-func (i subscriptionService) IsAdmin(user utils.Prn) bool {
+func (i subscriptionService) IsAdmin(authInfo *utils.AuthInfo) bool {
+	if authInfo == nil {
+		return false
+	}
+
+	if strings.ToUpper(authInfo.CallerType) == "ADMIN" || strings.Contains(strings.ToUpper(authInfo.Roles), "ADMIN") {
+		return true
+	}
+
 	for _, v := range i.admins {
-		if v == user {
+		if v == authInfo.Caller {
 			return true
 		}
 	}

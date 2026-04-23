@@ -142,7 +142,7 @@ func (s *App) put(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	if !s.service.IsAdmin(authInfo.Caller) {
+	if !s.service.IsAdmin(authInfo) {
 		utils.RestErrorWrapper(w, "You need to have admin role for subscriptin service", http.StatusForbidden)
 		return
 	}
