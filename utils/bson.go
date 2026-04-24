@@ -4,6 +4,7 @@
 package utils
 
 import (
+	"bytes"
 	"fmt"
 	"regexp"
 	"strings"
@@ -183,7 +184,7 @@ func BsonQuoteMap(m *map[string]interface{}) map[string]interface{} {
 		return nil
 	}
 	dotEscaped := walkMap(*m, BsonQuote, nil)
-	return jsonReplaceAll(dotEscaped, "$", "￠")
+	return JSONQuoteDollar(dotEscaped)
 }
 
 // BsonUnquoteMap is the inverse of BsonQuoteMap.
@@ -215,7 +216,7 @@ func BsonUnquoteMap(m *map[string]interface{}) map[string]interface{} {
 	if m == nil {
 		return nil
 	}
-	dollarReversed := jsonReplaceAll(*m, "￠", "$")
+	dollarReversed := JSONDollarUnquote(*m)
 	return walkMap(dollarReversed, BsonUnquote, nil)
 }
 
@@ -249,6 +250,19 @@ func BsonUnquoteMap(m *map[string]interface{}) map[string]interface{} {
 // cjson-based BsonQuoteMap behaviour; callers that need integer
 // precision already go through typed struct fields rather than
 // through map[string]interface{}.
+// JSONQuoteDollar returns a deep copy of v with every `$` in keys and
+// string values replaced by U+FFE0. Thin wrapper around jsonReplaceAll —
+// kept as the one place the `$`/U+FFE0 pair is spelt out so the sentinel
+// lives in a single code location.
+func JSONQuoteDollar(v map[string]interface{}) map[string]interface{} {
+	return jsonReplaceAll(v, "$", "\uFFE0")
+}
+
+// JSONDollarUnquote is the inverse of JSONQuoteDollar.
+func JSONDollarUnquote(v map[string]interface{}) map[string]interface{} {
+	return jsonReplaceAll(v, "\uFFE0", "$")
+}
+
 func jsonReplaceAll(v map[string]interface{}, from, to string) map[string]interface{} {
 	b, err := jsonc.Marshal(v)
 	if err != nil {
@@ -349,6 +363,21 @@ func BsonQuote(s string) string {
 
 func unquoteDollar(s string) string {
 	return strings.ReplaceAll(s, "\uFFE0", "$")
+}
+
+func quoteDollar(s string) string {
+	return strings.ReplaceAll(s, "$", "\uFFE0")
+}
+
+// QuoteDollarBytes returns a copy of content with every `$` replaced by
+// U+FFE0 (the same sentinel BsonQuoteMap uses for `$`). Returns content
+// unchanged when no `$` is present, so the common case avoids an
+// allocation.
+func QuoteDollarBytes(content []byte) []byte {
+	if !bytes.Contains(content, []byte("$")) {
+		return content
+	}
+	return []byte(quoteDollar(string(content)))
 }
 
 // Slugify converts a string into a slug standard string

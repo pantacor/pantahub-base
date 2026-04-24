@@ -22,7 +22,7 @@ func DecodeJsonPayload(r *rest.Request, v interface{}) error {
 		return ErrJsonPayloadEmpty
 	}
 
-	err = json.Unmarshal([]byte(utils.QuoteDollar(string(content))), v)
+	err = json.Unmarshal(utils.QuoteDollarBytes(content), v)
 	if err != nil {
 		return err
 	}
