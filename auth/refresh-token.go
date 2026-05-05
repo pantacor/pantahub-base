@@ -12,6 +12,7 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
+	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/auth/authmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -49,9 +50,25 @@ func (a *App) handlePostTokenRefresh(writer rest.ResponseWriter, r *rest.Request
 		return
 	}
 
-	caller, _ := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"].(string)
+	callerClaims, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)
+	if !ok {
+		utils.RestErrorWrapper(writer, "Caller has no JWT payload", http.StatusUnauthorized)
+		return
+	}
+	caller, _ := callerClaims["prn"].(string)
 	if caller == "" {
 		utils.RestErrorWrapper(writer, "Caller has no prn", http.StatusUnauthorized)
+		return
+	}
+	// Only service identities can refresh service-issued tokens. The token
+	// minted by /auth/token carries the user's identity (type=USER) but its
+	// "aud" is the service PRN; refreshing must therefore be initiated by
+	// that service authenticating itself, not by reusing the user-on-behalf
+	// bearer.
+	callerType, _ := callerClaims["type"].(string)
+	if callerType != string(accounts.AccountTypeService) {
+		log.Printf("WARNING: non-service caller %q (type=%q) tried to refresh a service token", caller, callerType)
+		utils.RestErrorWrapper(writer, "Only service callers may refresh service tokens", http.StatusForbidden)
 		return
 	}
 
