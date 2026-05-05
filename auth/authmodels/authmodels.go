@@ -68,6 +68,13 @@ type TokenStore struct {
 	Claims  map[string]interface{} `json:"jwt-claims"`
 }
 
+// TokenRefreshRequest is sent by a service to refresh a user-on-behalf access
+// token it previously received via POST /auth/token. The caller must
+// authenticate as the service whose PRN matches the "aud" claim of Token.
+type TokenRefreshRequest struct {
+	Token string `json:"token"`
+}
+
 type LoginRequestPayload struct {
 	Username string `json:"username"`
 	Password string `json:"password"`

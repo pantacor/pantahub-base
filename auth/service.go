@@ -232,6 +232,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		rest.Get("/", app.handleGetProfile),
 		rest.Post("/login", app.getTokenUsingPassword),
 		rest.Post("/token", app.handlePostToken),
+		rest.Post("/token/refresh", app.handlePostTokenRefresh),
 		rest.Get("/auth_status", handleAuthStatus),
 		rest.Get("/login", app.safeRefreshHandler),
 		rest.Get("/accounts", app.handleGetAccounts),
