@@ -105,6 +105,8 @@ func DoInit() {
 	defaultJwtMiddleware.Authenticator = authservices.AuthWithUserPassFactory(mongoClient)
 	defaultJwtMiddleware.PayloadFunc = authservices.AuthenticatePayloadFactory(mongoClient, defaultJwtMiddleware)
 
+	utils.BasicAuthTokenFactory = authservices.CreateBearerFromPersonalToken
+
 	adminUsers := utils.GetSubscriptionAdmins()
 	subService := subscriptions.NewService(mongoClient, utils.Prn("prn::subscriptions:"),
 		adminUsers, subscriptions.SubscriptionProperties)

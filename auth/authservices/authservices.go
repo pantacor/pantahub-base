@@ -2,6 +2,7 @@ package authservices
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/base64"
 	"errors"
 	"log"
@@ -141,6 +142,141 @@ func CreateUserToken(payload *authmodels.LoginRequestPayload, jwtMiddleware *jwt
 	}
 
 	return tokenString, rerr
+}
+
+// CreateBearerFromPersonalToken mints a short-lived JWT iff the supplied
+// (username, personalToken) pair resolves to a valid, non-deleted,
+// non-expired AuthToken owned by that username. Account passwords are
+// NEVER accepted.
+//
+// Returns 401 RError for: malformed token, tokenid not found, expired,
+// deleted, owner mismatch, or secret mismatch.
+func CreateBearerFromPersonalToken(
+	ctx context.Context,
+	username string,
+	personalToken string,
+	jwtMiddleware *jwt.JWTMiddleware,
+	mongoClient *mongo.Client,
+	ttl time.Duration,
+) (tokenString string, rerr *utils.RError) {
+	if jwtMiddleware == nil || mongoClient == nil {
+		rerr = &utils.RError{
+			Msg:   "Invalid personal token",
+			Error: "Invalid personal token",
+			Code:  http.StatusUnauthorized,
+		}
+		return "", rerr
+	}
+
+	// Try RawURLEncoding first (what tokenservice uses), then RawStdEncoding fallback.
+	var decoded []byte
+	var err error
+
+	decoded, err = base64.RawURLEncoding.DecodeString(personalToken)
+	if err != nil {
+		decoded, err = base64.RawStdEncoding.DecodeString(personalToken)
+		if err != nil {
+			rerr = &utils.RError{
+				Msg:   "Invalid personal token format",
+				Error: "Invalid personal token format",
+				Code:  http.StatusUnauthorized,
+			}
+			return "", rerr
+		}
+	}
+
+	parts := strings.SplitN(string(decoded), ":", 2)
+	if len(parts) != 2 {
+		rerr = &utils.RError{
+			Msg:   "Invalid personal token format",
+			Error: "Invalid personal token format",
+			Code:  http.StatusUnauthorized,
+		}
+		return "", rerr
+	}
+
+	tokenid := parts[0]
+	_ = parts[1] // secret is verified indirectly through authToken.Secret comparison
+
+	repo := tokenrepo.New(mongoClient)
+	service := tokenservice.New(repo)
+	authToken, err := service.GetToken(ctx, tokenid, "")
+	if err != nil || authToken == nil {
+		rerr = &utils.RError{
+			Msg:   "Invalid personal token",
+			Error: "Invalid personal token",
+			Code:  http.StatusUnauthorized,
+		}
+		return "", rerr
+	}
+
+	if authToken.Deleted || authToken.ExpireAt.Before(time.Now()) {
+		rerr = &utils.RError{
+			Msg:   "Invalid personal token",
+			Error: "Invalid personal token",
+			Code:  http.StatusUnauthorized,
+		}
+		return "", rerr
+	}
+
+	// Owner check: resolve username to PRN.
+	account, err := GetAccount(username, mongoClient)
+	if err != nil {
+		rerr = &utils.RError{
+			Msg:   "Invalid personal token",
+			Error: "Invalid personal token",
+			Code:  http.StatusUnauthorized,
+		}
+		return "", rerr
+	}
+
+	if authToken.Owner != account.Prn {
+		rerr = &utils.RError{
+			Msg:   "Invalid personal token",
+			Error: "Invalid personal token",
+			Code:  http.StatusUnauthorized,
+		}
+		return "", rerr
+	}
+
+	// Secret check: the personalToken is the composite base64 string that
+	// must match authToken.Secret verbatim.
+	if subtle.ConstantTimeCompare([]byte(authToken.Secret), []byte(personalToken)) != 1 {
+		rerr = &utils.RError{
+			Msg:   "Invalid personal token",
+			Error: "Invalid personal token",
+			Code:  http.StatusUnauthorized,
+		}
+		return "", rerr
+	}
+
+	// Build JWT.
+	token := jwtgo.New(jwtgo.GetSigningMethod(jwtMiddleware.SigningAlgorithm))
+	claims := token.Claims.(jwtgo.MapClaims)
+
+	claims["id"] = username
+	claims["nick"] = authToken.Name
+	claims["prn"] = authToken.Owner
+	claims["roles"] = strings.ToLower(string(authToken.Type))
+	claims["type"] = string(authToken.Type)
+	claims["orig_iat"] = time.Now().Unix()
+	claims["exp"] = time.Now().Add(ttl).Unix()
+
+	if len(authToken.Scopes) > 0 {
+		claims["scopes"] = strings.Join(authToken.Scopes, " ")
+	}
+
+	tokenString, err = token.SignedString(jwtMiddleware.Key)
+	if err != nil {
+		rerr = &utils.RError{
+			Msg:   "Error signing new token",
+			Error: "Error signing new token",
+			Code:  http.StatusInternalServerError,
+		}
+		return "", rerr
+	}
+
+	return tokenString, nil
 }
 
 func AuthWithUserPassFactory(mongoClient *mongo.Client) func(string, string) bool {

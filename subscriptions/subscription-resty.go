@@ -32,6 +32,7 @@ type App struct {
 	jwtMiddleware *jwt.JWTMiddleware
 	API           *rest.Api
 	service       SubscriptionService
+	mongoClient   *mongo.Client
 }
 
 // SubscriptionReq subscription request
@@ -210,6 +211,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, subscriptionService SubscriptionServi
 	app := new(App)
 	app.jwtMiddleware = jwtMiddleware
 	app.service = subscriptionService
+	app.mongoClient = mongoClient
 	app.API = rest.NewApi()
 
 	// we dont use default stack because we dont want content type enforcement
@@ -246,6 +248,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, subscriptionService SubscriptionServi
 	})
 	app.API.Use(&utils.URLCleanMiddleware{})
 
+	app.API.Use(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtMiddleware, Mongo: app.mongoClient})
 	// no authentication ngeeded for /login
 	app.API.Use(&rest.IfMiddleware{
 		Condition: func(request *rest.Request) bool {
