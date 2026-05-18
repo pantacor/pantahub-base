@@ -19,6 +19,7 @@ package auth
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"gitlab.com/pantacor/pantahub-base/auth/authmodels"
@@ -27,11 +28,12 @@ import (
 )
 
 // @Summary Get login token using username and password
-// @Description Get login token using username and password
+// @Description Get login token using username and password. Supports both JSON body credentials and HTTP Basic Auth header. When Authorization: Basic is present, it takes precedence over the JSON body.
 // @Accept  json
 // @Produce  json
 // @Tags auth
-// @Param body body authmodels.LoginRequestPayload true "Login credentials"
+// @Security BasicAuth
+// @Param body body authmodels.LoginRequestPayload false "Login credentials (required if not using Basic Auth)"
 // @Success 200 {object} authmodels.TokenResponse
 // @Failure 400 {object} utils.RError
 // @Failure 401 {object} utils.RError
@@ -47,10 +49,24 @@ func (a *App) getTokenUsingPassword(writer rest.ResponseWriter, r *rest.Request)
 	}
 
 	payload := &authmodels.LoginRequestPayload{}
-	err := r.DecodeJsonPayload(payload)
-	if err != nil {
-		utils.RestErrorWrapper(writer, "Failed to decode token Request", http.StatusBadRequest)
-		return
+
+	// Prefer Authorization: Basic if present.
+	authz := r.Header.Get("Authorization")
+	if strings.HasPrefix(authz, "Basic ") {
+		user, pass, ok := r.Request.BasicAuth()
+		if ok && user != "" {
+			payload.Username = user
+			payload.Password = pass
+		}
+	}
+
+	// Fall back to JSON body when no Basic auth credentials were extracted.
+	if payload.Username == "" {
+		err := r.DecodeJsonPayload(payload)
+		if err != nil {
+			utils.RestErrorWrapper(writer, "Failed to decode token Request", http.StatusBadRequest)
+			return
+		}
 	}
 
 	tokenString, rerr := authservices.CreateUserToken(payload, a.jwtMiddleware, a.mongoClient)
