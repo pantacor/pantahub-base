@@ -16,6 +16,7 @@ services:
             - pvr
             - fluentd
             - gc
+            - elasticsearch
         ports:
             - 12365:12365
             - 12366:12366
@@ -128,7 +129,6 @@ services:
             - ./fluentd.localhost.conf:/fluentd/etc/fluent.conf
 
     elasticsearch:
-        profiles: ["logs"]
         networks:
             - base
         container_name: elasticsearch
