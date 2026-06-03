@@ -22,11 +22,13 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
@@ -207,9 +209,8 @@ func (s *EService) WriteExportTar(
 	tw := tar.NewWriter(fileWriter)
 	defer tw.Close()
 
-	err := addToTarFileFromBytes(tw, "json", state, modtime)
-	if err != nil {
-		utils.RestErrorWrapper(w, err.Error(), http.StatusInternalServerError)
+	if err := addToTarFileFromBytes(tw, "json", state, modtime); err != nil {
+		handleTarWriteError(w, "json", err)
 		return
 	}
 
@@ -218,16 +219,37 @@ func (s *EService) WriteExportTar(
 	for _, object := range objectDownloads {
 		resp, err := http.Get(object.SignedGetURL)
 		if err != nil {
-			utils.RestErrorWrapper(w, err.Error(), http.StatusInternalServerError)
+			handleTarWriteError(w, "objects/"+object.ID, err)
 			return
 		}
 
-		err = addToTarFromResponse(tw, "objects/"+object.ID, resp, &object.TimeModified)
-		if err != nil {
-			utils.RestErrorWrapper(w, err.Error(), http.StatusInternalServerError)
+		if err := addToTarFromResponse(tw, "objects/"+object.ID, resp, &object.TimeModified); err != nil {
+			handleTarWriteError(w, "objects/"+object.ID, err)
 			return
 		}
 	}
+}
+
+// isClientDisconnect reports whether err indicates the client went away while
+// we were streaming (a cancelled download) rather than a server-side fault.
+func isClientDisconnect(err error) bool {
+	return errors.Is(err, syscall.EPIPE) ||
+		errors.Is(err, syscall.ECONNRESET) ||
+		errors.Is(err, context.Canceled) ||
+		errors.Is(err, context.DeadlineExceeded)
+}
+
+// handleTarWriteError keeps the original error response for genuine server-side
+// failures (preserving behavior for every existing consumer of this endpoint),
+// and only special-cases a cancelled download: a client disconnect surfaces as
+// a broken pipe, and calling RestErrorWrapper on that already-broken connection
+// would panic with "superfluous WriteHeader", so we just log it instead.
+func handleTarWriteError(w rest.ResponseWriter, entry string, err error) {
+	if isClientDisconnect(err) {
+		log.Printf("export: download cancelled by client while writing %q: %v", entry, err)
+		return
+	}
+	utils.RestErrorWrapper(w, err.Error(), http.StatusInternalServerError)
 }
 
 func addToTarFileFromBytes(writer *tar.Writer, archivePath string, content []byte, modtime *time.Time) error {

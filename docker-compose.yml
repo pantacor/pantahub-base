@@ -23,6 +23,12 @@ services:
         env_file:
             - ./env.default
             - ./.env.local
+        # Serve objects from the local-s3 mount instead of proxying to Scaleway
+        # (large objects stall over that connection in dev). Seeded from
+        # mocks/miele. Revert by removing this block + recreating `base`.
+        environment:
+            - PANTAHUB_STORAGE_DRIVER=local
+            - PANTAHUB_S3PATH=/local-s3
 
     gc:
         networks:
