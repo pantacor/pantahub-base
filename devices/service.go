@@ -74,6 +74,7 @@ type Device struct {
 	Secret              string                 `json:"secret,omitempty"`
 	TimeCreated         time.Time              `json:"time-created" bson:"timecreated"`
 	TimeModified        time.Time              `json:"time-modified" bson:"timemodified"`
+	MetaModified        time.Time              `json:"meta-modified" bson:"meta-modified"`
 	Challenge           string                 `json:"challenge,omitempty"`
 	IsPublic            bool                   `json:"public" bson:"ispublic"`
 	UserMeta            map[string]interface{} `json:"user-meta" bson:"user-meta"`

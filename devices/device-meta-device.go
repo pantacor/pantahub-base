@@ -109,9 +109,9 @@ func (a *App) handlePutDeviceData(w rest.ResponseWriter, r *rest.Request) {
 			"prn": owner.(string),
 		},
 		bson.M{"$set": bson.M{
-			"device-meta":        data,
-			"timemodified":       time.Now(),
-			"devicemetamodified": time.Now(),
+			"device-meta":   data,
+			"timemodified":  time.Now(),
+			"meta-modified": time.Now(),
 		}},
 	)
 	if err != nil {
@@ -238,7 +238,7 @@ func (a *App) handlePatchDeviceData(w rest.ResponseWriter, r *rest.Request) {
 
 		// Always update timemodified
 		setFields["timemodified"] = time.Now()
-		setFields["devicemetamodified"] = time.Now()
+		setFields["meta-modified"] = time.Now()
 
 		updateDoc := bson.M{}
 		if len(setFields) > 0 {
