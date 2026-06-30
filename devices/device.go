@@ -19,15 +19,23 @@ package devices
 import (
 	"context"
 	"errors"
+	"strconv"
 	"time"
 
 	petname "github.com/dustinkirkland/golang-petname"
+	"gitlab.com/pantacor/pantahub-base/subscriptions"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/mgo.v2/bson"
 )
+
+// GenerateDeviceNick generates a unique device nick using a 3-word petname
+// with a 4-character random suffix to avoid collisions on the owner+nick unique index.
+func GenerateDeviceNick() string {
+	return petname.Generate(3, "_") + "_" + utils.RandStringLower(4)
+}
 
 func createDevice(id, secret, owner string) (*Device, error) {
 	newDevice := &Device{}
@@ -45,7 +53,7 @@ func createDevice(id, secret, owner string) (*Device, error) {
 	newDevice.DeviceMeta = map[string]interface{}{}
 	newDevice.TimeCreated = time.Now()
 	newDevice.TimeModified = newDevice.TimeCreated
-	newDevice.Nick = petname.Generate(3, "_")
+	newDevice.Nick = GenerateDeviceNick()
 
 	return newDevice, nil
 }
@@ -92,4 +100,106 @@ func GetDeviceByID(ctx context.Context, id string, collection *mongo.Collection)
 		Decode(&device)
 
 	return &device, err
+}
+
+// ErrDeviceQuotaExceeded is returned when the device quota is exceeded
+var ErrDeviceQuotaExceeded = errors.New("device quota exceeded")
+
+// DeviceQuotaResult contains the result of a device quota check
+type DeviceQuotaResult struct {
+	CurrentCount int64
+	MaxAllowed   int64
+	Exceeded     bool
+}
+
+// CheckDeviceQuota checks if the owner has exceeded their device quota
+func CheckDeviceQuota(
+	ctx context.Context,
+	owner string,
+	mongoClient *mongo.Client,
+	subService subscriptions.SubscriptionService,
+) (*DeviceQuotaResult, error) {
+	result := &DeviceQuotaResult{}
+
+	// Get subscription for the owner
+	sub, err := subService.LoadBySubject(ctx, utils.Prn(owner))
+	if err != nil {
+		// If no subscription found, use default (FREE tier)
+		sub = subService.GetDefaultSubscription(utils.Prn(owner))
+	}
+
+	// Get device quota from subscription
+	deviceQuotaVal := sub.GetProperty("DEVICES")
+	if deviceQuotaVal == nil {
+		// No device quota set, allow unlimited
+		result.MaxAllowed = -1
+		return result, nil
+	}
+
+	deviceQuotaStr, ok := deviceQuotaVal.(string)
+	if !ok {
+		return nil, errors.New("invalid device quota value in subscription")
+	}
+
+	maxDevices, err := strconv.ParseInt(deviceQuotaStr, 10, 64)
+	if err != nil {
+		return nil, errors.New("invalid device quota value: " + err.Error())
+	}
+
+	// If quota is 0 or negative, treat as unlimited
+	if maxDevices <= 0 {
+		result.MaxAllowed = -1
+		return result, nil
+	}
+
+	result.MaxAllowed = maxDevices
+
+	// Count current devices for the owner
+	collection := mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
+	ctxC, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	deviceCount, err := collection.CountDocuments(ctxC, bson.M{
+		"owner":   owner,
+		"garbage": bson.M{"$ne": true},
+	})
+	if err != nil {
+		return nil, errors.New("error counting devices: " + err.Error())
+	}
+
+	result.CurrentCount = deviceCount
+	result.Exceeded = deviceCount >= maxDevices
+
+	if utils.GetEnv(utils.EnvPantahubDisableQuota) == "true" {
+		result.Exceeded = false
+	}
+
+	return result, nil
+}
+
+// flattenMap flattens a nested map into dot-notation keys for MongoDB atomic updates
+func flattenMap(prefix string, m map[string]interface{}, setFields bson.M, unsetFields bson.M) {
+	for k, v := range m {
+		key := k
+		if prefix != "" {
+			key = prefix + "." + k
+		}
+
+		if v == nil {
+			unsetFields[key] = ""
+			continue
+		}
+
+		// If it's a map, recurse to flatten further
+		// We handle both map[string]interface{} and bson.M
+		if nestedMap, ok := v.(map[string]interface{}); ok {
+			flattenMap(key, nestedMap, setFields, unsetFields)
+		} else if nestedMap, ok := v.(bson.M); ok {
+			flattenMap(key, map[string]interface{}(nestedMap), setFields, unsetFields)
+		} else {
+			// BSON-quote the leaf key part to handle dots in the metadata key name
+			// while preserving the path dots used for deep update.
+			setFields[key] = v
+		}
+	}
 }

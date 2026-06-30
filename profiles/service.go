@@ -86,6 +86,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware,
 		AccessControlMaxAge:           3600,
 	})
 
+	app.API.Use(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtMiddleware, Mongo: app.mongoClient})
 	app.API.Use(&rest.IfMiddleware{
 		Condition: func(request *rest.Request) bool {
 			// all need auth

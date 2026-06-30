@@ -118,13 +118,13 @@ func (a *App) handlePutStepMeta(w rest.ResponseWriter, r *rest.Request) {
 		},
 		bson.M{"$set": step},
 	)
-	if updateResult.MatchedCount == 0 {
-		utils.RestErrorWrapper(w, "Error updating step meta: not found", http.StatusBadRequest)
+	if err != nil {
+		utils.RestErrorWrapper(w, "Error updating step meta: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err != nil {
-		utils.RestErrorWrapper(w, "Error updating step meta: "+err.Error(), http.StatusInternalServerError)
+	if updateResult.MatchedCount == 0 {
+		utils.RestErrorWrapper(w, "Error updating step meta: not found", http.StatusBadRequest)
 		return
 	}
 

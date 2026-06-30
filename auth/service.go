@@ -19,7 +19,9 @@ package auth
 import (
 	"context"
 	"log"
+	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -72,6 +74,33 @@ func init() {
 			accountsdata.DefaultAccounts[k] = v
 		}
 	}
+}
+
+// safeRefreshHandler wraps jwtMiddleware.RefreshHandler to recover from panics
+// caused by tokens missing the "orig_iat" claim (e.g. from x509, third-party,
+// or implicit auth flows). The upstream RefreshHandler has an unchecked type
+// assertion on orig_iat that panics when the claim is nil.
+func (app *App) safeRefreshHandler(w rest.ResponseWriter, r *rest.Request) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Printf("WARN: RefreshHandler recovered from panic: %v", rec)
+			w.Header().Set("WWW-Authenticate", "JWT realm="+app.jwtMiddleware.Realm)
+			rest.Error(w, "Token is not refreshable", http.StatusUnauthorized)
+		}
+	}()
+
+	originalTimeout := app.jwtMiddleware.Timeout
+	timeoutStr := utils.GetEnv(utils.EnvPantahubAuthorizeJWTTimeoutMinutes)
+	authorizeTimeout, err := strconv.Atoi(timeoutStr)
+	if err != nil {
+		authorizeTimeout = 1920
+	}
+	app.jwtMiddleware.Timeout = time.Minute * time.Duration(authorizeTimeout)
+	defer func() {
+		app.jwtMiddleware.Timeout = originalTimeout
+	}()
+
+	app.jwtMiddleware.RefreshHandler(w, r)
 }
 
 // New create a new auth rest application
@@ -203,8 +232,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		rest.Get("/", app.handleGetProfile),
 		rest.Post("/login", app.getTokenUsingPassword),
 		rest.Post("/token", app.handlePostToken),
+		rest.Post("/token/refresh", app.handlePostTokenRefresh),
 		rest.Get("/auth_status", handleAuthStatus),
-		rest.Get("/login", app.jwtMiddleware.RefreshHandler),
+		rest.Get("/login", app.safeRefreshHandler),
 		rest.Get("/accounts", app.handleGetAccounts),
 		rest.Post("/accounts", app.handlePostAccount),
 		rest.Post("/sessions", app.handlePostSession),
@@ -219,6 +249,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		rest.Get("/oauth/callback/#service", app.HandleGetThirdPartyCallback),
 		rest.Post("/oauth/token", app.HandlePKCEToken),
 		rest.Get("/oauth/authorize", app.HandlePKCEAuthorize),
+		rest.Post("/oauth/authorize", app.HandlePostPKCEAuthorize),
+		rest.Post("/oauth/pkce/init", app.HandlePostPKCEInit),
 	)
 	app.API.Use(&tracer.OtelMiddleware{
 		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
@@ -339,6 +371,9 @@ func isWhiteListedForAuthentication(request *rest.Request) bool {
 
 	// Path prefix and method matches for OAuth endpoints
 	if strings.HasPrefix(request.URL.Path, "/oauth/token") && request.Method == "POST" {
+		return false
+	}
+	if strings.HasPrefix(request.URL.Path, "/oauth/pkce/init") && request.Method == "POST" {
 		return false
 	}
 	if strings.HasPrefix(request.URL.Path, "/oauth/authorize") && request.Method == "GET" {

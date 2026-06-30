@@ -48,6 +48,26 @@ func GetPKCERepo() (*PKCERepo, error) {
 		},
 		{
 			Keys: map[string]int{
+				"user_code": 1,
+			},
+			Options: &options.IndexOptions{
+				Unique:     &t,
+				Background: &f,
+				Sparse:     &f,
+			},
+		},
+		{
+			Keys: map[string]int{
+				"session_id": 1,
+			},
+			Options: &options.IndexOptions{
+				Unique:     &t,
+				Background: &f,
+				Sparse:     &f,
+			},
+		},
+		{
+			Keys: map[string]int{
 				"expires_at": 1,
 			},
 			Options: &options.IndexOptions{
@@ -91,6 +111,20 @@ func (db *PKCERepo) Create(ctx context.Context, pks *PKCEState) error {
 func (db *PKCERepo) FindByAuthCode(ctx context.Context, authCode string) (*PKCEState, error) {
 	pks := &PKCEState{}
 	err := db.Repo.FindBy(ctx, "auth_code", authCode, pks)
+	return pks, err
+}
+
+// FindByUserCode retrieves a PKCEState by its user_code
+func (db *PKCERepo) FindByUserCode(ctx context.Context, userCode string) (*PKCEState, error) {
+	pks := &PKCEState{}
+	err := db.Repo.FindBy(ctx, "user_code", userCode, pks)
+	return pks, err
+}
+
+// FindBySessionID retrieves a PKCEState by its session_id
+func (db *PKCERepo) FindBySessionID(ctx context.Context, sessionID string) (*PKCEState, error) {
+	pks := &PKCEState{}
+	err := db.Repo.FindBy(ctx, "session_id", sessionID, pks)
 	return pks, err
 }
 

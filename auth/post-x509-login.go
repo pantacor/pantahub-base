@@ -111,6 +111,7 @@ func createToken(device *devices.Device) (*TokenPayload, error) {
 	claims["prn"] = device.Prn
 	claims["owner"] = device.Owner
 	claims["scopes"] = "prn:pantahub.com:apis:/base/all"
+	claims["orig_iat"] = time.Now().Unix()
 
 	tokenString, err := token.SignedString(jwtSecret)
 

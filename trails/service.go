@@ -232,6 +232,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	})
 	app.API.Use(&utils.URLCleanMiddleware{})
 
+	app.API.Use(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtMiddleware, Mongo: app.mongoClient})
 	app.API.Use(&rest.IfMiddleware{
 		Condition: func(request *rest.Request) bool {
 			return true

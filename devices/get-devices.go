@@ -29,6 +29,7 @@ import (
 	"gitlab.com/pantacor/pantahub-base/profiles"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"gopkg.in/mgo.v2/bson"
@@ -112,7 +113,7 @@ func (a *App) handleGetDevices(w rest.ResponseWriter, r *rest.Request) {
 		}
 
 	} else if ok2 {
-		//To get devices of any user who have public devices by using owner nick
+		// To get devices of any user who have public devices by using owner nick
 		account, err := a.GetUserAccountByNick(r.Context(), ownerNickvalue[0])
 		if err != nil {
 			utils.RestErrorWrapper(w, "Error finding owner user account by nick:"+err.Error(), http.StatusForbidden)
@@ -288,7 +289,18 @@ func (a *App) handleGetDevice(w rest.ResponseWriter, r *rest.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
-	err = collection.FindOne(ctx, query).Decode(&device)
+
+	// Start a session with causal consistency to ensure read-after-write consistency
+	session, err := a.mongoClient.StartSession()
+	if err != nil {
+		utils.RestErrorWrapper(w, "Error starting database session: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer session.EndSession(ctx)
+
+	err = mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
+		return collection.FindOne(sc, query).Decode(&device)
+	})
 	if err != nil && mongoutils.IsNotFound(err) {
 		utils.RestErrorWrapper(w, "Device not found", http.StatusNotFound)
 		return
@@ -328,7 +340,6 @@ func (a *App) handleGetDevice(w rest.ResponseWriter, r *rest.Request) {
 			err := collectionAccounts.FindOne(ctx,
 				bson.M{"prn": device.Owner}).
 				Decode(&ownerAccount)
-
 			if err != nil {
 				utils.RestErrorWrapper(w, "Owner account not Found", http.StatusInternalServerError)
 				return
@@ -349,7 +360,6 @@ func (a *App) handleGetDevice(w rest.ResponseWriter, r *rest.Request) {
 
 // GetUserAccountByNick : Get User Account By Nick
 func (a *App) GetUserAccountByNick(parentCtx context.Context, nick string) (accounts.Account, error) {
-
 	var account accounts.Account
 
 	account, ok := accountsdata.DefaultAccounts["prn:pantahub.com:auth:/"+nick]
@@ -362,7 +372,6 @@ func (a *App) GetUserAccountByNick(parentCtx context.Context, nick string) (acco
 		err := collectionAccounts.FindOne(ctx,
 			bson.M{"nick": nick}).
 			Decode(&account)
-
 		if err != nil {
 			return account, err
 		}

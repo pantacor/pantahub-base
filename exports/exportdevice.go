@@ -22,6 +22,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/exports/exportservices"
+	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
 
@@ -45,6 +46,7 @@ func (a *App) handleGetExport(w rest.ResponseWriter, r *rest.Request) {
 	rev := r.PathParam("rev")
 	filename := r.PathParam("filename")
 	frags := r.URL.Query().Get("parts")
+	meta := r.URL.Query().Get("meta") == "true"
 
 	payload, ok := r.Env["JWT_PAYLOAD"]
 	if !ok {
@@ -116,5 +118,46 @@ func (a *App) handleGetExport(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
+	// meta=true returns a cheap size estimate (no blob fetch, no tar generation)
+	// so clients can show the user the total before starting the download.
+	if meta {
+		w.WriteJson(buildExportMeta(revision, state, objectDownloads))
+		return
+	}
+
 	exportservice.WriteExportTar(w, filename, objectDownloads, state, modtime)
+}
+
+// ExportMeta is the cheap size estimate returned for meta=true requests.
+type ExportMeta struct {
+	Rev              string `json:"rev"`
+	ObjectCount      int    `json:"object_count"`
+	UncompressedSize int64  `json:"uncompressed_size"`
+}
+
+const tarBlockSize = 512
+
+// tarEntrySize is the on-disk size a tar entry occupies: a 512-byte header plus
+// the content padded up to the next 512-byte block boundary.
+func tarEntrySize(contentSize int64) int64 {
+	padded := ((contentSize + tarBlockSize - 1) / tarBlockSize) * tarBlockSize
+	return tarBlockSize + padded
+}
+
+// buildExportMeta computes the uncompressed tar size from the state bytes and
+// each object's known SizeInt, matching what WriteExportTar would emit: one
+// "json" entry, one "objects/<id>" entry per object, and the 1024-byte
+// end-of-archive trailer. It is an upper bound for the gzip-compressed download.
+func buildExportMeta(rev string, state []byte, objectDownloads []objects.ObjectWithAccess) ExportMeta {
+	var total int64 = tarEntrySize(int64(len(state)))
+	for _, object := range objectDownloads {
+		total += tarEntrySize(object.SizeInt)
+	}
+	total += 2 * tarBlockSize // two zero blocks terminate the archive
+
+	return ExportMeta{
+		Rev:              rev,
+		ObjectCount:      len(objectDownloads),
+		UncompressedSize: total,
+	}
 }

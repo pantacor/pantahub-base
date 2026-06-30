@@ -11,6 +11,7 @@ import (
 	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/auth"
 	"gitlab.com/pantacor/pantahub-base/devices"
+	"gitlab.com/pantacor/pantahub-base/subscriptions"
 	"gitlab.com/pantacor/pantahub-base/testutils"
 	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
@@ -74,7 +75,10 @@ func setUp(t *testing.T) {
 	}
 
 	// trails app we test
-	devicesApp := devices.New(jwtMWR, mongoClient)
+	adminUsers := utils.GetSubscriptionAdmins()
+	subService := subscriptions.NewService(mongoClient, utils.Prn("prn::subscriptions:"),
+		adminUsers, subscriptions.SubscriptionProperties)
+	devicesApp := devices.New(jwtMWR, subService, mongoClient)
 	devicesServer := httptest.NewServer(devicesApp.API.MakeHandler())
 	devicesURL, err = url.Parse(devicesServer.URL)
 	if err != nil {

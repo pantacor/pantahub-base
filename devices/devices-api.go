@@ -22,7 +22,6 @@ import (
 	"errors"
 	"log"
 	"math/rand"
-	"net/http"
 	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
@@ -170,20 +169,20 @@ func (a *App) ResolveDeviceIDOrNick(ctx context.Context, owner string, param str
 
 // MarkDeviceAsGarbage : Mark Device as Garbage
 func MarkDeviceAsGarbage(
-	w rest.ResponseWriter,
 	deviceID string,
 ) (
 	gcapi.MarkDeviceGarbage,
 	*resty.Response,
+	error,
 ) {
 	response := gcapi.MarkDeviceGarbage{}
 	APIEndPoint := utils.GetEnv("PANTAHUB_GC_API") + "/markgarbage/device/" + deviceID
 	res, err := resty.R().Put(APIEndPoint)
 	if err != nil {
-		utils.RestErrorWrapper(w, "internal error calling test server: "+err.Error(), http.StatusInternalServerError)
+		return response, nil, err
 	}
 	err = json.Unmarshal(res.Body(), &response)
-	return response, res
+	return response, res, err
 }
 
 // LookupDeviceNick : Lookup Device Nicks and return device id

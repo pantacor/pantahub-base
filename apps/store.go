@@ -210,9 +210,9 @@ func AccessCodePayload(ctx context.Context, owner, serviceName, responseType, sc
 		return nil, err
 	}
 
-	if responseType == "code" && service.Type == AppTypePublic {
-		return nil, errors.New("Application can respond with code because the application is public")
-	}
+	// if responseType == "code" && service.Type == AppTypePublic {
+	// 	return nil, errors.New("Application can respond with code because the application is public")
+	// }
 
 	result := map[string]interface{}{}
 	result["approver_prn"] = accountPayload["prn"]

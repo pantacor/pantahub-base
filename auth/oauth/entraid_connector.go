@@ -95,15 +95,24 @@ func EntraidCb(ctx context.Context, config *oauth2.Config, code string) (*Respon
 		return &ResponsePayload{RedirectTo: ""}, err
 	}
 
+	// Use UserPrincipalName instead of the "mail" field to prevent nOAuth
+	// account takeover attacks. The "mail" field in Azure AD is user-editable
+	// and unverified, while UserPrincipalName is the authenticated identity.
+	email := payload.UserPrincipalName
+	if email == "" {
+		return &ResponsePayload{RedirectTo: ""}, fmt.Errorf("userPrincipalName is empty in Entra ID response")
+	}
+
 	// Split the email address to get the part before the '@'
-	parts := strings.Split(payload.Email, "@")
+	nick := payload.DisplayName
+	parts := strings.Split(email, "@")
 	if len(parts) > 1 {
-		payload.DisplayName = parts[0]
+		nick = parts[0]
 	}
 
 	return &ResponsePayload{
-		Email:   payload.Email,
-		Nick:    payload.DisplayName,
+		Email:   email,
+		Nick:    nick,
 		Raw:     string(data),
 		Service: ServiceEntraid,
 	}, nil

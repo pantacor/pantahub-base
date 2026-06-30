@@ -7,66 +7,58 @@ MONGO_PORT=${MONGO_PORT:-27017}
 # make sure the permissions for the mongokey is correct
 chmod 600 /keys/mongokey.yaml
 
-mongod --keyFile /keys/mongokey.yaml --transitionToAuth  --port ${MONGO_PORT} --replSet ${MONGO_RS} --bind_ip_all $@ &
-sleep 5
-
-replicaSet="""{
-  \"_id\": \"${MONGO_RS}\",
-  \"members\": [
-    {
-      \"_id\": 0,
-      \"host\": \"mongo:27017\"
-    },
-    {
-      \"_id\": 1,
-      \"host\": \"mongo2:30002\"
-    },
-    {
-      \"_id\": 2,
-      \"host\": \"mongo3:30003\"
-    }
-  ]
-}"""
-
-until mongo --eval "rs.initiate($replicaSet).ok || rs.status().ok" --port 27017 --quiet; do
-  echo "checking mongo replica set"
-  sleep 1
-done
-
-if ! mongo --eval 'db.getUsers()' "mongodb://admin:admin@localhost:27017/admin?authSource=admin&authMechanism=SCRAM-SHA-1&replicaSet=rs0"; then
-  until mongo --eval 'db.createUser({user: "admin", pwd: "admin", roles: [{role: "readWrite", db:"admin"}], mechanisms: ["SCRAM-SHA-1"]})' "mongodb://localhost:27017/admin?replicaSet=rs0"; do
-    echo "checking user"
-    if mongo --eval 'db.getUsers()' "mongodb://admin:admin@localhost:27017/admin?authSource=admin&authMechanism=SCRAM-SHA-1&replicaSet=rs0"; then
-      echo "get users"
-      break
-    fi
-    echo "checking user done"
-    sleep 1
+# Background process to initialize replica set and users
+(
+  echo "Mongo Initializer: Waiting for MongoDB to start..."
+  until mongo --port ${MONGO_PORT} --quiet --eval "db.adminCommand('ping')"; do
+    sleep 2
   done
-fi
 
-if ! mongo --eval 'db.getUsers()' "mongodb://user:pass@localhost:27017/pantabase-serv?authSource=pantabase-serv&authMechanism=SCRAM-SHA-1&replicaSet=rs0"; then
-  until mongo --eval 'db.createUser({user: "user", pwd: "pass", roles: [{role: "readWrite", db:"pantabase-serv"}], mechanisms: ["SCRAM-SHA-1"]})' "mongodb://localhost:27017/pantabase-serv?replicaSet=rs0"; do
-    echo "checking user"
-    if mongo --eval 'db.getUsers()' "mongodb://user:pass@localhost:27017/pantabase-serv?authSource=pantabase-serv&authMechanism=SCRAM-SHA-1&replicaSet=rs0"; then
-      echo "get users"
-      break
-    fi
-    echo "checking user done"
-    sleep 1
+  replicaSet="{
+    \"_id\": \"${MONGO_RS}\",
+    \"members\": [
+      { \"_id\": 0, \"host\": \"mongo:27017\" },
+      { \"_id\": 1, \"host\": \"mongo2:30002\" },
+      { \"_id\": 2, \"host\": \"mongo3:30003\" }
+    ]
+  }"
+
+  echo "Mongo Initializer: Initializing replica set..."
+  until mongo --port ${MONGO_PORT} --quiet --eval "rs.initiate($replicaSet).ok || rs.status().ok"; do
+    echo "Mongo Initializer: checking mongo replica set"
+    sleep 2
   done
-fi
 
-if ! mongo --eval 'db.getUsers()' "mongodb://phskafkaconnectsink:pass@localhost:27017/pantabase_devicesummary?authSource=pantabase_devicesummary&authMechanism=SCRAM-SHA-1&replicaSet=rs0"; then
-  until mongo --eval 'db.createUser({user: "phskafkaconnectsink", pwd: "pass", roles: [{role: "readWrite", db:"pantabase_devicesummary"}], mechanisms: ["SCRAM-SHA-1"]})' "mongodb://localhost:27017/pantabase_devicesummary?replicaSet=rs0"; do
-    echo "checking phskafkaconnectsink"
-    if mongo --eval 'db.getUsers()' "mongodb://phskafkaconnectsink:pass@localhost:27017/pantabase_devicesummary?authSource=pantabase_devicesummary&authMechanism=SCRAM-SHA-1&replicaSet=rs0"; then
-      echo "get users"
-      break
-    fi
-    echo "checking phskafkaconnectsink done"
-    sleep 1
-  done
-fi
+  echo "Mongo Initializer: Creating users..."
+  # Admin user
+  if ! mongo --eval 'db.getUsers()' "mongodb://admin:admin@localhost:${MONGO_PORT}/admin?authSource=admin&authMechanism=SCRAM-SHA-1&replicaSet=${MONGO_RS}" > /dev/null 2>&1; then
+    until mongo --eval 'db.createUser({user: "admin", pwd: "admin", roles: [{role: "readWrite", db:"admin"}], mechanisms: ["SCRAM-SHA-1"]})' "mongodb://localhost:${MONGO_PORT}/admin?replicaSet=${MONGO_RS}"; do
+      sleep 2
+    done
+  fi
 
-tail -f /proc/$(pidof mongod)/fd/1
+  # App user
+  if ! mongo --eval 'db.getUsers()' "mongodb://user:pass@localhost:${MONGO_PORT}/pantabase-serv?authSource=pantabase-serv&authMechanism=SCRAM-SHA-1&replicaSet=${MONGO_RS}" > /dev/null 2>&1; then
+    until mongo --eval 'db.createUser({user: "user", pwd: "pass", roles: [{role: "readWrite", db:"pantabase-serv"}], mechanisms: ["SCRAM-SHA-1"]})' "mongodb://localhost:${MONGO_PORT}/pantabase-serv?replicaSet=${MONGO_RS}"; do
+      sleep 2
+    done
+  fi
+
+  # PHS user
+  if ! mongo --eval 'db.getUsers()' "mongodb://phskafkaconnectsink:pass@localhost:${MONGO_PORT}/pantabase_devicesummary?authSource=pantabase_devicesummary&authMechanism=SCRAM-SHA-1&replicaSet=${MONGO_RS}" > /dev/null 2>&1; then
+    until mongo --eval 'db.createUser({user: "phskafkaconnectsink", pwd: "pass", roles: [{role: "readWrite", db:"pantabase_devicesummary"}], mechanisms: ["SCRAM-SHA-1"]})' "mongodb://localhost:${MONGO_PORT}/pantabase_devicesummary?replicaSet=${MONGO_RS}"; do
+      sleep 2
+    done
+  fi
+
+  # Source user
+  if ! mongo --eval 'db.getUsers()' "mongodb://phskafkaconnectsource:pass@localhost:${MONGO_PORT}/admin?authSource=admin&authMechanism=SCRAM-SHA-1&replicaSet=${MONGO_RS}" > /dev/null 2>&1; then
+    until mongo --eval 'db.createUser({user: "phskafkaconnectsource", pwd: "pass", roles: [{role: "readWrite", db:"admin"}, {role: "read", db:"local"}, {role: "read", db:"config"}], mechanisms: ["SCRAM-SHA-1"]})' "mongodb://localhost:${MONGO_PORT}/admin?replicaSet=${MONGO_RS}"; do
+      sleep 2
+    done
+  fi
+  echo "Mongo Initializer: Done."
+) &
+
+# Execute mongod as main process
+exec mongod --keyFile /keys/mongokey.yaml --transitionToAuth --port ${MONGO_PORT} --replSet ${MONGO_RS} --bind_ip_all --oplogSize ${MONGO_OPLOG_SIZE_MB:-990} "$@"

@@ -184,6 +184,7 @@ func createAccountToken(account *accounts.Account) (*TokenPayload, error) {
 	claims["roles"] = "user"
 	claims["type"] = "USER"
 	claims["scopes"] = "prn:pantahub.com:apis:/base/all"
+	claims["orig_iat"] = time.Now().Unix()
 
 	tokenString, err := token.SignedString(jwtSecret)
 

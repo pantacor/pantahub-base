@@ -1,0 +1,43 @@
+#!/bin/sh
+set -e
+
+apk add --no-cache curl > /dev/null 2>&1
+
+# Build crontab from K8s cronjob schedules
+# Uses PANTAHUB_SA_ADMIN_SECRET from env for Basic Auth
+
+PANTAHUB_API="http://base:12365"
+AUTH="saadmin:${PANTAHUB_SA_ADMIN_SECRET}"
+GC_API="${PANTAHUB_GC_API:-http://gc:2000}"
+
+cat > /etc/crontabs/root <<EOF
+# pv-pantahub-publicdevices-cronjob (every 15 minutes)
+*/15 * * * * curl -sf -X PUT -u "${AUTH}" "${PANTAHUB_API}/cron/public/devices" > /proc/1/fd/1 2>&1
+
+# pv-pantahub-publicsteps-cronjob (every 15 minutes)
+*/15 * * * * curl -sf -X PUT -u "${AUTH}" "${PANTAHUB_API}/cron/public/steps" > /proc/1/fd/1 2>&1
+
+# pv-pantahub-gc-cronjob (minute 57 every hour)
+57 * * * * curl -sf -X PUT "${GC_API}/cron" > /proc/1/fd/1 2>&1
+EOF
+
+echo "Cronjobs installed:"
+cat /etc/crontabs/root
+
+# Wait for dependencies to be ready before initial run
+echo "Waiting for services to be ready..."
+for i in $(seq 1 30); do
+    if curl -s -o /dev/null -w '' "${PANTAHUB_API}/"; then
+        break
+    fi
+    sleep 2
+done
+
+# Run all cronjobs once at startup
+echo "Running all cronjobs once at startup..."
+curl -sf -X PUT -u "${AUTH}" "${PANTAHUB_API}/cron/public/devices" 2>&1 || echo "publicdevices: failed or not ready"
+curl -sf -X PUT -u "${AUTH}" "${PANTAHUB_API}/cron/public/steps" 2>&1 || echo "publicsteps: failed or not ready"
+curl -sf -X PUT "${GC_API}/cron" 2>&1 || echo "gc: failed or not ready"
+echo "Startup run complete."
+
+exec crond -f -l 2

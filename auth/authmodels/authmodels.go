@@ -17,6 +17,7 @@ type TokenResponse struct {
 	State       string `json:"state,omitempty"`
 	TokenType   string `json:"token_type,omitempty"`
 	Scopes      string `json:"scopes,omitempty"`
+	ExpiresIn   int    `json:"expires_in,omitempty"`
 }
 
 type PasswordResetRequest struct {
@@ -65,6 +66,13 @@ type TokenStore struct {
 	Owner   string                 `json:"owner"`
 	Comment string                 `json:"comment"`
 	Claims  map[string]interface{} `json:"jwt-claims"`
+}
+
+// TokenRefreshRequest is sent by a service to refresh a user-on-behalf access
+// token it previously received via POST /auth/token. The caller must
+// authenticate as the service whose PRN matches the "aud" claim of Token.
+type TokenRefreshRequest struct {
+	Token string `json:"token"`
 }
 
 type LoginRequestPayload struct {

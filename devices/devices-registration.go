@@ -142,6 +142,19 @@ func (a *App) handleRegister(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
+	// Check device quota before creating device
+	quotaResult, err := CheckDeviceQuota(r.Context(), extensions.Owner, a.mongoClient, a.subService)
+	if err != nil {
+		utils.RestErrorWrapper(w, "Error checking device quota: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if quotaResult.Exceeded {
+		utils.RestErrorWrapperUser(w, "device quota exceeded",
+			"Device quota exceeded; delete some devices or request a quota bump from team@pantahub.com",
+			http.StatusForbidden)
+		return
+	}
+
 	secret := base64.RawStdEncoding.EncodeToString([]byte(extensions.NameSigByOwner))
 	device, err := createDevice(reqPayload.DeviceName, secret, extensions.Owner)
 	if err != nil {

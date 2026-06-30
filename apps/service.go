@@ -152,6 +152,7 @@ func (app *App) setupAPI() {
 		AccessControlAllowCredentials: true,
 		AccessControlMaxAge:           3600,
 	})
+	app.API.Use(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtMiddleware, Mongo: app.mongoClient})
 	app.API.Use(&rest.IfMiddleware{
 		Condition: needsAuth,
 		IfTrue:    app.jwtMiddleware,

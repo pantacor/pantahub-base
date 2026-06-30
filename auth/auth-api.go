@@ -764,6 +764,13 @@ func (a *App) handlePostToken(writer rest.ResponseWriter, r *rest.Request) {
 	tokenClaims["nick"] = userNick
 	tokenClaims["roles"] = userRoles
 	tokenClaims["type"] = userType
+	timeoutStr := utils.GetEnv(utils.EnvPantahubAuthorizeJWTTimeoutMinutes)
+	authorizeTimeout, err := strconv.Atoi(timeoutStr)
+	if err != nil {
+		authorizeTimeout = 1920
+	}
+	tokenClaims["exp"] = time.Now().Add(time.Minute * time.Duration(authorizeTimeout)).Unix()
+	tokenClaims["orig_iat"] = time.Now().Unix()
 
 	tokenString, err := token.SignedString(a.jwtMiddleware.Key)
 

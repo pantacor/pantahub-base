@@ -25,11 +25,9 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
-	petname "github.com/dustinkirkland/golang-petname"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -48,6 +46,7 @@ type challengePayload struct {
 // @Param body body challengePayload true "Device payload"
 // @Success 200 {object} Device
 // @Failure 400 {object} utils.RError
+// @Failure 403 {object} utils.RError
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /devices/{id} [put]
@@ -169,11 +168,26 @@ func (a *App) handlePutDevice(w rest.ResponseWriter, r *rest.Request) {
 	/* in case someone claims the device like this, update owner */
 	if len(challenge) > 0 {
 		if challenge == challengeVal {
+			// Check device quota before claiming device if it's currently unowned
+			if owner == "" {
+				quotaResult, err := CheckDeviceQuota(r.Context(), authID.(string), a.mongoClient, a.subService)
+				if err != nil {
+					utils.RestErrorWrapper(w, "Error checking device quota: "+err.Error(), http.StatusInternalServerError)
+					return
+				}
+				if quotaResult.Exceeded {
+					utils.RestErrorWrapperUser(w, "device quota exceeded",
+						"Device quota exceeded; delete some devices or request a quota bump from team@pantahub.com",
+						http.StatusForbidden)
+					return
+				}
+			}
+
 			newDevice.Owner = authID.(string)
 			newDevice.Challenge = ""
 			// if device had no proper nick, we assign one.
 			if strings.HasPrefix(newDevice.Nick, "__unregistered__") {
-				newDevice.Nick = petname.Generate(3, "_")
+				newDevice.Nick = GenerateDeviceNick()
 			}
 		} else {
 			utils.RestErrorWrapper(w, "No Access to Device", http.StatusForbidden)
@@ -194,13 +208,31 @@ func (a *App) handlePutDevice(w rest.ResponseWriter, r *rest.Request) {
 	newDevice.TimeModified = time.Now()
 	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
-	updateOptions := options.Update()
-	updateOptions.SetUpsert(true)
+
+	// Build update document to avoid overwriting sensitive fields accidentally
+	// and to ensure we don't clobber metadata we didn't intend to change.
+	updateDoc := bson.M{
+		"$set": bson.M{
+			"nick":         newDevice.Nick,
+			"secret":       newDevice.Secret,
+			"ispublic":     newDevice.IsPublic,
+			"timemodified": newDevice.TimeModified,
+			"challenge":    newDevice.Challenge,
+			"owner":        newDevice.Owner,
+		},
+	}
+
+	// Only update metadata if we are the authorized party for that metadata
+	if callerIsDevice {
+		updateDoc["$set"].(bson.M)["device-meta"] = newDevice.DeviceMeta
+	} else {
+		updateDoc["$set"].(bson.M)["user-meta"] = newDevice.UserMeta
+	}
+
 	_, err = collection.UpdateOne(
 		ctx,
 		bson.M{"_id": newDevice.ID},
-		bson.M{"$set": newDevice},
-		updateOptions,
+		updateDoc,
 	)
 	if err != nil {
 		utils.RestErrorWrapper(w, "error updating device: "+err.Error(), http.StatusBadRequest)

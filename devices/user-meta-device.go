@@ -94,6 +94,8 @@ func (a *App) handlePatchUserData(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "Error parsing data: "+err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	// 1. Quote the BSON keys first to handle dots in key names (e.g. "lo.ipv4")
 	data = utils.BsonQuoteMap(&data)
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
@@ -104,24 +106,22 @@ func (a *App) handlePatchUserData(w rest.ResponseWriter, r *rest.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
-	var device Device
-	err = collection.FindOne(ctx,
-		bson.M{
-			"_id":     deviceID,
-			"garbage": bson.M{"$ne": true},
-		}).
-		Decode(&device)
 
-	if err != nil && mongoutils.IsNotFound(err) {
-		utils.RestErrorWrapper(w, "Device not found", http.StatusNotFound)
-		return
+	setFields := bson.M{}
+	unsetFields := bson.M{}
+
+	// 2. Deep flatten the quoted data to allow atomic nested updates
+	flattenMap("user-meta", data, setFields, unsetFields)
+
+	// Always update timemodified
+	setFields["timemodified"] = time.Now()
+
+	updateDoc := bson.M{}
+	if len(setFields) > 0 {
+		updateDoc["$set"] = setFields
 	}
-	if err != nil {
-		utils.RestErrorWrapper(w, "error finding device "+err.Error(), http.StatusBadRequest)
-		return
-	}
-	for k, v := range data {
-		device.UserMeta[k] = v
+	if len(unsetFields) > 0 {
+		updateDoc["$unset"] = unsetFields
 	}
 
 	updateResult, err := collection.UpdateOne(
@@ -130,17 +130,14 @@ func (a *App) handlePatchUserData(w rest.ResponseWriter, r *rest.Request) {
 			"_id":   deviceID,
 			"owner": owner.(string),
 		},
-		bson.M{"$set": bson.M{
-			"user-meta":    device.UserMeta,
-			"timemodified": time.Now(),
-		}},
+		updateDoc,
 	)
-	if updateResult.MatchedCount == 0 {
-		utils.RestErrorWrapper(w, "Error updating device user-meta: not found", http.StatusBadRequest)
-		return
-	}
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if updateResult.MatchedCount == 0 {
+		utils.RestErrorWrapper(w, "Error updating device user-meta: not found", http.StatusBadRequest)
 		return
 	}
 
@@ -217,17 +214,9 @@ func (a *App) handlePutUserData(w rest.ResponseWriter, r *rest.Request) {
 		query["owner"] = owner.(string)
 	}
 
-	var device Device
-	err = collection.FindOne(ctx, query).Decode(&device)
-	if err != nil && mongoutils.IsNotFound(err) {
-		utils.RestErrorWrapper(w, "Device not found", http.StatusNotFound)
-		return
-	}
-	if err != nil {
-		utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
-		return
-	}
-
+	// For PUT, we replace the whole user-meta object.
+	// We do this via $set on the specific field to avoid Read-Modify-Write races
+	// on the rest of the device document.
 	updateResult, err := collection.UpdateOne(
 		ctx,
 		query,
@@ -236,12 +225,12 @@ func (a *App) handlePutUserData(w rest.ResponseWriter, r *rest.Request) {
 			"timemodified": time.Now(),
 		}},
 	)
-	if updateResult.MatchedCount == 0 {
-		utils.RestErrorWrapper(w, "Error updating device user-meta: not found", http.StatusBadRequest)
-		return
-	}
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if updateResult.MatchedCount == 0 {
+		utils.RestErrorWrapper(w, "Error updating device user-meta: not found", http.StatusBadRequest)
 		return
 	}
 

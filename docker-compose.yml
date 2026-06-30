@@ -2,6 +2,7 @@ services:
     base:
         networks:
             - base
+            - external
         container_name: api
         build:
             context: .
@@ -13,14 +14,21 @@ services:
             - pvr
         depends_on:
             - pvr
-            - elasticsearch
             - fluentd
+            - gc
+            - elasticsearch
         ports:
             - 12365:12365
             - 12366:12366
         env_file:
             - ./env.default
             - ./.env.local
+        # Serve objects from the local-s3 mount instead of proxying to Scaleway
+        # (large objects stall over that connection in dev). Seeded from
+        # mocks/miele. Revert by removing this block + recreating `base`.
+        environment:
+            - PANTAHUB_STORAGE_DRIVER=local
+            - PANTAHUB_S3PATH=/local-s3
 
     gc:
         networks:
@@ -41,13 +49,13 @@ services:
     pvr:
         networks:
             - base
+            - external
         image: registry.gitlab.com/pantacor/pantahub-pvr:latest
         environment:
             - PANTAHUB_API_HOST=http://base:12365
         links:
             - mongo
             - fluentd
-            - elasticsearch
             - phs
             - localstack
         depends_on:
@@ -91,20 +99,25 @@ services:
         volumes:
             - ${PWD}/entrypoints/phs-entrypoint:/docker-entrypoint
         environment:
+            - JAVA_OPTS=-XX:-UseContainerSupport
             - PANTAHUB_KAFKA_HOSTPORT=kafka:9092
             - PANTAHUB_SCHEMAREGISTRY_URL=http://kafka-schema-registry:8081
             - PANTAHUB_KAFKA_TOPIC_FLUENTD=fluentd-api
             - PANTAHUB_KAFKA_STREAMS_ID=ph-device-summary
             - PANTAHUB_KAFKA_TOPIC_SUMMARY=ph-device-summary-short
-            - PANTAHUB_KAFKA_TOPIC_PREFIX=pantabase-serv.pantabase-serv
+            - PANTAHUB_KAFKA_TOPIC_PREFIX=pantabase1.pantabase-serv
         links:
             - kafka
             - kafka-schema-registry
             - kafka-connect
         depends_on:
-            - kafka
-            - kafka-schema-registry
-            - kafka-connect
+            kafka:
+                condition: service_started
+            kafka-schema-registry:
+                condition: service_started
+            kafka-connect:
+                condition: service_healthy
+        restart: on-failure
         command: /docker-entrypoint
 
     fluentd:
@@ -120,8 +133,6 @@ services:
             - FLUENT_ELASTICSEARCH_PORT=9200
         volumes:
             - ./fluentd.localhost.conf:/fluentd/etc/fluent.conf
-        depends_on:
-            - elasticsearch
 
     elasticsearch:
         networks:
@@ -156,6 +167,7 @@ services:
             - elastic-data:/usr/share/elasticsearch/data
 
     kibana:
+        profiles: ["logs"]
         networks:
             - base
         image: docker.elastic.co/kibana/kibana:8.17.2
@@ -272,12 +284,13 @@ services:
         environment:
             - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
             - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+            - KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:9092
             - KAFKA_BROKER_ID=1
             - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
             - KAFKA_DEFAULT_REPLICATION_FACTOR=1
             - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
             - KAFKA_DELETE_TOPIC_ENABLE=true
-            - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+            - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT
             - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
         ports:
             - 9092:9092
@@ -311,6 +324,12 @@ services:
         networks:
             - base
         image: registry.gitlab.com/pantacor/kafka-connect-with-plugins:5.4.3
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8083/"]
+            interval: 10s
+            timeout: 5s
+            retries: 12
+            start_period: 30s
         ulimits:
             nofile:
                 soft: 65536
@@ -351,7 +370,7 @@ services:
     kafka-rest:
         networks:
             - base
-        image: confluentinc/cp-kafka-rest
+        image: confluentinc/cp-kafka-rest:5.4.3
         ulimits:
             nofile:
                 soft: 65536
@@ -360,7 +379,7 @@ services:
             - KAFKA_REST_BOOTSTRAP_SERVERS=kafka:9092
             - KAFKA_REST_HOST_NAME=kafka-rest
             - KAFKA_REST_ZOOKEEPER_CONNECT=zookeeper:2181
-            - KAFKA_REST_LISTENERS=http://kafka-rest:8083
+            - KAFKA_REST_LISTENERS=http://0.0.0.0:8082
         links:
             - kafka
             - zookeeper
@@ -395,6 +414,24 @@ services:
             - "/var/run/docker.sock:/var/run/docker.sock"
             - ${PWD}/.data/localstack:/tmp/localstack/data
 
+    cronjobs:
+        networks:
+            - base
+            - external
+        image: alpine:3.19
+        entrypoint: /entrypoint
+        depends_on:
+            - base
+            - gc
+        volumes:
+            - ${PWD}/entrypoints/cronjobs-entrypoint:/entrypoint:ro
+        env_file:
+            - ./env.default
+            - ./.env.local
+        environment:
+            - PANTAHUB_GC_API=http://gc:2000
+        restart: unless-stopped
+
     nginx:
         image: nginx:alpine
         volumes:
@@ -408,6 +445,9 @@ services:
 
 networks:
     base:
+        driver: bridge
+        internal: true
+    external:
         driver: bridge
 
 volumes:
