@@ -527,6 +527,45 @@ func (s *elasticLogger) postLogsv1(parentCtx context.Context, e []Entry, debug b
 		return errors.New("WARNING: elasticsearch log entry failed " + response.Status() + "\nReturned Body: " + string(response.Body()))
 	}
 
+	// Elasticsearch _bulk returns HTTP 200 even when individual documents
+	// fail to index (e.g. es_rejected_execution_exception write-queue
+	// rejections on big batches, or max_bytes_length_exceeded_exception when
+	// a msg field exceeds the keyword 32KB limit). Those per-item failures
+	// live in the response body and must be inspected explicitly; otherwise
+	// entries are dropped silently while the handler still replies ok.
+	var bulkResp struct {
+		Errors bool `json:"errors"`
+		Items  []map[string]struct {
+			Status int             `json:"status"`
+			Error  json.RawMessage `json:"error"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(response.Body(), &bulkResp); err != nil {
+		return fmt.Errorf("WARNING: elasticsearch _bulk response could not be parsed: %s\nReturned Body: %s", err, string(response.Body()))
+	}
+
+	if bulkResp.Errors {
+		failed := 0
+		firstError := ""
+		for _, item := range bulkResp.Items {
+			for _, result := range item {
+				if result.Status >= 300 || len(result.Error) > 0 {
+					failed++
+					if firstError == "" && len(result.Error) > 0 {
+						firstError = string(result.Error)
+					}
+				}
+			}
+		}
+		const maxSample = 512
+		if len(firstError) > maxSample {
+			firstError = firstError[:maxSample]
+		}
+		msg := fmt.Sprintf("WARNING: elasticsearch _bulk indexed with errors: %d of %d entries failed; first error: %s", failed, len(bulkResp.Items), firstError)
+		log.Println(msg)
+		return errors.New(msg)
+	}
+
 	return nil
 }
 
