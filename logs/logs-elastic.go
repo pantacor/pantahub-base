@@ -443,6 +443,25 @@ func (s *elasticLogger) postLogsv2(_ context.Context, e []Entry, _ bool) error {
 	return nil
 }
 
+// elasticBulkItemResult is the per-item result inside an Elasticsearch _bulk
+// response. Status is the item's HTTP-style status and Error carries the
+// failure type/reason when the item was not indexed.
+type elasticBulkItemResult struct {
+	Status int `json:"status"`
+	Error  struct {
+		Type   string `json:"type"`
+		Reason string `json:"reason"`
+	} `json:"error"`
+}
+
+// elasticBulkResponse is the subset of the _bulk response we inspect to detect
+// per-item indexing failures: the API returns HTTP 200 even when individual
+// documents fail, and those failures live per item under Items.
+type elasticBulkResponse struct {
+	Errors bool                               `json:"errors"`
+	Items  []map[string]elasticBulkItemResult `json:"items"`
+}
+
 func (s *elasticLogger) postLogsv1(parentCtx context.Context, e []Entry, debug bool) error {
 	if !s.works {
 		return errors.New("logger not initialized/works")
@@ -533,27 +552,27 @@ func (s *elasticLogger) postLogsv1(parentCtx context.Context, e []Entry, debug b
 	// a msg field exceeds the keyword 32KB limit). Those per-item failures
 	// live in the response body and must be inspected explicitly; otherwise
 	// entries are dropped silently while the handler still replies ok.
-	var bulkResp struct {
-		Errors bool `json:"errors"`
-		Items  []map[string]struct {
-			Status int             `json:"status"`
-			Error  json.RawMessage `json:"error"`
-		} `json:"items"`
-	}
+	var bulkResp elasticBulkResponse
 	if err := json.Unmarshal(response.Body(), &bulkResp); err != nil {
 		return fmt.Errorf("WARNING: elasticsearch _bulk response could not be parsed: %s\nReturned Body: %s", err, string(response.Body()))
 	}
 
 	if bulkResp.Errors {
-		failed := 0
+		failed, permanent, transient := 0, 0, 0
 		firstError := ""
 		for _, item := range bulkResp.Items {
 			for _, result := range item {
-				if result.Status >= 300 || len(result.Error) > 0 {
-					failed++
-					if firstError == "" && len(result.Error) > 0 {
-						firstError = string(result.Error)
-					}
+				if result.Status < 300 && result.Error.Type == "" {
+					continue
+				}
+				failed++
+				if firstError == "" && result.Error.Type != "" {
+					firstError = fmt.Sprintf("%s: %s", result.Error.Type, result.Error.Reason)
+				}
+				if isTransientBulkError(result.Status, result.Error.Type) {
+					transient++
+				} else {
+					permanent++
 				}
 			}
 		}
@@ -561,12 +580,45 @@ func (s *elasticLogger) postLogsv1(parentCtx context.Context, e []Entry, debug b
 		if len(firstError) > maxSample {
 			firstError = firstError[:maxSample]
 		}
-		msg := fmt.Sprintf("WARNING: elasticsearch _bulk indexed with errors: %d of %d entries failed; first error: %s", failed, len(bulkResp.Items), firstError)
-		log.Println(msg)
+		msg := fmt.Sprintf("elasticsearch _bulk indexed with errors: %d of %d entries failed (%d permanent, %d transient); first error: %s",
+			failed, len(bulkResp.Items), permanent, transient, firstError)
+
+		// A permanent per-item failure (mapper_parsing_exception,
+		// max_bytes_length_exceeded_exception, illegal_argument_exception, ...)
+		// will never index no matter how often the batch is resent. Returning
+		// an error here would wedge the device: ph_logger does not advance its
+		// saved log-file position on a failed push, so it would resend the same
+		// "poison" batch forever -- re-indexing the healthy items as duplicates
+		// and never uploading newer logs. So we drop-and-log the permanent
+		// failures and reply ok, letting the device advance past the batch.
+		// Only when *every* failure is transient (es_rejected_execution_exception
+		// / 429 write-queue pressure, unavailable shards, ...) do we return an
+		// error, because resending the same batch can then still succeed.
+		if permanent > 0 {
+			log.Printf("WARNING: dropping %d unindexable log entr(ies); %s", permanent, msg)
+			return nil
+		}
+		log.Printf("WARNING: %s", msg)
 		return errors.New(msg)
 	}
 
 	return nil
+}
+
+// isTransientBulkError reports whether an Elasticsearch _bulk per-item failure
+// is retryable (transient backpressure) versus a permanent rejection of the
+// document's content. Transient failures clear on a resend; permanent ones do
+// not, so the caller must not block the device's log stream on them.
+func isTransientBulkError(status int, errType string) bool {
+	switch errType {
+	case "es_rejected_execution_exception",
+		"unavailable_shards_exception",
+		"circuit_breaking_exception",
+		"cluster_block_exception",
+		"no_shard_available_action_exception":
+		return true
+	}
+	return status == http.StatusTooManyRequests || status == http.StatusServiceUnavailable
 }
 
 // NewElasticLogger uses environment settings to
