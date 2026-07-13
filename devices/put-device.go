@@ -229,6 +229,11 @@ func (a *App) handlePutDevice(w rest.ResponseWriter, r *rest.Request) {
 		updateDoc["$set"].(bson.M)["user-meta"] = newDevice.UserMeta
 	}
 
+	if newDevice.IsPublic != isPublic {
+		// clear the flag so the kafka listener re-syncs steps
+		updateDoc["$set"].(bson.M)["mark_public_processed"] = false
+	}
+
 	_, err = collection.UpdateOne(
 		ctx,
 		bson.M{"_id": newDevice.ID},

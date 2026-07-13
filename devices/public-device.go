@@ -98,18 +98,25 @@ func (a *App) handlePutPublic(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
+	wasPublic := newDevice.IsPublic
 	newDevice.IsPublic = true
 	newDevice.TimeModified = time.Now()
+
+	setFields := bson.M{
+		"ispublic":     newDevice.IsPublic,
+		"timemodified": newDevice.TimeModified,
+	}
+	if !wasPublic {
+		// clear the flag so the kafka listener re-syncs steps
+		setFields["mark_public_processed"] = false
+	}
 
 	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	_, err = collection.UpdateOne(
 		ctx,
 		bson.M{"_id": newDevice.ID},
-		bson.M{"$set": bson.M{
-			"ispublic":     newDevice.IsPublic,
-			"timemodified": newDevice.TimeModified,
-		}},
+		bson.M{"$set": setFields},
 	)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error updating device public state", http.StatusForbidden)
@@ -188,18 +195,25 @@ func (a *App) handleDeletePublic(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
+	wasPublic := newDevice.IsPublic
 	newDevice.IsPublic = false
 	newDevice.TimeModified = time.Now()
+
+	setFields := bson.M{
+		"ispublic":     newDevice.IsPublic,
+		"timemodified": newDevice.TimeModified,
+	}
+	if wasPublic {
+		// clear the flag so the kafka listener re-syncs steps
+		setFields["mark_public_processed"] = false
+	}
 
 	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	_, err = collection.UpdateOne(
 		ctx,
 		bson.M{"_id": newDevice.ID},
-		bson.M{"$set": bson.M{
-			"ispublic":     newDevice.IsPublic,
-			"timemodified": newDevice.TimeModified,
-		}},
+		bson.M{"$set": setFields},
 	)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error updating device public state", http.StatusForbidden)
