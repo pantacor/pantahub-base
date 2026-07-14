@@ -1,4 +1,42 @@
 
+<a name="049"></a>
+## [049](https://gitlab.com/pantacor/pantahub-base/compare/048...049)
+
+> 2026-07-13
+
+### Feat
+
+* support HTTP Basic Auth on POST /auth/login
+* HTTP Basic Auth → Bearer JWT translation middleware
+
+### Feature
+
+* add MetaModified field to Device struct
+* device export should buffer and calculate the sha
+* add devicemetamodified
+* add /auth/token/refresh for service-issued tokens
+
+### Fix
+
+* update golang-petname dependency
+* require service identity to refresh service-issued tokens
+* bson quote and unquote does walk the whole json
+* subscriptions is admin, allow token with roles or type admin
+* reset mark_public_processed when device ispublic changes
+* add cronjobs into the docker-compose
+* use a create device nick function
+* create a retry and change the nick in case of colision
+* make the device nick less prone to collitions
+* set defaullt for authorize token to 5 days
+* token refresh use the jwt authorize timeout
+* **logs:** drop-and-log permanent _bulk failures so devices don't stall
+* **logs:** detect elasticsearch _bulk per-item errors so large batches are not silently dropped
+
+### Refactor
+
+* bson tool have less point with the string to replace
+
+
 <a name="048"></a>
 ## [048](https://gitlab.com/pantacor/pantahub-base/compare/047...048)
 
