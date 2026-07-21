@@ -130,7 +130,22 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		w.Header().Add("Content-Disposition", "attachment; filename=\""+objClaims.DispositionName+"\"")
-		w.Header().Add("Content-Length", fmt.Sprintf("%d", objClaims.Size))
+		w.Header().Add("Accept-Ranges", "bytes")
+
+		// forward the client's Range header (if any) to S3 so that partial
+		// downloads can be resumed by the client after a network disruption
+		rangeHeader := r.Header.Get("Range")
+
+		requestObject := func(url string) (*http.Response, error) {
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+			if err != nil {
+				return nil, err
+			}
+			if rangeHeader != "" {
+				req.Header.Set("Range", rangeHeader)
+			}
+			return http.DefaultClient.Do(req)
+		}
 
 		var s3resp *http.Response
 		downloadUrl := ""
@@ -145,7 +160,7 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			s3resp, err = http.Get(downloadUrl)
+			s3resp, err = requestObject(downloadUrl)
 			if err != nil {
 				msg := fmt.Sprintf("ERROR: requesting download file, %v\n", err)
 				utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
@@ -164,7 +179,7 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 
-				s3resp, err = http.Get(downloadUrl)
+				s3resp, err = requestObject(downloadUrl)
 				if err != nil {
 					msg := fmt.Sprintf("ERROR: requesting download file, %v\n", err)
 					utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
@@ -177,18 +192,38 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				} else {
 					msg := fmt.Sprintf("ERROR: unexpected response from s3 server, status code %v\n", s3resp.StatusCode)
 					utils.LogError(msg, downloadUrl, s3resp.StatusCode)
+					s3resp.Body.Close()
 				}
 			}
 		}
 
-		if s3resp.StatusCode != http.StatusOK {
+		if s3resp.StatusCode != http.StatusOK && s3resp.StatusCode != http.StatusPartialContent {
 			msg := fmt.Sprintf("ERROR: unexpected response from s3 server, status code %v\ndownloadUrl: %s\n", s3resp.StatusCode, downloadUrl)
 			utils.HttpErrorWrapper(w, msg, s3resp.StatusCode)
+			s3resp.Body.Close()
 			return
 		}
+		defer s3resp.Body.Close()
 
 		w.Header().Add("PantahubCallTraceRegion", fmt.Sprintf("api=%s; data:%s", apiRegion, region))
-		io.CopyN(w, s3resp.Body, objClaims.Size)
+
+		// propagate the range response from S3 so the client knows it got
+		// a partial response and can resume from where it left off
+		if cr := s3resp.Header.Get("Content-Range"); cr != "" {
+			w.Header().Set("Content-Range", cr)
+		}
+
+		contentLength := s3resp.ContentLength
+		if contentLength < 0 {
+			contentLength = objClaims.Size
+		}
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", contentLength))
+
+		if s3resp.StatusCode == http.StatusPartialContent {
+			w.WriteHeader(http.StatusPartialContent)
+		}
+
+		io.Copy(w, s3resp.Body)
 		return
 	}
 
