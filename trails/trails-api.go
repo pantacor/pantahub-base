@@ -349,7 +349,30 @@ func GetStateObjects(
 		object, err := objectsApp.ResolveObjectWithLinks(ctx, owner, sha, autoLink)
 
 		if err != nil {
-			return nil, err
+			// A state routinely holds hundreds of objects, so returning the
+			// bare sentinel leaves no way to tell which one failed. Name the
+			// part and sha, and say what the condition actually means:
+			// ErrNoLinkTargetAvail describes the failed public-object
+			// fallback, not the real problem, which is that this owner has no
+			// usable copy of the object.
+			switch {
+			case errors.Is(err, objects.ErrNoLinkTargetAvail):
+				return nil, fmt.Errorf(
+					"state_object: no stored object for part %q (sha %s) under owner %s, and no public object available to link to: %w",
+					key, sha, owner, err)
+			case errors.Is(err, objects.ErrNoBackingFile):
+				return nil, fmt.Errorf(
+					"state_object: part %q (sha %s) is registered for owner %s but its content is missing from storage: %w",
+					key, sha, owner, err)
+			case errors.Is(err, mongo.ErrNoDocuments):
+				return nil, fmt.Errorf(
+					"state_object: no object registered for part %q (sha %s) under owner %s: %w",
+					key, sha, owner, err)
+			default:
+				return nil, fmt.Errorf(
+					"state_object: could not resolve part %q (sha %s) for owner %s: %w",
+					key, sha, owner, err)
+			}
 		}
 
 		// Save object
