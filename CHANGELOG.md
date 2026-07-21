@@ -1,8 +1,19 @@
 
+<a name="050"></a>
+## [050](https://gitlab.com/pantacor/pantahub-base/compare/049...050)
+
+> 2026-07-21
+
+### Fix
+
+* support HTTP Range requests on S3-backed object downloads
+* **trails:** name the object that cannot be resolved in a state
+
+
 <a name="049"></a>
 ## [049](https://gitlab.com/pantacor/pantahub-base/compare/048...049)
 
-> 2026-07-13
+> 2026-07-14
 
 ### Feat
 
