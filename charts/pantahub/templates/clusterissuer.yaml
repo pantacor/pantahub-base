@@ -17,8 +17,11 @@ spec:
       name: {{ .Values.ingress.letsencrypt.issuer }}-account-key
     solvers:
       - http01:
+          {{- if .Values.ingress.className }}
           ingress:
-            {{- with .Values.ingress.className }}
-            ingressClassName: {{ . }}
-            {{- end }}
+            ingressClassName: {{ .Values.ingress.className }}
+          {{- else }}
+          # empty selector: use the cluster's default ingress controller
+          ingress: {}
+          {{- end }}
 {{- end }}
