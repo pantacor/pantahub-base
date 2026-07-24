@@ -1,0 +1,355 @@
+# Kubernetes translation of docker-compose.yml.
+#
+# Service names are FIXED (mongo, kafka, fluentd, ...) because the entrypoint
+# scripts, connector configs and env defaults address services by those
+# hostnames, exactly like docker-compose does. Install at most one release per
+# namespace.
+
+global:
+  # storageClass for all PVCs ("" = cluster default)
+  storageClass: ""
+  # all default images are public, so no pull secrets are needed; this knob
+  # exists for private mirrors, e.g. imagePullSecrets: [{name: my-regcred}]
+  imagePullSecrets: []
+
+# ---------------------------------------------------------------------------
+# Shared pantahub environment (ConfigMap "pantahub-env"), consumed by base,
+# gc and the cronjobs. Mirrors env.default; override per deployment in a
+# values file (equivalent of .env.local).
+#
+# The JWT/JWE keys below are the well-known dev/testing keys from env.default.
+# REPLACE THEM for anything but a throwaway dev cluster.
+# ---------------------------------------------------------------------------
+env:
+  PANTAHUB_DISABLE_SIGN_UP: "false"
+  PANTAHUB_DISABLE_FORGOT_PASSWORD: "false"
+  PANTAHUB_DISABLE_EMAIL_PASSWORD_LOGIN: "false"
+  PANTAHUB_SCRYPT_SECRET: "ADD YOUR SECRET HERE"
+  PANTAHUB_JWT_SECRET: "LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFb2dJQkFBS0NBUUVBdWlnUU9PVFcva3o1THdzNzVuZ2k3QVhyWTZGaUFzQ3FCYTdPdEZSUkxvYzRuaGptCnhYR2Q0am5tdTYwMVlCTzdqTnd3MVVCOCt0OTJQdjduMXhvSFF1Z3RDeXMyL1IrSU4wWENvKzl4YUljRmVCeXcKcGcrOFVzOHFMcjBsRFFSaVErSi9KZnM1cTVrS1ovZ1kvdmY5ak1XeFcrVXN2cjVnNXRMWEZRK0NiZXBzbmVzeQpPRzlvR0NCckMyUHVlTytyWVlIOVhDb0J3cnVOWGk3Um9obUh3ZDZWa21ObURkTWRMMGhFd3Y0bGNTY0RRVWxICmZ6ZnRhdFp5Z2xRbmE1QjJYL00rQmh0MitWZ3dpSytOeTVJNkhaNTB6ZlRnSWYzL0FJaHVUelRSS2RlcVdwQnkKdld4RXJtU2xEN3kwT1JQTWpydVpqeXpTNG9IMEZQTFpYRDBqK1FJREFRQUJBb0lCQUVaQTZtWmVUcGpvT2I0OApVaDNYUnU2bUNVQ3ZYZ3JGNVNTQjVUWisvNmc4bGV4c1gyTXlUckJhdzY0ZVh4OWtNd3FrNnJVQVFtcDNQT3ZuClRWMkxVQ1E2OVF6YkFVU2p5c2Q1UjB5UkI4NjM3aU4zU0Y5VFh2SXRockRlNXdXem10WWR1M2g5Q0RXdmF4THoKdVpNM3lmTi9oRUMzQzV6c3dpczZkTHRaQUJNMG1UZ09pOFh6SlNwSElXUmtNTDNMN1BiNkY0eERQcDV2Q0FWMApRQVZqZXI2NVVUV1hiV3Vmb0d0L1JtWThFbzJzS2lqMU1IbnUvelJ4YjYvNFF0bkVtUlBmSnkvem5vVFFwVUlRCjVCd0JIdE5jWEtDOTByWXdNVGJsRXMxWFJ0TlF5WHBZSzY2V3N3b3VWclpRY1dybmp0b2R5ZnVsUWUvd3JqeFQKZ2JDaitwVUNnWUVBNSt5NnNNTEIxRHVsdmNTMEJidmh6MWYwZ1BXSVZGVGpxLzladzg2UlN1RDFWRytHc1pnRQpzNlBRN3UzNWJ2VGMxRUYzd21BVjBsQWFvTjlGVmE0SnBub2c0bzJmb3FlOE9XYXJNWjhJbElXMkVrdEo1L1ZlCnR3aXVZeGd6NkZzUU51UnF4NXJLTC9UQWlaKzN1QTd6RjJWb3BOWnlwSWFmWWJGRHhkdzY2eE1DZ1lFQXpYc1IKcEdNNzlWNk5LcFd5ZVlXa0NieG8xRWlnb2g2SDJ3Zm4wekczaWRVdTcxdURzS3ZkNENQWm1ycjdYbFVpOTVUSwpTblFWNlZoRmVDeEpNcjdPTU9pVk9mUlp4VzRpTmc2THpqSlhpcWdDNGQ5dll4TVpSMkNWL2Z1Sjh1b0JTc0JmCjRUTGIzSTNTd2hoajRhOHNoU2l5UmVnaFdXcEd1TXpaSEF4TnFrTUNnWUI2YnVFN1VRVUw2aFViOGd4cS9uMDkKZlJ3cE8vVWxOODhjekdkeDA4bWxzczR3TGRQNFN0MG9qREZQQUxmdDJEdi9uVFFBbThMSlROcFIxS3dBaUNpMgpCc0QzZUhZdVlzZ2RzVkpzbHB6cjh3NWo1L1R6Qy9oZFBhcjV5eHdUN0liSnc1bVBGK3JtbUJsUVRjMnB6OUtLCnBsRXd1N2kzbkEzbGY3UGNidDkzbXdLQmdDVkVRc2picm80cjNkSnhYL01tUjcvMFNkYm1iU3U1K2MzQnUwdlUKWW9NL0JNb29nTlBUOStPazNOeHhPUkc4d3lDLy9ZaFBVWUlHbm1MVE5WdGN1NnluSWhsbXRibFc1aUdEdGR0cAp5Zks5MGZnQlBBUnQvRkd6dE1CaGxIMVg3M0FOUDlacUVQSUpUc1loQWt4MkpzN251SjF4SWt0RE9SeGZHcWs1Cm1nUmRBb0dBVTIvTGtmVXA1cTlxaXozdWtDOGxpUW54aC9LTHpYSVJhT3FXdmtmd2N5NU9TT2RXVnpkWDV0d3YKdGQycnVsazFnVXk5OVlVWmowb3pzRll3cXlaZHppOUFsR3MxVkJjWkFWS08wbXk2cTRpSU9wMVJIczRWWjV0TApYSFRkSVFRMlJpeXVicmlGeHFYRzVRVzdJTWwvVm1DK2I0SlVCRm9UZ0dEZ21aa2d5S0k9Ci0tLS0tRU5EIFJTQSBQUklWQVRFIEtFWS0tLS0tCg=="
+  PANTAHUB_JWT_PUB: "LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0KTUlJQklqQU5CZ2txaGtpRzl3MEJBUUVGQUFPQ0FROEFNSUlCQ2dLQ0FRRUF1aWdRT09UVy9rejVMd3M3NW5naQo3QVhyWTZGaUFzQ3FCYTdPdEZSUkxvYzRuaGpteFhHZDRqbm11NjAxWUJPN2pOd3cxVUI4K3Q5MlB2N24xeG9IClF1Z3RDeXMyL1IrSU4wWENvKzl4YUljRmVCeXdwZys4VXM4cUxyMGxEUVJpUStKL0pmczVxNWtLWi9nWS92ZjkKak1XeFcrVXN2cjVnNXRMWEZRK0NiZXBzbmVzeU9HOW9HQ0JyQzJQdWVPK3JZWUg5WENvQndydU5YaTdSb2htSAp3ZDZWa21ObURkTWRMMGhFd3Y0bGNTY0RRVWxIZnpmdGF0WnlnbFFuYTVCMlgvTStCaHQyK1Znd2lLK055NUk2CkhaNTB6ZlRnSWYzL0FJaHVUelRSS2RlcVdwQnl2V3hFcm1TbEQ3eTBPUlBNanJ1Wmp5elM0b0gwRlBMWlhEMGoKK1FJREFRQUIKLS0tLS1FTkQgUFVCTElDIEtFWS0tLS0tCg=="
+  PANTAHUB_JWE_SECRET: "LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFcEFJQkFBS0NBUUVBMUY4Rk1KTElOTVdmUEJoSmVBVnd1cGlhZFk4SW5NQkdaY2trR3JqZG1jcU4vckFJCkV0bHFCbE5YT2RaanV6MklQVm9RMFB2L25VMEt5anJkR1JENHN2RkhFZEFqMkZnWWc4Y3B6ZHp0Z2c2aEpJNnIKSUJkMlAxR3hrQnF4ZlNlSDVrRE1JTzBrSWw4ZDBvRzZrVERNWmQyZlZxeFZFdTNmNG5RY08wU2ViUnJIODlVdwp6Rjg4NVAzaHZXbTRtM1g0ZGIvbjZyejFNckZrWlRVRnlJNXRTRms5V3c3V2RKam15WmZ3SGt0V085TG9OTjNUCkhBM2tLSWFtS1M2bEZMNTdOMldWKzNUY0Jnc0FERFFLdnpaZEtvUDd1dmd6MUVvTGwxTTY5TFZEc0dWSnh4QjQKTm1wbjVZRUJqZ296UlFZWWtTcWFGWXVIUEJmQkN0YytSN2VGNlFJREFRQUJBb0lCQUJUcEtrU25IMGw2Ny92bAoxRTRhRXdoOGdERDFIWDc1dTdUSUFtTVRNdGF5eUJwODBMNnlZNnN0eDVmdFVUS2RrMjJmRWFyU05WQVN4dTQwCnI1S0pSa093V0RRYnozdTg2T1VJMWtmcjZnTDFWODZXc2FqZVJvbGpqTjFJazVOa01oQnM3dXlMRFJUSlV0Rm8KYnF0Zko3RWNDbFZwY0pNRmt4YmtJZWVBRVMxaTJLUkl1bkdvNU80Tkkxa0s1MTNJTlp6bzFRK3BrZ3BzWXhZZwpHZFhxcS9lWFN2TzRNSjVJQkQ5QnZkQ0lnem1KL1ZzM29ZenNQeTRXMUVJempyWEZjcWV6akJBbEFzUVFCMElICkxacXkva3hBdWdsUkJybmxUVXQ3T2g4cGdqeGxWSWFmZlRnSnByVTJlZnFPR29TcGtJSmR6RDdkSy83emdzdGYKV2tXUGpRRUNnWUVBK3hEYktHRXM0RGM2TjNVUFFuL0ZGQ3hidTc0Q3puTFhPeFRubTNEQ21tU3d6OFhGalZReQpKblZXbEgyRHZETnVWVlErc1pydFZ5aklLa2FyUmk0Yk5JcXJocnFmUW5vaURzZmlnc1ZyVE8wSE90WnQ5ZExEClBySTlEcmNxRS9LTTZxR1VHd0hPZWV3dG9sL1lpenJNYU9ldlpsOEFmZzh1S1NyV1J0aG4wTWtDZ1lFQTJJdDgKaGV5REprQnRVditMMWd2VzEzZlVOTGxnaTVnMEU0MnFyMEJvMlJ0M0luSGt5TTl5UmxRWTJidVZxamQ1Y2ZFZwpISzZqYkVHM3BZbms5MDVBMzdpbzdreHFYeEZmZDlTTDhUQjUrWjRnUkkrRmhRVmZveGI0L1lnWjNuVmg5SmM1CktyajFVY3J4UWJRSzBLdzlod3FMaitJZ0lIVXNmVXk4eVEveXZDRUNnWUIzNTBYelUrMTlxNEtISjhYQTZZcHkKcHZpc2dnT1BHek9GU09lUHlkdDJwdTMyWEtxTFk1R0w0bkFWL0pla2t4OTNhd09DQ002ZTJLQTM2SVkxdnlGSgpCNDBCakRFeEsya0dqQm0yZ0poTkpjcFZKRUZockdXSWxORXFMUG5RaXY4WHMxRXJVTUtPWWVndGF2N2RCNWpGCjVSaFVtTHlBZDdtQSthOWFLRkgwV1FLQmdRQ0hxTE1GTDR0bURseXU3M3RLU0RaNjNBNHNUYXBIS2I0T05lVWwKVDRPZjU4MzEzVVpINjNZYXl4cWFaU000OVBIM1NPa21MdDRndHZiM0ZQRkZZVmZSRUYxOGxKRGJLQVlZQ3liMApuYnI4ZjJ5VnB4Z3RvcFVzbGZxODBtUHFjcjFBUHZESWJBRDhFZGljb2M5WXRWOENWNy9oRHZlemZkUzJWcm02CmVHeElJUUtCZ1FDdTNWcllVdmdvQkNsa24wR3pqYVBIZ0dRZkZQZjhMZEdTUXkyU255VStQSmEzU2J1UjNaSncKUVRjQ1lGRjlPc25ENjhPV0NrV2prR01xRXpjMTBuRDBOb2tYVmFBalZIbFEwVCtWYnA3YUFlWDhoVXpueXF2LwptZStYVHN3RDltZ1paUThYZWRsMFAxSXZlYkdRMUV3YVVqem9TRkpFbGFpNE1iTkd3cUduTHc9PQotLS0tLUVORCBSU0EgUFJJVkFURSBLRVktLS0tLQo="
+  PANTAHUB_JWE_PUB: "LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0KTUlJQklqQU5CZ2txaGtpRzl3MEJBUUVGQUFPQ0FROEFNSUlCQ2dLQ0FRRUExRjhGTUpMSU5NV2ZQQmhKZUFWdwp1cGlhZFk4SW5NQkdaY2trR3JqZG1jcU4vckFJRXRscUJsTlhPZFpqdXoySVBWb1EwUHYvblUwS3lqcmRHUkQ0CnN2RkhFZEFqMkZnWWc4Y3B6ZHp0Z2c2aEpJNnJJQmQyUDFHeGtCcXhmU2VINWtETUlPMGtJbDhkMG9HNmtURE0KWmQyZlZxeFZFdTNmNG5RY08wU2ViUnJIODlVd3pGODg1UDNodldtNG0zWDRkYi9uNnJ6MU1yRmtaVFVGeUk1dApTRms5V3c3V2RKam15WmZ3SGt0V085TG9OTjNUSEEza0tJYW1LUzZsRkw1N04yV1YrM1RjQmdzQUREUUt2elpkCktvUDd1dmd6MUVvTGwxTTY5TFZEc0dWSnh4QjRObXBuNVlFQmpnb3pSUVlZa1NxYUZZdUhQQmZCQ3RjK1I3ZUYKNlFJREFRQUIKLS0tLS1FTkQgUFVCTElDIEtFWS0tLS0tCg=="
+  PANTAHUB_USE_CAPTCHA: "false"
+  GOOGLE_CAPTCHA_SECRET: ""
+  GOOGLE_OAUTH_CLIENT_ID: ""
+  GOOGLE_OAUTH_CLIENT_SECRET: ""
+  GITHUB_OAUTH_CLIENT_ID: ""
+  GITHUB_OAUTH_CLIENT_SECRET: ""
+  GITLAB_OAUTH_CLIENT_ID: ""
+  GITLAB_OAUTH_CLIENT_SECRET: ""
+  ENTRAID_OAUTH_CLIENT_ID: ""
+  ENTRAID_OAUTH_CLIENT_SECRET: ""
+  PANTAHUB_AUTH_ALLOWED_DOMAINS: ""
+  PANTAHUB_DEMOACCOUNTS_PASSWORD_admin: ""
+  PANTAHUB_DEMOACCOUNTS_PASSWORD_user1: ""
+  PANTAHUB_DEMOACCOUNTS_PASSWORD_user2: ""
+  PANTAHUB_DEMOACCOUNTS_PASSWORD_user3: ""
+  PANTAHUB_DEMOACCOUNTS_PASSWORD_device1: ""
+  PANTAHUB_DEMOACCOUNTS_PASSWORD_service1: ""
+  PANTAHUB_HOST: "api.pantahub.com"
+  PANTAHUB_PORT: ""
+  PANTAHUB_SCHEME: "https"
+  PANTAHUB_HOST_WWW: "www.pantahub.com"
+  PANTAHUB_STORAGE_DRIVER: "local"
+  PANTAHUB_STORAGE_PATH: "/"
+  PANTAHUB_S3PATH: "../local-s3"
+  PANTAHUB_S3_USE_ANONYMOUS_CREDENTIALS: "false"
+  PANTAHUB_S3_ACCESS_KEY_ID: "foo"
+  PANTAHUB_S3_SECRET_ACCESS_KEY: "foo"
+  PANTAHUB_S3_REGION: "us-east-1"
+  PANTAHUB_S3_BUCKET: "testing"
+  PANTAHUB_S3_ENDPOINT: "http://localstack:4566"
+  MAILGUN_DOMAIN: ""
+  MAILGUN_APIKEY: ""
+  MAILGUN_PUBAPIKEY: ""
+  PANTAHUB_PRODUCTNAME: "pantahub-community"
+  ELASTIC_URL: "http://elasticsearch:9200"
+  PANTAHUB_ELASTIC_SHARDS: "5"
+  PANTAHUB_ELASTIC_REPLICAS: "1"
+  FLUENT_HOST: "fluentd"
+  FLUENT_PORT: "24224"
+  MONGO_HOST: "mongo"
+  MONGO_PORT: "27017"
+  MONGO_DB: "pantabase-serv"
+  MONGO_USER: "user"
+  MONGO_PASS: "pass"
+  SMTP_HOST: ""
+  SMTP_PORT: ""
+  SMTP_USER: ""
+  SMTP_PASS: ""
+  PH_AUTH: "https://api.pantahub.com/auth"
+  PANTAHUB_SA_ADMIN_SECRET: ""
+  PANTAHUB_GC_API: "http://gc:2000"
+  PANTAHUB_GC_REMOVE_GARBAGE: "true"
+  PANTAHUB_GC_UNCLAIMED_EXPIRY: "P5D"
+  PANTAHUB_GC_GARBAGE_EXPIRY: "P2D"
+
+# ---------------------------------------------------------------------------
+# Services (one block per docker-compose service)
+# ---------------------------------------------------------------------------
+
+base:
+  enabled: true
+  # docker-compose builds Dockerfile.development and live-mounts the source;
+  # in kubernetes you deploy a built image instead.
+  image: registry.gitlab.com/pantacor/pantahub-base
+  tag: develop
+  service:
+    type: ClusterIP
+  # per-service env overrides (compose "environment:" block)
+  env:
+    # the image entrypoint sources $ENVFILE (baked env.default by default),
+    # which would clobber the ConfigMap env — neutralize it
+    ENVFILE: "/dev/null"
+    PANTAHUB_STORAGE_DRIVER: "local"
+    PANTAHUB_S3PATH: "/local-s3"
+  persistence:
+    # /local-s3 object storage when PANTAHUB_STORAGE_DRIVER=local
+    size: 20Gi
+  resources: {}
+
+gc:
+  enabled: true
+  image: registry.gitlab.com/pantacor/pantahub-gc
+  tag: develop
+  env:
+    PANTAHUB_GC_UNCLAIMED_EXPIRY: "P5D"
+    PANTAHUB_GC_GARBAGE_EXPIRY: "P2D"
+    PANTAHUB_HOST: "base"
+    PANTAHUB_PORT: "12365"
+    PANTAHUB_GC_API: "http://gc:2000"
+  resources: {}
+
+pvr:
+  enabled: true
+  image: registry.gitlab.com/pantacor/pantahub-pvr
+  tag: latest
+  service:
+    type: ClusterIP
+  env:
+    PANTAHUB_API_HOST: "http://base:12365"
+  resources: {}
+
+www:
+  enabled: true
+  image: registry.gitlab.com/pantacor/pantahub-www
+  tag: devel
+  service:
+    type: ClusterIP
+  # REACT_APP_* set the www server consumes (from hub/ui's .env / env.www,
+  # minus billing/stripe which are not part of the open-source stack): the Go
+  # server injects every REACT_APP_* var into window.env at runtime and
+  # derives its CSP from the URL ones. The three base/www/pvr URLs are
+  # rewired automatically when ingress.domain is set.
+  env:
+    REACT_APP_TITLE: "PantacorHub DevBench"
+    # client-facing interfaces (defaults assume the port-forward workflow)
+    REACT_APP_API_URL: "http://localhost:12365"
+    REACT_APP_WWW_URL: "http://localhost:3000"
+    REACT_APP_PVR_URL: "http://localhost:12367"
+    REACT_APP_BLOG_URL: ""
+    REACT_APP_IMAGES_CI_CHANNEL: "release-candidate"
+    REACT_APP_SUPPORTED_DEVICES_URL: "https://pantavisor-ci.s3.amazonaws.com/pv-initial-devices/stable.json"
+    REACT_APP_REFRESH_RATE: "6000"
+    REACT_APP_CAPTCHA_SITE_KEY: ""
+    REACT_APP_HOSTED_LOGO: ""
+    REACT_APP_MIXPANEL_ID: ""
+    REACT_APP_MAIN_LOGO: ""
+    REACT_APP_GA_KEY: ""
+    REACT_APP_GTM_ID: ""
+    REACT_APP_SOCIAL_OAUTH_GOOGLE_DISABLE: "false"
+    REACT_APP_SOCIAL_OAUTH_GITLAB_DISABLE: "false"
+    REACT_APP_SOCIAL_OAUTH_GITHUB_DISABLE: "false"
+    REACT_APP_SOCIAL_OAUTH_DISABLE: "false"
+    REACT_APP_SERVICE_WORKER: "false"
+    REACT_APP_REDUX_DEBUG: "true"
+    SKIP_PREFLIGHT_CHECK: "true"
+    REACT_APP_DEBUG: "true"
+  resources: {}
+
+phs:
+  enabled: true
+  image: registry.gitlab.com/pantacor/pantahub-streams-devicesummary
+  tag: X64-develop
+  env:
+    JAVA_OPTS: "-XX:-UseContainerSupport"
+    PANTAHUB_KAFKA_HOSTPORT: "kafka:9092"
+    PANTAHUB_SCHEMAREGISTRY_URL: "http://kafka-schema-registry:8081"
+    PANTAHUB_KAFKA_TOPIC_FLUENTD: "fluentd-api"
+    PANTAHUB_KAFKA_STREAMS_ID: "ph-device-summary"
+    PANTAHUB_KAFKA_TOPIC_SUMMARY: "ph-device-summary-short"
+    PANTAHUB_KAFKA_TOPIC_PREFIX: "pantabase1.pantabase-serv"
+  resources: {}
+
+fluentd:
+  enabled: true
+  image: registry.gitlab.com/pantacor/cloud/fluentd-ph
+  tag: master
+  env:
+    FLUENT_ELASTICSEARCH_HOST: "elasticsearch"
+    FLUENT_ELASTICSEARCH_PORT: "9200"
+  # bounded by default: an unbounded fluentd buffer OOM-looped production
+  # (ce019, 2026-07); base treats fluentd as a hard startup dependency.
+  resources:
+    requests:
+      memory: 400Mi
+    limits:
+      memory: 1536Mi
+
+elasticsearch:
+  enabled: true
+  image: docker.elastic.co/elasticsearch/elasticsearch
+  tag: 8.17.2
+  # privileged initContainer that sets vm.max_map_count=262144 on the node
+  sysctlInit:
+    enabled: true
+  persistence:
+    size: 10Gi
+  resources:
+    limits:
+      memory: 1Gi
+
+kibana:
+  # compose keeps kibana behind the "logs" profile; off by default here too
+  enabled: false
+  image: docker.elastic.co/kibana/kibana
+  tag: 8.17.2
+  service:
+    type: ClusterIP
+  # xpack encryption keys rendered into kibana.yml (32+ chars each, e.g.
+  # `openssl rand -hex 16`). Defaults are the well-known dev keys —
+  # REPLACE THEM for anything but a throwaway dev cluster.
+  encryptionKeys:
+    encryptedSavedObjects: "706b827ddbcaa0ccc8330896cab5829d"
+    reporting: "9bc1ecfc178f6f4e5534b199d43e9f58"
+    security: "1d06883188ba212a0b4701219651426e"
+  resources: {}
+
+mongo:
+  enabled: true
+  image: mongo
+  tag: 4.4.3
+  # rs0 member names/ports are hardcoded in mongo-cluster-entrypoint;
+  # keep them in sync if you change anything here.
+  members:
+    - name: mongo
+      port: 27017
+      primary: true
+    - name: mongo2
+      port: 30002
+      primary: false
+    - name: mongo3
+      port: 30003
+      primary: false
+  # All mongo users are created by mongo-cluster-entrypoint on first
+  # bring-up and rendered into the kafka-connect connector configs, so each
+  # credential lives in exactly one place:
+  #   root user  -> mongo.env MONGO_INITDB_ROOT_USERNAME / _PASSWORD
+  #   app user   -> env MONGO_USER / MONGO_PASS (database env.MONGO_DB)
+  #   connectors -> mongo.connectUsers below
+  # Passwords end up inside mongodb:// connection URIs: stick to URL-safe
+  # characters (letters, digits, - _ . ~). Defaults are the well-known dev
+  # credentials — REPLACE THEM for anything but a throwaway dev cluster.
+  env:
+    MONGO_INITDB_ROOT_USERNAME: "admin"
+    MONGO_INITDB_ROOT_PASSWORD: "admin"
+    MONGO_RS: "rs0"
+  connectUsers:
+    # debezium source connector (pantabase.json), reads the oplog via admin
+    source:
+      username: "phskafkaconnectsource"
+      password: "pass"
+    # device-summary sink connectors, write to pantabase_devicesummary
+    sink:
+      username: "phskafkaconnectsink"
+      password: "pass"
+  # replica-set keyfile entries (Secret "pantahub-mongokey", mongod YAML
+  # keyfile format; list more than one key during rotation). Generate with
+  # `openssl rand -base64 32`. The default is the well-known dev key —
+  # REPLACE IT for anything but a throwaway dev cluster.
+  keyfileKeys:
+    - "62PQfye4Pdg89I45jcB/GxHNcoaGgLXP1ZOSh4QLttM="
+  persistence:
+    size: 10Gi
+  resources: {}
+
+zookeeper:
+  enabled: true
+  image: confluentinc/cp-zookeeper
+  tag: 5.4.3
+  resources: {}
+
+kafka:
+  enabled: true
+  image: confluentinc/cp-kafka
+  tag: 5.4.3
+  persistence:
+    size: 10Gi
+  resources: {}
+
+kafkaSchemaRegistry:
+  enabled: true
+  image: confluentinc/cp-schema-registry
+  tag: 5.4.3
+  resources: {}
+
+kafkaConnect:
+  enabled: true
+  image: registry.gitlab.com/pantacor/kafka-connect-with-plugins
+  tag: 5.4.3
+  resources: {}
+
+kafkaRest:
+  enabled: true
+  image: confluentinc/cp-kafka-rest
+  tag: 5.4.3
+  resources: {}
+
+localstack:
+  enabled: true
+  image: localstack/localstack
+  tag: 1.3.0
+  persistence:
+    # emptyDir when disabled — compose used a host bind mount
+    enabled: false
+    size: 5Gi
+  resources: {}
+
+cronjobs:
+  # native k8s CronJobs replacing the compose "cronjobs" crond container
+  enabled: true
+  image: curlimages/curl
+  tag: 8.11.1
+  publicDevicesSchedule: "*/15 * * * *"
+  publicStepsSchedule: "*/15 * * * *"
+  gcSchedule: "57 * * * *"
+
+ingress:
+  # Public, client-facing entry points (replaces the compose nginx proxy).
+  # Setting `domain` serves:
+  #   api.<domain> -> base (device/client API)
+  #   hub.<domain> -> www  (web UI)
+  #   pvr.<domain> -> pvr
+  # and automatically rewires PANTAHUB_HOST/PH_AUTH/REACT_APP_* to those URLs.
+  enabled: false
+  # "" uses the cluster's default IngressClass (traefik on stock k3s);
+  # set explicitly (e.g. "nginx") when running several controllers
+  className: ""
+  annotations: {}
+  domain: ""
+  # fallback hosts when domain is unset (local clusters)
+  apiHost: api.localhost
+  hubHost: hub.localhost
+  pvrHost: pvr.localhost
+  tls:
+    enabled: true
+    # cert-manager stores the issued certificate here
+    secretName: pantahub-tls
+  letsencrypt:
+    # annotate the ingress for cert-manager; requires cert-manager installed
+    enabled: true
+    issuer: letsencrypt-prod
+    # create the ClusterIssuer too (set an email for the ACME account)
+    createIssuer: true
+    email: ""
+    server: https://acme-v02.api.letsencrypt.org/directory

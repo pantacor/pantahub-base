@@ -1,0 +1,57 @@
+{{- if .Values.www.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: www
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "www") | nindent 4 }}
+spec:
+  type: {{ .Values.www.service.type }}
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+  selector:
+    {{- include "pantahub.selectorLabels" (dict "ctx" . "name" "www") | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: www
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "www") | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "pantahub.selectorLabels" (dict "ctx" . "name" "www") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "pantahub.labels" (dict "ctx" . "name" "www") | nindent 8 }}
+      annotations:
+        checksum/env: {{ include "pantahub.wwwEnv" . | sha256sum }}
+    spec:
+      enableServiceLinks: false
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: www
+          image: "{{ .Values.www.image }}:{{ .Values.www.tag }}"
+          env:
+            {{- include "pantahub.wwwEnv" . | nindent 12 }}
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          {{- with .Values.www.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

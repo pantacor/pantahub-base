@@ -1,0 +1,15 @@
+{
+  "name": "pantabasejsonmgo-steps",
+  "config": {
+    "connector.class": "com.mongodb.kafka.connect.MongoSourceConnector",
+    "key.converter.schemas.enable": "false",
+    "database": "{{ .Values.env.MONGO_DB }}",
+    "publish.full.document.only": "true",
+    "topic.prefix": "pantabasemgo",
+    "connection.uri": "mongodb://{{ .Values.mongo.env.MONGO_INITDB_ROOT_USERNAME }}:{{ .Values.mongo.env.MONGO_INITDB_ROOT_PASSWORD }}@mongo:27017/{{ .Values.env.MONGO_DB }}?authSource=admin&authMechanism=SCRAM-SHA-1",
+    "value.converter.schemas.enable": "false",
+    "collection": "pantahub_steps",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter"
+  }
+}

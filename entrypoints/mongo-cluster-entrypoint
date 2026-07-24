@@ -24,7 +24,7 @@ chmod 600 /keys/mongokey.yaml
   }"
 
   echo "Mongo Initializer: Initializing replica set..."
-  until mongo --port ${MONGO_PORT} --quiet --eval "rs.initiate($replicaSet).ok || rs.status().ok"; do
+  until mongo --port ${MONGO_PORT} --quiet --eval "quit((rs.initiate($replicaSet).ok || rs.status().ok) ? 0 : 1)"; do
     echo "Mongo Initializer: checking mongo replica set"
     sleep 2
   done

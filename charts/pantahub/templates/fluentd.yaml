@@ -1,0 +1,76 @@
+{{- if .Values.fluentd.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: fluentd
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "fluentd") | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: syslog
+      port: 5140
+      targetPort: 5140
+    - name: forward
+      port: 24224
+      targetPort: 24224
+      protocol: TCP
+    - name: forward-udp
+      port: 24224
+      targetPort: 24224
+      protocol: UDP
+  selector:
+    {{- include "pantahub.selectorLabels" (dict "ctx" . "name" "fluentd") | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fluentd
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "fluentd") | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "pantahub.selectorLabels" (dict "ctx" . "name" "fluentd") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "pantahub.labels" (dict "ctx" . "name" "fluentd") | nindent 8 }}
+      annotations:
+        checksum/config: {{ .Files.Get "files/fluentd/fluent.conf" | sha256sum }}
+    spec:
+      enableServiceLinks: false
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: fluentd
+          image: "{{ .Values.fluentd.image }}:{{ .Values.fluentd.tag }}"
+          env:
+            {{- include "pantahub.envMap" .Values.fluentd.env | nindent 12 }}
+          ports:
+            - containerPort: 5140
+            - containerPort: 24224
+              protocol: TCP
+            - containerPort: 24224
+              protocol: UDP
+          readinessProbe:
+            tcpSocket:
+              port: 24224
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          volumeMounts:
+            - name: fluentd-conf
+              mountPath: /fluentd/etc/fluent.conf
+              subPath: fluent.conf
+          {{- with .Values.fluentd.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: fluentd-conf
+          configMap:
+            name: pantahub-fluentd-conf
+{{- end }}

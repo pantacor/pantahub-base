@@ -1,0 +1,64 @@
+{{- if .Values.kafkaSchemaRegistry.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-schema-registry
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "kafka-schema-registry") | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8081
+      targetPort: 8081
+  selector:
+    {{- include "pantahub.selectorLabels" (dict "ctx" . "name" "kafka-schema-registry") | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-schema-registry
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "kafka-schema-registry") | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "pantahub.selectorLabels" (dict "ctx" . "name" "kafka-schema-registry") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "pantahub.labels" (dict "ctx" . "name" "kafka-schema-registry") | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: kafka-schema-registry
+          image: "{{ .Values.kafkaSchemaRegistry.image }}:{{ .Values.kafkaSchemaRegistry.tag }}"
+          env:
+            - name: SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS
+              value: "PLAINTEXT://kafka:9092"
+            - name: SCHEMA_REGISTRY_KAFKASTORE_GROUP_ID
+              value: "pantacor-dev"
+            - name: SCHEMA_REGISTRY_MASTER_ELIGIBILITY
+              value: "true"
+            - name: SCHEMA_REGISTRY_HOST_NAME
+              value: "kafka-schema-registry"
+            - name: JMX_PORT
+              value: "5555"
+          ports:
+            - containerPort: 8081
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8081
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          {{- with .Values.kafkaSchemaRegistry.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

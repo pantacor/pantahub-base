@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pantahub-env
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "pantahub-env") | nindent 4 }}
+data:
+  {{- include "pantahub.effectiveEnv" . | nindent 2 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pantahub-entrypoints
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "pantahub-entrypoints") | nindent 4 }}
+data:
+  {{- range $path, $_ := .Files.Glob "files/entrypoints/*" }}
+  {{ base $path }}: |
+{{ tpl ($.Files.Get $path) $ | indent 4 }}
+  {{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pantahub-fluentd-conf
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "fluentd") | nindent 4 }}
+data:
+  fluent.conf: |
+{{ .Files.Get "files/fluentd/fluent.conf" | indent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pantahub-kafka-connect-configs
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "kafka-connect") | nindent 4 }}
+data:
+  {{- range $path, $_ := .Files.Glob "files/connect-configs/*" }}
+  {{ base $path }}: |
+{{ tpl ($.Files.Get $path) $ | indent 4 }}
+  {{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pantahub-kibana-conf
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "kibana") | nindent 4 }}
+data:
+  kibana.yml: |
+{{ tpl (.Files.Get "files/kibana.yml") . | indent 4 }}
+---
+# Empty env file mounted over the gc image's baked /opt/ph/bin/env.default
+# (compose does the same with .env.local) so the ConfigMap env wins.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pantahub-empty-envfile
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "gc") | nindent 4 }}
+data:
+  env.default: ""
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pantahub-mongokey
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "mongo") | nindent 4 }}
+type: Opaque
+stringData:
+  # mongod YAML keyfile: one list entry per key (extra entries allow rotation)
+  mongokey.yaml: |
+    {{- range .Values.mongo.keyfileKeys }}
+    - {{ . | quote }}
+    {{- end }}

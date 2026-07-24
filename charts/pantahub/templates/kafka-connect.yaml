@@ -1,0 +1,107 @@
+{{- if .Values.kafkaConnect.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-connect
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "kafka-connect") | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8083
+      targetPort: 8083
+  selector:
+    {{- include "pantahub.selectorLabels" (dict "ctx" . "name" "kafka-connect") | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-connect
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "kafka-connect") | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "pantahub.selectorLabels" (dict "ctx" . "name" "kafka-connect") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "pantahub.labels" (dict "ctx" . "name" "kafka-connect") | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: kafka-connect
+          image: "{{ .Values.kafkaConnect.image }}:{{ .Values.kafkaConnect.tag }}"
+          command: ["/entrypoints/kafka-connect-entrypoint"]
+          env:
+            - name: CONNECT_REST_ADVERTISED_HOST_NAME
+              value: "kafka-connect"
+            - name: CONNECT_REST_PORT
+              value: "8083"
+            - name: CONNECT_PLUGIN_PATH
+              value: "/opt/plugins/,/usr/share/java/"
+            - name: CONNECT_BOOTSTRAP_SERVERS
+              value: "PLAINTEXT://kafka:9092"
+            - name: CONNECT_GROUP_ID
+              value: "pantacor-dev"
+            - name: CONNECT_OFFSET_STORAGE_TOPIC
+              value: "pantacor-cp-kafka-connect-offset-dev"
+            - name: CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR
+              value: "1"
+            - name: CONNECT_STATUS_STORAGE_TOPIC
+              value: "pantacor-cp-kafka-connect-status"
+            - name: CONNECT_STATUS_STORAGE_REPLICATION_FACTOR
+              value: "1"
+            - name: CONNECT_CONFIG_STORAGE_TOPIC
+              value: "pantacor-cp-kafka-connect-config-dev"
+            - name: CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR
+              value: "1"
+            - name: CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL
+              value: "http://kafka-schema-registry:8081"
+            - name: CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL
+              value: "http://kafka-schema-registry:8081"
+            - name: CONNECT_KEY_CONVERTER
+              value: "io.confluent.connect.avro.AvroConverter"
+            - name: CONNECT_VALUE_CONVERTER
+              value: "io.confluent.connect.avro.AvroConverter"
+            - name: CONNECT_INTERNAL_KEY_CONVERTER
+              value: "org.apache.kafka.connect.json.JsonConverter"
+            - name: CONNECT_INTERNAL_VALUE_CONVERTER
+              value: "org.apache.kafka.connect.json.JsonConverter"
+            - name: KAFKA_JMX_PORT
+              value: "5555"
+          ports:
+            - containerPort: 8083
+          # compose healthcheck: curl -f http://localhost:8083/
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8083
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 12
+          volumeMounts:
+            - name: entrypoints
+              mountPath: /entrypoints
+            - name: connect-configs
+              mountPath: /opt/kafka-connect-configs
+              readOnly: true
+          {{- with .Values.kafkaConnect.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: entrypoints
+          configMap:
+            name: pantahub-entrypoints
+            defaultMode: 0755
+        - name: connect-configs
+          configMap:
+            name: pantahub-kafka-connect-configs
+{{- end }}

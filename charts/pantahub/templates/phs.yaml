@@ -1,0 +1,43 @@
+{{- if .Values.phs.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: phs
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "phs") | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "pantahub.selectorLabels" (dict "ctx" . "name" "phs") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "pantahub.labels" (dict "ctx" . "name" "phs") | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: phs
+          image: "{{ .Values.phs.image }}:{{ .Values.phs.tag }}"
+          # entrypoint waits for the debezium connector + registered schemas,
+          # replacing compose's depends_on/service_healthy ordering
+          command: ["/entrypoints/phs-entrypoint"]
+          env:
+            {{- include "pantahub.envMap" .Values.phs.env | nindent 12 }}
+          volumeMounts:
+            - name: entrypoints
+              mountPath: /entrypoints
+          {{- with .Values.phs.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: entrypoints
+          configMap:
+            name: pantahub-entrypoints
+            defaultMode: 0755
+{{- end }}

@@ -1,0 +1,46 @@
+{{- if .Values.cronjobs.enabled }}
+{{- $root := . }}
+{{- $jobs := list
+  (dict "name" "pantahub-publicdevices" "schedule" .Values.cronjobs.publicDevicesSchedule "cmd" "curl -sf -X PUT -u \"saadmin:${PANTAHUB_SA_ADMIN_SECRET}\" http://base:12365/cron/public/devices")
+  (dict "name" "pantahub-publicsteps" "schedule" .Values.cronjobs.publicStepsSchedule "cmd" "curl -sf -X PUT -u \"saadmin:${PANTAHUB_SA_ADMIN_SECRET}\" http://base:12365/cron/public/steps")
+  (dict "name" "pantahub-gc" "schedule" .Values.cronjobs.gcSchedule "cmd" "curl -sf -X PUT ${PANTAHUB_GC_API:-http://gc:2000}/cron")
+}}
+{{- range $jobs }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" $root "name" .name) | nindent 4 }}
+spec:
+  schedule: {{ .schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 600
+      template:
+        metadata:
+          labels:
+            {{- include "pantahub.labels" (dict "ctx" $root "name" .name) | nindent 12 }}
+        spec:
+          restartPolicy: Never
+          enableServiceLinks: false
+      {{- with $root.Values.global.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          containers:
+            - name: curl
+              image: "{{ $root.Values.cronjobs.image }}:{{ $root.Values.cronjobs.tag }}"
+              envFrom:
+                - configMapRef:
+                    name: pantahub-env
+              command: ["/bin/sh", "-c"]
+              args:
+                - {{ .cmd | quote }}
+---
+{{- end }}
+{{- end }}

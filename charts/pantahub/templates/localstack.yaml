@@ -1,0 +1,108 @@
+{{- if .Values.localstack.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: localstack
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "localstack") | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: edge
+      port: 4566
+      targetPort: 4566
+    - name: legacy
+      port: 4599
+      targetPort: 4599
+  selector:
+    {{- include "pantahub.selectorLabels" (dict "ctx" . "name" "localstack") | nindent 4 }}
+---
+{{- if .Values.localstack.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-localstack
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "localstack") | nindent 4 }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  {{- with .Values.global.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.localstack.persistence.size }}
+---
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: localstack
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "localstack") | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "pantahub.selectorLabels" (dict "ctx" . "name" "localstack") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "pantahub.labels" (dict "ctx" . "name" "localstack") | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: localstack
+          image: "{{ .Values.localstack.image }}:{{ .Values.localstack.tag }}"
+          # docker-socket / lambda options from compose are dropped: only the
+          # s3 service is used by pantahub
+          env:
+            - name: SERVICES
+              value: "s3"
+            - name: DEFAULT_REGION
+              value: "us-east-1"
+            - name: AWS_DEFAULT_REGION
+              value: "us-east-1"
+            - name: BUCKET_NAME
+              value: "pantahub"
+            - name: HOSTNAME_EXTERNAL
+              value: "localstack"
+            - name: HOSTNAME
+              value: "localstack"
+            - name: USE_SSL
+              value: "false"
+            - name: DATA_DIR
+              value: "/data"
+            - name: DEBUG
+              value: "1"
+          ports:
+            - containerPort: 4566
+            - containerPort: 4599
+          readinessProbe:
+            httpGet:
+              path: /_localstack/health
+              port: 4566
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          volumeMounts:
+            - name: data
+              mountPath: /tmp/localstack/data
+          {{- with .Values.localstack.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: data
+          {{- if .Values.localstack.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: data-localstack
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+{{- end }}

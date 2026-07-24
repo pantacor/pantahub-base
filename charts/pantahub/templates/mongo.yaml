@@ -1,0 +1,111 @@
+{{- if .Values.mongo.enabled }}
+{{- $root := . }}
+{{- range .Values.mongo.members }}
+{{- $member := . }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $member.name }}
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" $root "name" $member.name) | nindent 4 }}
+spec:
+  # headless: rs.initiate requires the member hostname to resolve to the pod
+  # IP itself (a ClusterIP "does not map to this node" and mongod rejects it)
+  clusterIP: None
+  # resolvable before Ready, else a restarting member can't identify itself
+  # in the stored rs config and comes up REMOVED
+  publishNotReadyAddresses: true
+  ports:
+    - name: mongodb
+      port: {{ $member.port }}
+      targetPort: {{ $member.port }}
+  selector:
+    {{- include "pantahub.selectorLabels" (dict "ctx" $root "name" $member.name) | nindent 4 }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-{{ $member.name }}
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" $root "name" $member.name) | nindent 4 }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  {{- with $root.Values.global.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ $root.Values.mongo.persistence.size }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $member.name }}
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" $root "name" $member.name) | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "pantahub.selectorLabels" (dict "ctx" $root "name" $member.name) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "pantahub.labels" (dict "ctx" $root "name" $member.name) | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      {{- with $root.Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: mongo
+          image: "{{ $root.Values.mongo.image }}:{{ $root.Values.mongo.tag }}"
+          # the entrypoint chmods the keyfile, which a read-only secret mount
+          # forbids — copy it to an emptyDir first
+          command: ["/bin/sh", "-c"]
+          args:
+            - cp /keys-ro/mongokey.yaml /keys/mongokey.yaml &&
+              exec /entrypoints/{{ if $member.primary }}mongo-cluster-entrypoint{{ else }}mongo-cluster-secondary-entrypoint{{ end }}
+          env:
+            - name: MONGO_PORT
+              value: {{ $member.port | quote }}
+            {{- include "pantahub.envMap" $root.Values.mongo.env | nindent 12 }}
+          ports:
+            - containerPort: {{ $member.port }}
+          readinessProbe:
+            tcpSocket:
+              port: {{ $member.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          volumeMounts:
+            - name: data
+              mountPath: /data/db
+            - name: entrypoints
+              mountPath: /entrypoints
+            - name: mongokey-ro
+              mountPath: /keys-ro
+            - name: keys
+              mountPath: /keys
+          {{- with $root.Values.mongo.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: data-{{ $member.name }}
+        - name: entrypoints
+          configMap:
+            name: pantahub-entrypoints
+            defaultMode: 0755
+        - name: mongokey-ro
+          secret:
+            secretName: pantahub-mongokey
+        - name: keys
+          emptyDir: {}
+---
+{{- end }}
+{{- end }}

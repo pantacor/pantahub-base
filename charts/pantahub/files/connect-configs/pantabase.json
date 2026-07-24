@@ -1,0 +1,14 @@
+{
+	"name": "pantabase",
+	"config": {
+		"connector.class": "io.debezium.connector.mongodb.MongoDbConnector",
+		"mongodb.hosts": "rs0/mongo:27017",
+		"mongodb.name": "pantabase1",
+		"mongodb.user": "{{ .Values.mongo.connectUsers.source.username }}",
+		"mongodb.password": "{{ .Values.mongo.connectUsers.source.password }}",
+		"mongodb.authsource": "admin",
+		"database.whitelist": "{{ .Values.env.MONGO_DB }}",
+		"collection.whitelist": ".*pantahub_.*",
+		"snapshot.mode": "intitial"
+	}
+}

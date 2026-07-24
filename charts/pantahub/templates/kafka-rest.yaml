@@ -1,0 +1,61 @@
+{{- if .Values.kafkaRest.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-rest
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "kafka-rest") | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8082
+      targetPort: 8082
+  selector:
+    {{- include "pantahub.selectorLabels" (dict "ctx" . "name" "kafka-rest") | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-rest
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "kafka-rest") | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "pantahub.selectorLabels" (dict "ctx" . "name" "kafka-rest") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "pantahub.labels" (dict "ctx" . "name" "kafka-rest") | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: kafka-rest
+          image: "{{ .Values.kafkaRest.image }}:{{ .Values.kafkaRest.tag }}"
+          env:
+            - name: KAFKA_REST_BOOTSTRAP_SERVERS
+              value: "kafka:9092"
+            - name: KAFKA_REST_HOST_NAME
+              value: "kafka-rest"
+            - name: KAFKA_REST_ZOOKEEPER_CONNECT
+              value: "zookeeper:2181"
+            - name: KAFKA_REST_LISTENERS
+              value: "http://0.0.0.0:8082"
+          ports:
+            - containerPort: 8082
+          readinessProbe:
+            tcpSocket:
+              port: 8082
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          {{- with .Values.kafkaRest.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

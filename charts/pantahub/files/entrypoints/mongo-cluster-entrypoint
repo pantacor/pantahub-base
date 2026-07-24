@@ -1,0 +1,76 @@
+#!/bin/sh
+
+set -ex
+
+MONGO_PORT=${MONGO_PORT:-27017}
+
+# credentials rendered from the chart values (single source of truth, see
+# the mongo section of values.yaml); also used by the connector configs
+MONGO_ROOT_USER='{{ .Values.mongo.env.MONGO_INITDB_ROOT_USERNAME }}'
+MONGO_ROOT_PASS='{{ .Values.mongo.env.MONGO_INITDB_ROOT_PASSWORD }}'
+MONGO_APP_USER='{{ .Values.env.MONGO_USER }}'
+MONGO_APP_PASS='{{ .Values.env.MONGO_PASS }}'
+MONGO_APP_DB='{{ .Values.env.MONGO_DB }}'
+MONGO_SINK_USER='{{ .Values.mongo.connectUsers.sink.username }}'
+MONGO_SINK_PASS='{{ .Values.mongo.connectUsers.sink.password }}'
+MONGO_SOURCE_USER='{{ .Values.mongo.connectUsers.source.username }}'
+MONGO_SOURCE_PASS='{{ .Values.mongo.connectUsers.source.password }}'
+
+# make sure the permissions for the mongokey is correct
+chmod 600 /keys/mongokey.yaml
+
+# Background process to initialize replica set and users
+(
+  echo "Mongo Initializer: Waiting for MongoDB to start..."
+  until mongo --port ${MONGO_PORT} --quiet --eval "db.adminCommand('ping')"; do
+    sleep 2
+  done
+
+  replicaSet="{
+    \"_id\": \"${MONGO_RS}\",
+    \"members\": [
+      { \"_id\": 0, \"host\": \"mongo:27017\" },
+      { \"_id\": 1, \"host\": \"mongo2:30002\" },
+      { \"_id\": 2, \"host\": \"mongo3:30003\" }
+    ]
+  }"
+
+  echo "Mongo Initializer: Initializing replica set..."
+  until mongo --port ${MONGO_PORT} --quiet --eval "quit((rs.initiate($replicaSet).ok || rs.status().ok) ? 0 : 1)"; do
+    echo "Mongo Initializer: checking mongo replica set"
+    sleep 2
+  done
+
+  echo "Mongo Initializer: Creating users..."
+  # Admin user
+  if ! mongo --eval 'db.getUsers()' "mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASS}@localhost:${MONGO_PORT}/admin?authSource=admin&authMechanism=SCRAM-SHA-1&replicaSet=${MONGO_RS}" > /dev/null 2>&1; then
+    until mongo --eval "db.createUser({user: \"${MONGO_ROOT_USER}\", pwd: \"${MONGO_ROOT_PASS}\", roles: [{role: \"readWrite\", db:\"admin\"}], mechanisms: [\"SCRAM-SHA-1\"]})" "mongodb://localhost:${MONGO_PORT}/admin?replicaSet=${MONGO_RS}"; do
+      sleep 2
+    done
+  fi
+
+  # App user
+  if ! mongo --eval 'db.getUsers()' "mongodb://${MONGO_APP_USER}:${MONGO_APP_PASS}@localhost:${MONGO_PORT}/${MONGO_APP_DB}?authSource=${MONGO_APP_DB}&authMechanism=SCRAM-SHA-1&replicaSet=${MONGO_RS}" > /dev/null 2>&1; then
+    until mongo --eval "db.createUser({user: \"${MONGO_APP_USER}\", pwd: \"${MONGO_APP_PASS}\", roles: [{role: \"readWrite\", db:\"${MONGO_APP_DB}\"}], mechanisms: [\"SCRAM-SHA-1\"]})" "mongodb://localhost:${MONGO_PORT}/${MONGO_APP_DB}?replicaSet=${MONGO_RS}"; do
+      sleep 2
+    done
+  fi
+
+  # PHS user
+  if ! mongo --eval 'db.getUsers()' "mongodb://${MONGO_SINK_USER}:${MONGO_SINK_PASS}@localhost:${MONGO_PORT}/pantabase_devicesummary?authSource=pantabase_devicesummary&authMechanism=SCRAM-SHA-1&replicaSet=${MONGO_RS}" > /dev/null 2>&1; then
+    until mongo --eval "db.createUser({user: \"${MONGO_SINK_USER}\", pwd: \"${MONGO_SINK_PASS}\", roles: [{role: \"readWrite\", db:\"pantabase_devicesummary\"}], mechanisms: [\"SCRAM-SHA-1\"]})" "mongodb://localhost:${MONGO_PORT}/pantabase_devicesummary?replicaSet=${MONGO_RS}"; do
+      sleep 2
+    done
+  fi
+
+  # Source user
+  if ! mongo --eval 'db.getUsers()' "mongodb://${MONGO_SOURCE_USER}:${MONGO_SOURCE_PASS}@localhost:${MONGO_PORT}/admin?authSource=admin&authMechanism=SCRAM-SHA-1&replicaSet=${MONGO_RS}" > /dev/null 2>&1; then
+    until mongo --eval "db.createUser({user: \"${MONGO_SOURCE_USER}\", pwd: \"${MONGO_SOURCE_PASS}\", roles: [{role: \"readWrite\", db:\"admin\"}, {role: \"read\", db:\"local\"}, {role: \"read\", db:\"config\"}], mechanisms: [\"SCRAM-SHA-1\"]})" "mongodb://localhost:${MONGO_PORT}/admin?replicaSet=${MONGO_RS}"; do
+      sleep 2
+    done
+  fi
+  echo "Mongo Initializer: Done."
+) &
+
+# Execute mongod as main process
+exec mongod --keyFile /keys/mongokey.yaml --transitionToAuth --port ${MONGO_PORT} --replSet ${MONGO_RS} --bind_ip_all --oplogSize ${MONGO_OPLOG_SIZE_MB:-990} "$@"

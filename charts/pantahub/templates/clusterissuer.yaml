@@ -1,0 +1,24 @@
+{{- if and .Values.ingress.enabled .Values.ingress.tls.enabled .Values.ingress.letsencrypt.enabled .Values.ingress.letsencrypt.createIssuer }}
+# Requires cert-manager (its CRDs) to be installed in the cluster first:
+#   helm repo add jetstack https://charts.jetstack.io
+#   helm install cert-manager jetstack/cert-manager -n cert-manager \
+#     --create-namespace --set crds.enabled=true
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ .Values.ingress.letsencrypt.issuer }}
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "letsencrypt") | nindent 4 }}
+spec:
+  acme:
+    email: {{ required "ingress.letsencrypt.email is required when createIssuer is true (Let's Encrypt ACME account email)" .Values.ingress.letsencrypt.email }}
+    server: {{ .Values.ingress.letsencrypt.server }}
+    privateKeySecretRef:
+      name: {{ .Values.ingress.letsencrypt.issuer }}-account-key
+    solvers:
+      - http01:
+          ingress:
+            {{- with .Values.ingress.className }}
+            ingressClassName: {{ . }}
+            {{- end }}
+{{- end }}

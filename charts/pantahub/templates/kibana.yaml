@@ -1,0 +1,68 @@
+{{- if .Values.kibana.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: kibana
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "kibana") | nindent 4 }}
+spec:
+  type: {{ .Values.kibana.service.type }}
+  ports:
+    - name: http
+      port: 5601
+      targetPort: 5601
+  selector:
+    {{- include "pantahub.selectorLabels" (dict "ctx" . "name" "kibana") | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kibana
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "kibana") | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "pantahub.selectorLabels" (dict "ctx" . "name" "kibana") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "pantahub.labels" (dict "ctx" . "name" "kibana") | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: kibana
+          image: "{{ .Values.kibana.image }}:{{ .Values.kibana.tag }}"
+          env:
+            - name: SERVERNAME
+              value: "kibana"
+            - name: ELASTICSEARCH_HOSTS
+              value: "http://elasticsearch:9200"
+            - name: XPACK_SECURITY_ENABLED
+              value: "false"
+          ports:
+            - containerPort: 5601
+          readinessProbe:
+            httpGet:
+              path: /api/status
+              port: 5601
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          volumeMounts:
+            - name: kibana-conf
+              mountPath: /usr/share/kibana/config/kibana.yml
+              subPath: kibana.yml
+          {{- with .Values.kibana.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: kibana-conf
+          configMap:
+            name: pantahub-kibana-conf
+{{- end }}

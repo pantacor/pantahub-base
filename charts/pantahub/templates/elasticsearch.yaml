@@ -1,0 +1,113 @@
+{{- if .Values.elasticsearch.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "elasticsearch") | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 9200
+      targetPort: 9200
+  selector:
+    {{- include "pantahub.selectorLabels" (dict "ctx" . "name" "elasticsearch") | nindent 4 }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-elasticsearch
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "elasticsearch") | nindent 4 }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  {{- with .Values.global.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.elasticsearch.persistence.size }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: elasticsearch
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "elasticsearch") | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "pantahub.selectorLabels" (dict "ctx" . "name" "elasticsearch") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "pantahub.labels" (dict "ctx" . "name" "elasticsearch") | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        {{- if .Values.elasticsearch.sysctlInit.enabled }}
+        - name: sysctl
+          image: busybox:1.36
+          command: ["sysctl", "-w", "vm.max_map_count=262144"]
+          securityContext:
+            privileged: true
+        {{- end }}
+        - name: chown-data
+          image: busybox:1.36
+          command: ["sh", "-c", "chown -R 1000:1000 /usr/share/elasticsearch/data"]
+          volumeMounts:
+            - name: data
+              mountPath: /usr/share/elasticsearch/data
+      containers:
+        - name: elasticsearch
+          image: "{{ .Values.elasticsearch.image }}:{{ .Values.elasticsearch.tag }}"
+          env:
+            - name: cluster.name
+              value: "docker-cluster"
+            # memory_lock needs a memlock ulimit kubernetes can't grant; off here
+            - name: bootstrap.memory_lock
+              value: "false"
+            - name: discovery.type
+              value: "single-node"
+            - name: ES_JAVA_OPTS
+              value: "-Xms512m -Xmx512m -XX:-UseContainerSupport"
+            - name: xpack.security.enabled
+              value: "false"
+            - name: xpack.watcher.enabled
+              value: "false"
+            - name: xpack.security.transport.ssl.enabled
+              value: "false"
+            - name: xpack.security.http.ssl.enabled
+              value: "false"
+            - name: NODE_LOCK_PATH
+              value: "/usr/share/elasticsearch/data/node.lock"
+            - name: MUST_BE_WRITABLE
+              value: "true"
+          ports:
+            - containerPort: 9200
+          readinessProbe:
+            httpGet:
+              path: /_cluster/health
+              port: 9200
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          volumeMounts:
+            - name: data
+              mountPath: /usr/share/elasticsearch/data
+          {{- with .Values.elasticsearch.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: data-elasticsearch
+{{- end }}
