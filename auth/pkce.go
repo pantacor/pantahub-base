@@ -64,6 +64,13 @@ func (app *App) HandlePostPKCEInit(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
+	// Pin the redirect target to the callback URLs registered on client_id
+	// before it is persisted into the PKCE state.
+	if err := app.validateRedirectURI(ctx, req.ClientID, req.RedirectURI, auditContext(r, "pkce_init")); err != nil {
+		utils.RestErrorWrapperUser(w, "invalid_request", err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	pks, err := pkceservice.CreatePKCEState(ctx, req.CodeChallenge, req.CodeChallengeMethod, req.RedirectURI, req.State, req.ClientID, req.Scope)
 	if err != nil {
 		utils.RestErrorWrapperUser(w, "internal_error", "Failed to create PKCE state", http.StatusInternalServerError)
@@ -431,6 +438,14 @@ func (app *App) HandlePKCEAuthorize(w rest.ResponseWriter, r *rest.Request) {
 	// Basic validation
 	if clientID == "" || redirectURI == "" || codeChallenge == "" || codeChallengeMethod == "" {
 		utils.RestErrorWrapperUser(w, "invalid_request", "Missing required PKCE parameters", http.StatusBadRequest)
+		return
+	}
+
+	// Pin the redirect target to the callback URLs registered on client_id
+	// before it is persisted into the PKCE state or echoed into the authorize
+	// URL handed to the web app.
+	if err := app.validateRedirectURI(ctx, clientID, redirectURI, auditContext(r, "pkce_authorize")); err != nil {
+		utils.RestErrorWrapperUser(w, "invalid_request", err.Error(), http.StatusBadRequest)
 		return
 	}
 

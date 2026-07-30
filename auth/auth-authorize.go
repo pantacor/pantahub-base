@@ -32,6 +32,7 @@ import (
 	"gitlab.com/pantacor/pantahub-base/auth/authmodels"
 	"gitlab.com/pantacor/pantahub-base/auth/authservices"
 	"gitlab.com/pantacor/pantahub-base/auth/pkceservice"
+	"gitlab.com/pantacor/pantahub-base/auth/redirecturi"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -96,7 +97,7 @@ func (app *App) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Request)
 		return
 	}
 
-	errCode, err := app.validateScopesAndURIs(r.Context(), "", req.Service, req.Scopes, req.RedirectURI)
+	errCode, err := app.validateScopesAndURIs(r.Context(), "", req.Service, req.Scopes, req.RedirectURI, auditContext(r, "implicit_token"))
 	if err != nil {
 		utils.RestErrorWrapper(w, err.Error(), errCode)
 		return
@@ -226,7 +227,7 @@ func (app *App) handlePostCode(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	errCode, err := app.validateScopesAndURIs(r.Context(), "", req.Service, req.Scopes, req.RedirectURI)
+	errCode, err := app.validateScopesAndURIs(r.Context(), "", req.Service, req.Scopes, req.RedirectURI, auditContext(r, "authorization_code"))
 	if err != nil {
 		utils.RestErrorWrapper(w, err.Error(), errCode)
 		return
@@ -289,16 +290,7 @@ func (app *App) handlePostCode(w rest.ResponseWriter, r *rest.Request) {
 	w.WriteJson(response)
 }
 
-func containsStringWithPrefix(slice []string, prefix string) bool {
-	for _, v := range slice {
-		if strings.HasPrefix(prefix, v) {
-			return true
-		}
-	}
-	return false
-}
-
-func (app *App) validateScopesAndURIs(ctx context.Context, caller, reqService, reqScopes, reqRedirectURI string) (int, error) {
+func (app *App) validateScopesAndURIs(ctx context.Context, caller, reqService, reqScopes, reqRedirectURI string, audit redirecturi.AuditContext) (int, error) {
 	defaultAccount := false
 	service, _, err := apps.SearchApp(ctx, caller, reqService, app.mongoClient.Database(utils.MongoDb))
 	if err != nil {
@@ -329,9 +321,13 @@ func (app *App) validateScopesAndURIs(ctx context.Context, caller, reqService, r
 		}
 	}
 
+	// The redirect target must sit on a callback URL registered on the service.
+	// An app with no registered callbacks fails closed rather than skipping the
+	// check.
 	if reqRedirectURI != "" {
-		if service.RedirectURIs != nil && !containsStringWithPrefix(service.RedirectURIs, reqRedirectURI) {
-			return http.StatusBadRequest, errors.New("error implicit access token failed; redirect URL does not match registered service")
+		audit.ClientID = reqService
+		if err := redirecturi.Validate(service.RedirectURIs, reqRedirectURI, audit); err != nil {
+			return http.StatusBadRequest, err
 		}
 	}
 

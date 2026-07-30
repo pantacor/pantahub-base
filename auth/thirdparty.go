@@ -60,7 +60,12 @@ type TokenPayload struct {
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /auth/oauth/login/{service} [get]
 func (a *App) HandleGetThirdPartyLogin(w rest.ResponseWriter, r *rest.Request) {
-	oauth.AuthorizeByService(w, r)
+	audit := auditContext(r, "social_login")
+	audit.Service = r.PathParam("service")
+
+	oauth.AuthorizeByService(w, r, func(redirectURI string) error {
+		return validateSocialRedirectURI(redirectURI, audit)
+	})
 }
 
 // HandleGetThirdPartyCallback login or register user using thirdparty integration
@@ -83,6 +88,21 @@ func (a *App) HandleGetThirdPartyCallback(w rest.ResponseWriter, r *rest.Request
 	if err != nil {
 		processErr(w, r.Request, err, "Unable to connect to thirdparty service", http.StatusForbidden, payload.RedirectTo)
 		return
+	}
+
+	// The return target is carried inside the signed state, so it cannot have
+	// been tampered with since we issued it. It is checked again here so that a
+	// target that was allowed at authorize time but is no longer configured
+	// cannot receive a token.
+	if payload.RedirectTo != "" {
+		audit := auditContext(r, "social_login_callback")
+		audit.Service = string(payload.Service)
+
+		if err := validateSocialRedirectURI(payload.RedirectTo, audit); err != nil {
+			payload.RedirectTo = ""
+			utils.RestError(w, err, err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
 
 	if payload.Email == "" {
@@ -145,15 +165,20 @@ func (a *App) HandleGetThirdPartyCallback(w rest.ResponseWriter, r *rest.Request
 	if payload.RedirectTo != "" {
 		redirectURI := fmt.Sprintf("%s#token=%s", payload.RedirectTo, url.QueryEscape(token.Token))
 		http.Redirect(w, r.Request, redirectURI, http.StatusTemporaryRedirect)
+		return
 	}
 
 	w.WriteJson(token)
 }
 
+// processErr reports an error to the caller, bouncing back to the return target
+// when there is one. redirectTo must already have been validated: it is only
+// ever the value carried in the signed state.
 func processErr(w rest.ResponseWriter, r *http.Request, err error, msg string, code int, redirectTo string) {
 	if redirectTo != "" {
 		redirectURI := fmt.Sprintf("%s?error=%s", redirectTo, url.QueryEscape(msg))
 		http.Redirect(w, r, redirectURI, http.StatusTemporaryRedirect)
+		return
 	}
 
 	utils.RestError(w, err, msg, code)

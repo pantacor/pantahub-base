@@ -18,11 +18,17 @@ package oauth
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
@@ -68,8 +74,7 @@ const (
 	// ServiceEntraid entraid service enum
 	ServiceEntraid = ServiceType("entraid")
 
-	oauthCookie    = "oauthstate"
-	redirectCookie = "redirecturi"
+	oauthCookie = "oauthstate"
 )
 
 // ServicesConfigs get service config
@@ -96,8 +101,13 @@ var ServicesCallback = map[ServiceType]CallbackServiceFunc{
 	ServiceEntraid: EntraidCb,
 }
 
+// RedirectValidator reports whether redirectURI is an acceptable return target
+// for the social login flow. It is supplied by the caller so this package stays
+// free of configuration and database dependencies.
+type RedirectValidator func(redirectURI string) error
+
 // AuthorizeByService use service to autorize
-func AuthorizeByService(w rest.ResponseWriter, r *rest.Request) {
+func AuthorizeByService(w rest.ResponseWriter, r *rest.Request, validate RedirectValidator) {
 	service := ServiceType(r.PathParam("service"))
 	redirectURI := r.Request.URL.Query().Get("redirect_uri")
 
@@ -105,6 +115,16 @@ func AuthorizeByService(w rest.ResponseWriter, r *rest.Request) {
 	if !found {
 		utils.RestError(w, nil, "We can't connect to that service", http.StatusForbidden)
 		return
+	}
+
+	// The callback returns a signed-in user token in the fragment, so the
+	// return target has to be our own web interface. This is checked before we
+	// go anywhere near the identity provider.
+	if redirectURI != "" {
+		if err := validate(redirectURI); err != nil {
+			utils.RestError(w, err, err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
 
 	ServicesAutorize[service](redirectURI, getConfig(), w, r)
@@ -132,44 +152,160 @@ func CbByService(r *rest.Request) (*ResponsePayload, error) {
 		return payload, fmt.Errorf("error reading cookie: %s", err)
 	}
 
-	if r.FormValue("state") != oauthState.Value {
+	// The state returned by the provider must be the one we issued for this
+	// browser session.
+	returnedState := r.FormValue("state")
+	if subtleCompare(returnedState, oauthState.Value) != 1 {
 		payload := &ResponsePayload{RedirectTo: ""}
 		return payload, errors.New("we can't validate the state")
 	}
 
-	redirectURI, _ := r.Cookie(redirectCookie)
-	if redirectURI != nil {
-		payload.RedirectTo = redirectURI.Value
+	// The redirect target travels inside the signed state rather than in a
+	// cookie of its own, so it cannot be swapped independently of the state.
+	claims, err := decodeState(returnedState)
+	if err != nil {
+		payload := &ResponsePayload{RedirectTo: ""}
+		return payload, fmt.Errorf("we can't validate the state: %s", err)
 	}
 
+	payload.RedirectTo = claims.RedirectURI
 	payload.Service = service
 
 	return payload, nil
 }
 
+// stateClaims is the payload carried inside the OAuth state parameter. Binding
+// the flow parameters to the state means a tampered redirect target invalidates
+// the signature instead of silently redirecting somewhere else.
+type stateClaims struct {
+	Nonce       string `json:"n"`
+	RedirectURI string `json:"r,omitempty"`
+	IssuedAt    int64  `json:"t"`
+}
+
+// stateTTL bounds how long an issued state stays acceptable.
+const stateTTL = 15 * time.Minute
+
+var (
+	stateKeyOnce sync.Once
+	stateKey     []byte
+)
+
+// stateSigningKey derives the HMAC key used to sign state values. The JWT
+// secret is reused so every replica signs with the same key; if it is missing
+// we fall back to a per-process key, which keeps flows working on a single
+// instance and fails closed across replicas rather than signing with nothing.
+func stateSigningKey() []byte {
+	stateKeyOnce.Do(func() {
+		secret := utils.GetEnv(utils.EnvPantahubJWTAuthSecret)
+		if secret != "" {
+			sum := sha256.Sum256([]byte("pantahub-oauth-state:" + secret))
+			stateKey = sum[:]
+			return
+		}
+
+		log.Printf("WARNING: %s is unset; OAuth state signing falls back to a per-process key", utils.EnvPantahubJWTAuthSecret)
+		stateKey = make([]byte, 32)
+		if _, err := rand.Read(stateKey); err != nil {
+			log.Printf("CRITICAL: unable to generate an OAuth state signing key: %v", err)
+		}
+	})
+
+	return stateKey
+}
+
+// encodeState serialises and signs the flow parameters into a single opaque
+// state value of the form <payload>.<mac>.
+func encodeState(claims stateClaims) (string, error) {
+	encoded, err := json.Marshal(claims)
+	if err != nil {
+		return "", err
+	}
+
+	payload := base64.RawURLEncoding.EncodeToString(encoded)
+	mac := hmac.New(sha256.New, stateSigningKey())
+	mac.Write([]byte(payload))
+
+	return payload + "." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil)), nil
+}
+
+// decodeState verifies the signature and freshness of a state value and
+// returns the parameters it carries.
+func decodeState(state string) (*stateClaims, error) {
+	payload, signature, found := strings.Cut(state, ".")
+	if !found {
+		return nil, errors.New("malformed state")
+	}
+
+	expected := hmac.New(sha256.New, stateSigningKey())
+	expected.Write([]byte(payload))
+
+	provided, err := base64.RawURLEncoding.DecodeString(signature)
+	if err != nil {
+		return nil, errors.New("malformed state signature")
+	}
+
+	if !hmac.Equal(provided, expected.Sum(nil)) {
+		return nil, errors.New("state signature mismatch")
+	}
+
+	decoded, err := base64.RawURLEncoding.DecodeString(payload)
+	if err != nil {
+		return nil, errors.New("malformed state payload")
+	}
+
+	claims := &stateClaims{}
+	if err := json.Unmarshal(decoded, claims); err != nil {
+		return nil, errors.New("malformed state payload")
+	}
+
+	if time.Since(time.Unix(claims.IssuedAt, 0)) > stateTTL {
+		return nil, errors.New("state has expired")
+	}
+
+	return claims, nil
+}
+
+// subtleCompare reports 1 when the two values are equal, comparing in constant
+// time so the state cookie cannot be probed byte by byte.
+func subtleCompare(a, b string) int {
+	if len(a) != len(b) {
+		return 0
+	}
+	if hmac.Equal([]byte(a), []byte(b)) {
+		return 1
+	}
+	return 0
+}
+
+// generateStateOauthCookie issues a signed state carrying the flow parameters
+// and pins it to this browser session with a cookie.
 func generateStateOauthCookie(redirectURL string, w http.ResponseWriter) string {
-	var expiration = time.Now().Add(365 * 24 * time.Hour)
-
 	b := make([]byte, 16)
-	rand.Read(b)
-	state := base64.URLEncoding.EncodeToString(b)
-
-	cookie := &http.Cookie{
-		Name:    oauthCookie,
-		Value:   state,
-		Expires: expiration,
-		Path:    "/",
+	if _, err := rand.Read(b); err != nil {
+		log.Printf("CRITICAL: crypto/rand.Read failed while generating OAuth state: %v", err)
+		return ""
 	}
 
-	redirectURICookie := &http.Cookie{
-		Name:    redirectCookie,
-		Value:   redirectURL,
-		Expires: expiration,
-		Path:    "/",
+	state, err := encodeState(stateClaims{
+		Nonce:       base64.RawURLEncoding.EncodeToString(b),
+		RedirectURI: redirectURL,
+		IssuedAt:    time.Now().Unix(),
+	})
+	if err != nil {
+		log.Printf("CRITICAL: unable to encode OAuth state: %v", err)
+		return ""
 	}
 
-	http.SetCookie(w, cookie)
-	http.SetCookie(w, redirectURICookie)
+	http.SetCookie(w, &http.Cookie{
+		Name:     oauthCookie,
+		Value:    state,
+		Expires:  time.Now().Add(stateTTL),
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   utils.GetEnv(utils.EnvPantahubScheme) == "https",
+		SameSite: http.SameSiteLaxMode,
+	})
 
 	return state
 }
