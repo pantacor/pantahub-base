@@ -184,15 +184,29 @@ func TestMatchRejectsFragments(t *testing.T) {
 	}
 }
 
-func TestValidateFailsClosedWithoutRegisteredCallbacks(t *testing.T) {
-	err := Validate(nil, "https://app.example.com/oauth/callback", AuditContext{})
-	if err != ErrNoneRegistered {
-		t.Errorf("expected ErrNoneRegistered for an app with no callbacks, got %v", err)
+// An application that declares no callbacks is left unconstrained, so existing
+// registrations that predate the requirement keep working. The occurrence is
+// logged under AuditEventUnvalidated rather than silently permitted.
+func TestValidateAllowsApplicationsWithoutRegisteredCallbacks(t *testing.T) {
+	if err := Validate(nil, "https://anywhere.example/cb", AuditContext{}); err != nil {
+		t.Errorf("expected an app with no callbacks to be unconstrained, got %v", err)
 	}
 
-	err = Validate([]string{}, "https://anything", AuditContext{})
-	if err != ErrNoneRegistered {
-		t.Errorf("expected ErrNoneRegistered for an empty callback list, got %v", err)
+	if err := Validate([]string{}, "https://anywhere.example/cb", AuditContext{}); err != nil {
+		t.Errorf("expected an empty callback list to be unconstrained, got %v", err)
+	}
+
+	// A malformed target is still refused, with or without callbacks.
+	if err := Validate(nil, "", AuditContext{}); err != ErrMalformed {
+		t.Errorf("expected ErrMalformed for an empty redirect_uri, got %v", err)
+	}
+}
+
+// The permissive empty-list path must not extend to the social login origin
+// check: that flow hands back a user token and has to fail closed.
+func TestValidateOriginStillFailsClosedWhenUnconfigured(t *testing.T) {
+	if err := ValidateOrigin(nil, "https://anywhere.example/login", AuditContext{}); err != ErrNoneRegistered {
+		t.Errorf("expected ErrNoneRegistered for social login with no origins, got %v", err)
 	}
 }
 
@@ -258,12 +272,5 @@ func TestSocialLoginOriginRejectsRegisteredAppCallbacks(t *testing.T) {
 		if MatchOrigin(origins, candidate) {
 			t.Errorf("social login origin check accepted application callback %q", candidate)
 		}
-	}
-}
-
-func TestValidateOriginFailsClosedWithoutOrigins(t *testing.T) {
-	err := ValidateOrigin(nil, "https://hub.example.com/login", AuditContext{})
-	if err != ErrNoneRegistered {
-		t.Errorf("expected ErrNoneRegistered when no origins are configured, got %v", err)
 	}
 }

@@ -260,14 +260,20 @@ func ValidateOrigin(allowedOrigins []string, candidate string, ctx AuditContext)
 // Validate checks candidate against the registered callback URLs and emits an
 // audit event when it is rejected. ctx carries the request metadata used for
 // monitoring; it is not consulted for the decision.
+//
+// An application that has registered no callbacks at all is left unconstrained.
+// Registrations predate the requirement to declare a callback, so rejecting
+// them would break clients that work today. Each occurrence is recorded under
+// AuditEventUnvalidated so the outstanding registrations can be found and
+// completed, after which those applications become constrained automatically.
 func Validate(registered []string, candidate string, ctx AuditContext) error {
 	if candidate == "" {
 		return ErrMalformed
 	}
 
 	if len(registered) == 0 {
-		ctx.reject(candidate, ErrNoneRegistered)
-		return ErrNoneRegistered
+		ctx.unvalidated(candidate)
+		return nil
 	}
 
 	if !Match(registered, candidate) {
@@ -319,6 +325,42 @@ type auditEvent struct {
 // target. Alert on a rising rate of these: a spike means somebody is probing
 // the allowlist, and any occurrence with an external host is worth a look.
 const AuditEventName = "oauth_redirect_uri_rejected"
+
+// AuditEventUnvalidated is the stable identifier emitted when a redirect target
+// is allowed only because the application has no registered callbacks. Every
+// one of these is an application whose redirect targets are unconstrained;
+// treat the list as a backlog to fix rather than as steady state.
+const AuditEventUnvalidated = "oauth_redirect_uri_unvalidated"
+
+// LogRejection records a redirect target refused for a reason the matcher does
+// not itself evaluate, such as a client_id that resolves to nothing.
+func LogRejection(candidate string, reason error, ctx AuditContext) {
+	ctx.reject(candidate, reason)
+}
+
+// unvalidated records a redirect target that was allowed through only because
+// the application declares no callbacks to check it against.
+func (c AuditContext) unvalidated(candidate string) {
+	event := auditEvent{
+		Event:       AuditEventUnvalidated,
+		Severity:    "warning",
+		Flow:        c.Flow,
+		ClientID:    c.ClientID,
+		Service:     c.Service,
+		RedirectURI: truncate(candidate, 512),
+		Reason:      "application has no registered callback URLs, so its redirect targets are unconstrained",
+		RemoteAddr:  c.RemoteAddr,
+		UserAgent:   truncate(c.UserAgent, 256),
+	}
+
+	encoded, err := json.Marshal(event)
+	if err != nil {
+		log.Printf("%s: redirect_uri=%q", AuditEventUnvalidated, event.RedirectURI)
+		return
+	}
+
+	log.Println(string(encoded))
+}
 
 // reject writes the audit record. Rejections are rare by construction, so this
 // logs unconditionally rather than sampling.

@@ -60,15 +60,21 @@ func (a *App) registeredCallbacks(ctx context.Context, clientID string) ([]strin
 }
 
 // validateRedirectURI rejects any redirect target that is not registered
-// against clientID. An unresolvable client is a failure: there is no set of
-// registered callbacks to check against, so there is nothing to permit.
+// against clientID.
+//
+// A client_id that resolves to nothing is rejected outright. That is a
+// different case from an application that exists but declares no callbacks:
+// the latter is deliberately left unconstrained for compatibility, and routing
+// an unknown client through that path would let any caller opt out of the check
+// simply by naming an application that does not exist.
 func (a *App) validateRedirectURI(ctx context.Context, clientID, candidate string, audit redirecturi.AuditContext) error {
 	audit.ClientID = clientID
 
 	registered, err := a.registeredCallbacks(ctx, clientID)
 	if err != nil {
 		if err == ErrUnknownClient {
-			return redirecturi.Validate(nil, candidate, audit)
+			redirecturi.LogRejection(candidate, ErrUnknownClient, audit)
+			return ErrUnknownClient
 		}
 		return err
 	}
