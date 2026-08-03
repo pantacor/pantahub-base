@@ -51,6 +51,22 @@ chmod 600 /keys/mongokey.yaml
     done
   fi
 
+  # Webhooks user (pantahub-webhooks service, webhooks/docker-compose.yml)
+  if ! mongo --eval 'db.getUsers()' "mongodb://webhooks:pass@localhost:${MONGO_PORT}/pantabase-webhooks?authSource=pantabase-webhooks&authMechanism=SCRAM-SHA-1&replicaSet=${MONGO_RS}" > /dev/null 2>&1; then
+    until mongo --eval 'db.createUser({user: "webhooks", pwd: "pass", roles: [{role: "readWrite", db:"pantabase-webhooks"}], mechanisms: ["SCRAM-SHA-1"]})' "mongodb://localhost:${MONGO_PORT}/pantabase-webhooks?replicaSet=${MONGO_RS}"; do
+      sleep 2
+    done
+  fi
+
+  # Fleet user. fleet/ no longer runs its own replica set; it shares this
+  # cluster and keeps its own simplefleet database. Matches the user that
+  # fleet/entrypoints/mongo-cluster-entrypoint used to create.
+  if ! mongo --eval 'db.getUsers()' "mongodb://user:pass@localhost:${MONGO_PORT}/simplefleet?authSource=simplefleet&authMechanism=SCRAM-SHA-1&replicaSet=${MONGO_RS}" > /dev/null 2>&1; then
+    until mongo --eval 'db.createUser({user: "user", pwd: "pass", roles: [{role: "readWrite", db:"simplefleet"}], mechanisms: ["SCRAM-SHA-1"]})' "mongodb://localhost:${MONGO_PORT}/simplefleet?replicaSet=${MONGO_RS}"; do
+      sleep 2
+    done
+  fi
+
   # Source user
   if ! mongo --eval 'db.getUsers()' "mongodb://phskafkaconnectsource:pass@localhost:${MONGO_PORT}/admin?authSource=admin&authMechanism=SCRAM-SHA-1&replicaSet=${MONGO_RS}" > /dev/null 2>&1; then
     until mongo --eval 'db.createUser({user: "phskafkaconnectsource", pwd: "pass", roles: [{role: "readWrite", db:"admin"}, {role: "read", db:"local"}, {role: "read", db:"config"}], mechanisms: ["SCRAM-SHA-1"]})' "mongodb://localhost:${MONGO_PORT}/admin?replicaSet=${MONGO_RS}"; do

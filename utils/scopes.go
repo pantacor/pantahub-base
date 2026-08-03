@@ -72,6 +72,9 @@ type IScopes struct {
 	ReadMetrics     Scope
 	WriteMetrics    Scope
 	UpdateMetrics   Scope
+	Webhooks        Scope
+	ReadWebhooks    Scope
+	WriteWebhooks   Scope
 }
 
 // Scopes variable with all the posible scopes
@@ -190,6 +193,21 @@ var Scopes = &IScopes{
 		ID:          "metrics.change",
 		Service:     PantahubServiceID,
 		Description: "Update metrics",
+	},
+	Webhooks: Scope{
+		ID:          "webhooks",
+		Service:     PantahubServiceID,
+		Description: "Read/Write webhooks",
+	},
+	ReadWebhooks: Scope{
+		ID:          "webhooks.readonly",
+		Service:     PantahubServiceID,
+		Description: "Read only webhooks",
+	},
+	WriteWebhooks: Scope{
+		ID:          "webhooks.write",
+		Service:     PantahubServiceID,
+		Description: "Write only webhooks",
 	},
 }
 
