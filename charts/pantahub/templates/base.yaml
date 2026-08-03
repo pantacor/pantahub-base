@@ -65,10 +65,19 @@ spec:
           command:
             - sh
             - -c
+            # only wait for deps this release actually runs — a disabled
+            # (external) dep has no Service here and would block forever
             - |
+              {{- if .Values.mongo.enabled }}
               until nc -z mongo 27017; do echo waiting for mongo; sleep 2; done
+              {{- end }}
+              {{- if .Values.fluentd.enabled }}
               until nc -z fluentd 24224; do echo waiting for fluentd; sleep 2; done
+              {{- end }}
+              {{- if .Values.elasticsearch.enabled }}
               until nc -z elasticsearch 9200; do echo waiting for elasticsearch; sleep 2; done
+              {{- end }}
+              true
       containers:
         - name: base
           image: "{{ .Values.base.image }}:{{ .Values.base.tag }}"

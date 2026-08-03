@@ -29,6 +29,8 @@ spec:
     metadata:
       labels:
         {{- include "pantahub.labels" (dict "ctx" . "name" "kibana") | nindent 8 }}
+      annotations:
+        checksum/config: {{ tpl (.Files.Get "files/kibana.yml") . | sha256sum }}
     spec:
       enableServiceLinks: false
       {{- with .Values.global.imagePullSecrets }}

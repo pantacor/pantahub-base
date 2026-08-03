@@ -29,6 +29,9 @@ spec:
     metadata:
       labels:
         {{- include "pantahub.labels" (dict "ctx" . "name" "kafka-connect") | nindent 8 }}
+      annotations:
+        checksum/connect-configs: {{ include "pantahub.filesContent" (dict "ctx" $ "glob" "files/connect-configs/*") | sha256sum }}
+        checksum/entrypoints: {{ include "pantahub.filesContent" (dict "ctx" $ "glob" "files/entrypoints/*") | sha256sum }}
     spec:
       enableServiceLinks: false
       {{- with .Values.global.imagePullSecrets }}

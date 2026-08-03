@@ -77,8 +77,10 @@ spec:
               value: "localstack"
             - name: USE_SSL
               value: "false"
-            - name: DATA_DIR
-              value: "/data"
+            {{- if .Values.localstack.persistence.enabled }}
+            - name: PERSISTENCE
+              value: "1"
+            {{- end }}
             - name: DEBUG
               value: "1"
           ports:
@@ -91,8 +93,9 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 10
           volumeMounts:
+            # localstack >=1.x keeps all state under /var/lib/localstack
             - name: data
-              mountPath: /tmp/localstack/data
+              mountPath: /var/lib/localstack
           {{- with .Values.localstack.resources }}
           resources:
             {{- toYaml . | nindent 12 }}

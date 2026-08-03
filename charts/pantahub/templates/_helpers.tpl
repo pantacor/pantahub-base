@@ -51,12 +51,14 @@ Usage: {{ include "pantahub.envMap" .Values.www.env | nindent 12 }}
 {{- end }}
 
 {{/*
-Effective shared env (pantahub-env ConfigMap data). When a public domain is
-configured, the host/scheme keys are derived from it and win over .Values.env.
+Effective shared env (pantahub-env ConfigMap data). When the ingress is
+enabled, the host/scheme keys are derived from the ingress hosts (domain or
+the apiHost/hubHost/pvrHost fallbacks) and win over .Values.env — otherwise
+the ingress would serve hosts the app has never heard of.
 */}}
 {{- define "pantahub.effectiveEnv" -}}
 {{- $env := deepCopy .Values.env }}
-{{- if and .Values.ingress.enabled .Values.ingress.domain }}
+{{- if .Values.ingress.enabled }}
 {{- $scheme := include "pantahub.publicScheme" . }}
 {{- $api := include "pantahub.apiHost" . }}
 {{- $_ := set $env "PANTAHUB_HOST" $api }}
@@ -71,15 +73,29 @@ configured, the host/scheme keys are derived from it and win over .Values.env.
 {{- end }}
 
 {{/*
-www container env: REACT_APP_* URLs follow the public domain when set.
+www container env: REACT_APP_* URLs follow the ingress hosts when the
+ingress is enabled.
 */}}
 {{- define "pantahub.wwwEnv" -}}
 {{- $env := deepCopy .Values.www.env }}
-{{- if and .Values.ingress.enabled .Values.ingress.domain }}
+{{- if .Values.ingress.enabled }}
 {{- $scheme := include "pantahub.publicScheme" . }}
 {{- $_ := set $env "REACT_APP_API_URL" (printf "%s://%s" $scheme (include "pantahub.apiHost" .)) }}
 {{- $_ := set $env "REACT_APP_WWW_URL" (printf "%s://%s" $scheme (include "pantahub.hubHost" .)) }}
 {{- $_ := set $env "REACT_APP_PVR_URL" (printf "%s://%s" $scheme (include "pantahub.pvrHost" .)) }}
 {{- end }}
 {{- include "pantahub.envMap" $env }}
+{{- end }}
+
+{{/*
+Concatenated tpl-rendered content of a files/ glob — for checksum/... pod
+annotations, so deployments roll when their mounted config (including the
+values templated into it) changes.
+Usage: {{ include "pantahub.filesContent" (dict "ctx" $ "glob" "files/entrypoints/*") | sha256sum }}
+*/}}
+{{- define "pantahub.filesContent" -}}
+{{- $ctx := .ctx }}
+{{- range $path, $_ := $ctx.Files.Glob .glob }}
+{{ tpl ($ctx.Files.Get $path) $ctx }}
+{{- end }}
 {{- end }}

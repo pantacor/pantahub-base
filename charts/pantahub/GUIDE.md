@@ -188,10 +188,15 @@ ingress:
     email: you@example.com  # ACME account email (expiry notices)
 ```
 
-Then `helm upgrade ... -f my-values.yaml`. Setting `ingress.domain` also
-rewires the app automatically — `PANTAHUB_HOST`, `PANTAHUB_SCHEME`,
+Then `helm upgrade ... -f my-values.yaml`. Enabling the ingress also rewires
+the app automatically — `PANTAHUB_HOST`, `PANTAHUB_SCHEME`,
 `PANTAHUB_HOST_WWW`, `PH_AUTH` and the UI's `REACT_APP_*` URLs all switch to
 `https://api./hub./pvr.<domain>`, and base/gc/www roll to pick that up.
+
+(Without `domain`, the ingress serves the `.localhost` fallback hosts —
+useful on a local cluster with 80/443 mapped; set `ingress.tls.enabled=false`
+and `ingress.letsencrypt.enabled=false` there, Let's Encrypt can't issue for
+`.localhost` names.)
 
 The chart creates the `letsencrypt-prod` ClusterIssuer for you
 (`ingress.letsencrypt.createIssuer=false` if your cluster already has one —
@@ -232,14 +237,22 @@ kubectl -n pantahub rollout restart deploy/base
 ```
 
 **Edited an entrypoint / fluentd conf / connector config in the repo?**
-The chart ships copies under `charts/pantahub/files/` — refresh them, then
-upgrade:
+The chart ships copies under `charts/pantahub/files/`. The ones that are
+verbatim copies can simply be re-copied:
 
 ```bash
-cp entrypoints/{mongo-cluster-entrypoint,mongo-cluster-secondary-entrypoint,kafka-entrypoint,kafka-connect-entrypoint,phs-entrypoint} charts/pantahub/files/entrypoints/
+cp entrypoints/{mongo-cluster-secondary-entrypoint,kafka-entrypoint,kafka-connect-entrypoint,phs-entrypoint} charts/pantahub/files/entrypoints/
 cp fluentd.localhost.conf charts/pantahub/files/fluentd/fluent.conf
-cp kafka/connect-configs/*.json charts/pantahub/files/connect-configs/
 helm upgrade pantahub ./charts/pantahub -n pantahub -f my-values.yaml
+```
+
+**Do NOT blindly copy** `mongo-cluster-entrypoint`, `kafka/connect-configs/*.json`
+or `entrypoints/kibana.yml` — their chart copies are templated (credentials
+come from values; see the "Dev secrets" caveat in README.md) and a plain `cp`
+would wipe that. Port changes to those by hand, e.g.:
+
+```bash
+diff entrypoints/mongo-cluster-entrypoint charts/pantahub/files/entrypoints/mongo-cluster-entrypoint
 ```
 
 **Run a cron endpoint by hand** (instead of waiting for the CronJob):

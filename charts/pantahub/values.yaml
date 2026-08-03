@@ -310,7 +310,11 @@ localstack:
   image: localstack/localstack
   tag: 1.3.0
   persistence:
-    # emptyDir when disabled — compose used a host bind mount
+    # mounts a PVC on /var/lib/localstack and sets PERSISTENCE=1. NOTE:
+    # snapshot persistence is a LocalStack PRO feature — the default community
+    # image ignores it and S3 state is lost on restart either way (use a Pro
+    # image, or a fork like gresau/localstack-persist, if you need it).
+    # Disabled: emptyDir (compose used a host bind mount).
     enabled: false
     size: 5Gi
   resources: {}
@@ -330,14 +334,17 @@ ingress:
   #   api.<domain> -> base (device/client API)
   #   hub.<domain> -> www  (web UI)
   #   pvr.<domain> -> pvr
-  # and automatically rewires PANTAHUB_HOST/PH_AUTH/REACT_APP_* to those URLs.
+  # Whenever the ingress is enabled, PANTAHUB_HOST/PH_AUTH/REACT_APP_* are
+  # rewired to the served hosts (from `domain`, or the fallbacks below).
   enabled: false
   # "" uses the cluster's default IngressClass (traefik on stock k3s);
   # set explicitly (e.g. "nginx") when running several controllers
   className: ""
   annotations: {}
   domain: ""
-  # fallback hosts when domain is unset (local clusters)
+  # fallback hosts when domain is unset (local clusters; combine with
+  # tls.enabled=false + letsencrypt.enabled=false — LE cannot issue for
+  # .localhost names)
   apiHost: api.localhost
   hubHost: hub.localhost
   pvrHost: pvr.localhost

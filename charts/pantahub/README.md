@@ -88,7 +88,8 @@ actually running it — don't undo them):
   them URL-safe.
 - The `files/` directory contains **copies** of `entrypoints/`,
   `fluentd.localhost.conf` and `kafka/connect-configs/` — if you change the
-  originals, re-copy them (or wire that into CI). They are rendered through
+  originals, refresh the copies (see GUIDE.md §5; some are templated and must
+  be ported by hand, not `cp`'d). They are rendered through
   `tpl`, so `files/kibana.yml`, `files/entrypoints/mongo-cluster-entrypoint`
   and `files/connect-configs/*` intentionally diverge from the originals
   where credentials were hardcoded: those come from values (see above).
