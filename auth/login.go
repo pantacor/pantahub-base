@@ -69,6 +69,12 @@ func (a *App) getTokenUsingPassword(writer rest.ResponseWriter, r *rest.Request)
 		}
 	}
 
+	// accounts with two-factor authentication enabled get an MFA challenge
+	// instead of a session token (personal access tokens stay single-step)
+	if handled := a.maybeStartMFALogin(writer, r, payload); handled {
+		return
+	}
+
 	tokenString, rerr := authservices.CreateUserToken(payload, a.jwtMiddleware, a.mongoClient)
 	if rerr != nil {
 		utils.RestErrorWrite(writer, rerr)

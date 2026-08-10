@@ -144,6 +144,71 @@ func CreateUserToken(payload *authmodels.LoginRequestPayload, jwtMiddleware *jwt
 	return tokenString, rerr
 }
 
+// MintAuthenticatedUserToken builds a session token for a user whose
+// identity was already proven (password + second factor, or a passkey
+// assertion). It mirrors the claim shape of CreateUserToken but never calls
+// the Authenticator: the caller is responsible for having authenticated the
+// user. extraClaims (e.g. "amr", "auth_time") are overlaid last but cannot
+// override identity or expiry claims.
+func MintAuthenticatedUserToken(payload *authmodels.LoginRequestPayload, extraClaims map[string]interface{}, jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) (tokenString string, rerr *utils.RError) {
+	scopes := utils.ScopeStringFilterBy(strings.Fields(payload.Scope), "", "")
+
+	token := jwtgo.New(jwtgo.GetSigningMethod(jwtMiddleware.SigningAlgorithm))
+	claims := token.Claims.(jwtgo.MapClaims)
+
+	protected := map[string]bool{
+		"id": true, "prn": true, "nick": true, "roles": true, "type": true,
+		"exp": true, "orig_iat": true, "scopes": true,
+	}
+	for key, value := range extraClaims {
+		if !protected[key] {
+			claims[key] = value
+		}
+	}
+
+	accExpires := time.Now().Add(jwtMiddleware.Timeout).Unix()
+	if jwtMiddleware.PayloadFunc != nil {
+		acc := jwtMiddleware.PayloadFunc(payload.Username)
+		if acc == nil {
+			rerr = &utils.RError{
+				Msg:   "Authentication Failed",
+				Error: "Authentication Failed",
+				Code:  http.StatusUnauthorized,
+			}
+			return "", rerr
+		}
+		for key, value := range acc {
+			if key == "exp" {
+				accExpires = value.(int64)
+			}
+			claims[key] = value
+		}
+	}
+
+	claims["id"] = payload.Username
+	claims["exp"] = accExpires
+
+	if len(scopes) > 0 {
+		claims["scopes"] = strings.Join(scopes, " ")
+	}
+
+	if jwtMiddleware.MaxRefresh != 0 {
+		claims["orig_iat"] = time.Now().Unix()
+	}
+
+	tokenString, err := token.SignedString(jwtMiddleware.Key)
+	if err != nil {
+		rerr = &utils.RError{
+			Msg:   "Error signing new token",
+			Error: "Error signing new token",
+			Code:  http.StatusInternalServerError,
+		}
+		return "", rerr
+	}
+
+	return tokenString, nil
+}
+
 // CreateBearerFromPersonalToken mints a short-lived JWT iff the supplied
 // (username, personalToken) pair resolves to a valid, non-deleted,
 // non-expired AuthToken owned by that username. Account passwords are
@@ -277,6 +342,47 @@ func CreateBearerFromPersonalToken(
 	}
 
 	return tokenString, nil
+}
+
+// IsValidPersonalToken tells whether secret is a valid personal access token
+// (PAT) usable to log in as the given account. PATs are the machine channel
+// and stay exempt from the two-factor step-up; this check is cheap (no
+// password hash comparison) so the login gate can classify the credential
+// before deciding whether to demand a second factor.
+func IsValidPersonalToken(ctx context.Context, username string, accountPrn string, secret string, mongoClient *mongo.Client) bool {
+	if mongoClient == nil || secret == "" {
+		return false
+	}
+
+	decoded, err := base64.RawStdEncoding.DecodeString(secret)
+	if err != nil {
+		return false
+	}
+
+	splitPassword := strings.Split(string(decoded), ":")
+	if len(splitPassword) < 2 {
+		return false
+	}
+
+	repo := tokenrepo.New(mongoClient)
+	service := tokenservice.New(repo)
+	authToken, err := service.GetToken(ctx, splitPassword[0], "")
+	if err != nil || authToken == nil {
+		return false
+	}
+
+	if authToken.Deleted || authToken.ExpireAt.Unix() <= time.Now().Unix() {
+		return false
+	}
+
+	if subtle.ConstantTimeCompare([]byte(authToken.Secret), []byte(secret)) != 1 {
+		return false
+	}
+
+	// bind strictly to ownership: a PAT authorizes only its owner's account,
+	// never an account whose login identifier merely equals the PAT's
+	// user-chosen Name
+	return authToken.Owner == accountPrn
 }
 
 func AuthWithUserPassFactory(mongoClient *mongo.Client) func(string, string) bool {

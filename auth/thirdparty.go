@@ -17,6 +17,7 @@
 package auth
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"net/http"
@@ -28,7 +29,9 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/accounts"
+	"gitlab.com/pantacor/pantahub-base/auth/authmodels"
 	"gitlab.com/pantacor/pantahub-base/auth/authservices"
+	"gitlab.com/pantacor/pantahub-base/auth/mfaservice"
 	"gitlab.com/pantacor/pantahub-base/auth/oauth"
 	"gitlab.com/pantacor/pantahub-base/auth/pkceservice"
 	"gitlab.com/pantacor/pantahub-base/utils"
@@ -156,6 +159,12 @@ func (a *App) HandleGetThirdPartyCallback(w rest.ResponseWriter, r *rest.Request
 		}
 	}
 
+	// social logins step up to the second factor like password logins do;
+	// the challenge is carried to the login page via the redirect fragment
+	if handled := a.maybeStartSocialMFALogin(w, r, account, payload.RedirectTo); handled {
+		return
+	}
+
 	token, err := createAccountToken(account)
 	if err != nil {
 		processErr(w, r.Request, err, err.Error(), http.StatusInternalServerError, payload.RedirectTo)
@@ -169,6 +178,62 @@ func (a *App) HandleGetThirdPartyCallback(w rest.ResponseWriter, r *rest.Request
 	}
 
 	w.WriteJson(token)
+}
+
+// maybeStartSocialMFALogin issues the MFA challenge for social logins into
+// accounts that have two-factor authentication enabled. Returns handled ==
+// true when a response was already written.
+func (a *App) maybeStartSocialMFALogin(w rest.ResponseWriter, r *rest.Request, account *accounts.Account, redirectTo string) bool {
+	if !mfaFeatureEnabled() || a.mfaRepo == nil {
+		return false
+	}
+
+	ctx, cancel := context.WithTimeout(r.Request.Context(), 10*time.Second)
+	defer cancel()
+
+	settings, err := a.mfaRepo.GetByOwner(ctx, account.Prn)
+	if err != nil {
+		// fail closed: never fall through to a single-factor social session
+		// for an account that may be MFA-protected when the state is unknown
+		processErr(w, r.Request, err, "Please try again later", http.StatusServiceUnavailable, redirectTo)
+		return true
+	}
+	if settings == nil || !settings.Enabled {
+		return false
+	}
+
+	methods := a.availableMFAMethods(ctx, settings)
+
+	mfaToken, err := mfaservice.CreateMFAPendingToken(
+		a.jwtMiddleware,
+		account.Nick,
+		account.Prn,
+		"",
+		[]string{"oauth"},
+		methods,
+	)
+	if err != nil {
+		processErr(w, r.Request, err, "Error creating MFA token", http.StatusInternalServerError, redirectTo)
+		return true
+	}
+
+	if redirectTo != "" {
+		redirectURI := fmt.Sprintf("%s#mfa_token=%s&mfa_methods=%s",
+			redirectTo,
+			url.QueryEscape(mfaToken),
+			url.QueryEscape(strings.Join(methods, ",")),
+		)
+		http.Redirect(w, r.Request, redirectURI, http.StatusTemporaryRedirect)
+		return true
+	}
+
+	noStore(w)
+	w.WriteJson(authmodels.MFARequiredResponse{
+		MFARequired: true,
+		MFAToken:    mfaToken,
+		Methods:     methods,
+	})
+	return true
 }
 
 // processErr reports an error to the caller, bouncing back to the return target

@@ -30,6 +30,34 @@ const (
 	// EnvPantahubScryptSecret scrypt secret
 	EnvPantahubScryptSecret = "PANTAHUB_SCRYPT_SECRET"
 
+	// EnvPantahubMfaEnabled master gate for the two-factor authentication and
+	// WebAuthn/passkey endpoints ("true"/"false")
+	// default: true
+	EnvPantahubMfaEnabled = "PANTAHUB_MFA_ENABLED"
+
+	// EnvPantahubMfaEncKey base64 encoded 32 byte AES-256-GCM key used to
+	// encrypt TOTP secrets at rest. MUST BE SET for TOTP enrollment to work.
+	EnvPantahubMfaEncKey = "PANTAHUB_MFA_ENC_KEY"
+
+	// EnvPantahubMfaPendingTimeoutMinutes TTL in minutes of the single-use
+	// MFA-pending token issued between the password step and the second factor
+	// default: 5
+	EnvPantahubMfaPendingTimeoutMinutes = "PANTAHUB_MFA_PENDING_TIMEOUT_MINUTES"
+
+	// EnvPantahubWebauthnRPID WebAuthn Relying Party ID: the registrable
+	// domain credentials are scoped to (e.g. "pantacor.com"). MUST BE SET per
+	// deployment for WebAuthn/passkeys to work.
+	EnvPantahubWebauthnRPID = "PANTAHUB_WEBAUTHN_RP_ID"
+
+	// EnvPantahubWebauthnRPOrigins comma separated list of exact origins
+	// (scheme://host[:port]) trusted for WebAuthn ceremonies. MUST BE SET per
+	// deployment for WebAuthn/passkeys to work.
+	EnvPantahubWebauthnRPOrigins = "PANTAHUB_WEBAUTHN_RP_ORIGINS"
+
+	// EnvPantahubWebauthnRPName WebAuthn Relying Party display name
+	// default: Pantacor Hub
+	EnvPantahubWebauthnRPName = "PANTAHUB_WEBAUTHN_RP_NAME"
+
 	// EnvPantahubJWTAuthPub Pantahub JWT Public Key. Public RSA key in base64 encoded PEM format
 	EnvPantahubJWTAuthPub = "PANTAHUB_JWT_PUB"
 
@@ -370,6 +398,12 @@ var defaultEnvs = map[string]string{
 	EnvPantahubJWESecret:                    "YOU MUST CHANGE THIS",
 	EnvPantahubJWEPub:                       "YOU MUST CHANGE THIS",
 	EnvPantahubScryptSecret:                 "YOU MUST CHANGE THIS",
+	EnvPantahubMfaEnabled:                   "true",
+	EnvPantahubMfaEncKey:                    "",
+	EnvPantahubMfaPendingTimeoutMinutes:     "5",
+	EnvPantahubWebauthnRPID:                 "",
+	EnvPantahubWebauthnRPOrigins:            "",
+	EnvPantahubWebauthnRPName:               "Pantacor Hub",
 	EnvPantahubJWTObjectSecret:              "YOU MUST CHANGE THIS",
 	EnvPantahubJWTTimeoutMinutes:            "60",
 	EnvPantahubRecoverJWTTimeoutMinutes:     "60",

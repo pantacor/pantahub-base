@@ -342,6 +342,10 @@ func testAuthAuthTokenPreservesState(t *testing.T) {
 }
 
 func testAuthAuthTokenClientUse(t *testing.T) {
+	if authTokenClient1 == "" {
+		t.Skip("no client token available; DoAuthorizeToken setup is disabled")
+	}
+
 	u := *serverURL
 	u.Path = "/auth_status"
 	res, err := utils.R().SetAuthToken(authTokenClient1).Get(u.String())
@@ -367,7 +371,7 @@ func testAuthAuthTokenClientUse(t *testing.T) {
 
 	if !ok {
 		t.Errorf("/auth_status with oauth2 implicit access token must return json with 'prn' field")
-		t.Fail()
+		return
 	}
 
 	if prn != "prn:pantahub.com:auth:/user1" {

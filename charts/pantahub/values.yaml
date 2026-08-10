@@ -71,8 +71,8 @@ env:
   MONGO_HOST: "mongo"
   MONGO_PORT: "27017"
   MONGO_DB: "pantabase-serv"
-  MONGO_USER: "user"
-  MONGO_PASS: "pass"
+  # MONGO_USER / MONGO_PASS are injected from mongo.appUser (the single
+  # credential source, kept next to the user bootstrap in the mongo section)
   SMTP_HOST: ""
   SMTP_PORT: ""
   SMTP_USER: ""
@@ -83,6 +83,7 @@ env:
   PANTAHUB_GC_REMOVE_GARBAGE: "true"
   PANTAHUB_GC_UNCLAIMED_EXPIRY: "P5D"
   PANTAHUB_GC_GARBAGE_EXPIRY: "P2D"
+  PANTAHUB_WEBHOOKS_PROXY_TRUST_INSECURE: "true"
 
 # ---------------------------------------------------------------------------
 # Services (one block per docker-compose service)
@@ -103,6 +104,7 @@ base:
     ENVFILE: "/dev/null"
     PANTAHUB_STORAGE_DRIVER: "local"
     PANTAHUB_S3PATH: "/local-s3"
+    PANTAHUB_WEBHOOKS_PROXY_TRUST_INSECURE: "true"
   persistence:
     # /local-s3 object storage when PANTAHUB_STORAGE_DRIVER=local
     size: 20Gi
@@ -181,6 +183,29 @@ phs:
     PANTAHUB_KAFKA_TOPIC_PREFIX: "pantabase1.pantabase-serv"
   resources: {}
 
+webhooks:
+  enabled: true
+  image: registry.gitlab.com/pantacor/services/webhooks
+  tag: main
+  service:
+    type: ClusterIP
+  env:
+    PH_WEBHOOKS_HTTP_ADDR: ":12380"
+    # PH_WEBHOOKS_MONGO_URI is derived from mongo.webhooksUser and this DB
+    # name; set it here explicitly only to point at an external mongo
+    PH_WEBHOOKS_MONGO_DB: "pantabase-webhooks"
+    PH_WEBHOOKS_KAFKA_BROKERS: "kafka:9092"
+    PH_WEBHOOKS_KAFKA_GROUP: "ph-webhooks-v1"
+    PH_WEBHOOKS_KAFKA_TOPIC_DEVICES: "pantabasemgo.pantabase-serv.pantahub_devices"
+    PH_WEBHOOKS_KAFKA_TOPIC_STEPS: "pantabasemgo.pantabase-serv.pantahub_steps"
+    PH_WEBHOOKS_PROXY_SECRET: ""
+    PH_WEBHOOKS_PROXY_SECRET_V2: ""
+    PH_WEBHOOKS_PROXY_TRUST_INSECURE: "true"
+    PH_WEBHOOKS_ALLOW_PRIVATE_TARGETS: "false"
+    PH_WEBHOOKS_ALLOW_HTTP_TARGETS: "false"
+    PH_WEBHOOKS_LOG_LEVEL: "info"
+  resources: {}
+
 fluentd:
   enabled: true
   image: registry.gitlab.com/pantacor/cloud/fluentd-ph
@@ -245,7 +270,11 @@ mongo:
   # bring-up and rendered into the kafka-connect connector configs, so each
   # credential lives in exactly one place:
   #   root user  -> mongo.env MONGO_INITDB_ROOT_USERNAME / _PASSWORD
-  #   app user   -> env MONGO_USER / MONGO_PASS (database env.MONGO_DB)
+  #   app user   -> mongo.appUser (database env.MONGO_DB; injected into the
+  #                 shared env as MONGO_USER / MONGO_PASS)
+  #   webhooks   -> mongo.webhooksUser (database
+  #                 webhooks.env.PH_WEBHOOKS_MONGO_DB; rendered into
+  #                 PH_WEBHOOKS_MONGO_URI)
   #   connectors -> mongo.connectUsers below
   # Passwords end up inside mongodb:// connection URIs: stick to URL-safe
   # characters (letters, digits, - _ . ~). Defaults are the well-known dev
@@ -254,6 +283,12 @@ mongo:
     MONGO_INITDB_ROOT_USERNAME: "admin"
     MONGO_INITDB_ROOT_PASSWORD: "admin"
     MONGO_RS: "rs0"
+  appUser:
+    username: "user"
+    password: "pass"
+  webhooksUser:
+    username: "webhooks"
+    password: "pass"
   connectUsers:
     # debezium source connector (pantabase.json), reads the oplog via admin
     source:

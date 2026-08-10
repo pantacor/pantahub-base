@@ -30,6 +30,32 @@ services:
             - PANTAHUB_STORAGE_DRIVER=local
             - PANTAHUB_S3PATH=/local-s3
 
+    # TLS ingress for local development (opt-in: --profile tls). Terminates
+    # HTTPS on :443 for the dev stack, kubernetes-ingress style: the
+    # Caddyfile (entrypoints/Caddyfile) is the routing resource and the
+    # mkcert root CA is the local issuer. Certificates and hostnames are
+    # provisioned by ../tls-local.sh, which also flips the WebAuthn RP and
+    # ui API-URL env vars to match.
+    proxy:
+        networks:
+            - base
+            - external
+        image: caddy:2-alpine
+        container_name: hub-tls-proxy
+        profiles:
+            - tls
+        ports:
+            - 443:443
+        extra_hosts:
+            # the ui dev server (vite) runs on the host, not in compose
+            - host.docker.internal:host-gateway
+        env_file:
+            - ./env.default
+            - ./.env.local
+        volumes:
+            - ./entrypoints/Caddyfile:/etc/caddy/Caddyfile:ro
+            - ../.certs:/certs:ro
+
     gc:
         networks:
             - base

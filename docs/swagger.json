@@ -685,7 +685,12 @@
         },
         "/auth/login": {
             "post": {
-                "description": "Get login token using username and password",
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "description": "Get login token using username and password. Supports both JSON body credentials and HTTP Basic Auth header. When Authorization: Basic is present, it takes precedence over the JSON body.",
                 "consumes": [
                     "application/json"
                 ],
@@ -698,10 +703,9 @@
                 "summary": "Get login token using username and password",
                 "parameters": [
                     {
-                        "description": "Login credentials",
+                        "description": "Login credentials (required if not using Basic Auth)",
                         "name": "body",
                         "in": "body",
-                        "required": true,
                         "schema": {
                             "$ref": "#/definitions/authmodels.LoginRequestPayload"
                         }
@@ -734,6 +738,1070 @@
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/login/mfa/recovery": {
+            "post": {
+                "description": "Second step of a two-factor login using a single-use recovery code. The code is invalidated on use.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Complete a pending login with a recovery code",
+                "parameters": [
+                    {
+                        "description": "Pending token and recovery code",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.MFALoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.TokenResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/login/mfa/totp": {
+            "post": {
+                "description": "Second step of a two-factor login: exchanges the mfa_token from POST /auth/login plus a valid authenticator code for a session token.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Complete a pending login with an authenticator (TOTP) code",
+                "parameters": [
+                    {
+                        "description": "Pending token and authenticator code",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.MFALoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.TokenResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/login/mfa/webauthn": {
+            "post": {
+                "description": "Returns assertion options for the account's registered security keys/passkeys. Authenticated by the mfa_token from POST /auth/login.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Start the WebAuthn second factor of a pending login",
+                "parameters": [
+                    {
+                        "description": "Pending token",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.WebauthnLoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.WebauthnOptionsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/login/mfa/webauthn/finish": {
+            "post": {
+                "description": "Verifies the WebAuthn assertion and exchanges the mfa_token for a session token.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Complete a pending login with a security key or passkey",
+                "parameters": [
+                    {
+                        "description": "Pending token, session id and browser assertion response",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.WebauthnLoginFinishRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.TokenResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/login/webauthn/begin": {
+            "post": {
+                "description": "Begins a usernameless WebAuthn ceremony with discoverable credentials. User verification is required; a successful passkey assertion counts as multi-factor on its own.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Start a passkey sign-in",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.WebauthnOptionsResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/login/webauthn/finish": {
+            "post": {
+                "description": "Verifies the discoverable-credential assertion, resolves the account from the asserted user handle and mints a session token. No password involved.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Complete a passkey sign-in",
+                "parameters": [
+                    {
+                        "description": "Session id and browser assertion response",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.PasskeyLoginFinishRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.TokenResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/mfa": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns whether MFA is enabled and which factors are configured for the authenticated user.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Get the caller's two-factor authentication status",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.MFAStatusResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/mfa/reauth/recovery": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Re-proves the account with a single-use recovery code and returns a short-lived sudo token.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Re-authenticate with a recovery code",
+                "parameters": [
+                    {
+                        "description": "Recovery code",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.MFASudoCodeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.SudoResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/mfa/reauth/totp": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Re-proves an existing TOTP factor and returns a short-lived sudo token used to authorize sensitive MFA-management operations.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Re-authenticate with an authenticator (TOTP) code",
+                "parameters": [
+                    {
+                        "description": "Authenticator code",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.MFASudoCodeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.SudoResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/mfa/reauth/webauthn": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns assertion options for the caller's registered security keys/passkeys; completing it yields a sudo token for sensitive MFA-management operations.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Start a WebAuthn re-authentication",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.WebauthnOptionsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/mfa/reauth/webauthn/finish": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Verifies the WebAuthn assertion and returns a short-lived sudo token.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Finish a WebAuthn re-authentication",
+                "parameters": [
+                    {
+                        "description": "Session id and browser assertion",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.WebauthnSudoFinishRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.SudoResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/mfa/recovery/regenerate": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Replaces the recovery code set with a fresh one (shown exactly once). Requires the account password (or a fresh session for passwordless accounts) and enabled two-factor authentication.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Regenerate recovery codes",
+                "parameters": [
+                    {
+                        "description": "Fresh-auth proof",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.MFAPasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.RecoveryCodesResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/mfa/totp": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Generates a fresh TOTP secret for the authenticated user. Requires the account password (or a fresh session for passwordless accounts). The enrollment stays pending until confirmed with a first valid code.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Start a TOTP (authenticator app) enrollment",
+                "parameters": [
+                    {
+                        "description": "Fresh-auth proof",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.MFAPasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.TOTPEnrollResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Removes the authenticator app factor. Requires the account password (or a fresh session for passwordless accounts). Disables two-factor authentication when no other factor remains.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Remove the TOTP authenticator factor",
+                "parameters": [
+                    {
+                        "description": "Fresh-auth proof",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.MFAPasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {},
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/mfa/totp/confirm": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Verifies the first code from the authenticator app, enables two-factor authentication and returns the single-use recovery codes (shown exactly once).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Confirm a pending TOTP enrollment",
+                "parameters": [
+                    {
+                        "description": "First authenticator code",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.TOTPConfirmRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.RecoveryCodesResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/mfa/webauthn/credentials/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Removes a credential. Requires the account password (or a fresh session for passwordless accounts). Disables two-factor authentication when no other factor remains.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Remove a registered security key or passkey",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Credential id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Fresh-auth proof",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.MFAPasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {},
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Rename a registered security key or passkey",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Credential id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "New label",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.WebauthnRenameRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.WebauthnCredentialInfo"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/mfa/webauthn/register": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Begins a WebAuthn registration ceremony. Requires the account password (or a fresh session for passwordless accounts). Set passkey to true to register a discoverable credential usable for passwordless sign-in.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Start registering a security key or passkey",
+                "parameters": [
+                    {
+                        "description": "Fresh-auth proof and credential kind",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.WebauthnRegisterRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.WebauthnOptionsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/mfa/webauthn/register/finish": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Verifies the authenticator's attestation response and stores the credential. Returns fresh recovery codes when this registration turned two-factor authentication on.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Finish registering a security key or passkey",
+                "parameters": [
+                    {
+                        "description": "Session id, label and browser credential response",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.WebauthnRegisterFinishRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.WebauthnRegisterFinishResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/utils.RError"
                         }
@@ -875,7 +1943,7 @@
         },
         "/auth/password": {
             "post": {
-                "description": "send email with token to user in order to reset password to given user",
+                "description": "gets the recovery token and validate it in order to overwrite the user password",
                 "consumes": [
                     "application/json"
                 ],
@@ -885,7 +1953,7 @@
                 "tags": [
                     "auth"
                 ],
-                "summary": "send email with token to user in order to reset password to given user",
+                "summary": "gets the recovery token and validate it in order to overwrite the user password",
                 "parameters": [
                     {
                         "description": "New password payload",
@@ -1100,6 +2168,63 @@
                     },
                     "404": {
                         "description": "Account not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Error processing request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/token/refresh": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Refresh a token previously obtained via POST /auth/token.\nThe caller must authenticate as the service that owns the token\n(i.e. its PRN must equal the token's \"aud\" claim).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Refresh a service-issued user access token",
+                "parameters": [
+                    {
+                        "description": "Token to refresh",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.TokenRefreshRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/authmodels.TokenResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid payload",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/utils.RError"
                         }
@@ -1969,6 +3094,59 @@
             }
         },
         "/devices/tokens/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get a device token by ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "devices"
+                ],
+                "summary": "Get a device token by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.PantahubDevicesJoinToken"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            },
             "delete": {
                 "security": [
                     {
@@ -2004,6 +3182,68 @@
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Update specific fields (Nick, OVMode) of a device token.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "devices"
+                ],
+                "summary": "Update a device token (Nick and OVMode only)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID of the token to update",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Fields to update",
+                        "name": "tokenBody",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/devices.patchDeviceTokenRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.PantahubDevicesJoinToken"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/utils.RError"
                         }
@@ -2118,6 +3358,12 @@
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/utils.RError"
                         }
@@ -5453,6 +6699,81 @@
                 }
             }
         },
+        "authmodels.MFALoginRequest": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "mfa_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "authmodels.MFAPasswordRequest": {
+            "type": "object",
+            "properties": {
+                "password": {
+                    "type": "string"
+                },
+                "sudo_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "authmodels.MFAStatusResponse": {
+            "type": "object",
+            "properties": {
+                "mfa_enabled": {
+                    "type": "boolean"
+                },
+                "password_set": {
+                    "type": "boolean"
+                },
+                "recovery_codes_remaining": {
+                    "type": "integer"
+                },
+                "totp": {
+                    "$ref": "#/definitions/authmodels.MFAStatusTOTP"
+                },
+                "webauthn": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/authmodels.WebauthnCredentialInfo"
+                    }
+                }
+            }
+        },
+        "authmodels.MFAStatusTOTP": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "pending": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "authmodels.MFASudoCodeRequest": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                }
+            }
+        },
+        "authmodels.PasskeyLoginFinishRequest": {
+            "type": "object",
+            "properties": {
+                "credential": {
+                    "type": "object"
+                },
+                "session_id": {
+                    "type": "string"
+                }
+            }
+        },
         "authmodels.PasswordReset": {
             "type": "object",
             "properties": {
@@ -5472,9 +6793,58 @@
                 }
             }
         },
+        "authmodels.RecoveryCodesResponse": {
+            "type": "object",
+            "properties": {
+                "recovery_codes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "authmodels.SudoResponse": {
+            "type": "object",
+            "properties": {
+                "sudo_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "authmodels.TOTPConfirmRequest": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                }
+            }
+        },
+        "authmodels.TOTPEnrollResponse": {
+            "type": "object",
+            "properties": {
+                "otpauth_url": {
+                    "type": "string"
+                },
+                "secret": {
+                    "type": "string"
+                }
+            }
+        },
+        "authmodels.TokenRefreshRequest": {
+            "type": "object",
+            "properties": {
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
         "authmodels.TokenResponse": {
             "type": "object",
             "properties": {
+                "expires_in": {
+                    "type": "integer"
+                },
                 "redirect_uri": {
                     "type": "string"
                 },
@@ -5488,6 +6858,120 @@
                     "type": "string"
                 },
                 "token_type": {
+                    "type": "string"
+                }
+            }
+        },
+        "authmodels.WebauthnCredentialInfo": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "is_passkey": {
+                    "type": "boolean"
+                },
+                "last_used_at": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "time-created": {
+                    "type": "string"
+                }
+            }
+        },
+        "authmodels.WebauthnLoginFinishRequest": {
+            "type": "object",
+            "properties": {
+                "credential": {
+                    "type": "object"
+                },
+                "mfa_token": {
+                    "type": "string"
+                },
+                "session_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "authmodels.WebauthnLoginRequest": {
+            "type": "object",
+            "properties": {
+                "mfa_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "authmodels.WebauthnOptionsResponse": {
+            "type": "object",
+            "properties": {
+                "options": {
+                    "type": "object"
+                },
+                "session_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "authmodels.WebauthnRegisterFinishRequest": {
+            "type": "object",
+            "properties": {
+                "credential": {
+                    "type": "object"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "session_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "authmodels.WebauthnRegisterFinishResponse": {
+            "type": "object",
+            "properties": {
+                "credential": {
+                    "$ref": "#/definitions/authmodels.WebauthnCredentialInfo"
+                },
+                "recovery_codes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "authmodels.WebauthnRegisterRequest": {
+            "type": "object",
+            "properties": {
+                "passkey": {
+                    "type": "boolean"
+                },
+                "password": {
+                    "type": "string"
+                },
+                "sudo_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "authmodels.WebauthnRenameRequest": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "authmodels.WebauthnSudoFinishRequest": {
+            "type": "object",
+            "properties": {
+                "credential": {
+                    "type": "object"
+                },
+                "session_id": {
                     "type": "string"
                 }
             }
@@ -5711,6 +7195,9 @@
                 "mark_public_processed": {
                     "type": "boolean"
                 },
+                "meta-modified": {
+                    "type": "string"
+                },
                 "nick": {
                     "type": "string"
                 },
@@ -5772,6 +7259,23 @@
         "devices.metaDataPayload": {
             "type": "object",
             "additionalProperties": true
+        },
+        "devices.patchDeviceTokenRequest": {
+            "type": "object",
+            "properties": {
+                "default-user-meta": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "nick": {
+                    "type": "string"
+                },
+                "ovmode": {
+                    "$ref": "#/definitions/models.OVModeExtension"
+                }
+            }
         },
         "devices.registerReq": {
             "type": "object",
@@ -6292,12 +7796,16 @@
                     "description": "progress number. steps or 1-100",
                     "$ref": "#/definitions/trailmodels.DownloadProgress"
                 },
-                "log": {
+                "logs": {
                     "description": "log if available",
                     "type": "string"
                 },
                 "progress": {
                     "description": "progress number. steps or 1-100",
+                    "type": "integer"
+                },
+                "retries": {
+                    "description": "number of retries attempted",
                     "type": "integer"
                 },
                 "status": {

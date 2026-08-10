@@ -8,9 +8,12 @@ MONGO_PORT=${MONGO_PORT:-27017}
 # the mongo section of values.yaml); also used by the connector configs
 MONGO_ROOT_USER='{{ .Values.mongo.env.MONGO_INITDB_ROOT_USERNAME }}'
 MONGO_ROOT_PASS='{{ .Values.mongo.env.MONGO_INITDB_ROOT_PASSWORD }}'
-MONGO_APP_USER='{{ .Values.env.MONGO_USER }}'
-MONGO_APP_PASS='{{ .Values.env.MONGO_PASS }}'
+MONGO_APP_USER='{{ .Values.mongo.appUser.username }}'
+MONGO_APP_PASS='{{ .Values.mongo.appUser.password }}'
 MONGO_APP_DB='{{ .Values.env.MONGO_DB }}'
+MONGO_WEBHOOKS_USER='{{ .Values.mongo.webhooksUser.username }}'
+MONGO_WEBHOOKS_PASS='{{ .Values.mongo.webhooksUser.password }}'
+MONGO_WEBHOOKS_DB='{{ .Values.webhooks.env.PH_WEBHOOKS_MONGO_DB }}'
 MONGO_SINK_USER='{{ .Values.mongo.connectUsers.sink.username }}'
 MONGO_SINK_PASS='{{ .Values.mongo.connectUsers.sink.password }}'
 MONGO_SOURCE_USER='{{ .Values.mongo.connectUsers.source.username }}'
@@ -52,6 +55,13 @@ chmod 600 /keys/mongokey.yaml
   # App user
   if ! mongo --eval 'db.getUsers()' "mongodb://${MONGO_APP_USER}:${MONGO_APP_PASS}@localhost:${MONGO_PORT}/${MONGO_APP_DB}?authSource=${MONGO_APP_DB}&authMechanism=SCRAM-SHA-1&replicaSet=${MONGO_RS}" > /dev/null 2>&1; then
     until mongo --eval "db.createUser({user: \"${MONGO_APP_USER}\", pwd: \"${MONGO_APP_PASS}\", roles: [{role: \"readWrite\", db:\"${MONGO_APP_DB}\"}], mechanisms: [\"SCRAM-SHA-1\"]})" "mongodb://localhost:${MONGO_PORT}/${MONGO_APP_DB}?replicaSet=${MONGO_RS}"; do
+      sleep 2
+    done
+  fi
+
+  # Webhooks user
+  if ! mongo --eval 'db.getUsers()' "mongodb://${MONGO_WEBHOOKS_USER}:${MONGO_WEBHOOKS_PASS}@localhost:${MONGO_PORT}/${MONGO_WEBHOOKS_DB}?authSource=${MONGO_WEBHOOKS_DB}&authMechanism=SCRAM-SHA-1&replicaSet=${MONGO_RS}" > /dev/null 2>&1; then
+    until mongo --eval "db.createUser({user: \"${MONGO_WEBHOOKS_USER}\", pwd: \"${MONGO_WEBHOOKS_PASS}\", roles: [{role: \"readWrite\", db:\"${MONGO_WEBHOOKS_DB}\"}], mechanisms: [\"SCRAM-SHA-1\"]})" "mongodb://localhost:${MONGO_PORT}/${MONGO_WEBHOOKS_DB}?replicaSet=${MONGO_RS}"; do
       sleep 2
     done
   fi
