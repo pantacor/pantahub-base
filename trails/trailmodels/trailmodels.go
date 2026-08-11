@@ -124,9 +124,10 @@ type TrailSummary struct {
 }
 
 // FillLastSeen falls back to Timestamp for summaries created before
-// devices started reporting meta-modified.
+// devices started reporting meta-modified. The devicesummary sink stores
+// unset values as the unix epoch, so both zero times count as unset.
 func (s *TrailSummary) FillLastSeen() {
-	if s.LastSeen.IsZero() {
+	if s.LastSeen.IsZero() || s.LastSeen.Unix() == 0 {
 		s.LastSeen = s.Timestamp
 	}
 }
