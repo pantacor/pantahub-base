@@ -115,6 +115,7 @@ func (a *App) handleGetTrailSummary(w rest.ResponseWriter, r *rest.Request) {
 			utils.RestErrorWrapper(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
 			return
 		}
+		result.FillLastSeen()
 		summaries = append(summaries, result)
 	}
 

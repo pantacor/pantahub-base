@@ -100,6 +100,8 @@ func (a *App) handleGetTrailStepSummary(w rest.ResponseWriter, r *rest.Request) 
 		return
 	}
 
+	summary.FillLastSeen()
+
 	if owner != summary.Owner {
 		summary.FleetGroup = ""
 		summary.FleetLocation = ""

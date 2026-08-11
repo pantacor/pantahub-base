@@ -144,7 +144,8 @@ func (a *App) handleGetSummary(w rest.ResponseWriter, r *rest.Request) {
 		dInfo.Nick = v.DeviceNick
 		dInfo.DeviceID = v.DeviceID
 		dInfo.Status = v.Status
-		dInfo.LastActivity = v.Timestamp
+		v.FillLastSeen()
+		dInfo.LastActivity = v.LastSeen
 		summary.TopDevices = append(summary.TopDevices, dInfo)
 	}
 

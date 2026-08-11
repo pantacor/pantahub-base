@@ -111,6 +111,7 @@ type TrailSummary struct {
 	StatusMsg        string    `json:"status-msg" bson:"status_msg"` // message of progress status
 	Status           string    `json:"status" bson:"status"`         // status code
 	Timestamp        time.Time `json:"timestamp" bson:"timestamp"`   // greater of last seen and last modified
+	LastSeen         time.Time `json:"last-seen" bson:"meta_modified"` // last time the device pushed device-meta
 	StepTime         time.Time `json:"step-time" bson:"step_time"`
 	ProgressTime     time.Time `json:"progress-time" bson:"progress_time"`
 	TrailTouchedTime time.Time `json:"trail-touched-time" bson:"trail_touched_time"`
@@ -120,4 +121,12 @@ type TrailSummary struct {
 	FleetLocation    string    `json:"fleet-location" bson:"fleet_location"`
 	FleetRev         string    `json:"fleet-rev" bson:"fleet_rev"`
 	Owner            string    `json:"-" bson:"owner"`
+}
+
+// FillLastSeen falls back to Timestamp for summaries created before
+// devices started reporting meta-modified.
+func (s *TrailSummary) FillLastSeen() {
+	if s.LastSeen.IsZero() {
+		s.LastSeen = s.Timestamp
+	}
 }
