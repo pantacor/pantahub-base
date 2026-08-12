@@ -1,4 +1,4 @@
-// Copyright 2026  Pantacor Ltd.
+// Copyright 2026 Pantacor Ltd.
 //
 
 package auth
