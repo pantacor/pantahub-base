@@ -236,7 +236,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, subService subscriptions.Subscription
 		// default api
 		rest.Get("/auth_status", utils.ScopeFilter(readDevicesScopes, handleAuth)),
 		rest.Get("/", utils.ScopeFilter(readDevicesScopes, app.handleGetDevices)),
-		rest.Post("/", utils.ScopeFilter(writeDevicesScopes,
+		rest.Post("/", utils.ScopeFilterOptionalAuth(writeDevicesScopes,
 			func(writer rest.ResponseWriter, request *rest.Request) {
 				userAgent := request.Header.Get("User-Agent")
 				if userAgent == "" {
