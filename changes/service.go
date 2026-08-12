@@ -34,10 +34,9 @@ import (
 	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-base/utils/tracer"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/x/bsonx"
-	"gopkg.in/mgo.v2/bson"
 )
 
 const createIndexTimeout = 3000 * time.Second
@@ -392,9 +391,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	indexOptionsTrails := indexOptionDevices
 
 	index1 := mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "owner", Value: bsonx.Int32(1)},
-			{Key: devicesLastModifiedKeyConst, Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "owner", Value: int32(1)},
+			{Key: devicesLastModifiedKeyConst, Value: int32(1)},
 		},
 		Options: &indexOptionDevices,
 	}
@@ -405,9 +404,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	}
 
 	index2 := mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "owner", Value: bsonx.Int32(1)},
-			{Key: stepsLastModifiedKeyConst, Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "owner", Value: int32(1)},
+			{Key: stepsLastModifiedKeyConst, Value: int32(1)},
 		},
 		Options: &indexOptionsSteps,
 	}
@@ -419,9 +418,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	}
 
 	index3 := mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "owner", Value: bsonx.Int32(1)},
-			{Key: trailsLastModifiedKeyConst, Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "owner", Value: int32(1)},
+			{Key: trailsLastModifiedKeyConst, Value: int32(1)},
 		},
 		Options: &indexOptionsTrails,
 	}
@@ -438,15 +437,12 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		"/changes:", log.Lshortfile)})
 	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "changes"})
 	app.API.Use(&rest.StatusMiddleware{})
-	app.API.Use(&rest.TimerMiddleware{})
 	app.API.Use(&metrics.Middleware{})
 
 	app.API.Use(rest.DefaultCommonStack...)
 	app.API.Use(&rest.CorsMiddleware{
-		RejectNonCorsRequests: false,
-		OriginValidator: func(origin string, request *rest.Request) bool {
-			return true
-		},
+		RejectNonCorsRequests:         false,
+		OriginValidator:               utils.AllowlistedOrigin,
 		AllowedMethods:                []string{"GET"},
 		AllowedHeaders:                []string{"*"},
 		AccessControlAllowCredentials: true,

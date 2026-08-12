@@ -2,7 +2,7 @@
 #
 # Ingress-style routing: one HTTPS entrypoint on :443, SNI-routed per
 # hostname to the ui dev server (on the host) and the api container.
-# HUB_TLS_UI_HOST / HUB_TLS_API_HOST are written into .env.local by
+# HUB_TLS_*_HOST values are written into .env.local by
 # ../tls-local.sh (a <lan-ip>.sslip.io name pair, so phones on the same
 # network resolve them too); hub.localhost aliases work on the dev machine
 # itself. The certificate is minted by mkcert (the "local issuer") into
@@ -20,6 +20,11 @@ https://{$HUB_TLS_UI_HOST}:443, https://hub.localhost:443 {
 https://{$HUB_TLS_API_HOST}:443, https://api.hub.localhost:443 {
 	tls /certs/hub.pem /certs/hub-key.pem
 	reverse_proxy base:12365
+}
+
+https://{$HUB_TLS_PVR_HOST}:443, https://pvr.hub.localhost:443 {
+	tls /certs/hub.pem /certs/hub-key.pem
+	reverse_proxy pvr:12367
 }
 
 https://{$HUB_TLS_FLEET_HOST}:443, https://fleet.hub.localhost:443 {

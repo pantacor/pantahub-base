@@ -35,9 +35,9 @@ import (
 	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-base/utils/tracer"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/x/bsonx"
 )
 
 const (
@@ -124,8 +124,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	indexOptions.SetBackground(true)
 
 	index := mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "nick", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "nick", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -145,8 +145,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "prn", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "prn", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -166,8 +166,29 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "email", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "connected_providers.service", Value: int32(1)},
+			{Key: "connected_providers.provider_id", Value: int32(1)},
+		},
+		Options: &indexOptions,
+	}
+	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
+	if err != nil {
+		log.Fatalln("Error setting up connected provider index for pantahub_accounts: " + err.Error())
+		return nil
+	}
+
+	CreateIndexesOptions = options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+
+	indexOptions = options.IndexOptions{}
+	indexOptions.SetUnique(true)
+	indexOptions.SetSparse(true)
+	indexOptions.SetBackground(true)
+
+	index = mongo.IndexModel{
+		Keys: bson.D{
+			{Key: "email", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -199,15 +220,12 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		"/auth:", log.Lshortfile)})
 	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "auth"})
 	app.API.Use(&rest.StatusMiddleware{})
-	app.API.Use(&rest.TimerMiddleware{})
 	app.API.Use(&metrics.Middleware{})
-	app.API.Use(rest.DefaultDevStack...)
+	app.API.Use(rest.DefaultCommonStack...)
 	app.API.Use(&rest.CorsMiddleware{
 		RejectNonCorsRequests: false,
-		OriginValidator: func(origin string, request *rest.Request) bool {
-			return true
-		},
-		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		OriginValidator:       utils.AllowlistedOrigin,
+		AllowedMethods:        []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{
 			"Accept",
 			"Content-Type",
@@ -265,6 +283,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		rest.Post("/mfa/webauthn/register/finish", app.handlePostWebauthnRegisterFinish),
 		rest.Patch("/mfa/webauthn/credentials/#id", app.handlePatchWebauthnCredential),
 		rest.Delete("/mfa/webauthn/credentials/#id", app.handleDeleteWebauthnCredential),
+		rest.Get("/connected-providers", app.handleGetConnectedProviders),
+		rest.Post("/connected-providers", app.handlePostConnectedProvider),
+		rest.Delete("/connected-providers", app.handleDeleteConnectedProvider),
 		rest.Post("/token", app.handlePostToken),
 		rest.Post("/token/refresh", app.handlePostTokenRefresh),
 		rest.Get("/auth_status", handleAuthStatus),

@@ -272,10 +272,10 @@ func TestBsonUnquoteMap_ValueSide(t *testing.T) {
 	// unchanged — the runtime unquoter doesn't get to guess.
 	// `.` in a value never gets touched either direction.
 	in := map[string]interface{}{
-		"clean":            "￠{VAR}",                   // canonical: ￠ in value, reversed
-		"opaque_n":         "pvwificonnect/srcＮjson",   // Ｎ in value: legitimate, preserved
+		"clean":            "￠{VAR}",                  // canonical: ￠ in value, reversed
+		"opaque_n":         "pvwificonnect/srcＮjson",  // Ｎ in value: legitimate, preserved
 		"mixed":            "￠cmd with Ｎdot and ￠ref", // ￠ reversed, Ｎ preserved
-		"dotted.preserved": "a.b.c",                    // `.` untouched in value
+		"dotted.preserved": "a.b.c",                   // `.` untouched in value
 	}
 	got := BsonUnquoteMap(&in)
 

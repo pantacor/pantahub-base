@@ -58,10 +58,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware,
 	app.API.Use(rest.DefaultCommonStack...)
 	app.API.Use(&rest.CorsMiddleware{
 		RejectNonCorsRequests: false,
-		OriginValidator: func(origin string, request *rest.Request) bool {
-			return true
-		},
-		AllowedMethods: []string{"PUT"},
+		OriginValidator:       utils.AllowlistedOrigin,
+		AllowedMethods:        []string{"PUT"},
 		AllowedHeaders: []string{
 			"Accept",
 			"Content-Type",

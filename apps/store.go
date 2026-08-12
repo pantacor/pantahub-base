@@ -92,9 +92,12 @@ func LoginAsApp(serviceID, secret string, database *mongo.Database) (*TPApp, err
 	}
 
 	tpApp := &TPApp{}
-	dbResult := collection.FindOne(ctx, findQuery)
-
-	dbResult.Decode(tpApp)
+	if err := collection.FindOne(ctx, findQuery).Decode(tpApp); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, nil
+		}
+		return nil, err
+	}
 	return tpApp, nil
 }
 

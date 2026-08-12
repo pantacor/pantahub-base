@@ -33,9 +33,9 @@ import (
 	"gitlab.com/pantacor/pantahub-base/utils/tracer"
 
 	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/x/bsonx"
 
 	"github.com/alecthomas/units"
 	"github.com/ant0ine/go-json-rest/rest"
@@ -242,9 +242,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, subService subscriptions.Subscription
 	indexOptions.SetBackground(true)
 
 	index := mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "owner", Value: bsonx.Int32(1)},
-			{Key: "garbage", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "owner", Value: int32(1)},
+			{Key: "garbage", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -260,16 +260,13 @@ func New(jwtMiddleware *jwt.JWTMiddleware, subService subscriptions.Subscription
 		"/objects:", log.Lshortfile)})
 	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "objects"})
 	app.API.Use(&rest.StatusMiddleware{})
-	app.API.Use(&rest.TimerMiddleware{})
 	app.API.Use(&metrics.Middleware{})
 
 	app.API.Use(rest.DefaultCommonStack...)
 	app.API.Use(&rest.CorsMiddleware{
 		RejectNonCorsRequests: false,
-		OriginValidator: func(origin string, request *rest.Request) bool {
-			return true
-		},
-		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		OriginValidator:       utils.AllowlistedOrigin,
+		AllowedMethods:        []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{
 			"Accept",
 			"Content-Type",

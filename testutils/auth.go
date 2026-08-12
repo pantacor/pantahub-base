@@ -20,7 +20,7 @@ func DoLogin(t *testing.T, serverURL *url.URL, username string, password string)
 	}).Post(u.String())
 
 	if err != nil {
-		t.Errorf("internal error calling test server " + err.Error())
+		t.Errorf("%s", "internal error calling test server "+err.Error())
 		t.Fail()
 	}
 
@@ -34,7 +34,7 @@ func DoLogin(t *testing.T, serverURL *url.URL, username string, password string)
 	err = json.Unmarshal(res.Body(), &resMap)
 
 	if err != nil {
-		t.Errorf("Bad json returned from server for login " + err.Error())
+		t.Errorf("%s", "Bad json returned from server for login "+err.Error())
 		t.Fail()
 	}
 
@@ -42,7 +42,7 @@ func DoLogin(t *testing.T, serverURL *url.URL, username string, password string)
 
 	token, ok := resMap["token"].(string)
 	if !ok {
-		t.Errorf("Body contained no token: " + string(res.Body()))
+		t.Errorf("%s", "Body contained no token: "+string(res.Body()))
 		t.Fail()
 	}
 

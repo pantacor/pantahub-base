@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"gitlab.com/pantacor/pantahub-base/utils"
@@ -38,6 +39,7 @@ var (
 const oauthGitlabURLAPI = "https://gitlab.com/api/v4/user?access_token="
 
 type gitlabPayload struct {
+	ID       int64  `json:"id"`
 	Email    string `json:"email"`
 	Username string `json:"username"`
 	State    string `json:"state"`
@@ -90,11 +92,15 @@ func GitlabCb(ctx context.Context, config *oauth2.Config, code string) (*Respons
 	if payload.State != "active" {
 		return &ResponsePayload{RedirectTo: ""}, fmt.Errorf("user is not active")
 	}
+	if payload.ID <= 0 {
+		return &ResponsePayload{RedirectTo: ""}, fmt.Errorf("gitlab user ID is missing")
+	}
 
 	return &ResponsePayload{
-		Email: payload.Email,
-		Nick:  payload.Username,
-		Raw:   string(data),
+		Email:      payload.Email,
+		Nick:       payload.Username,
+		ProviderID: strconv.FormatInt(payload.ID, 10),
+		Raw:        string(data),
 	}, nil
 }
 

@@ -24,6 +24,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
@@ -42,6 +43,7 @@ var (
 const oauthGithubURLAPI = "https://api.github.com/user"
 
 type githubPayload struct {
+	ID    int64  `json:"id"`
 	Login string `json:"login"`
 	Email string `json:"email"`
 }
@@ -88,11 +90,15 @@ func GithubCb(ctx context.Context, config *oauth2.Config, code string) (*Respons
 	if err != nil {
 		return &ResponsePayload{RedirectTo: ""}, err
 	}
+	if payload.ID <= 0 {
+		return &ResponsePayload{RedirectTo: ""}, fmt.Errorf("github user ID is missing")
+	}
 
 	return &ResponsePayload{
-		Email: payload.Email,
-		Nick:  payload.Login,
-		Raw:   string(data),
+		Email:      payload.Email,
+		Nick:       payload.Login,
+		ProviderID: strconv.FormatInt(payload.ID, 10),
+		Raw:        string(data),
 	}, nil
 }
 

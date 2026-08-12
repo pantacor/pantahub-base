@@ -1,7 +1,5 @@
 #!/bin/sh
 
-set -x
-
 # Wait for the pantabase Debezium connector to exist
 echo "PHS: Waiting for pantabase connector to be registered..."
 until curl -s -f http://kafka-connect:8083/connectors/pantabase > /dev/null 2>&1; do

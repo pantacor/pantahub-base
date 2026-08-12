@@ -18,11 +18,11 @@ func TestTarEntrySize(t *testing.T) {
 		content int64
 		want    int64
 	}{
-		{0, 512},        // header only, no content blocks
-		{1, 1024},       // header + one padded block
-		{512, 1024},     // header + exactly one block
-		{513, 1536},     // header + two blocks
-		{1024, 1536},    // header + two blocks
+		{0, 512},     // header only, no content blocks
+		{1, 1024},    // header + one padded block
+		{512, 1024},  // header + exactly one block
+		{513, 1536},  // header + two blocks
+		{1024, 1536}, // header + two blocks
 	}
 	for _, tc := range cases {
 		if got := tarEntrySize(tc.content); got != tc.want {

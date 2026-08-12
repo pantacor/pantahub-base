@@ -21,10 +21,10 @@ import (
 	"time"
 
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/x/bsonx"
-	"gopkg.in/mgo.v2/bson"
+	mgo "gopkg.in/mgo.v2/bson"
 )
 
 // SubscriptionPage pagination for subscription
@@ -79,7 +79,7 @@ type subscriptionService struct {
 }
 
 var (
-	defaultSubscriptionID = bson.NewObjectId().Hex()
+	defaultSubscriptionID = mgo.NewObjectId().Hex()
 	defaultSubscription   = SubscriptionMgo{
 		ID:         defaultSubscriptionID,
 		Prn:        utils.Prn("prn::subscriptions:/" + defaultSubscriptionID),
@@ -101,7 +101,7 @@ func (i subscriptionService) New(
 
 	// create subscription object
 	s := SubscriptionMgo{}
-	s.ID = bson.NewObjectId().Hex()
+	s.ID = mgo.NewObjectId().Hex()
 	s.Prn = utils.Prn("prn::subscriptions:/" + s.ID)
 	s.service = i
 	s.Subject = subject
@@ -309,9 +309,9 @@ func (i subscriptionService) ensureIndices() error {
 	indexOptions.SetUnique(true)
 
 	index := mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "service", Value: bsonx.Int32(1)},
-			{Key: "subject", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "service", Value: int32(1)},
+			{Key: "subject", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}

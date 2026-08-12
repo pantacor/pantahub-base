@@ -27,11 +27,10 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	"gitlab.com/pantacor/pantahub-base/gcapi"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/x/bsonx"
-	"gopkg.in/mgo.v2/bson"
 	"gopkg.in/resty.v1"
 )
 
@@ -52,9 +51,9 @@ func (app *App) EnsureDevicesIndices() error {
 	indexOptions.SetBackground(true)
 
 	index := mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "owner", Value: bsonx.Int32(1)},
-			{Key: "nick", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "owner", Value: int32(1)},
+			{Key: "nick", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -73,8 +72,8 @@ func (app *App) EnsureDevicesIndices() error {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "timemodified", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "timemodified", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -94,8 +93,8 @@ func (app *App) EnsureDevicesIndices() error {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "prn", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "prn", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -115,9 +114,9 @@ func (app *App) EnsureDevicesIndices() error {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "owner", Value: bsonx.Int32(1)},
-			{Key: "garbage", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "owner", Value: int32(1)},
+			{Key: "garbage", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -137,9 +136,9 @@ func (app *App) EnsureDevicesIndices() error {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "device", Value: bsonx.Int32(1)},
-			{Key: "garbage", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "device", Value: int32(1)},
+			{Key: "garbage", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}

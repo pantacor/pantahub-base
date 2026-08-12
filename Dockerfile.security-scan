@@ -1,0 +1,10 @@
+# Reproduce the CI Go security scan locally in Docker.
+FROM golang:1.25.12
+
+ENV GOPRIVATE=gitlab.com/pantacor/*
+WORKDIR /src
+
+COPY security_scan.sh /usr/local/bin/security_scan.sh
+RUN chmod +x /usr/local/bin/security_scan.sh
+
+CMD ["/usr/local/bin/security_scan.sh"]

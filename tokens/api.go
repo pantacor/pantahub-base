@@ -70,17 +70,14 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "tokens"})
 
 	app.API.Use(&rest.StatusMiddleware{})
-	app.API.Use(&rest.TimerMiddleware{})
 	app.API.Use(&metrics.Middleware{})
 	app.API.Use(rest.DefaultCommonStack...)
 
 	// we allow calls from other domains to allow webapps; XXX: review
 	app.API.Use(&rest.CorsMiddleware{
 		RejectNonCorsRequests: false,
-		OriginValidator: func(origin string, request *rest.Request) bool {
-			return true
-		},
-		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		OriginValidator:       utils.AllowlistedOrigin,
+		AllowedMethods:        []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{
 			"Accept",
 			"Content-Type",

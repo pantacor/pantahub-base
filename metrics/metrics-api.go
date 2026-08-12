@@ -75,15 +75,16 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	app.API.Use(rest.DefaultCommonStack...)
 	app.API.Use(&rest.CorsMiddleware{
 		RejectNonCorsRequests: false,
-		OriginValidator: func(origin string, request *rest.Request) bool {
-			return true
-		},
-		AllowedMethods: []string{"GET", "OPTIONS"},
+		OriginValidator:       utils.AllowlistedOrigin,
+		AllowedMethods:        []string{"GET", "OPTIONS"},
 		AllowedHeaders: []string{
 			"Accept", "Content-Type", "X-Custom-Header", "Origin", "Authorization"},
 		AccessControlAllowCredentials: true,
 		AccessControlMaxAge:           3600,
 	})
+
+	app.API.Use(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtMiddleware, Mongo: app.mongoClient})
+	app.API.Use(app.jwtMiddleware)
 
 	// /auth_status endpoints
 	apiRouter, _ := rest.MakeRouter(

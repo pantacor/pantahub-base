@@ -25,11 +25,9 @@ import (
 	"time"
 
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/x/bsonx"
-
-	"gopkg.in/mgo.v2/bson"
 )
 
 type disableToken struct {
@@ -88,8 +86,8 @@ func (a *App) EnsureTokenIndices() error {
 	indexOptions.SetBackground(true)
 
 	index := mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "owner", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "owner", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -108,9 +106,9 @@ func (a *App) EnsureTokenIndices() error {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "nick", Value: bsonx.Int32(1)},
-			{Key: "owner", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "nick", Value: int32(1)},
+			{Key: "owner", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -130,8 +128,8 @@ func (a *App) EnsureTokenIndices() error {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "nick", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "nick", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -151,8 +149,8 @@ func (a *App) EnsureTokenIndices() error {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "disabled", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "disabled", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -172,8 +170,8 @@ func (a *App) EnsureTokenIndices() error {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "prn", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "prn", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -193,8 +191,8 @@ func (a *App) EnsureTokenIndices() error {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "tokensha", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "tokensha", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}

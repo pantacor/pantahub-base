@@ -16,7 +16,6 @@ sleep 10
 
 # Background process to upload connector configs once Kafka Connect is ready
 (
-  set -x
   echo "Connector Configurator: Waiting for Kafka Connect to be ready..."
 
   while true; do

@@ -28,10 +28,10 @@ import (
 	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-base/utils/tracer"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/x/bsonx"
 )
 
 const (
@@ -122,15 +122,12 @@ func (app *App) setupAPI() {
 		"/apps:", log.Lshortfile)})
 	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "apps"})
 	app.API.Use(&rest.StatusMiddleware{})
-	app.API.Use(&rest.TimerMiddleware{})
 	app.API.Use(&metrics.Middleware{})
 	app.API.Use(rest.DefaultCommonStack...)
 	app.API.Use(&rest.CorsMiddleware{
 		RejectNonCorsRequests: false,
-		OriginValidator: func(origin string, request *rest.Request) bool {
-			return true
-		},
-		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		OriginValidator:       utils.AllowlistedOrigin,
+		AllowedMethods:        []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{
 			"Accept",
 			"Content-Type",
@@ -173,8 +170,8 @@ func (app *App) setIndexes() error {
 	indexOptions.SetBackground(true)
 
 	index := mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "nick", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "nick", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -193,8 +190,8 @@ func (app *App) setIndexes() error {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "prn", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "prn", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}

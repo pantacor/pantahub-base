@@ -31,9 +31,9 @@ import (
 	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-base/utils/tracer"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/x/bsonx"
 )
 
 // New create a new trails rest application
@@ -59,9 +59,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	indexOptions.SetBackground(true)
 
 	index := mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "owner", Value: bsonx.Int32(1)},
-			{Key: "garbage", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "owner", Value: int32(1)},
+			{Key: "garbage", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -80,9 +80,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "device", Value: bsonx.Int32(1)},
-			{Key: "garbage", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "device", Value: int32(1)},
+			{Key: "garbage", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -101,9 +101,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "owner", Value: bsonx.Int32(1)},
-			{Key: "garbage", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "owner", Value: int32(1)},
+			{Key: "garbage", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -122,9 +122,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "device", Value: bsonx.Int32(1)},
-			{Key: "garbage", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "device", Value: int32(1)},
+			{Key: "garbage", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -144,12 +144,12 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "trail-id", Value: bsonx.Int32(1)},
-			{Key: "owner", Value: bsonx.Int32(1)},
-			{Key: "progress.status", Value: bsonx.Int32(1)},
-			{Key: "garbage", Value: bsonx.Int32(1)},
-			{Key: "rev", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "trail-id", Value: int32(1)},
+			{Key: "owner", Value: int32(1)},
+			{Key: "progress.status", Value: int32(1)},
+			{Key: "garbage", Value: int32(1)},
+			{Key: "rev", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -169,12 +169,12 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "trail-id", Value: bsonx.Int32(1)},
-			{Key: "device", Value: bsonx.Int32(1)},
-			{Key: "progress.status", Value: bsonx.Int32(1)},
-			{Key: "garbage", Value: bsonx.Int32(1)},
-			{Key: "rev", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "trail-id", Value: int32(1)},
+			{Key: "device", Value: int32(1)},
+			{Key: "progress.status", Value: int32(1)},
+			{Key: "garbage", Value: int32(1)},
+			{Key: "rev", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -194,11 +194,11 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "trail-id", Value: bsonx.Int32(1)},
-			{Key: "progress.status", Value: bsonx.Int32(1)},
-			{Key: "garbage", Value: bsonx.Int32(1)},
-			{Key: "rev", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "trail-id", Value: int32(1)},
+			{Key: "progress.status", Value: int32(1)},
+			{Key: "garbage", Value: int32(1)},
+			{Key: "rev", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -215,16 +215,13 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		"/trails:", log.Lshortfile)})
 	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "trails"})
 	app.API.Use(&rest.StatusMiddleware{})
-	app.API.Use(&rest.TimerMiddleware{})
 	app.API.Use(&metrics.Middleware{})
 	app.API.Use(&utils.CanonicalJSONMiddleware{})
 
 	app.API.Use(rest.DefaultCommonStack...)
 	app.API.Use(&rest.CorsMiddleware{
-		RejectNonCorsRequests: false,
-		OriginValidator: func(origin string, request *rest.Request) bool {
-			return true
-		},
+		RejectNonCorsRequests:         false,
+		OriginValidator:               utils.AllowlistedOrigin,
 		AllowedMethods:                []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:                []string{"Accept", "Content-Type", "X-Custom-Header", "Origin", "Authorization", "Content-Length"},
 		AccessControlAllowCredentials: true,

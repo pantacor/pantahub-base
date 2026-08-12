@@ -97,7 +97,8 @@ func CreateUserToken(payload *authmodels.LoginRequestPayload, jwtMiddleware *jwt
 		}
 	}
 
-	if authToken != nil && !authToken.Deleted && authToken.ExpireAt.Unix() > time.Now().Unix() {
+	if authToken != nil && !authToken.Deleted && authToken.ExpireAt.Unix() > time.Now().Unix() &&
+		subtle.ConstantTimeCompare([]byte(payload.Password), []byte(authToken.Secret)) == 1 {
 		scopes = authToken.Scopes
 		claims["id"] = payload.Username
 		claims["nick"] = authToken.Name
@@ -407,7 +408,10 @@ func AuthWithUserPassFactory(mongoClient *mongo.Client) func(string, string) boo
 
 		if strings.HasPrefix(loginUser, utils.BaseServiceID) {
 			tpApp, err := apps.LoginAsApp(loginUser, password, mongoClient.Database(utils.MongoDb))
-			if err != nil || tpApp == nil {
+			if err != nil || tpApp == nil || tpApp.Prn == "" {
+				return false
+			}
+			if tpApp.Type != apps.AppTypeConfidential {
 				return false
 			}
 			return true

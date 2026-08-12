@@ -64,7 +64,7 @@ import (
 func main() {
 
 	utils.InitScopes()
-	base.DoInit()
+	handler := base.DoInit()
 
 	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" && os.Getenv("OTEL_SERVICE_NAME") != "" {
 		tp := tracer.Init(os.Getenv("OTEL_SERVICE_NAME"))
@@ -83,7 +83,7 @@ func main() {
 	portIntTLS := utils.GetEnv(utils.EnvPantahubPortIntTLS)
 
 	go func() {
-		log.Fatal(http.ListenAndServeTLS(":"+portIntTLS, "localhost.cert.pem", "localhost.key.pem", nil))
+		log.Fatal(http.ListenAndServeTLS(":"+portIntTLS, "localhost.cert.pem", "localhost.key.pem", handler))
 	}()
 
 	ifaces, _ := net.Interfaces()
@@ -97,9 +97,9 @@ func main() {
 			case *net.IPAddr:
 				ip = v.IP
 			}
-			log.Printf("Serving @ https://" + ip.String() + ":" + portIntTLS + "/\n")
-			log.Printf("Serving @ http://" + ip.String() + ":" + portInt + "/\n")
+			log.Printf("%s", "Serving @ https://"+ip.String()+":"+portIntTLS+"/\n")
+			log.Printf("%s", "Serving @ http://"+ip.String()+":"+portInt+"/\n")
 		}
 	}
-	log.Fatal(http.ListenAndServe(":"+portInt, nil))
+	log.Fatal(http.ListenAndServe(":"+portInt, handler))
 }

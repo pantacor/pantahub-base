@@ -44,13 +44,13 @@ func testValidAccount(t *testing.T) {
 		"testnick",
 	)
 	if res.StatusCode() != 200 {
-		t.Errorf("Error Registering User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Errorf("%s", "Error Registering User Account:Expected Response code:200 but got:"+strconv.Itoa(res.StatusCode()))
 		t.Error(res)
 	}
 	account := helpers.GetUser(t, "test@gmail.com", MongoDb)
 	result, res := helpers.VerifyUserAccount(t, account.Id.Hex(), account.Challenge)
 	if res.StatusCode() != 200 {
-		t.Errorf("Expected Response code:200 OK but got:" + strconv.Itoa(res.StatusCode()))
+		t.Errorf("%s", "Expected Response code:200 OK but got:"+strconv.Itoa(res.StatusCode()))
 	}
 	expectedResult := map[string]interface{}{
 		"type":  "USER",
@@ -103,7 +103,7 @@ func testInvalidAccount(t *testing.T) {
 	result, res := helpers.VerifyUserAccount(t, account.Id.Hex(), account.Challenge)
 
 	if res.StatusCode() != 403 {
-		t.Errorf("Expected Response code 403:Forbidden failed but got:" + strconv.Itoa(res.StatusCode()))
+		t.Errorf("%s", "Expected Response code 403:Forbidden failed but got:"+strconv.Itoa(res.StatusCode()))
 	}
 	expectedResult := map[string]interface{}{
 		"Error": "Not Accessible Resource Id",

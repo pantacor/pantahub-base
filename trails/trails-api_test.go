@@ -70,7 +70,7 @@ func setUp(t *testing.T) {
 	authServer := httptest.NewServer(authApp.API.MakeHandler())
 	authURL, err = url.Parse(authServer.URL)
 	if err != nil {
-		t.Errorf("error parsing test server URL " + err.Error())
+		t.Errorf("%s", "error parsing test server URL "+err.Error())
 		t.Fail()
 	}
 
@@ -82,7 +82,7 @@ func setUp(t *testing.T) {
 	devicesServer := httptest.NewServer(devicesApp.API.MakeHandler())
 	devicesURL, err = url.Parse(devicesServer.URL)
 	if err != nil {
-		t.Errorf("error parsing test server URL " + err.Error())
+		t.Errorf("%s", "error parsing test server URL "+err.Error())
 		t.Fail()
 	}
 
@@ -91,7 +91,7 @@ func setUp(t *testing.T) {
 	server = httptest.NewServer(trailsApp.API.MakeHandler())
 	serverURL, err = url.Parse(server.URL)
 	if err != nil {
-		t.Errorf("error parsing test server URL " + err.Error())
+		t.Errorf("%s", "error parsing test server URL "+err.Error())
 		t.Fail()
 	}
 
@@ -110,7 +110,7 @@ func postState(t *testing.T) {
 	res, err := resty.R().SetAuthToken(deviceAuthToken).SetBody(map[string]string{"mystate": "mystate"}).Post(u.String())
 
 	if err != nil {
-		t.Errorf("internal error calling test server " + err.Error())
+		t.Errorf("%s", "internal error calling test server "+err.Error())
 		t.Fail()
 	}
 
@@ -118,7 +118,7 @@ func postState(t *testing.T) {
 	err = json.Unmarshal(res.Body(), &trail)
 
 	if err != nil {
-		t.Errorf("internal error parsing trail" + err.Error())
+		t.Errorf("%s", "internal error parsing trail"+err.Error())
 		t.Fail()
 	}
 }
@@ -132,7 +132,7 @@ func postStateHash(t *testing.T) {
 		Get(s0.String())
 
 	if err != nil {
-		t.Errorf("internal error getting step 0" + err.Error())
+		t.Errorf("%s", "internal error getting step 0"+err.Error())
 		t.Fail()
 	}
 
@@ -140,7 +140,7 @@ func postStateHash(t *testing.T) {
 	err = json.Unmarshal(res.Body(), &step)
 
 	if err != nil {
-		t.Errorf("internal error parsing trail" + err.Error())
+		t.Errorf("%s", "internal error parsing trail"+err.Error())
 		t.Fail()
 	}
 
@@ -160,7 +160,7 @@ func postStep(t *testing.T) {
 		Post(u.String())
 
 	if err != nil {
-		t.Errorf("internal error calling test server " + err.Error())
+		t.Errorf("%s", "internal error calling test server "+err.Error())
 		t.Fail()
 	}
 
@@ -174,7 +174,7 @@ func postStep(t *testing.T) {
 	err = json.Unmarshal(res.Body(), &step)
 
 	if err != nil {
-		t.Errorf("internal error parsing trail: " + err.Error())
+		t.Errorf("%s", "internal error parsing trail: "+err.Error())
 		t.Fail()
 	}
 }
@@ -188,7 +188,7 @@ func postStepsHash(t *testing.T) {
 		Get(s1.String())
 
 	if err != nil {
-		t.Errorf("internal error getting step 0" + err.Error())
+		t.Errorf("%s", "internal error getting step 0"+err.Error())
 		t.Fail()
 	}
 
@@ -196,7 +196,7 @@ func postStepsHash(t *testing.T) {
 	err = json.Unmarshal(res.Body(), &step)
 
 	if err != nil {
-		t.Errorf("internal error parsing trail" + err.Error())
+		t.Errorf("%s", "internal error parsing trail"+err.Error())
 		t.Fail()
 	}
 

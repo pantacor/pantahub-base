@@ -384,38 +384,44 @@ const (
 	// EnvPantahubDisableEmailPasswordLogin disable email/password login
 	EnvPantahubDisableEmailPasswordLogin = "PANTAHUB_DISABLE_EMAIL_PASSWORD_LOGIN"
 
+	// EnvPantahubOAuthConnectedAccountsEnforce requires OAuth identities to be
+	// explicitly connected before they can sign in to an existing account.
+	// The default is true.
+	EnvPantahubOAuthConnectedAccountsEnforce = "PANTAHUB_OAUTH_CONNECTED_ACCOUNTS_ENFORCE"
+
 	// EnvPantahubDisableQuota disable quota enforcement
 	EnvPantahubDisableQuota = "PANTAHUB_DISABLE_QUOTA"
 )
 
 var defaultEnvs = map[string]string{
-	EnvPantahubProductName:                  "pantahub-personal",
-	EnvPantahubDemoAccountsPasswordService1: "O9i8HlpSc",
-	EnvGoogleCaptchaSecret:                  "YOU MUST CHANGE THIS",
-	EnvPantahubUseCaptcha:                   "true",
-	EnvPantahubJWTAuthSecret:                "YOU MUST CHANGE THIS",
-	EnvPantahubJWTAuthPub:                   "YOU MUST CHANGE THIS",
-	EnvPantahubJWESecret:                    "YOU MUST CHANGE THIS",
-	EnvPantahubJWEPub:                       "YOU MUST CHANGE THIS",
-	EnvPantahubScryptSecret:                 "YOU MUST CHANGE THIS",
-	EnvPantahubMfaEnabled:                   "true",
-	EnvPantahubMfaEncKey:                    "",
-	EnvPantahubMfaPendingTimeoutMinutes:     "5",
-	EnvPantahubWebauthnRPID:                 "",
-	EnvPantahubWebauthnRPOrigins:            "",
-	EnvPantahubWebauthnRPName:               "Pantacor Hub",
-	EnvPantahubJWTObjectSecret:              "YOU MUST CHANGE THIS",
-	EnvPantahubJWTTimeoutMinutes:            "60",
-	EnvPantahubRecoverJWTTimeoutMinutes:     "60",
-	EnvPantahubJWTMaxRefreshMinutes:         "1440",
-	EnvAnonJWTTimeoutMinutes:                "5",
-	EnvPendingOVModeJWTTimeoutMinutes:       "5",
-	EnvPantahubAuthorizeJWTTimeoutMinutes:   "7200",
-	EnvPantahubDisableSignup:                "false",
-	EnvPantahubAuthAllowedDomains:           "",
-	EnvPantahubDisableForgotPassword:        "false",
-	EnvPantahubDisableEmailPasswordLogin:    "false",
-	EnvPantahubDisableQuota:                 "false",
+	EnvPantahubProductName:                   "pantahub-personal",
+	EnvPantahubDemoAccountsPasswordService1:  "O9i8HlpSc",
+	EnvGoogleCaptchaSecret:                   "YOU MUST CHANGE THIS",
+	EnvPantahubUseCaptcha:                    "true",
+	EnvPantahubJWTAuthSecret:                 "YOU MUST CHANGE THIS",
+	EnvPantahubJWTAuthPub:                    "YOU MUST CHANGE THIS",
+	EnvPantahubJWESecret:                     "YOU MUST CHANGE THIS",
+	EnvPantahubJWEPub:                        "YOU MUST CHANGE THIS",
+	EnvPantahubScryptSecret:                  "YOU MUST CHANGE THIS",
+	EnvPantahubMfaEnabled:                    "true",
+	EnvPantahubMfaEncKey:                     "",
+	EnvPantahubMfaPendingTimeoutMinutes:      "5",
+	EnvPantahubWebauthnRPID:                  "",
+	EnvPantahubWebauthnRPOrigins:             "",
+	EnvPantahubWebauthnRPName:                "Pantacor Hub",
+	EnvPantahubJWTObjectSecret:               "YOU MUST CHANGE THIS",
+	EnvPantahubJWTTimeoutMinutes:             "60",
+	EnvPantahubRecoverJWTTimeoutMinutes:      "60",
+	EnvPantahubJWTMaxRefreshMinutes:          "1440",
+	EnvAnonJWTTimeoutMinutes:                 "5",
+	EnvPendingOVModeJWTTimeoutMinutes:        "5",
+	EnvPantahubAuthorizeJWTTimeoutMinutes:    "7200",
+	EnvPantahubDisableSignup:                 "false",
+	EnvPantahubAuthAllowedDomains:            "",
+	EnvPantahubDisableForgotPassword:         "false",
+	EnvPantahubDisableEmailPasswordLogin:     "false",
+	EnvPantahubOAuthConnectedAccountsEnforce: "true",
+	EnvPantahubDisableQuota:                  "false",
 
 	EnvPantahubCaCert:          "",
 	EnvPantahubCaRaUser:        "",

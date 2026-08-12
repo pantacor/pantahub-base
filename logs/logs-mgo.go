@@ -24,10 +24,9 @@ import (
 	"time"
 
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/x/bsonx"
-	"gopkg.in/mgo.v2/bson"
 )
 
 type mgoLogger struct {
@@ -48,8 +47,8 @@ func (s *mgoLogger) register() error {
 	indexOptions.SetBackground(true)
 
 	index := mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "own", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "own", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -71,8 +70,8 @@ func (s *mgoLogger) register() error {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "dev", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "dev", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -94,8 +93,8 @@ func (s *mgoLogger) register() error {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "time-created", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "time-created", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -117,9 +116,9 @@ func (s *mgoLogger) register() error {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "tsec", Value: bsonx.Int32(1)},
-			{Key: "tnano", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "tsec", Value: int32(1)},
+			{Key: "tnano", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -140,8 +139,8 @@ func (s *mgoLogger) register() error {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "lvl", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "lvl", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -162,10 +161,10 @@ func (s *mgoLogger) register() error {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "dev", Value: bsonx.Int32(1)},
-			{Key: "own", Value: bsonx.Int32(1)},
-			{Key: "time-created", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "dev", Value: int32(1)},
+			{Key: "own", Value: int32(1)},
+			{Key: "time-created", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}

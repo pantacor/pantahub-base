@@ -16,3 +16,6 @@ vendor/
 .chglog
 .tmp
 .data
+gosec.sarif
+govulncheck.out
+.agents/

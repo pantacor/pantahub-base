@@ -158,7 +158,7 @@ func GetMongoClient() (*mongo.Client, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	log.Println("Will connect to mongodb with: " + mongoConnect)
+	log.Printf("Connecting to storage database at host %s:%s", host, port)
 	client, err := mongo.Connect(ctx, clientOptions)
 	return client, err
 }

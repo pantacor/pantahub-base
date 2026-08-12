@@ -95,7 +95,7 @@ func GetMongoClient() (*mongo.Client, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	log.Println("Will connect to mongo PROD db with: " + mongoConnect)
+	log.Printf("Connecting to database at host %s:%s, db: %s", host, port, MongoDb)
 	client, err := mongo.Connect(ctx, clientOptions)
 
 	return client, err
@@ -138,7 +138,7 @@ func GetMongoClientTest() (*mongo.Client, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	log.Println("Will connect to mongo PROD db with: " + mongoConnect)
+	log.Printf("Connecting to test database at host %s:%s, db: %s", host, port, MongoDb)
 	client, err := mongo.Connect(ctx, clientOptions)
 
 	return client, err
@@ -164,7 +164,7 @@ func GetMongoSession() (*mgo.Session, error) {
 	if mongoRs != "" {
 		mongoConnect = mongoConnect + "?replicaSet=" + mongoRs
 	}
-	log.Println("Will connect to mongo PROD db with: " + mongoConnect)
+	log.Printf("Connecting to database at host %s:%s, db: %s", mongoHost, mongoPort, mongoDb)
 
 	return mgo.Dial(mongoConnect)
 }
@@ -189,7 +189,7 @@ func GetMongoSessionTest() (*mgo.Session, error) {
 	if mongoRs != "" {
 		mongoConnect = mongoConnect + "?replicaSet=" + mongoRs
 	}
-	log.Println("Will connect to mongo TEST db with: " + mongoConnect)
+	log.Printf("Connecting to test database at host %s:%s, db: %s", mongoHost, mongoPort, mongoDb)
 
 	return mgo.Dial(mongoConnect)
 }

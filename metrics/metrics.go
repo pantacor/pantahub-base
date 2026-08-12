@@ -25,7 +25,7 @@ func (m *Middleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFunc {
 		handler(w, r)
 		elapse := r.Env["ELAPSED_TIME"].(*time.Duration)
 
-		endpoint := r.Request.RequestURI
+		endpoint := r.URL.Path
 		method := r.Request.Method
 		code := strconv.Itoa(r.Env["STATUS_CODE"].(int))
 

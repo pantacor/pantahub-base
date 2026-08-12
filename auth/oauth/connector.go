@@ -44,6 +44,7 @@ type Config struct {
 type ResponsePayload struct {
 	Nick       string      `json:"nick"`
 	Email      string      `json:"email"`
+	ProviderID string      `json:"provider_id"`
 	RedirectTo string      `json:"redirect_uri"`
 	Raw        string      `json:"raw"`
 	Service    ServiceType `json:"service_type"`
@@ -109,10 +110,15 @@ type RedirectValidator func(redirectURI string) error
 // AuthorizeByService use service to autorize
 func AuthorizeByService(w rest.ResponseWriter, r *rest.Request, validate RedirectValidator) {
 	service := ServiceType(r.PathParam("service"))
+	if service == "" {
+		// Authenticated connect flows start at /connected-providers and carry
+		// the selected service in the request body. The caller places it in the
+		// query only while invoking this shared authorizer.
+		service = ServiceType(r.Request.URL.Query().Get("service"))
+	}
 	redirectURI := r.Request.URL.Query().Get("redirect_uri")
 
-	getConfig, found := ServicesConfigs[service]
-	if !found {
+	if _, found := ServicesConfigs[service]; !found {
 		utils.RestError(w, nil, "We can't connect to that service", http.StatusForbidden)
 		return
 	}
@@ -127,7 +133,28 @@ func AuthorizeByService(w rest.ResponseWriter, r *rest.Request, validate Redirec
 		}
 	}
 
-	ServicesAutorize[service](redirectURI, getConfig(), w, r)
+	authorizeURL, err := AuthorizationURLByService(service, redirectURI, w)
+	if err != nil {
+		utils.RestError(w, err, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r.Request, authorizeURL, http.StatusTemporaryRedirect)
+}
+
+// AuthorizationURLByService creates a provider authorization URL and pins its
+// signed state to the current browser session. Callers that need to initiate
+// OAuth from an authenticated API request can return this URL as JSON and let
+// the browser navigate to it afterwards.
+func AuthorizationURLByService(service ServiceType, redirectURI string, w http.ResponseWriter) (string, error) {
+	getConfig, found := ServicesConfigs[service]
+	if !found {
+		return "", fmt.Errorf("we can't connect to service: %s", service)
+	}
+	state := generateStateOauthCookie(redirectURI, w)
+	if state == "" {
+		return "", errors.New("unable to create OAuth state")
+	}
+	return getConfig().AuthCodeURL(state), nil
 }
 
 // CbByService use service callback

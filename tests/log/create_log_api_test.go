@@ -1,17 +1,16 @@
-//
 // Copyright 2019  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//   http://www.apache.org/licenses/LICENSE-2.0
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
-//   Unless required by applicable law or agreed to in writing, software
-//   distributed under the License is distributed on an "AS IS" BASIS,
-//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//   See the License for the specific language governing permissions and
-//   limitations under the License.
+//	Unless required by applicable law or agreed to in writing, software
+//	distributed under the License is distributed on an "AS IS" BASIS,
+//	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	See the License for the specific language governing permissions and
+//	limitations under the License.
 package tests
 
 import (
@@ -29,7 +28,7 @@ var MongoDb *mongo.Database
 func connectToDb(t *testing.T) {
 	MongoClient, err := utils.GetMongoClient()
 	if err != nil {
-		t.Errorf("Error Connecting to Db:" + err.Error())
+		t.Errorf("%s", "Error Connecting to Db:"+err.Error())
 	}
 	MongoDb = MongoClient.Database(utils.MongoDb)
 }
@@ -48,17 +47,17 @@ func testCreateLog(t *testing.T) {
 	log.Print(" Case 1:Create Log Of A Device")
 	_, res := helpers.Login(t, "user1", "user1")
 	if res.StatusCode() != 200 {
-		t.Errorf("Error Login User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Errorf("%s", "Error Login User Account:Expected Response code:200 but got:"+strconv.Itoa(res.StatusCode()))
 		t.Error(res)
 	}
 	device, res := helpers.CreateDevice(t, true, "123")
 	if res.StatusCode() != 200 {
-		t.Errorf("Error Creating Device:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Errorf("%s", "Error Creating Device:Expected Response code:200 but got:"+strconv.Itoa(res.StatusCode()))
 		t.Error(res)
 	}
 	loginResult, res := helpers.LoginDevice(t, device.Prn, device.Secret)
 	if res.StatusCode() != 200 {
-		t.Errorf("Error Login Device Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Errorf("%s", "Error Login Device Account:Expected Response code:200 but got:"+strconv.Itoa(res.StatusCode()))
 		t.Error(res)
 	}
 	dToken := loginResult["token"].(string)
@@ -72,7 +71,7 @@ func testCreateLog(t *testing.T) {
 	}
 	result, res := helpers.CreateLog(t, dToken, logData)
 	if res.StatusCode() != 200 {
-		t.Errorf("Expected Response code:200 OK but got:" + strconv.Itoa(res.StatusCode()))
+		t.Errorf("%s", "Expected Response code:200 OK but got:"+strconv.Itoa(res.StatusCode()))
 	}
 	expectedResult := []interface{}{
 		map[string]interface{}{

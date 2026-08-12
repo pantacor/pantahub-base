@@ -1,17 +1,16 @@
-//
 // Copyright 2019  Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//   http://www.apache.org/licenses/LICENSE-2.0
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
-//   Unless required by applicable law or agreed to in writing, software
-//   distributed under the License is distributed on an "AS IS" BASIS,
-//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//   See the License for the specific language governing permissions and
-//   limitations under the License.
+//	Unless required by applicable law or agreed to in writing, software
+//	distributed under the License is distributed on an "AS IS" BASIS,
+//	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	See the License for the specific language governing permissions and
+//	limitations under the License.
 package tests
 
 import (
@@ -36,26 +35,26 @@ func testListObjectsOfUser(t *testing.T) {
 	log.Print(" Case 1:List Objects Of User")
 	_, res := helpers.Login(t, "user1", "user1")
 	if res.StatusCode() != 200 {
-		t.Errorf("Error Login User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Errorf("%s", "Error Login User Account:Expected Response code:200 but got:"+strconv.Itoa(res.StatusCode()))
 		t.Error(res)
 	}
 
 	sha := helpers.GenerateObjectSha()
 	_, object1, res := helpers.CreateObject(t, sha)
 	if res.StatusCode() != 200 {
-		t.Errorf("Error Creating Object:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Errorf("%s", "Error Creating Object:Expected Response code:200 but got:"+strconv.Itoa(res.StatusCode()))
 		t.Error(res)
 	}
 	sha = helpers.GenerateObjectSha()
 	_, object2, res := helpers.CreateObject(t, sha)
 	if res.StatusCode() != 200 {
-		t.Errorf("Error Creating Object:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Errorf("%s", "Error Creating Object:Expected Response code:200 but got:"+strconv.Itoa(res.StatusCode()))
 		t.Error(res)
 	}
 	sha = helpers.GenerateObjectSha()
 	_, object3, res := helpers.CreateObject(t, sha)
 	if res.StatusCode() != 200 {
-		t.Errorf("Error Creating Object:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Errorf("%s", "Error Creating Object:Expected Response code:200 but got:"+strconv.Itoa(res.StatusCode()))
 		t.Error(res)
 	}
 	//log.Print(object1)
@@ -63,7 +62,7 @@ func testListObjectsOfUser(t *testing.T) {
 	result, res := helpers.ListObjects(t)
 	//log.Print(result)
 	if res.StatusCode() != 200 {
-		t.Errorf("Expected Response code:200 OK but got:" + strconv.Itoa(res.StatusCode()))
+		t.Errorf("%s", "Expected Response code:200 OK but got:"+strconv.Itoa(res.StatusCode()))
 	}
 	expectedResult := []interface{}{
 		map[string]interface{}{

@@ -65,7 +65,7 @@ func setUp(t *testing.T) {
 	serverURL, err = url.Parse(server.URL)
 
 	if err != nil {
-		t.Errorf("error parsing test server URL " + err.Error())
+		t.Errorf("%s", "error parsing test server URL "+err.Error())
 		t.Fail()
 	}
 }
@@ -81,7 +81,7 @@ func testNoCredsLogin401(t *testing.T) {
 	res, err := utils.R().SetBody(map[string]string{}).Post(u.String())
 
 	if err != nil {
-		t.Errorf("internal error calling test server " + err.Error())
+		t.Errorf("%s", "internal error calling test server "+err.Error())
 		t.Fail()
 	}
 
@@ -101,7 +101,7 @@ func testBadCredsLogin401(t *testing.T) {
 	}).Post(u.String())
 
 	if err != nil {
-		t.Errorf("internal error calling test server " + err.Error())
+		t.Errorf("%s", "internal error calling test server "+err.Error())
 		t.Fail()
 	}
 
@@ -121,7 +121,7 @@ func testGoodLogin(t *testing.T) {
 	}).Post(u.String())
 
 	if err != nil {
-		t.Errorf("internal error calling test server " + err.Error())
+		t.Errorf("%s", "internal error calling test server "+err.Error())
 		t.Fail()
 	}
 
@@ -137,7 +137,7 @@ func testRefreshToken(t *testing.T) {
 	res, err := utils.R().SetAuthToken(authTokenUser1).Get(u.String())
 
 	if err != nil {
-		t.Errorf("internal error calling test server " + err.Error())
+		t.Errorf("%s", "internal error calling test server "+err.Error())
 		t.Fail()
 	}
 
@@ -150,7 +150,7 @@ func testRefreshToken(t *testing.T) {
 	err = json.Unmarshal(res.Body(), &resMap)
 
 	if err != nil {
-		t.Errorf("Bad json returned from server for login " + err.Error())
+		t.Errorf("%s", "Bad json returned from server for login "+err.Error())
 		t.Fail()
 	}
 
@@ -158,7 +158,7 @@ func testRefreshToken(t *testing.T) {
 
 	authTokenUser1, ok = resMap["token"].(string)
 	if !ok {
-		t.Errorf("Body contained no token: " + string(res.Body()))
+		t.Errorf("%s", "Body contained no token: "+string(res.Body()))
 		t.Fail()
 	}
 }
@@ -189,7 +189,7 @@ func testAuthAuthTokenGood(t *testing.T) {
 	res, err := utils.R().SetAuthToken(authTokenUser1).SetBody(&body).Post(u.String())
 
 	if err != nil {
-		t.Errorf("internal error calling test server " + err.Error())
+		t.Errorf("%s", "internal error calling test server "+err.Error())
 		t.Fail()
 	}
 
@@ -200,7 +200,7 @@ func testAuthAuthTokenGood(t *testing.T) {
 	result := map[string]interface{}{}
 	err = json.Unmarshal(res.Body(), &result)
 	if err != nil {
-		t.Errorf("error parsing body result as json" + err.Error())
+		t.Errorf("%s", "error parsing body result as json"+err.Error())
 		t.Fail()
 	}
 
@@ -228,28 +228,28 @@ func testAuthAuthTokenGood(t *testing.T) {
 
 	// protect against bad format
 	if err != nil {
-		t.Errorf("error parsing redirect_uri" + err.Error())
+		t.Errorf("%s", "error parsing redirect_uri"+err.Error())
 		t.Fail()
 	}
 
 	uriToken := uri.Query().Get("access_token")
 	if uriToken == "" {
-		t.Errorf("'access_token' field must be included in redirect_uri: redirect_uri=" + uriStr)
+		t.Errorf("%s", "'access_token' field must be included in redirect_uri: redirect_uri="+uriStr)
 		t.Fail()
 	}
 	uriScope := uri.Query().Get("scope")
 	if uriScope == "" {
-		t.Errorf("'scope' field must be included in redirect_uri: redirect_uri=" + uriStr)
+		t.Errorf("%s", "'scope' field must be included in redirect_uri: redirect_uri="+uriStr)
 		t.Fail()
 	}
 	uriTokenType := uri.Query().Get("token_type")
 	if uriTokenType == "" {
-		t.Errorf("'token_type' field must be included in redirect_uri: redirect_uri=" + uriStr)
+		t.Errorf("%s", "'token_type' field must be included in redirect_uri: redirect_uri="+uriStr)
 		t.Fail()
 	}
 	uriExpiresIn := uri.Query().Get("expires_in")
 	if uriExpiresIn == "" {
-		t.Errorf("'expires_in' field must be included in redirect_uri: redirect_uri=" + uriStr)
+		t.Errorf("%s", "'expires_in' field must be included in redirect_uri: redirect_uri="+uriStr)
 		t.Fail()
 	}
 }
@@ -267,7 +267,7 @@ func testAuthAuthTokenBadURL(t *testing.T) {
 	res, err := utils.R().SetAuthToken(authTokenUser1).SetBody(&body).Post(u.String())
 
 	if err != nil {
-		t.Errorf("internal error calling test server " + err.Error())
+		t.Errorf("%s", "internal error calling test server "+err.Error())
 		t.Fail()
 	}
 
@@ -289,7 +289,7 @@ func testAuthAuthTokenBadClient(t *testing.T) {
 	res, err := utils.R().SetAuthToken(authTokenUser1).SetBody(&body).Post(u.String())
 
 	if err != nil {
-		t.Errorf("internal error calling test server " + err.Error())
+		t.Errorf("%s", "internal error calling test server "+err.Error())
 		t.Fail()
 	}
 
@@ -312,7 +312,7 @@ func testAuthAuthTokenPreservesState(t *testing.T) {
 	res, err := utils.R().SetAuthToken(authTokenUser1).SetBody(&body).Post(u.String())
 
 	if err != nil {
-		t.Errorf("internal error calling test server " + err.Error())
+		t.Errorf("%s", "internal error calling test server "+err.Error())
 		t.Fail()
 	}
 
@@ -323,20 +323,20 @@ func testAuthAuthTokenPreservesState(t *testing.T) {
 	result := map[string]interface{}{}
 	err = json.Unmarshal(res.Body(), &result)
 	if err != nil {
-		t.Errorf("error parsing body result as json" + err.Error())
+		t.Errorf("%s", "error parsing body result as json"+err.Error())
 		t.Fail()
 	}
 	uriStr := result["redirect_uri"].(string)
 	uri, err := url.Parse(uriStr)
 
 	if err != nil {
-		t.Errorf("error parsing redirect_uri" + err.Error())
+		t.Errorf("%s", "error parsing redirect_uri"+err.Error())
 		t.Fail()
 	}
 
 	resultState := uri.Query().Get("state")
 	if resultState != body["state"].(string) {
-		t.Errorf("'state' field of result does not match 'state' passed to /authorize endpoint:" + resultState + "!=" + body["state"].(string))
+		t.Errorf("%s", "'state' field of result does not match 'state' passed to /authorize endpoint:"+resultState+"!="+body["state"].(string))
 		t.Fail()
 	}
 }
@@ -351,7 +351,7 @@ func testAuthAuthTokenClientUse(t *testing.T) {
 	res, err := utils.R().SetAuthToken(authTokenClient1).Get(u.String())
 
 	if err != nil {
-		t.Errorf("internal error calling test server " + err.Error())
+		t.Errorf("%s", "internal error calling test server "+err.Error())
 		t.Fail()
 	}
 
@@ -363,7 +363,7 @@ func testAuthAuthTokenClientUse(t *testing.T) {
 	var result map[string]interface{}
 	err = json.Unmarshal(res.Body(), &result)
 	if err != nil {
-		t.Errorf("internal error calling test server " + err.Error())
+		t.Errorf("%s", "internal error calling test server "+err.Error())
 		t.Fail()
 	}
 
@@ -375,7 +375,7 @@ func testAuthAuthTokenClientUse(t *testing.T) {
 	}
 
 	if prn != "prn:pantahub.com:auth:/user1" {
-		t.Errorf("/auth_status with oauth2 implicit access token must 'prn' field matching 'prn:pantahub.com:auth:/client1', but returned: " + prn.(string))
+		t.Errorf("%s", "/auth_status with oauth2 implicit access token must 'prn' field matching 'prn:pantahub.com:auth:/client1', but returned: "+prn.(string))
 		t.Fail()
 	}
 }

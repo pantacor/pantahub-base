@@ -252,7 +252,11 @@ func ScopeFilter(filterScopes []Scope, handler rest.HandlerFunc) rest.HandlerFun
 
 	return func(w rest.ResponseWriter, r *rest.Request) {
 		authInfo := GetAuthInfo(r)
-		if authInfo != nil && len(parsedFilterScopes) > 0 {
+		if authInfo == nil {
+			RestErrorWrapper(w, "Authentication Required", http.StatusUnauthorized)
+			return
+		}
+		if len(parsedFilterScopes) > 0 {
 			if !MatchScope(parsedFilterScopes, authInfo.Scopes) {
 				phAuth := GetEnv(EnvPantahubAuth)
 				w.Header().Set("WWW-Authenticate", `Bearer Realm="pantahub services",
@@ -312,9 +316,18 @@ func MarshalScopes(scopes []Scope) []string {
 
 func ParseScopes(scopes []string) []Scope {
 	parsedScopes := []Scope{}
+	prefix := PantahubServiceID + "/"
 	for _, s := range scopes {
-		id := strings.Split(s, PantahubServiceID+"/")[1]
-		parsedScopes = append(parsedScopes, PhScopesMap[id])
+		parts := strings.Split(s, prefix)
+		var id string
+		if len(parts) < 2 {
+			id = s
+		} else {
+			id = parts[1]
+		}
+		if scope, ok := PhScopesMap[id]; ok {
+			parsedScopes = append(parsedScopes, scope)
+		}
 	}
 	return parsedScopes
 }

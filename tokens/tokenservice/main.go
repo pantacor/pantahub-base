@@ -132,6 +132,9 @@ func (s *Service) CreateToken(ctx context.Context, payload *AuthTokenReqPayload,
 	token.Name = payload.Name
 	if payload.Type != "" {
 		token.Type = payload.Type
+		if !token.ValidType() {
+			return nil, errors.New("invalid token type")
+		}
 	} else {
 		token.Type = accounts.AccountTypeSessionUser
 	}

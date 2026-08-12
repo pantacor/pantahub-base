@@ -43,6 +43,7 @@ var (
 const oauthGoogleURLAPI = "https://www.googleapis.com/oauth2/v2/userinfo?access_token="
 
 type googlePayload struct {
+	ID            string `json:"id"`
 	Email         string `json:"email"`
 	VerifiedEmail bool   `json:"verified_email"`
 }
@@ -94,6 +95,9 @@ func GoogleCb(ctx context.Context, config *oauth2.Config, code string) (payload 
 	if !googlePayload.VerifiedEmail {
 		return &ResponsePayload{RedirectTo: ""}, errors.New("users email is not verified")
 	}
+	if googlePayload.ID == "" {
+		return &ResponsePayload{RedirectTo: ""}, errors.New("google user ID is missing")
+	}
 
 	re := regexp.MustCompile(`@.*`)
 	nick := fmt.Sprintf(
@@ -102,9 +106,10 @@ func GoogleCb(ctx context.Context, config *oauth2.Config, code string) (payload 
 		rand.Intn(100),
 	)
 	return &ResponsePayload{
-		Email: googlePayload.Email,
-		Nick:  nick,
-		Raw:   string(data),
+		Email:      googlePayload.Email,
+		Nick:       nick,
+		ProviderID: googlePayload.ID,
+		Raw:        string(data),
 	}, nil
 }
 

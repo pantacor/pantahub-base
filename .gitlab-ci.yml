@@ -1,8 +1,22 @@
 stages:
+    - security
     - build
     - deploy
 
 image: docker:27.3.1-cli # Use a modern client
+
+security-scan:
+    stage: security
+    image: golang:1.25.12
+    services: []
+    script:
+        - touch gosec.sarif
+        - ./security_scan.sh
+    artifacts:
+        reports:
+            sast: gosec.sarif
+        when: always
+
 services:
     - name: docker:27.3.1-dind # Use a matching server
       alias: docker

@@ -89,7 +89,15 @@ func (a *App) HandleGetThirdPartyLogin(w rest.ResponseWriter, r *rest.Request) {
 func (a *App) HandleGetThirdPartyCallback(w rest.ResponseWriter, r *rest.Request) {
 	payload, err := oauth.CbByService(r)
 	if err != nil {
-		processErr(w, r.Request, err, "Unable to connect to thirdparty service", http.StatusForbidden, payload.RedirectTo)
+		redirectTo := ""
+		if payload != nil {
+			redirectTo = payload.RedirectTo
+		}
+		processErr(w, r.Request, err, "Unable to connect to thirdparty service", http.StatusForbidden, redirectTo)
+		return
+	}
+	if payload == nil {
+		processErr(w, r.Request, fmt.Errorf("empty OAuth provider response"), "Unable to connect to thirdparty service", http.StatusForbidden, "")
 		return
 	}
 
@@ -108,39 +116,109 @@ func (a *App) HandleGetThirdPartyCallback(w rest.ResponseWriter, r *rest.Request
 		}
 	}
 
-	if payload.Email == "" {
-		errMg := fmt.Sprintf("You need to validate your email or make it public on %s", payload.Service)
-		processErr(w, r.Request, err, errMg, http.StatusForbidden, payload.RedirectTo)
-		return
-	}
-
-	if !authservices.IsEmailDomainAllowed(payload.Email) {
-		errMg := fmt.Sprintf("Email domain not allowed: %s", payload.Email)
-		processErr(w, r.Request, err, errMg, http.StatusForbidden, payload.RedirectTo)
-		return
-	}
-
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
-	account, err := getUserByEmail(r.Context(), payload.Email, collection)
+	if payload.ProviderID == "" {
+		processErr(w, r.Request, fmt.Errorf("OAuth provider ID is missing"), "Unable to identify OAuth account", http.StatusForbidden, payload.RedirectTo)
+		return
+	}
+	if payload.Email != "" && !authservices.IsEmailDomainAllowed(payload.Email) {
+		errMg := fmt.Sprintf("Email domain not allowed: %s", payload.Email)
+		processErr(w, r.Request, fmt.Errorf("email domain is not allowed"), errMg, http.StatusForbidden, payload.RedirectTo)
+		return
+	}
+
+	// A connect flow is authenticated before it starts. The signed, short-lived
+	// cookie binds the callback to that account and must be consumed before any
+	// provider data is used for login.
+	connectPRN, hasConnectCookie, cookieErr := getOAuthConnectPRN(r)
+	if hasConnectCookie {
+		utils.DeleteCookie(w, r, oauthConnectPRNCookie)
+		if cookieErr != nil {
+			processErr(w, r.Request, cookieErr, "Invalid OAuth connect session", http.StatusForbidden, payload.RedirectTo)
+			return
+		}
+
+		account, err := getUserByPRN(r.Context(), connectPRN, collection)
+		if err != nil {
+			processErr(w, r.Request, err, "Account not found", http.StatusForbidden, payload.RedirectTo)
+			return
+		}
+		provider := accounts.ConnectedProvider{
+			Service:     string(payload.Service),
+			ProviderID:  payload.ProviderID,
+			Email:       payload.Email,
+			ConnectedAt: time.Now(),
+		}
+		if err := connectProvider(r.Context(), account.Prn, provider, collection); err != nil {
+			status := http.StatusInternalServerError
+			if isDubplicateKey("connected_providers", err) {
+				status = http.StatusConflict
+			}
+			processErr(w, r.Request, err, "OAuth provider is already connected to another account", status, payload.RedirectTo)
+			return
+		}
+		redirectAfterProviderConnect(w, r, payload.RedirectTo, provider)
+		return
+	}
+
+	// Login is resolved by service + stable provider ID. Email is only used to
+	// provision a brand-new OAuth account; it is never sufficient to sign in to
+	// an existing account.
+	account, err := getUserByProvider(r.Context(), string(payload.Service), payload.ProviderID, collection)
 	if err != nil && err != mongo.ErrNoDocuments {
 		processErr(w, r.Request, err, "Error with Database connectivity", http.StatusInternalServerError, payload.RedirectTo)
 		return
 	}
-
 	if err == mongo.ErrNoDocuments {
-		account, err = createUser(r.Context(), payload.Email, payload.Nick, "", "", collection)
-		if err != nil && isDubplicateKey("nick", err) {
-			scopeNick := payload.Nick + "_" + string(payload.Service)
-			account, err = createUser(r.Context(), payload.Email, scopeNick, "", "", collection)
+		if payload.Email == "" {
+			errMg := fmt.Sprintf("You need to validate your email or make it public on %s", payload.Service)
+			processErr(w, r.Request, fmt.Errorf("email is missing"), errMg, http.StatusForbidden, payload.RedirectTo)
+			return
 		}
 
-		urlPrefix := utils.GetEnv(utils.EnvPantahubScheme) + "://" + utils.GetEnv(utils.EnvPantahubWWWHost)
-		if utils.GetEnv(utils.EnvPantahubPort) != "" {
-			urlPrefix += ":"
-			urlPrefix += utils.GetEnv(utils.EnvPantahubPort)
+		account, err = getUserByEmail(r.Context(), payload.Email, collection)
+		if err != nil && err != mongo.ErrNoDocuments {
+			processErr(w, r.Request, err, "Error with Database connectivity", http.StatusInternalServerError, payload.RedirectTo)
+			return
 		}
+		if err == mongo.ErrNoDocuments {
+			account, err = createUser(r.Context(), payload.Email, payload.Nick, "", "", collection)
+			if err != nil && isDubplicateKey("nick", err) {
+				scopeNick := payload.Nick + "_" + string(payload.Service)
+				account, err = createUser(r.Context(), payload.Email, scopeNick, "", "", collection)
+			}
+			if err == nil {
+				provider := accounts.ConnectedProvider{
+					Service:     string(payload.Service),
+					ProviderID:  payload.ProviderID,
+					Email:       payload.Email,
+					ConnectedAt: time.Now(),
+				}
+				err = connectProvider(r.Context(), account.Prn, provider, collection)
+			}
 
-		utils.SendWelcome(account.Email, account.Nick, urlPrefix)
+			if err == nil {
+				urlPrefix := utils.GetEnv(utils.EnvPantahubScheme) + "://" + utils.GetEnv(utils.EnvPantahubWWWHost)
+				if utils.GetEnv(utils.EnvPantahubPort) != "" {
+					urlPrefix += ":"
+					urlPrefix += utils.GetEnv(utils.EnvPantahubPort)
+				}
+				utils.SendWelcome(account.Email, account.Nick, urlPrefix)
+			}
+		} else if connectedAccountsEnforced() {
+			processErr(w, r.Request, fmt.Errorf("OAuth provider is not connected to this account"), "This OAuth account is not connected; sign in with your password and connect it first", http.StatusForbidden, payload.RedirectTo)
+			return
+		} else {
+			// Legacy opt-out mode keeps email-based social login working, but
+			// records the stable identity for subsequent logins.
+			provider := accounts.ConnectedProvider{
+				Service:     string(payload.Service),
+				ProviderID:  payload.ProviderID,
+				Email:       payload.Email,
+				ConnectedAt: time.Now(),
+			}
+			err = connectProvider(r.Context(), account.Prn, provider, collection)
+		}
 	}
 	if err != nil {
 		processErr(w, r.Request, err, "Error with Database connectivity", http.StatusInternalServerError, payload.RedirectTo)
@@ -178,6 +256,10 @@ func (a *App) HandleGetThirdPartyCallback(w rest.ResponseWriter, r *rest.Request
 	}
 
 	w.WriteJson(token)
+}
+
+func connectedAccountsEnforced() bool {
+	return strings.ToLower(strings.TrimSpace(utils.GetEnv(utils.EnvPantahubOAuthConnectedAccountsEnforce))) != "false"
 }
 
 // maybeStartSocialMFALogin issues the MFA challenge for social logins into

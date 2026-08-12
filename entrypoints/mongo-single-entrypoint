@@ -1,7 +1,5 @@
 #!/bin/sh
 
-set -x
-
 mongod --replSet ${MONGO_RS:-rs0} --bind_ip_all --port 27017 &
 
 sleep 5
