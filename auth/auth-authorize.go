@@ -119,7 +119,7 @@ func (app *App) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Request)
 	tokenClaims["scopes"] = req.Scopes
 	tokenClaims["prn"] = caller
 	tokenClaims["orig_iat"] = time.Now().Unix()
-	tokenClaims["exp"] = time.Now().Add(app.jwtMiddleware.Timeout)
+	tokenClaims["exp"] = time.Now().Add(app.jwtMiddleware.Timeout).Unix()
 	tokenString, err := token.SignedString(app.jwtMiddleware.Key)
 
 	if err != nil {
@@ -251,7 +251,7 @@ func (app *App) handlePostCode(w rest.ResponseWriter, r *rest.Request) {
 		}
 	}
 
-	mapClaim["exp"] = time.Now().Add(time.Minute * 5)
+	mapClaim["exp"] = time.Now().Add(time.Minute * 5).Unix()
 
 	response := codeResponse{}
 	code := jwtgo.New(jwtgo.GetSigningMethod(app.jwtMiddleware.SigningAlgorithm))
