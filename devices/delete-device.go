@@ -108,5 +108,7 @@ func (a *App) handleDeleteDevice(w rest.ResponseWriter, r *rest.Request) {
 		}
 	}
 
+	device.Secret = ""
+	device.Challenge = ""
 	w.WriteJson(device)
 }
