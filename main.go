@@ -19,6 +19,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"time"
 
 	"gitlab.com/pantacor/pantahub-base/base"
 	"gitlab.com/pantacor/pantahub-base/docs"
@@ -83,7 +84,16 @@ func main() {
 	portIntTLS := utils.GetEnv(utils.EnvPantahubPortIntTLS)
 
 	go func() {
-		log.Fatal(http.ListenAndServeTLS(":"+portIntTLS, "localhost.cert.pem", "localhost.key.pem", handler))
+		// ReadHeaderTimeout bounds slowloris-style header stalls without
+		// capping large object/log body transfers; no Read/WriteTimeout so
+		// streaming uploads and downloads are not truncated.
+		tlsSrv := &http.Server{
+			Addr:              ":" + portIntTLS,
+			Handler:           handler,
+			ReadHeaderTimeout: 15 * time.Second,
+			IdleTimeout:       120 * time.Second,
+		}
+		log.Fatal(tlsSrv.ListenAndServeTLS("localhost.cert.pem", "localhost.key.pem"))
 	}()
 
 	ifaces, _ := net.Interfaces()
@@ -101,5 +111,11 @@ func main() {
 			log.Printf("%s", "Serving @ http://"+ip.String()+":"+portInt+"/\n")
 		}
 	}
-	log.Fatal(http.ListenAndServe(":"+portInt, handler))
+	srv := &http.Server{
+		Addr:              ":" + portInt,
+		Handler:           handler,
+		ReadHeaderTimeout: 15 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+	log.Fatal(srv.ListenAndServe())
 }
