@@ -210,15 +210,8 @@ func DoInit() http.Handler {
 		fservermux = &LocalFileServer{fileServer: http.FileServer(http.Dir(utils.PantahubS3Path())), directory: utils.PantahubS3Path()}
 	}
 
-	// configured cors allowlist
-	fserver := cors.New(cors.Options{
-		AllowOriginFunc: func(origin string) bool {
-			return utils.AllowlistedOrigin(origin, nil)
-		},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"*"},
-		AllowCredentials: true,
-	}).Handler(fservermux)
+	// default cors - allow GET and POST from all origins
+	fserver := cors.AllowAll().Handler(fservermux)
 
 	// @deprecated
 	mux.Handle("/local-s3/", http.StripPrefix("/local-s3", fserver))

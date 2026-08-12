@@ -441,8 +441,10 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 
 	app.API.Use(rest.DefaultCommonStack...)
 	app.API.Use(&rest.CorsMiddleware{
-		RejectNonCorsRequests:         false,
-		OriginValidator:               utils.AllowlistedOrigin,
+		RejectNonCorsRequests: false,
+		OriginValidator: func(origin string, request *rest.Request) bool {
+			return true
+		},
 		AllowedMethods:                []string{"GET"},
 		AllowedHeaders:                []string{"*"},
 		AccessControlAllowCredentials: true,

@@ -126,8 +126,10 @@ func (app *App) setupAPI() {
 	app.API.Use(rest.DefaultCommonStack...)
 	app.API.Use(&rest.CorsMiddleware{
 		RejectNonCorsRequests: false,
-		OriginValidator:       utils.AllowlistedOrigin,
-		AllowedMethods:        []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		OriginValidator: func(origin string, request *rest.Request) bool {
+			return true
+		},
+		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{
 			"Accept",
 			"Content-Type",
