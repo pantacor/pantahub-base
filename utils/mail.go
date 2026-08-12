@@ -23,7 +23,7 @@ import (
 	"io"
 	"log"
 	"path/filepath"
-	"text/template"
+	"html/template"
 	"time"
 
 	"github.com/mailgun/mailgun-go/v4"
