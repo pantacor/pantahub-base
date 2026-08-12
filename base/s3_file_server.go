@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -401,8 +402,16 @@ func parseS3ConfigFromK8s() error {
 
 	response := map[string]interface{}{}
 
+	caCert, err := os.ReadFile("/run/secrets/kubernetes.io/serviceaccount/ca.crt")
+	if err != nil {
+		return fmt.Errorf("k8s CA file can't be read: %s", err)
+	}
+	caPool := x509.NewCertPool()
+	if !caPool.AppendCertsFromPEM(caCert) {
+		return fmt.Errorf("failed to parse k8s CA certificate")
+	}
 	client := resty.New()
-	client.SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	client.SetTLSClientConfig(&tls.Config{RootCAs: caPool})
 	res, err := client.R().
 		SetHeader("Authorization", "Bearer "+string(token)).
 		Get(fmt.Sprintf("%s/api/v1/nodes/%s", utils.GetEnv(utils.EnvK8sApiUrl), utils.GetEnv(utils.EnvK8sNodeName)))

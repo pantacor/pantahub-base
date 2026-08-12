@@ -83,7 +83,6 @@ func WSDL(URL string) (*WsdlTP, error) {
 			TLSClientConfig: &tls.Config{
 				RootCAs:            pool,
 				Certificates:       []tls.Certificate{clientCert},
-				InsecureSkipVerify: true,
 			},
 		},
 	}
