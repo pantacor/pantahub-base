@@ -73,7 +73,7 @@ func (app *App) handleCreateApp(w rest.ResponseWriter, r *rest.Request) {
 
 	err := validatePayload(payload)
 	if err != nil {
-		utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapperUser(w, err.Error(), err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -86,7 +86,7 @@ func (app *App) handleCreateApp(w rest.ResponseWriter, r *rest.Request) {
 
 	apptype, err := parseType(payload.Type)
 	if err != nil {
-		utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapperUser(w, err.Error(), err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -96,7 +96,7 @@ func (app *App) handleCreateApp(w rest.ResponseWriter, r *rest.Request) {
 
 	scopes, err := parseScopes(payload.Scopes, payload.Nick)
 	if err != nil {
-		utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
+		utils.RestErrorWrapperUser(w, err.Error(), err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -111,7 +111,7 @@ func (app *App) handleCreateApp(w rest.ResponseWriter, r *rest.Request) {
 	if apptype == AppTypeConfidential && len(payload.ExposedScopes) > 0 {
 		newApp.ExposedScopes, err = parseScopes(payload.ExposedScopes, payload.Nick)
 		if err != nil {
-			utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
+			utils.RestErrorWrapperUser(w, err.Error(), err.Error(), http.StatusBadRequest)
 			return
 		}
 	}
