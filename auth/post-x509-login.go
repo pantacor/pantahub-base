@@ -65,8 +65,8 @@ func (a *App) handleAuthUsingDeviceCert(w rest.ResponseWriter, r *rest.Request) 
 		return
 	}
 
-	revoked, ok := revoke.VerifyCertificate(cert)
-	if revoked && !ok {
+	revoked, _ := revoke.VerifyCertificate(cert)
+	if revoked {
 		utils.RestErrorWrapper(w, "The certificate is not valid anymore, could be revoked or is expired", http.StatusForbidden)
 		return
 	}
