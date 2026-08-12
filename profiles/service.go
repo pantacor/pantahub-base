@@ -149,7 +149,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware,
 			"/config/meta",
 			rest.WrapMiddlewares(
 				[]rest.Middleware{
-					utils.InitScopeFilterMiddleware(readProfileScopes),
+					utils.InitScopeFilterMiddleware(writeProfileScopes),
 				},
 				app.handlePutGlobalMeta,
 			),

@@ -225,7 +225,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware, subService subscriptions.Subscription
 		rest.Post("/#id/ownership/validate", utils.ScopeFilter(validateDeviceScopes, app.handleValidateOwnership)),
 
 		// token api
-		rest.Post("/tokens", utils.ScopeFilter(readDevicesScopes, app.handlePostTokens)),
+		rest.Post("/tokens", utils.ScopeFilter(updateDevicesScopes, app.handlePostTokens)),
 		rest.Delete("/tokens/#id", utils.ScopeFilter(updateDevicesScopes, app.handleDisableTokens)),
 		rest.Patch("/tokens/#id", utils.ScopeFilter(updateDevicesScopes, app.handlePatchTokens)),
 		rest.Get("/tokens/#id", utils.ScopeFilter(readDevicesScopes, app.handleGetToken)),
