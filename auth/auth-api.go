@@ -312,14 +312,8 @@ func (a *App) handlePostAccount(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	passwordScrypt, err := utils.HashPassword(newAccount.Password, utils.CryptoMethods.SCrypt)
-	if err != nil {
-		utils.RestError(w, err, err.Error(), http.StatusInternalServerError)
-		return
-	}
 	newAccount.Password = ""
 	newAccount.PasswordBcrypt = passwordBcrypt
-	newAccount.PasswordScrypt = passwordScrypt
 
 	mgoid := primitive.NewObjectID()
 	ObjectID, err := primitive.ObjectIDFromHex(mgoid.Hex())
@@ -571,17 +565,11 @@ func (a *App) handlePasswordReset(writer rest.ResponseWriter, r *rest.Request) {
 		utils.RestError(writer, err, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	passwordScrypt, err := utils.HashPassword(data.Password, utils.CryptoMethods.SCrypt)
-	if err != nil {
-		utils.RestError(writer, err, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	update := bson.M{
 		"$set": bson.M{
 			"password":        "",
 			"password_bcrypt": passwordBcrypt,
-			"password_scrypt": passwordScrypt,
+			"password_scrypt": "",
 			"challenge":       "",
 			"time-modified":   time.Now(),
 		},

@@ -64,11 +64,6 @@ func createUser(ctx context.Context, email, nick, password, challenge string, db
 		return nil, err
 	}
 
-	passwordScrypt, err := utils.HashPassword(password, utils.CryptoMethods.SCrypt)
-	if err != nil {
-		return nil, err
-	}
-
 	mgoid := primitive.NewObjectID()
 	ObjectID, err := primitive.ObjectIDFromHex(mgoid.Hex())
 	if err != nil {
@@ -85,7 +80,6 @@ func createUser(ctx context.Context, email, nick, password, challenge string, db
 		Password:       "",
 		Challenge:      challenge,
 		PasswordBcrypt: passwordBcrypt,
-		PasswordScrypt: passwordScrypt,
 		Type:           accounts.AccountTypeUser,
 		TimeCreated:    createdAt,
 		TimeModified:   createdAt,
