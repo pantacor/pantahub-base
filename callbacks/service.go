@@ -17,6 +17,7 @@
 package callbacks
 
 import (
+	"crypto/subtle"
 	"log"
 	"os"
 
@@ -87,7 +88,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware,
 	basicAuthMW := &rest.AuthBasicMiddleware{
 		Realm: "Pantahub Health @ " + utils.GetEnv(utils.EnvPantahubAuth),
 		Authenticator: func(userId string, password string) bool {
-			return saAdminSecret != "" && userId == "saadmin" && password == saAdminSecret
+			return saAdminSecret != "" && userId == "saadmin" && subtle.ConstantTimeCompare([]byte(password), []byte(saAdminSecret)) == 1
 		},
 	}
 
