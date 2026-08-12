@@ -87,6 +87,7 @@ func (a *App) handlePutStepMeta(w rest.ResponseWriter, r *rest.Request) {
 
 	if step.Owner != owner {
 		utils.RestErrorWrapper(w, "No write access to step meta", http.StatusForbidden)
+		return
 	}
 
 	metaMap := map[string]interface{}{}

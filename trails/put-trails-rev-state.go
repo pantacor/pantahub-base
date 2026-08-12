@@ -93,6 +93,7 @@ func (a *App) handlePutStepState(w rest.ResponseWriter, r *rest.Request) {
 
 	if step.Owner != owner {
 		utils.RestErrorWrapper(w, "No write access to step state", http.StatusForbidden)
+		return
 	}
 
 	stateMap := map[string]interface{}{}
