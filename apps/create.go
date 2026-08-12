@@ -25,6 +25,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	petname "github.com/dustinkirkland/golang-petname"
+	"gitlab.com/pantacor/pantahub-base/auth/redirecturi"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"gopkg.in/mgo.v2/bson"
@@ -207,6 +208,11 @@ func validatePayload(app *CreateAppPayload) error {
 	}
 	if len(app.RedirectURIs) == 0 {
 		return errors.New("A new app need to have at least one redirect URI")
+	}
+	for _, uri := range app.RedirectURIs {
+		if err := redirecturi.ValidateURI(uri); err != nil {
+			return errors.New("invalid redirect URI '" + uri + "': " + err.Error())
+		}
 	}
 
 	logoSize := utils.CalcBinarySize(app.Logo)

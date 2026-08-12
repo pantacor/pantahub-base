@@ -131,6 +131,15 @@ func parse(rawURI string) (*parsed, error) {
 	}, nil
 }
 
+// ValidateURI reports whether rawURI is well-formed and safe to register as a
+// redirect URI: non-empty, parseable, a non-dangerous scheme, no embedded
+// credentials, a non-empty host, and no fragment. It does not require HTTPS so
+// that loopback development URIs remain usable.
+func ValidateURI(rawURI string) error {
+	_, err := parse(rawURI)
+	return err
+}
+
 // cleanPath normalises a URL path for comparison, resolving any . and ..
 // segments so a registered prefix cannot be escaped by traversing out of it.
 func cleanPath(raw string) string {
