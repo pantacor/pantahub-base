@@ -2,33 +2,11 @@ package auth
 
 import (
 	"testing"
-	"time"
 )
 
-func TestOAuthConnectCookieRoundTripAndTamperProtection(t *testing.T) {
-	t.Setenv("PANTAHUB_JWT_SECRET", "unit-test-secret")
-	now := time.Now().Truncate(time.Second)
-
-	value, err := encodeOAuthConnectCookie("prn:::accounts:/user", now)
-	if err != nil {
-		t.Fatalf("encodeOAuthConnectCookie() error = %v", err)
-	}
-	got, err := decodeOAuthConnectCookie(value, now.Add(time.Second))
-	if err != nil {
-		t.Fatalf("decodeOAuthConnectCookie() error = %v", err)
-	}
-	if got != "prn:::accounts:/user" {
-		t.Fatalf("decoded PRN = %q", got)
-	}
-
-	tampered := value[:len(value)-1] + "B"
-	if _, err := decodeOAuthConnectCookie(tampered, now); err == nil {
-		t.Fatal("tampered OAuth connect cookie was accepted")
-	}
-	if _, err := decodeOAuthConnectCookie(value, now.Add(oauthConnectCookieTTL+time.Second)); err == nil {
-		t.Fatal("expired OAuth connect cookie was accepted")
-	}
-}
+// The account PRN a connect flow binds to now travels inside the signed OAuth
+// state rather than a cross-site cookie; its roundtrip/tamper/expiry coverage
+// lives with the state implementation in the auth/oauth package.
 
 func TestConnectedAccountsEnforcedDefaultsToTrue(t *testing.T) {
 	t.Setenv("PANTAHUB_OAUTH_CONNECTED_ACCOUNTS_ENFORCE", "")

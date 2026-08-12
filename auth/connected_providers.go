@@ -1,10 +1,6 @@
 package auth
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
@@ -17,16 +13,6 @@ import (
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/mongo"
 )
-
-const (
-	oauthConnectPRNCookie = "oauth_connect_prn"
-	oauthConnectCookieTTL = 10 * time.Minute
-)
-
-type oauthConnectCookiePayload struct {
-	PRN      string `json:"prn"`
-	IssuedAt int64  `json:"iat"`
-}
 
 type connectedProviderConnectRequest struct {
 	Service    string `json:"service"`
@@ -42,86 +28,6 @@ type connectedProviderResponse struct {
 	Service     string    `json:"service"`
 	Email       string    `json:"email,omitempty"`
 	ConnectedAt time.Time `json:"connected_at,omitempty"`
-}
-
-func oauthConnectCookieKey() []byte {
-	key := sha256.Sum256([]byte("pantahub-oauth-connect-cookie:" + utils.GetEnv(utils.EnvPantahubJWTAuthSecret)))
-	return key[:]
-}
-
-func encodeOAuthConnectCookie(prn string, issuedAt time.Time) (string, error) {
-	if prn == "" {
-		return "", errors.New("account PRN is required")
-	}
-
-	payload, err := json.Marshal(oauthConnectCookiePayload{PRN: prn, IssuedAt: issuedAt.Unix()})
-	if err != nil {
-		return "", err
-	}
-	payloadEncoded := base64.RawURLEncoding.EncodeToString(payload)
-	mac := hmac.New(sha256.New, oauthConnectCookieKey())
-	_, _ = mac.Write([]byte(payloadEncoded))
-	signature := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
-	return payloadEncoded + "." + signature, nil
-}
-
-func decodeOAuthConnectCookie(value string, now time.Time) (string, error) {
-	payloadEncoded, signatureEncoded, found := strings.Cut(value, ".")
-	if !found || payloadEncoded == "" || signatureEncoded == "" {
-		return "", errors.New("malformed OAuth connect cookie")
-	}
-
-	provided, err := base64.RawURLEncoding.DecodeString(signatureEncoded)
-	if err != nil {
-		return "", errors.New("malformed OAuth connect cookie signature")
-	}
-	mac := hmac.New(sha256.New, oauthConnectCookieKey())
-	_, _ = mac.Write([]byte(payloadEncoded))
-	if !hmac.Equal(provided, mac.Sum(nil)) {
-		return "", errors.New("invalid OAuth connect cookie signature")
-	}
-
-	payloadBytes, err := base64.RawURLEncoding.DecodeString(payloadEncoded)
-	if err != nil {
-		return "", errors.New("malformed OAuth connect cookie payload")
-	}
-	payload := oauthConnectCookiePayload{}
-	if err := json.Unmarshal(payloadBytes, &payload); err != nil || payload.PRN == "" {
-		return "", errors.New("malformed OAuth connect cookie payload")
-	}
-	issuedAt := time.Unix(payload.IssuedAt, 0)
-	if issuedAt.After(now.Add(time.Minute)) || now.Sub(issuedAt) > oauthConnectCookieTTL {
-		return "", errors.New("expired OAuth connect cookie")
-	}
-
-	return payload.PRN, nil
-}
-
-func setOAuthConnectCookie(w http.ResponseWriter, prn string) error {
-	value, err := encodeOAuthConnectCookie(prn, time.Now())
-	if err != nil {
-		return err
-	}
-	http.SetCookie(w, &http.Cookie{
-		Name:     oauthConnectPRNCookie,
-		Value:    value,
-		Path:     "/",
-		Expires:  time.Now().Add(oauthConnectCookieTTL),
-		MaxAge:   int(oauthConnectCookieTTL / time.Second),
-		HttpOnly: true,
-		Secure:   utils.GetEnv(utils.EnvPantahubScheme) == "https",
-		SameSite: http.SameSiteLaxMode,
-	})
-	return nil
-}
-
-func getOAuthConnectPRN(r *rest.Request) (string, bool, error) {
-	value := utils.GetCookie(r, oauthConnectPRNCookie)
-	if value == "" {
-		return "", false, nil
-	}
-	prn, err := decodeOAuthConnectCookie(value, time.Now())
-	return prn, true, err
 }
 
 func socialConnectAccountPRN(r *rest.Request) (string, error) {
@@ -213,12 +119,11 @@ func (a *App) handlePostConnectedProvider(w rest.ResponseWriter, r *rest.Request
 		}
 	}
 
-	if err := setOAuthConnectCookie(w, accountPRN); err != nil {
-		utils.RestError(w, err, "Unable to start OAuth connect flow", http.StatusInternalServerError)
-		return
-	}
-
-	authorizeURL, err := oauth.AuthorizationURLByService(service, redirectTo, w)
+	// The authenticated account PRN is bound into the signed OAuth state rather
+	// than a cross-site cookie: the hub and API are on different registrable
+	// domains, so the browser drops such cookies. The callback trusts only a PRN
+	// we signed here, and the caller is authenticated at this point.
+	authorizeURL, err := oauth.AuthorizationURLByServiceWithConnect(service, redirectTo, accountPRN)
 	if err != nil {
 		utils.RestError(w, err, "Unable to start OAuth connect flow", http.StatusInternalServerError)
 		return

@@ -127,18 +127,13 @@ func (a *App) HandleGetThirdPartyCallback(w rest.ResponseWriter, r *rest.Request
 		return
 	}
 
-	// A connect flow is authenticated before it starts. The signed, short-lived
-	// cookie binds the callback to that account and must be consumed before any
-	// provider data is used for login.
-	connectPRN, hasConnectCookie, cookieErr := getOAuthConnectPRN(r)
-	if hasConnectCookie {
-		utils.DeleteCookie(w, r, oauthConnectPRNCookie)
-		if cookieErr != nil {
-			processErr(w, r.Request, cookieErr, "Invalid OAuth connect session", http.StatusForbidden, payload.RedirectTo)
-			return
-		}
-
-		account, err := getUserByPRN(r.Context(), connectPRN, collection)
+	// A connect flow carries the authenticated account PRN inside the signed
+	// OAuth state (see AuthorizationURLByServiceWithConnect), not a cross-site
+	// cookie. The state signature means the callback trusts only a PRN we signed
+	// when the authenticated request started the flow; the browser cannot supply
+	// one of its own.
+	if payload.ConnectPRN != "" {
+		account, err := getUserByPRN(r.Context(), payload.ConnectPRN, collection)
 		if err != nil {
 			processErr(w, r.Request, err, "Account not found", http.StatusForbidden, payload.RedirectTo)
 			return

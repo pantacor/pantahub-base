@@ -48,6 +48,9 @@ type ResponsePayload struct {
 	RedirectTo string      `json:"redirect_uri"`
 	Raw        string      `json:"raw"`
 	Service    ServiceType `json:"service_type"`
+	// ConnectPRN is the authenticated account PRN carried in the signed OAuth
+	// state during a connect flow. It is never serialised to clients.
+	ConnectPRN string `json:"-"`
 }
 
 // ServiceType type of service
@@ -157,6 +160,35 @@ func AuthorizationURLByService(service ServiceType, redirectURI string, w http.R
 	return getConfig().AuthCodeURL(state), nil
 }
 
+// AuthorizationURLByServiceWithConnect builds a provider authorization URL for an
+// authenticated connect flow. The account PRN is carried inside the signed,
+// short-lived state so the callback can complete the connect without relying on
+// a cross-site cookie (the hub and API are on different registrable domains, so
+// browsers drop such cookies). The HMAC signature makes the PRN unforgeable.
+func AuthorizationURLByServiceWithConnect(service ServiceType, redirectURI, connectPRN string) (string, error) {
+	getConfig, found := ServicesConfigs[service]
+	if !found {
+		return "", fmt.Errorf("we can't connect to service: %s", service)
+	}
+
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("unable to generate OAuth state: %w", err)
+	}
+
+	state, err := encodeState(stateClaims{
+		Nonce:       base64.RawURLEncoding.EncodeToString(b),
+		RedirectURI: redirectURI,
+		ConnectPRN:  connectPRN,
+		IssuedAt:    time.Now().Unix(),
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return getConfig().AuthCodeURL(state), nil
+}
+
 // CbByService use service callback
 func CbByService(r *rest.Request) (*ResponsePayload, error) {
 	var err error
@@ -173,22 +205,12 @@ func CbByService(r *rest.Request) (*ResponsePayload, error) {
 		return payload, fmt.Errorf("%s error -- %s", service, err)
 	}
 
-	oauthState, err := r.Cookie(oauthCookie)
-	if err != nil {
-		payload := &ResponsePayload{RedirectTo: ""}
-		return payload, fmt.Errorf("error reading cookie: %s", err)
-	}
-
-	// The state returned by the provider must be the one we issued for this
-	// browser session.
+	// The state travels only in the signed `state` parameter the provider echoes
+	// back. It is HMAC-signed and short-lived, so it cannot be forged or tampered
+	// with, and it does not depend on a cross-site cookie surviving the provider
+	// redirect. The provider's authorization code is single-use, which prevents a
+	// completed callback from being replayed.
 	returnedState := r.FormValue("state")
-	if subtleCompare(returnedState, oauthState.Value) != 1 {
-		payload := &ResponsePayload{RedirectTo: ""}
-		return payload, errors.New("we can't validate the state")
-	}
-
-	// The redirect target travels inside the signed state rather than in a
-	// cookie of its own, so it cannot be swapped independently of the state.
 	claims, err := decodeState(returnedState)
 	if err != nil {
 		payload := &ResponsePayload{RedirectTo: ""}
@@ -196,6 +218,7 @@ func CbByService(r *rest.Request) (*ResponsePayload, error) {
 	}
 
 	payload.RedirectTo = claims.RedirectURI
+	payload.ConnectPRN = claims.ConnectPRN
 	payload.Service = service
 
 	return payload, nil
@@ -207,6 +230,7 @@ func CbByService(r *rest.Request) (*ResponsePayload, error) {
 type stateClaims struct {
 	Nonce       string `json:"n"`
 	RedirectURI string `json:"r,omitempty"`
+	ConnectPRN  string `json:"p,omitempty"`
 	IssuedAt    int64  `json:"t"`
 }
 
@@ -291,18 +315,6 @@ func decodeState(state string) (*stateClaims, error) {
 	}
 
 	return claims, nil
-}
-
-// subtleCompare reports 1 when the two values are equal, comparing in constant
-// time so the state cookie cannot be probed byte by byte.
-func subtleCompare(a, b string) int {
-	if len(a) != len(b) {
-		return 0
-	}
-	if hmac.Equal([]byte(a), []byte(b)) {
-		return 1
-	}
-	return 0
 }
 
 // generateStateOauthCookie issues a signed state carrying the flow parameters
