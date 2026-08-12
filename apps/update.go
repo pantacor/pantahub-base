@@ -43,7 +43,10 @@ func (app *App) handleUpdateApp(w rest.ResponseWriter, r *rest.Request) {
 	id := r.PathParam("id")
 
 	payload := &CreateAppPayload{}
-	r.DecodeJsonPayload(payload)
+	if err := r.DecodeJsonPayload(payload); err != nil {
+		utils.RestErrorWrapperUser(w, err.Error(), "invalid request body", http.StatusBadRequest)
+		return
+	}
 
 	err := validatePayload(payload)
 	if err != nil {

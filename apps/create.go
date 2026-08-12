@@ -58,7 +58,10 @@ type CreateAppPayload struct {
 func (app *App) handleCreateApp(w rest.ResponseWriter, r *rest.Request) {
 	newApp := &TPApp{}
 	payload := &CreateAppPayload{Logo: ""}
-	r.DecodeJsonPayload(payload)
+	if err := r.DecodeJsonPayload(payload); err != nil {
+		utils.RestErrorWrapperUser(w, err.Error(), "invalid request body", http.StatusBadRequest)
+		return
+	}
 
 	var owner interface{}
 	var ownerNick interface{}
