@@ -112,6 +112,17 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
+	// A device token may only post steps to its OWN trail. Without this a device
+	// token (whose owner claim is the user's PRN) passes the owner check above for
+	// every trail the user owns, letting one device deploy revisions to siblings.
+	if authType == "DEVICE" {
+		callerPrn, _ := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"].(string)
+		if trail.Device != callerPrn {
+			utils.RestErrorWrapper(w, "No access", http.StatusForbidden)
+			return
+		}
+	}
+
 	collSteps := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 	if collSteps == nil {
 		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
