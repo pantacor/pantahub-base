@@ -18,6 +18,7 @@ package mqtt
 
 import (
 	"context"
+	"errors"
 	"log"
 	"log/slog"
 	"net/http"
@@ -27,6 +28,7 @@ import (
 
 	mochi "github.com/mochi-mqtt/server/v2"
 	"github.com/mochi-mqtt/server/v2/listeners"
+	"gitlab.com/pantacor/pantahub-base/logs"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -123,7 +125,16 @@ func sessionExpiry() time.Duration {
 
 // New builds the broker, installs the authentication and bridge hooks, and
 // mounts the WebSocket transport. Nothing is served until Start is called.
-func New(mongoClient *mongo.Client) (*Service, error) {
+//
+// logsApp must be the same App the REST /logs service was built with. Its
+// backend is the only registered one in the process, and registration is what
+// marks an elastic backend usable; a second backend built here would look
+// configured and silently discard every entry.
+func New(mongoClient *mongo.Client, logsApp *logs.App) (*Service, error) {
+	if logsApp == nil {
+		return nil, errors.New("mqtt: no logs app")
+	}
+
 	expiry := sessionExpiry()
 
 	capabilities := mochi.NewDefaultServerCapabilities()
@@ -148,7 +159,7 @@ func New(mongoClient *mongo.Client) (*Service, error) {
 		return nil, err
 	}
 
-	if err := server.AddHook(&bridgeHook{mongoClient: mongoClient}, nil); err != nil {
+	if err := server.AddHook(&bridgeHook{mongoClient: mongoClient, logs: logsApp}, nil); err != nil {
 		return nil, err
 	}
 

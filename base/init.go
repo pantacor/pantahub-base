@@ -147,9 +147,12 @@ func DoInit() http.Handler {
 		app := plog.New(defaultJwtMiddleware, mongoClient)
 		mux.Handle("/plog/", http.StripPrefix("/plog", app.API.MakeHandler()))
 	}
+	// Kept in scope for the MQTT bridge below: its backend is the only
+	// registered one in this process, and an unregistered elastic backend
+	// silently discards everything written through it.
+	logsApp := logs.New(defaultJwtMiddleware, mongoClient)
 	{
-		app := logs.New(defaultJwtMiddleware, mongoClient)
-		mux.Handle("/logs/", http.StripPrefix("/logs", app.API.MakeHandler()))
+		mux.Handle("/logs/", http.StripPrefix("/logs", logsApp.API.MakeHandler()))
 	}
 	{
 		app := healthz.New(mongoClient)
@@ -225,7 +228,7 @@ func DoInit() http.Handler {
 	// port of its own: the deployment only swaps the container image, so a new
 	// port would be unreachable. Devices connect to wss://<host><path>.
 	if mqtt.Enabled() {
-		service, err := mqtt.New(mongoClient)
+		service, err := mqtt.New(mongoClient, logsApp)
 		if err != nil {
 			log.Println("ERROR: could not start mqtt message plane: " + err.Error())
 		} else if err := service.Start(context.Background()); err != nil {

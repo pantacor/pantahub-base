@@ -18,46 +18,24 @@ package logs
 
 import (
 	"context"
-
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
-// NewIngest builds a logs App that can only store entries, for callers that
-// ingest logs outside the REST API — currently the MQTT message plane.
+// PostLogs stores entries using the configured backend, for callers that ingest
+// logs outside the REST API — currently the MQTT message plane. Entries reach
+// the same store whichever transport carried them, so a device that publishes
+// logs over MQTT is queryable through GET /logs exactly like one that posts them.
 //
-// Backend selection is identical to New, so entries reach the same store
-// whichever transport carried them: a device that publishes logs over MQTT is
-// queryable through GET /logs exactly like one that posts them.
+// It must be called on the App built by New, not on a separately constructed
+// one. Backend registration is what marks an elastic backend usable (it sets
+// the per-instance "works" flag, not just the server-side index template), and
+// New is what registers it. A second App built from the same environment would
+// look correctly configured and silently drop every entry — visible only as a
+// server-side log line, because a QoS 1 PUBACK tells the device the broker
+// accepted the packet, not that the write succeeded.
 //
-// Unlike New it neither builds the REST API nor registers the backend, because
-// the REST App created earlier in base.DoInit already owns registration, and it
-// returns errors instead of exiting: the message plane is optional, and a
-// logging misconfiguration must not take the API process down with it.
-func NewIngest(mongoClient *mongo.Client) (*App, error) {
-	app := new(App)
-	app.mongoClient = mongoClient
-
-	backend, err := NewElasticLogger()
-	if err != nil {
-		return nil, err
-	}
-
-	if backend == nil {
-		backend, err = NewMgoLogger(mongoClient)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	app.backend = backend
-
-	return app, nil
-}
-
-// PostLogs stores entries using the configured backend. Callers are responsible
-// for filling in the fields the REST handler would set from the request
-// identity — Device, Owner and TimeCreated — because those come from the
-// authenticated session rather than from the payload.
+// Callers are responsible for filling in the fields the REST handler would set
+// from the request identity — Device, Owner and TimeCreated — because those
+// come from the authenticated session rather than from the payload.
 func (a *App) PostLogs(ctx context.Context, entries []Entry) error {
 	if len(entries) == 0 {
 		return nil

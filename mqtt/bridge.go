@@ -119,11 +119,9 @@ func (h *bridgeHook) Init(config any) error {
 	h.jobs = make(chan bridgeJob, bridgeQueueDepth)
 	h.done = make(chan struct{})
 
-	logIngest, err := logs.NewIngest(h.mongoClient)
-	if err != nil {
-		return err
+	if h.logs == nil {
+		return errors.New("mqtt: bridge: no logs app")
 	}
-	h.logs = logIngest
 
 	for i := 0; i < bridgeWorkers; i++ {
 		h.wg.Add(1)
