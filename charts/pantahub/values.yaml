@@ -378,6 +378,11 @@ ingress:
   # "" uses the cluster's default IngressClass (traefik on stock k3s);
   # set explicitly (e.g. "nginx") when running several controllers
   className: ""
+  # CORS is handled by pantahub-base itself (it reflects the request origin,
+  # which credentialed browser clients like the hub UI require). Do NOT add
+  # ingress-level CORS annotations here: "cors-allow-origin: *" together with
+  # "cors-allow-credentials: true" is rejected by browsers, and any static
+  # origin list breaks the other first-party frontends (fleet, billing).
   annotations: {}
   domain: ""
   # fallback hosts when domain is unset (local clusters; combine with

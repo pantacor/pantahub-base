@@ -29,6 +29,11 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+// ErrInvalidTokenType reports a token create request whose type is not a
+// valid account type; endpoints map it to 400 (a caller error, not a
+// service failure).
+var ErrInvalidTokenType = errors.New("invalid token type")
+
 type ListOfToken struct {
 	querymongo.Pagination `json:",inline"`
 	Items                 []tokenmodels.AuthToken `json:"items"`
@@ -133,7 +138,7 @@ func (s *Service) CreateToken(ctx context.Context, payload *AuthTokenReqPayload,
 	if payload.Type != "" {
 		token.Type = payload.Type
 		if !token.ValidType() {
-			return nil, errors.New("invalid token type")
+			return nil, ErrInvalidTokenType
 		}
 	} else {
 		token.Type = accounts.AccountTypeSessionUser

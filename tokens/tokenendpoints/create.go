@@ -14,6 +14,7 @@
 package tokenendpoints
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/ant0ine/go-json-rest/rest"
@@ -35,6 +36,7 @@ import (
 // @Success 200 {object} tokenmodels.AuthToken
 // @Failure 400 {object} utils.RError
 // @Failure 403 {object} utils.RError
+// @Failure 409 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /tokens/ [post]
 func (app *Endpoints) CreateToken(w rest.ResponseWriter, r *rest.Request) {
@@ -58,8 +60,13 @@ func (app *Endpoints) CreateToken(w rest.ResponseWriter, r *rest.Request) {
 
 	response, err := app.service.CreateToken(r.Context(), &payload, owner.(string))
 	if err != nil {
+		if errors.Is(err, tokenservice.ErrInvalidTokenType) {
+			utils.RestErrorUser(w, err, "invalid token type", http.StatusBadRequest)
+			return
+		}
+
 		if mongo.IsDuplicateKeyError(err) {
-			utils.RestErrorUser(w, err, "token name is already taken", http.StatusInternalServerError)
+			utils.RestErrorUser(w, err, "token name is already taken", http.StatusConflict)
 			return
 		}
 
