@@ -306,7 +306,10 @@ func (a *App) handlePostReauthWebauthnFinish(writer rest.ResponseWriter, r *rest
 		return
 	}
 
-	if ok := a.acceptAssertedCredential(ctx, writer, r, account.Prn, credential); !ok {
+	// reauth of an already-authenticated session: UV is discouraged
+	// (possession only), so do not reject a passkey that asserts without user
+	// verification here.
+	if ok := a.acceptAssertedCredential(ctx, writer, r, account.Prn, credential, false); !ok {
 		return
 	}
 

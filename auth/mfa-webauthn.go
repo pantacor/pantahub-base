@@ -570,7 +570,9 @@ func (a *App) handlePostLoginMFAWebauthnFinish(writer rest.ResponseWriter, r *re
 		return
 	}
 
-	if ok := a.acceptAssertedCredential(ctx, writer, r, claims.Prn, credential); !ok {
+	// second factor after password: UV is discouraged (possession only), so
+	// do not reject a passkey that asserts without user verification here.
+	if ok := a.acceptAssertedCredential(ctx, writer, r, claims.Prn, credential, false); !ok {
 		return
 	}
 
@@ -578,25 +580,34 @@ func (a *App) handlePostLoginMFAWebauthnFinish(writer rest.ResponseWriter, r *re
 }
 
 // acceptAssertedCredential applies the post-assertion bookkeeping shared by
-// the 2FA and passkey flows: clone detection on the sign counter and
+// the 2FA, reauth and passkey flows: clone detection on the sign counter and
 // persisting the updated authenticator state. Non-backup-eligible
 // credentials with a counter regression are treated as cloned and rejected;
 // synced (backup-eligible) passkeys legitimately report non-incrementing
 // counters and only log.
-func (a *App) acceptAssertedCredential(ctx context.Context, writer rest.ResponseWriter, r *rest.Request, ownerPrn string, credential *webauthn.Credential) bool {
+//
+// requireUserVerification must be set only by the first-factor passkey
+// sign-in, where the passkey alone is the whole authentication and therefore
+// has to be user-verified. The second-factor step-up and reauth flows pass
+// false: they deliberately begin the assertion with UserVerification
+// "discouraged" (the password/session is the knowledge factor and the
+// assertion only needs to prove possession), so a passkey that legitimately
+// reports UV=false there must not be rejected — otherwise an account whose
+// only registered credentials are passkeys could never complete step-up or
+// reauth.
+func (a *App) acceptAssertedCredential(ctx context.Context, writer rest.ResponseWriter, r *rest.Request, ownerPrn string, credential *webauthn.Credential, requireUserVerification bool) bool {
 	stored, err := a.webauthnRepo.GetByCredentialID(ctx, credential.ID)
 	if err != nil || stored == nil || stored.Owner != ownerPrn {
 		utils.RestErrorWrapperUser(writer, "Authentication Failed", "Authentication Failed", http.StatusUnauthorized)
 		return false
 	}
 
-	// A credential registered as a passkey carries user verification as its
-	// own factor; an assertion from it that is not user-verified is either a
-	// downgrade or a different (2FA-only) authenticator asserting the same id,
-	// and must not be accepted with passkey-level assurance. Second-factor
-	// keys legitimately assert without UV (the password/step-up is the other
-	// factor), so this only applies to passkeys.
-	if stored.IsPasskey && !credential.Flags.UserVerified {
+	// When this flow grants passkey-level assurance (first-factor passkey
+	// sign-in), an assertion from a passkey that is not user-verified is a
+	// downgrade and must be rejected. Flows that already hold the knowledge
+	// factor (password step-up, session reauth) intentionally assert without
+	// UV and so do not gate on it here — see requireUserVerification.
+	if requireUserVerification && stored.IsPasskey && !credential.Flags.UserVerified {
 		utils.RestErrorWrapperUser(writer, "Authentication Failed", "Authentication Failed", http.StatusUnauthorized)
 		return false
 	}
@@ -772,7 +783,10 @@ func (a *App) handlePostPasskeyLoginFinish(writer rest.ResponseWriter, r *rest.R
 		return
 	}
 
-	if ok := a.acceptAssertedCredential(ctx, writer, r, account.Prn, credential); !ok {
+	// first-factor passkey sign-in: the passkey is the whole authentication
+	// (UV was required at BeginDiscoverableLogin and re-checked above), so
+	// require user verification for passkey-level assurance.
+	if ok := a.acceptAssertedCredential(ctx, writer, r, account.Prn, credential, true); !ok {
 		return
 	}
 
