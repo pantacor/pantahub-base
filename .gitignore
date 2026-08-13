@@ -19,3 +19,6 @@ vendor/
 gosec.sarif
 govulncheck.out
 .agents/
+
+# tls-local.sh mints the local HTTPS ingress cert here; only the example is tracked.
+.certs/*.pem

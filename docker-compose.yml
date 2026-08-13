@@ -54,7 +54,9 @@ services:
             - ./.env.local
         volumes:
             - ./entrypoints/Caddyfile:/etc/caddy/Caddyfile:ro
-            - ../.certs:/certs:ro
+            # In-repo so a standalone pantahub-base checkout can run the tls
+            # profile. tls-local.sh mints hub.pem/hub-key.pem in here.
+            - ./.certs:/certs:ro
 
     gc:
         networks:

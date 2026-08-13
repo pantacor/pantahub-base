@@ -6,7 +6,7 @@
 # ../tls-local.sh (a <lan-ip>.sslip.io name pair, so phones on the same
 # network resolve them too); hub.localhost aliases work on the dev machine
 # itself. The certificate is minted by mkcert (the "local issuer") into
-# ../.certs and covers all four names.
+# ../.certs (this repo's own, mounted at /certs) and covers all four names.
 {
 	admin off
 	auto_https off
