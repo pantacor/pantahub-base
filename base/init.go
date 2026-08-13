@@ -17,6 +17,7 @@
 package base
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"log"
@@ -40,6 +41,7 @@ import (
 	"gitlab.com/pantacor/pantahub-base/healthz"
 	"gitlab.com/pantacor/pantahub-base/logs"
 	"gitlab.com/pantacor/pantahub-base/metrics"
+	"gitlab.com/pantacor/pantahub-base/mqtt"
 	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/plog"
 	"gitlab.com/pantacor/pantahub-base/profiles"
@@ -218,6 +220,22 @@ func DoInit() http.Handler {
 
 	// handle s3 storage request's
 	mux.Handle("/s3/", http.StripPrefix("/s3", fserver))
+
+	// The MQTT message plane shares the API's listener rather than opening a
+	// port of its own: the deployment only swaps the container image, so a new
+	// port would be unreachable. Devices connect to wss://<host><path>.
+	if mqtt.Enabled() {
+		service, err := mqtt.New(mongoClient)
+		if err != nil {
+			log.Println("ERROR: could not start mqtt message plane: " + err.Error())
+		} else if err := service.Start(context.Background()); err != nil {
+			log.Println("ERROR: could not serve mqtt message plane: " + err.Error())
+		} else {
+			path := mqtt.WsPath()
+			mux.Handle(path, service.Handler())
+			log.Println("INFO: mqtt message plane serving at " + path)
+		}
+	}
 
 	mux.Handle("/swagger/", httpSwagger.Handler(
 		httpSwagger.URL("/swagger/doc.json"), //The url pointing to API definition"
