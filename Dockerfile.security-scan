@@ -1,5 +1,5 @@
 # Reproduce the CI Go security scan locally in Docker.
-FROM golang:1.25.12
+FROM golang:1.25.13
 
 ENV GOPRIVATE=gitlab.com/pantacor/*
 WORKDIR /src
