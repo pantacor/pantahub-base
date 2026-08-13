@@ -98,10 +98,13 @@ deploy-devel:
         - mkdir -p $HOME/.kube
         - echo -n $KUBE_CONFIG_DEV | base64 -d > $HOME/.kube/config
         - kubectl set image deploy/pv-pantahub-base pantahub-base=$CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
+    # develop only: KUBE_CONFIG_DEV is a protected variable and only master and
+    # develop are protected branches, so on a feature branch it is not injected,
+    # the kubeconfig written above is empty, and kubectl falls back to
+    # localhost:8080 and fails. Feature branches still build and push an image
+    # (build-branch), so deploying one is a manual kubectl set image away.
     only:
         - develop
-        - /^feature\/.*$/
-        - /^feat\/.*$/
 
 deploy-prod:
     stage: deploy
