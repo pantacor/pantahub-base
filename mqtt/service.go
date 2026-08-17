@@ -18,12 +18,14 @@ package mqtt
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"log"
 	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	mochi "github.com/mochi-mqtt/server/v2"
@@ -45,9 +47,19 @@ const (
 	EnvMqttWsPath = "PANTAHUB_MQTT_WS_PATH"
 
 	// EnvMqttTCPAddress optionally opens a native MQTT TCP listener. Empty
-	// disables it; the shipped Kubernetes service only publishes the HTTP
-	// ports, so this is for local development and future native ingress.
+	// disables it. With EnvMqttTLSCert/Key set the listener serves MQTTS
+	// (MQTT over TLS, conventionally :8883); without them it is plain MQTT
+	// (:1883), which must only be exposed on a trusted network.
 	EnvMqttTCPAddress = "PANTAHUB_MQTT_TCP_ADDRESS"
+
+	// EnvMqttTLSCert and EnvMqttTLSKey point at a PEM certificate and key the
+	// native TCP listener terminates TLS with, so it speaks MQTTS. The ingress
+	// in front of the broker passes 8883 straight through (nginx TCP services
+	// do not terminate TLS), so the broker is the TLS endpoint. Both must be
+	// set to enable TLS; the files are re-read on each handshake so a
+	// cert-manager rotation is picked up without a restart.
+	EnvMqttTLSCert = "PANTAHUB_MQTT_TLS_CERT"
+	EnvMqttTLSKey  = "PANTAHUB_MQTT_TLS_KEY"
 
 	// EnvMqttSessionExpiry is how long, in seconds, the broker keeps a
 	// disconnected device's session so queued messages survive a reboot or a
@@ -174,9 +186,14 @@ func New(mongoClient *mongo.Client, logsApp *logs.App) (*Service, error) {
 	}
 
 	if service.tcpAddress != "" {
+		tlsConfig, err := tcpTLSConfig()
+		if err != nil {
+			return nil, err
+		}
 		tcp := listeners.NewTCP(listeners.Config{
-			ID:      "pantahub-tcp",
-			Address: service.tcpAddress,
+			ID:        "pantahub-tcp",
+			Address:   service.tcpAddress,
+			TLSConfig: tlsConfig,
 		})
 		if err := server.AddListener(tcp); err != nil {
 			return nil, err
@@ -186,6 +203,83 @@ func New(mongoClient *mongo.Client, logsApp *logs.App) (*Service, error) {
 	service.notifier = NewNotifier(mongoClient, server)
 
 	return service, nil
+}
+
+// tcpTLSConfig builds the TLS configuration for the native listener from the
+// configured cert and key, or returns nil to leave the listener as plain MQTT.
+// Requiring both env vars keeps a half-configured deployment (a cert but no
+// key) from silently coming up unencrypted. The certificate is resolved per
+// handshake through certReloader, so a cert-manager rotation of the mounted
+// secret is served without restarting the pod.
+func tcpTLSConfig() (*tls.Config, error) {
+	certPath := utils.GetEnvDefault(EnvMqttTLSCert, "")
+	keyPath := utils.GetEnvDefault(EnvMqttTLSKey, "")
+	if certPath == "" && keyPath == "" {
+		return nil, nil
+	}
+	if certPath == "" || keyPath == "" {
+		return nil, errors.New("mqtt: both " + EnvMqttTLSCert + " and " + EnvMqttTLSKey + " must be set for MQTTS")
+	}
+
+	reloader := &certReloader{certPath: certPath, keyPath: keyPath}
+	// Load once up front so a missing or malformed cert fails startup loudly
+	// rather than every handshake later.
+	if _, err := reloader.load(); err != nil {
+		return nil, err
+	}
+
+	return &tls.Config{
+		MinVersion:     tls.VersionTLS12,
+		GetCertificate: reloader.GetCertificate,
+	}, nil
+}
+
+// certReloader serves the TLS certificate from disk, reloading it when the
+// files change. cert-manager writes a renewed certificate into the same mounted
+// secret, so a broker that read the cert once at startup would keep presenting
+// the old one until it restarted; reloading on modification time keeps the
+// served certificate current across a rotation.
+type certReloader struct {
+	certPath string
+	keyPath  string
+
+	mu       sync.Mutex
+	cert     *tls.Certificate
+	loadedAt time.Time
+}
+
+// GetCertificate satisfies tls.Config.GetCertificate.
+func (r *certReloader) GetCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+	return r.load()
+}
+
+func (r *certReloader) load() (*tls.Certificate, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Reload only when the certificate file has changed since the last load,
+	// so the common handshake path is a stat, not a parse.
+	if r.cert != nil {
+		if info, err := os.Stat(r.certPath); err == nil && !info.ModTime().After(r.loadedAt) {
+			return r.cert, nil
+		}
+	}
+
+	cert, err := tls.LoadX509KeyPair(r.certPath, r.keyPath)
+	if err != nil {
+		if r.cert != nil {
+			// A rotation caught mid-write leaves the pair briefly inconsistent;
+			// keep serving the last good certificate rather than failing the
+			// handshake, and try again on the next one.
+			log.Printf("mqtt: keeping previous TLS certificate, reload failed: %v", err)
+			return r.cert, nil
+		}
+		return nil, err
+	}
+
+	r.cert = &cert
+	r.loadedAt = time.Now()
+	return r.cert, nil
 }
 
 // Handler returns the WebSocket transport as an http.Handler so it can be
