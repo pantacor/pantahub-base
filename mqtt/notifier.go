@@ -106,6 +106,15 @@ func NewNotifier(mongoClient *mongo.Client, server *mochi.Server) *Notifier {
 // it. Errors that are worth reporting are logged as they happen; the returned
 // error only reflects context cancellation.
 func (n *Notifier) Run(ctx context.Context) error {
+	// The broker's retained messages live only in memory, and a change stream
+	// opened now starts at the current cluster time: anything that turned a
+	// step NEW while the process was down produced no event this stream will
+	// ever see, and the retained steps/new was lost with the old process. A
+	// device reconnecting afterward would be told nothing is pending until the
+	// next unrelated change to its trail. Sweep the current NEW steps first so
+	// every pending revision is (re)published before the watchers take over.
+	n.reconcilePendingSteps(ctx)
+
 	watchers := []struct {
 		collection string
 		pipeline   mongo.Pipeline
@@ -134,6 +143,49 @@ func (n *Notifier) Run(ctx context.Context) error {
 	wg.Wait()
 
 	return ctx.Err()
+}
+
+// reconcilePendingSteps publishes the oldest outstanding NEW step for every
+// trail that has one, rebuilding the retained steps/new topics after a restart.
+// A publish reaches both devices already subscribed (as a live message) and
+// devices that subscribe later (as the retained message), so the pending
+// revision is delivered either way. It is best effort: an error watching a
+// single trail is logged and the sweep continues, because a change stream will
+// still catch that trail's next transition.
+func (n *Notifier) reconcilePendingSteps(ctx context.Context) {
+	queryCtx, cancel := context.WithTimeout(ctx, notifierQueryTimeout)
+	defer cancel()
+
+	trailIDs, err := n.mongoClient.
+		Database(utils.MongoDb).
+		Collection(stepsCollection).
+		Distinct(queryCtx, "trail-id", bson.M{
+			"progress.status": "NEW",
+			"garbage":         bson.M{"$ne": true},
+		})
+	if err != nil {
+		// A deployment without change streams also cannot reconcile; that is
+		// expected and already reported when the watchers start.
+		log.Println("mqtt: notifier could not list trails with pending steps: " + err.Error())
+		return
+	}
+
+	published := 0
+	for _, raw := range trailIDs {
+		if ctx.Err() != nil {
+			return
+		}
+		trailID, ok := raw.(primitive.ObjectID)
+		if !ok {
+			continue
+		}
+		n.publishOldestNewStep(ctx, trailID)
+		published++
+	}
+
+	if published > 0 {
+		log.Printf("mqtt: notifier reconciled %d pending step(s) at startup", published)
+	}
 }
 
 // notifierPipeline keeps uninteresting operation types on the server side, so a

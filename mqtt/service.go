@@ -85,6 +85,11 @@ type Service struct {
 	notifier    *Notifier
 	tcpAddress  string
 	wsPath      string
+
+	// stop cancels the notifier's change-stream goroutines on Close. Without
+	// it those goroutines outlive the broker, holding a Mongo cursor open until
+	// the process exits.
+	stop context.CancelFunc
 }
 
 // Enabled reports whether the message plane should be started at all.
@@ -197,8 +202,11 @@ func (s *Service) Start(ctx context.Context) error {
 		return err
 	}
 
+	runCtx, cancel := context.WithCancel(ctx)
+	s.stop = cancel
+
 	go func() {
-		if err := s.notifier.Run(ctx); err != nil && ctx.Err() == nil {
+		if err := s.notifier.Run(runCtx); err != nil && runCtx.Err() == nil {
 			log.Println("mqtt: notifier stopped: " + err.Error())
 		}
 	}()
@@ -206,7 +214,12 @@ func (s *Service) Start(ctx context.Context) error {
 	return nil
 }
 
-// Close shuts the broker down and disconnects every client.
+// Close shuts the broker down, cancels the notifier and disconnects every
+// client. The notifier is cancelled first so its change-stream goroutines and
+// their Mongo cursors are released rather than left running past shutdown.
 func (s *Service) Close() error {
+	if s.stop != nil {
+		s.stop()
+	}
 	return s.server.Close()
 }

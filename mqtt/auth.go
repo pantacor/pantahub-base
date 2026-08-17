@@ -49,9 +49,35 @@ const (
 	propKind    = "ph-identity-kind"
 	propSubject = "ph-identity-subject"
 
+	// propScopes carries the space-separated OAuth scopes of a user or session
+	// token, so the ACL hook can hold a scope-narrowed token to the same
+	// device privileges the REST plane would.
+	propScopes = "ph-identity-scopes"
+
 	// propOwnsPrefix + <device-id> caches the per-connection outcome of an
 	// ownership lookup, "1" for owned and "0" for definitely not owned.
 	propOwnsPrefix = "ph-owns/"
+)
+
+// Device topic access for a user or session token mirrors the scope filters the
+// REST device endpoints enforce (devices.Service): reading device state needs a
+// read-capable scope, and writing a command needs a write-capable scope. A
+// token minted through /tokens with a narrowed scope set is thereby held to the
+// same privileges on the message plane as on REST, instead of silently gaining
+// full device read and command access. A normal login token carries the API
+// ("all") scope, which is in both lists, so ordinary users are unaffected.
+var (
+	mqttReadDeviceScopes = utils.MarshalScopes([]utils.Scope{
+		utils.Scopes.API,
+		utils.Scopes.APIReadOnly,
+		utils.Scopes.Devices,
+		utils.Scopes.ReadDevices,
+	})
+	mqttWriteDeviceScopes = utils.MarshalScopes([]utils.Scope{
+		utils.Scopes.API,
+		utils.Scopes.Devices,
+		utils.Scopes.WriteDevices,
+	})
 )
 
 // Identity kinds. A device may only reach its own namespace; a user may reach
@@ -162,17 +188,29 @@ func (h *authHook) OnConnectAuthenticate(cl *mochi.Client, pk packets.Packet) bo
 	}
 
 	if claims, ok := parseToken(password); ok {
-		return authenticateWithToken(cl, device, claims)
+		if !authenticateWithToken(cl, device, claims) {
+			return false
+		}
+	} else {
+		// Not a token: fall back to the device secret. DeviceAuth re-reads the
+		// device document; a connection is rare enough that the second read is
+		// cheaper than duplicating the credential comparison here.
+		if !authservices.DeviceAuth(username, password, h.mongoClient) {
+			return false
+		}
+		setIdentity(cl, kindDevice, device.ID.Hex(), "")
 	}
 
-	// Not a token: fall back to the device secret. DeviceAuth re-reads the
-	// device document; a connection is rare enough that the second read is
-	// cheaper than duplicating the credential comparison here.
-	if !authservices.DeviceAuth(username, password, h.mongoClient) {
+	// A Last Will is published and retained by the broker with no ACL check of
+	// its own (mochi's sendLWT bypasses OnACLCheck), so an accepted will lets a
+	// client write any topic the moment it disconnects ungracefully. Gate it
+	// here, at CONNECT, with the very same ACL a live publish faces: a will the
+	// authenticated identity could not publish is rejected, taking the whole
+	// connection with it, rather than being armed for later delivery.
+	if pk.Connect.WillFlag && !h.OnACLCheck(cl, pk.Connect.WillTopic, true) {
 		return false
 	}
 
-	setIdentity(cl, kindDevice, device.ID.Hex())
 	return true
 }
 
@@ -203,8 +241,16 @@ func (h *authHook) OnACLCheck(cl *mochi.Client, topic string, write bool) bool {
 
 	case kindUser:
 		// A user reads anything a device it owns exposes, but only ever
-		// writes instructions to it.
-		if write && suffix != SuffixCommands {
+		// writes instructions to it — and only within the scopes the token
+		// carries, mirroring the REST device endpoints.
+		if write {
+			if suffix != SuffixCommands {
+				return false
+			}
+			if !utils.MatchScope(mqttWriteDeviceScopes, clientScopes(cl)) {
+				return false
+			}
+		} else if !utils.MatchScope(mqttReadDeviceScopes, clientScopes(cl)) {
 			return false
 		}
 		return h.userOwns(cl, subject, deviceID)
@@ -232,11 +278,15 @@ func authenticateWithToken(cl *mochi.Client, device *devices.Device, claims jwtg
 		if !strings.HasPrefix(callerPrn, devicePrnPrefix) || utils.PrnGetID(callerPrn) != device.ID.Hex() {
 			return false
 		}
-		setIdentity(cl, kindDevice, device.ID.Hex())
+		setIdentity(cl, kindDevice, device.ID.Hex(), "")
 		return true
 
 	case accounts.AccountTypeUser, accounts.AccountTypeSessionUser:
-		setIdentity(cl, kindUser, callerPrn)
+		// The scopes travel with the identity so the ACL hook can enforce them
+		// per topic without re-parsing the token. An absent claim is no scopes,
+		// which the REST plane also treats as insufficient for device access.
+		callerScopes, _ := claims["scopes"].(string)
+		setIdentity(cl, kindUser, callerPrn, callerScopes)
 		return true
 	}
 
@@ -345,14 +395,20 @@ func (h *authHook) lookupDevice(ctx context.Context, id string) (*devices.Device
 
 // setIdentity records the authenticated identity, replacing every user property
 // the client sent so that none of the keys read below can be attacker supplied.
-func setIdentity(cl *mochi.Client, kind, subject string) {
+// scopes is stored only when non-empty, keeping a device identity's properties
+// exactly as they were.
+func setIdentity(cl *mochi.Client, kind, subject, scopes string) {
 	cl.Lock()
 	defer cl.Unlock()
 
-	cl.Properties.Props.User = []packets.UserProperty{
+	props := []packets.UserProperty{
 		{Key: propKind, Val: kind},
 		{Key: propSubject, Val: subject},
 	}
+	if scopes != "" {
+		props = append(props, packets.UserProperty{Key: propScopes, Val: scopes})
+	}
+	cl.Properties.Props.User = props
 }
 
 // identity returns the kind and subject recorded at CONNECT. An unauthenticated
@@ -375,6 +431,22 @@ func identity(cl *mochi.Client) (kind, subject string) {
 	}
 
 	return kind, subject
+}
+
+// clientScopes returns the scopes recorded for a user identity at CONNECT, as
+// the REST plane's space-separated fields. A device identity, or a user token
+// that carried no scopes claim, yields none — which denies every scoped check.
+func clientScopes(cl *mochi.Client) []string {
+	cl.RLock()
+	defer cl.RUnlock()
+
+	for _, prop := range cl.Properties.Props.User {
+		if prop.Key == propScopes {
+			return strings.Fields(prop.Val)
+		}
+	}
+
+	return nil
 }
 
 // cachedOwnership returns a previously resolved ownership answer for deviceID.

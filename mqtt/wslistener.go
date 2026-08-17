@@ -39,6 +39,14 @@ const wsSubprotocol = "mqtt"
 // that has already gone away. The socket is torn down regardless afterwards.
 const wsCloseGraceTimeout = time.Second
 
+// wsConnectTimeout bounds how long a freshly upgraded connection may take to
+// send its MQTT CONNECT. The broker only sets its own read deadline once CONNECT
+// has been read, so without this a peer that completes the WebSocket handshake
+// and then goes silent would pin a goroutine and a socket forever. mochi resets
+// the deadline from the negotiated keepalive as soon as CONNECT arrives, so this
+// only ever bounds the pre-CONNECT window.
+const wsConnectTimeout = 20 * time.Second
+
 // errNotBinaryMessage is returned when a peer sends a non-binary frame. MQTT
 // over WebSocket is defined over binary messages only. [MQTT-6.0.0-2]
 var errNotBinaryMessage = errors.New("mqtt: websocket message type not binary")
@@ -164,6 +172,11 @@ func (l *wsListener) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	adapter := &wsConn{Conn: conn.UnderlyingConn(), ws: conn}
 	defer adapter.Close()
+
+	// Bound the pre-CONNECT window so a silent peer cannot pin this goroutine
+	// and its socket indefinitely. The broker resets the deadline once it has
+	// read CONNECT, so this only governs the handshake-to-CONNECT gap.
+	_ = adapter.SetReadDeadline(time.Now().Add(wsConnectTimeout))
 
 	if err := establish(l.id, adapter); err != nil && log != nil {
 		log.Warn("mqtt: websocket client ended", "error", err, "listener", l.id)
