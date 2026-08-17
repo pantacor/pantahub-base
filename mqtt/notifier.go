@@ -54,6 +54,15 @@ const (
 	// A stream that stayed open this long counts as healthy: the next failure
 	// starts backing off from scratch instead of from the previous ceiling.
 	notifierBackoffReset = 2 * time.Minute
+
+	// A notification publish goes to the in-process broker, so a failure is
+	// rare and usually momentary (the inline client briefly unavailable). The
+	// consume loop advances its resume token past an event once handled and the
+	// live stream never redelivers, so a dropped publish is a dropped
+	// notification until the trail's next change. A few short retries turn a
+	// transient failure back into a delivery rather than a silent gap.
+	notifierPublishAttempts   = 3
+	notifierPublishRetryDelay = 200 * time.Millisecond
 )
 
 // Mongo error codes that mean the deployment cannot serve change streams at
@@ -106,29 +115,31 @@ func NewNotifier(mongoClient *mongo.Client, server *mochi.Server) *Notifier {
 // it. Errors that are worth reporting are logged as they happen; the returned
 // error only reflects context cancellation.
 func (n *Notifier) Run(ctx context.Context) error {
-	// The broker's retained messages live only in memory, and a change stream
-	// opened now starts at the current cluster time: anything that turned a
-	// step NEW while the process was down produced no event this stream will
-	// ever see, and the retained steps/new was lost with the old process. A
-	// device reconnecting afterward would be told nothing is pending until the
-	// next unrelated change to its trail. Sweep the current NEW steps first so
-	// every pending revision is (re)published before the watchers take over.
-	n.reconcilePendingSteps(ctx)
-
 	watchers := []struct {
 		collection string
 		pipeline   mongo.Pipeline
 		handle     func(context.Context, *changeEvent)
+		// onReady rebuilds the retained topics this collection owns, once the
+		// change stream is open. The broker's retained messages live only in
+		// memory and a stream opened now starts at the current cluster time, so
+		// anything that changed while the process was down produced no event
+		// the stream will see and the retained copy was lost with the old
+		// process. The sweep runs *after* the stream is capturing, so an event
+		// that lands during the sweep is delivered by the stream rather than
+		// falling into the gap between snapshot and subscribe.
+		onReady func(context.Context)
 	}{
 		{
 			collection: stepsCollection,
 			pipeline:   notifierPipeline("insert", "update", "replace"),
 			handle:     n.handleStepChange,
+			onReady:    n.reconcilePendingSteps,
 		},
 		{
 			collection: devicesCollection,
 			pipeline:   notifierPipeline("update"),
 			handle:     n.handleDeviceChange,
+			onReady:    n.reconcileUserMeta,
 		},
 	}
 
@@ -137,7 +148,7 @@ func (n *Notifier) Run(ctx context.Context) error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			n.watch(ctx, w.collection, w.pipeline, w.handle)
+			n.watch(ctx, w.collection, w.pipeline, w.handle, w.onReady)
 		}()
 	}
 	wg.Wait()
@@ -149,9 +160,10 @@ func (n *Notifier) Run(ctx context.Context) error {
 // trail that has one, rebuilding the retained steps/new topics after a restart.
 // A publish reaches both devices already subscribed (as a live message) and
 // devices that subscribe later (as the retained message), so the pending
-// revision is delivered either way. It is best effort: an error watching a
-// single trail is logged and the sweep continues, because a change stream will
-// still catch that trail's next transition.
+// revision is delivered either way. It is best effort: an error on a single
+// trail is logged and the sweep continues, because the change stream that is
+// already open by the time this runs will still catch that trail's next
+// transition.
 func (n *Notifier) reconcilePendingSteps(ctx context.Context) {
 	queryCtx, cancel := context.WithTimeout(ctx, notifierQueryTimeout)
 	defer cancel()
@@ -188,6 +200,65 @@ func (n *Notifier) reconcilePendingSteps(ctx context.Context) {
 	}
 }
 
+// reconcileUserMeta republishes the retained user-meta for every device that
+// has any, rebuilding those topics after a restart for the same reason
+// reconcilePendingSteps rebuilds steps/new: the retained copy was lost with the
+// old broker and the change stream only carries future edits. Only devices with
+// a non-empty user-meta are touched, so an idle fleet costs nothing, and each
+// publish carries the same unquoted map handleDeviceChange would send.
+func (n *Notifier) reconcileUserMeta(ctx context.Context) {
+	queryCtx, cancel := context.WithTimeout(ctx, notifierQueryTimeout)
+	defer cancel()
+
+	cursor, err := n.mongoClient.
+		Database(utils.MongoDb).
+		Collection(devicesCollection).
+		Find(queryCtx, bson.M{
+			"user-meta": bson.M{"$exists": true, "$nin": bson.A{nil, bson.M{}}},
+			"garbage":   bson.M{"$ne": true},
+		}, options.Find().SetProjection(bson.M{"_id": 1, "user-meta": 1}))
+	if err != nil {
+		log.Println("mqtt: notifier could not list devices with user-meta: " + err.Error())
+		return
+	}
+	defer cursor.Close(queryCtx)
+
+	published := 0
+	for cursor.Next(queryCtx) {
+		if ctx.Err() != nil {
+			return
+		}
+
+		var doc struct {
+			ID       primitive.ObjectID     `bson:"_id"`
+			UserMeta map[string]interface{} `bson:"user-meta"`
+		}
+		if err := cursor.Decode(&doc); err != nil {
+			log.Println("mqtt: notifier could not decode a device for user-meta reconcile: " + err.Error())
+			continue
+		}
+		if len(doc.UserMeta) == 0 {
+			continue
+		}
+
+		payload, err := json.Marshal(utils.BsonUnquoteMap(&doc.UserMeta))
+		if err != nil {
+			log.Println("mqtt: notifier could not encode user-meta of device " + doc.ID.Hex() + ": " + err.Error())
+			continue
+		}
+
+		n.publish(Topic(doc.ID.Hex(), SuffixUserMeta), payload)
+		published++
+	}
+	if err := cursor.Err(); err != nil {
+		log.Println("mqtt: notifier user-meta reconcile cursor ended: " + err.Error())
+	}
+
+	if published > 0 {
+		log.Printf("mqtt: notifier reconciled user-meta for %d device(s) at startup", published)
+	}
+}
+
 // notifierPipeline keeps uninteresting operation types on the server side, so a
 // busy collection does not push every delete and drop over the wire.
 func notifierPipeline(types ...string) mongo.Pipeline {
@@ -219,9 +290,11 @@ func (n *Notifier) watch(
 	collection string,
 	pipeline mongo.Pipeline,
 	handle func(context.Context, *changeEvent),
+	onReady func(context.Context),
 ) {
 	var resumeToken bson.Raw
 	backoff := notifierBackoffInitial
+	readied := false
 
 	for ctx.Err() == nil {
 		openedAt := time.Now()
@@ -252,6 +325,18 @@ func (n *Notifier) watch(
 			}
 			backoff = nextNotifierBackoff(backoff)
 			continue
+		}
+
+		// The stream is now capturing from its start point, so the retained
+		// topics can be rebuilt without a snapshot-to-subscribe gap: any change
+		// during the sweep is already in this stream's history and will be
+		// delivered by consume below. Only on the first open — reconnects must
+		// not re-sweep the whole fleet on every transient stream failure.
+		if !readied {
+			readied = true
+			if onReady != nil {
+				onReady(ctx)
+			}
 		}
 
 		err = n.consume(ctx, stream, handle, &resumeToken)
@@ -550,11 +635,18 @@ func changeDeviceID(event *changeEvent) (string, bool) {
 }
 
 // publish sends a retained notification. A nil or empty payload clears the
-// retained message for the topic.
+// retained message for the topic. A momentary failure is retried, because the
+// change stream that produced this event will not redeliver it and the resume
+// token has effectively moved past it.
 func (n *Notifier) publish(topic string, payload []byte) {
-	if err := n.server.Publish(topic, payload, true, notifierQoS); err != nil {
-		log.Println("mqtt: notifier could not publish to " + topic + ": " + err.Error())
+	var err error
+	for attempt := 0; attempt < notifierPublishAttempts; attempt++ {
+		if err = n.server.Publish(topic, payload, true, notifierQoS); err == nil {
+			return
+		}
+		time.Sleep(notifierPublishRetryDelay)
 	}
+	log.Println("mqtt: notifier could not publish to " + topic + " after retries: " + err.Error())
 }
 
 // isChangeStreamUnsupported reports whether the deployment can never serve
