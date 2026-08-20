@@ -649,6 +649,98 @@ func (n *Notifier) publish(topic string, payload []byte) {
 	log.Println("mqtt: notifier could not publish to " + topic + " after retries: " + err.Error())
 }
 
+// PublishUserMeta answers a device's user-meta/get request: it loads the
+// device's full user-meta and publishes it on SuffixUserMeta, exactly as the
+// change-stream reconcile does, so the device applies it through the same path.
+// This lets a device seed itself over the one MQTT socket on connect instead of
+// a REST call, and covers the window after a broker restart before the retained
+// user-meta has been rebuilt.
+func (n *Notifier) PublishUserMeta(ctx context.Context, deviceID string) {
+	id, err := primitive.ObjectIDFromHex(deviceID)
+	if err != nil {
+		return
+	}
+	queryCtx, cancel := context.WithTimeout(ctx, notifierQueryTimeout)
+	defer cancel()
+
+	var doc struct {
+		UserMeta map[string]interface{} `bson:"user-meta"`
+	}
+	err = n.mongoClient.
+		Database(utils.MongoDb).
+		Collection(devicesCollection).
+		FindOne(queryCtx, bson.M{"_id": id}, options.FindOne().SetProjection(bson.M{"_id": 1, "user-meta": 1})).
+		Decode(&doc)
+	if err != nil {
+		if !errors.Is(err, mongo.ErrNoDocuments) {
+			log.Println("mqtt: user-meta/get could not load device " + deviceID + ": " + err.Error())
+		}
+		return
+	}
+
+	payload, err := json.Marshal(utils.BsonUnquoteMap(&doc.UserMeta))
+	if err != nil {
+		log.Println("mqtt: user-meta/get could not encode user-meta of device " + deviceID + ": " + err.Error())
+		return
+	}
+	n.publish(Topic(deviceID, SuffixUserMeta), payload)
+}
+
+// PublishStepsSince answers a device's steps/get request: it publishes every
+// pending trail step newer than `since`, oldest first, on SuffixStepsNew as
+// live (not retained) messages, so a device that was offline installs the whole
+// queue of missed revisions in order. Retention on steps/new stays owned by the
+// change-stream reconcile, which is why these publishes do not set the flag.
+func (n *Notifier) PublishStepsSince(ctx context.Context, deviceID string, since int) {
+	id, err := primitive.ObjectIDFromHex(deviceID)
+	if err != nil {
+		return
+	}
+	queryCtx, cancel := context.WithTimeout(ctx, notifierQueryTimeout)
+	defer cancel()
+
+	cursor, err := n.mongoClient.
+		Database(utils.MongoDb).
+		Collection(stepsCollection).
+		Find(queryCtx, bson.M{
+			"trail-id":        id,
+			"rev":             bson.M{"$gt": since},
+			"progress.status": "NEW",
+			"garbage":         bson.M{"$ne": true},
+		}, options.Find().SetSort(bson.M{"rev": 1}))
+	if err != nil {
+		log.Println("mqtt: steps/get could not query steps for " + deviceID + ": " + err.Error())
+		return
+	}
+	defer cursor.Close(queryCtx)
+
+	topic := Topic(deviceID, SuffixStepsNew)
+	for cursor.Next(queryCtx) {
+		step := trailmodels.Step{}
+		if err := cursor.Decode(&step); err != nil {
+			log.Println("mqtt: steps/get could not decode a step for " + deviceID + ": " + err.Error())
+			continue
+		}
+		payload, err := json.Marshal(stepNotice{
+			Rev:         step.Rev,
+			StateSha:    step.StateSha,
+			CommitMsg:   step.CommitMsg,
+			Status:      step.StepProgress.Status,
+			TimeCreated: step.TimeCreated,
+		})
+		if err != nil {
+			log.Println("mqtt: steps/get could not encode step notice for " + deviceID + ": " + err.Error())
+			continue
+		}
+		if err := n.server.Publish(topic, payload, false, notifierQoS); err != nil {
+			log.Println("mqtt: steps/get could not publish step to " + topic + ": " + err.Error())
+		}
+	}
+	if err := cursor.Err(); err != nil {
+		log.Println("mqtt: steps/get cursor ended for " + deviceID + ": " + err.Error())
+	}
+}
+
 // isChangeStreamUnsupported reports whether the deployment can never serve
 // change streams, as opposed to having failed to serve one right now.
 func isChangeStreamUnsupported(err error) bool {

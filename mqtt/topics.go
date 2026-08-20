@@ -59,6 +59,19 @@ const (
 	// SuffixStatus carries device liveness. Retained, and also published by
 	// the broker as the device's last will.
 	SuffixStatus = "status"
+
+	// SuffixUserMetaGet is a device REQUEST: publishing to it (empty payload)
+	// asks the Hub to publish the device's full user-meta on SuffixUserMeta.
+	// It lets a device seed itself on connect over the same MQTT socket instead
+	// of a REST round-trip, and covers the window after a broker restart when
+	// the retained user-meta has not been rebuilt yet.
+	SuffixUserMetaGet = "user-meta/get"
+
+	// SuffixStepsGet is a device REQUEST with a {"since": <rev>} payload: the
+	// Hub replies on SuffixStepsNew with every trail step newer than <rev>, in
+	// ascending order, so the device catches up on the whole queue of revisions
+	// it missed while offline rather than only the newest one.
+	SuffixStepsGet = "steps/get"
 )
 
 // progress topics are "steps/<rev>/progress".
@@ -132,7 +145,7 @@ func ParseProgress(suffix string) (rev int, ok bool) {
 // writable; everything the Hub tells the device is not.
 func DeviceMayPublish(suffix string) bool {
 	switch suffix {
-	case SuffixDeviceMeta, SuffixLogs, SuffixStatus:
+	case SuffixDeviceMeta, SuffixLogs, SuffixStatus, SuffixUserMetaGet, SuffixStepsGet:
 		return true
 	}
 

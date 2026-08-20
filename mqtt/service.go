@@ -202,6 +202,14 @@ func New(mongoClient *mongo.Client, logsApp *logs.App) (*Service, error) {
 
 	service.notifier = NewNotifier(mongoClient, server)
 
+	// Answers device pull requests (user-meta/get, steps/get) by replying
+	// through the notifier, so a device seeds itself over the one MQTT socket
+	// on connect. Added after the notifier exists, and after bridgeHook, whose
+	// OnPublish leaves these request topics untouched.
+	if err := server.AddHook(newRequestHook(service.notifier), nil); err != nil {
+		return nil, err
+	}
+
 	return service, nil
 }
 
