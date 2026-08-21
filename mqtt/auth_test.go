@@ -130,3 +130,29 @@ func TestScopeSetsCoverReadAndWrite(t *testing.T) {
 		t.Fatal("the read-only scope must not satisfy device writes")
 	}
 }
+
+// TestDeviceCannotClaimAnotherDevicesSession pins the client-id binding: the
+// session is keyed by client id and a second CONNECT with the same id evicts
+// the first, so a device presenting another device's id — valid credentials
+// and all — would be a cross-device eviction loop. A device may only claim
+// the session named after itself; user identities keep free ids.
+func TestDeviceCannotClaimAnotherDevicesSession(t *testing.T) {
+	dev := &mochi.Client{}
+	setIdentity(dev, kindDevice, "5f0000000000000000000001", "")
+
+	if !mayClaimSession(dev, "5f0000000000000000000001") {
+		t.Fatal("a device was denied its own session")
+	}
+	if mayClaimSession(dev, "5f0000000000000000000002") {
+		t.Fatal("a device claimed another device's session")
+	}
+	if mayClaimSession(dev, "") {
+		t.Fatal("a device claimed the empty client id")
+	}
+
+	user := &mochi.Client{}
+	setIdentity(user, kindUser, "prn:pantahub.com:auth:/alice", scopeAll)
+	if !mayClaimSession(user, "dashboard-alice-1") {
+		t.Fatal("a user identity was denied a free client id")
+	}
+}

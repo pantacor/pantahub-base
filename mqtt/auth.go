@@ -201,6 +201,17 @@ func (h *authHook) OnConnectAuthenticate(cl *mochi.Client, pk packets.Packet) bo
 		setIdentity(cl, kindDevice, device.ID.Hex(), "")
 	}
 
+	// The broker keys sessions by client id and hands a session to whoever
+	// presents its id: a second CONNECT with the same id evicts the first
+	// (session takeover). The ACL already stops a colliding id from touching
+	// another device's topics, but not from evicting that device over and
+	// over — a cross-device denial of service that needs nothing more than
+	// valid credentials for *any* device. Bind the id at CONNECT instead: a
+	// device identity may only claim the session named after itself.
+	if !mayClaimSession(cl, pk.Connect.ClientIdentifier) {
+		return false
+	}
+
 	// A Last Will is published and retained by the broker with no ACL check of
 	// its own (mochi's sendLWT bypasses OnACLCheck), so an accepted will lets a
 	// client write any topic the moment it disconnects ungracefully. Gate it
@@ -212,6 +223,16 @@ func (h *authHook) OnConnectAuthenticate(cl *mochi.Client, pk packets.Packet) bo
 	}
 
 	return true
+}
+
+// mayClaimSession reports whether the authenticated identity may open an MQTT
+// session under this client id. A device is bound to its own device id — the
+// id pvsm and every other device client already uses — so no device can take
+// over another device's session. User and session identities keep free ids:
+// their sessions are ephemeral dashboards, not something a device depends on.
+func mayClaimSession(cl *mochi.Client, clientID string) bool {
+	kind, subject := identity(cl)
+	return kind != kindDevice || clientID == subject
 }
 
 // OnACLCheck authorizes a single publish (write) or subscribe (read). It never
