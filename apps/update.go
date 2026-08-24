@@ -94,14 +94,18 @@ func (app *App) handleUpdateApp(w rest.ResponseWriter, r *rest.Request) {
 
 	if apptype == AppTypePublic {
 		tpApp.Secret = ""
+		tpApp.SecretHash = ""
 	}
 
-	if apptype == AppTypeConfidential && tpApp.Secret == "" {
+	// a confidential app without a stored secret hash gets a fresh secret,
+	// returned in this response only
+	if apptype == AppTypeConfidential && tpApp.SecretHash == "" {
 		tpApp.Secret, err = utils.GenerateSecret(30)
 		if err != nil {
 			utils.RestErrorWrapper(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		tpApp.SecretHash = utils.HashSecret(tpApp.Secret)
 	}
 
 	if apptype == AppTypeConfidential && len(payload.ExposedScopes) > 0 {

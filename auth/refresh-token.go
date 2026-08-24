@@ -5,6 +5,7 @@ package auth
 
 import (
 	"errors"
+	"gitlab.com/pantacor/pantahub-base/auth/authservices"
 	"log"
 	"net/http"
 	"strconv"
@@ -102,6 +103,20 @@ func (a *App) handlePostTokenRefresh(writer rest.ResponseWriter, r *rest.Request
 	if aud != caller {
 		log.Printf("WARNING: caller %q tried to refresh a token issued for %q", caller, aud)
 		utils.RestErrorWrapper(writer, "Caller is not the audience of this token", http.StatusUnauthorized)
+		return
+	}
+
+	// The subject must still exist and be active: a token for a deleted or
+	// never-activated account must not be renewable indefinitely.
+	subject, _ := oldClaims["prn"].(string)
+	if subject == "" {
+		utils.RestErrorWrapper(writer, "Token has no subject — not refreshable", http.StatusUnauthorized)
+		return
+	}
+	account, err := authservices.GetAccount(subject, a.mongoClient)
+	if err != nil || account.Prn != subject || account.Challenge != "" {
+		log.Printf("WARNING: refusing to refresh token for inactive or missing account %q", subject)
+		utils.RestErrorWrapper(writer, "Account is not active", http.StatusUnauthorized)
 		return
 	}
 

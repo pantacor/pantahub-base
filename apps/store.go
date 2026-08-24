@@ -40,9 +40,13 @@ func CreateOrUpdateApp(ctx context.Context, tpApp *TPApp, database *mongo.Databa
 		tpApp.Nick = slug.Make(tpApp.Nick)
 	}
 
+	update := bson.M{"$set": tpApp}
 	if tpApp.Type != AppTypeConfidential {
 		tpApp.ExposedScopes = []utils.Scope{}
 		tpApp.Secret = ""
+		tpApp.SecretHash = ""
+		// public clients carry no secret at all (omitempty would keep a stale one)
+		update["$unset"] = bson.M{"secret": "", "secret_hash": ""}
 	}
 
 	collection := database.Collection(DBCollection)
@@ -61,11 +65,57 @@ func CreateOrUpdateApp(ctx context.Context, tpApp *TPApp, database *mongo.Databa
 	_, err := collection.UpdateOne(
 		ctxC,
 		bson.M{"_id": tpApp.ID},
-		bson.M{"$set": tpApp},
+		update,
 		updateOptions,
 	)
 
 	return tpApp, err
+}
+
+// MigratePlaintextSecrets stores the sha256 digest of every app secret still
+// held in plaintext without a secret_hash. The plaintext is kept so replicas
+// on the previous build keep authenticating apps during a rolling deploy;
+// PurgePlaintextSecrets removes it afterwards. Idempotent.
+func MigratePlaintextSecrets(ctx context.Context, database *mongo.Database) (int64, error) {
+	collection := database.Collection(DBCollection)
+	cursor, err := collection.Find(ctx,
+		bson.M{"secret": bson.M{"$exists": true, "$type": "string", "$ne": ""}, "secret_hash": bson.M{"$exists": false}},
+		options.Find().SetProjection(bson.M{"_id": 1, "secret": 1}))
+	if err != nil {
+		return 0, err
+	}
+	defer cursor.Close(ctx)
+
+	var migrated int64
+	for cursor.Next(ctx) {
+		var legacy struct {
+			ID     primitive.ObjectID `bson:"_id"`
+			Secret string             `bson:"secret"`
+		}
+		if err := cursor.Decode(&legacy); err != nil {
+			return migrated, err
+		}
+		res, err := collection.UpdateOne(ctx,
+			bson.M{"_id": legacy.ID, "secret": legacy.Secret, "secret_hash": bson.M{"$exists": false}},
+			bson.M{"$set": bson.M{"secret_hash": utils.HashSecret(legacy.Secret)}})
+		if err != nil {
+			return migrated, err
+		}
+		migrated += res.ModifiedCount
+	}
+	return migrated, cursor.Err()
+}
+
+// PurgePlaintextSecrets drops the legacy plaintext secret from apps that
+// already carry a secret_hash.
+func PurgePlaintextSecrets(ctx context.Context, database *mongo.Database) (int64, error) {
+	res, err := database.Collection(DBCollection).UpdateMany(ctx,
+		bson.M{"secret": bson.M{"$exists": true}, "secret_hash": bson.M{"$exists": true, "$ne": ""}},
+		bson.M{"$unset": bson.M{"secret": ""}})
+	if err != nil {
+		return 0, err
+	}
+	return res.ModifiedCount, nil
 }
 
 // LoginAsApp using and application id and secret
@@ -78,17 +128,26 @@ func LoginAsApp(serviceID, secret string, database *mongo.Database) (*TPApp, err
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	if secret == "" {
+		return nil, nil
+	}
+
+	// secrets are stored hashed; the plaintext clause only matches rows not
+	// yet migrated (it disappears once PANTAHUB_PURGE_PLAINTEXT_SECRETS ran)
 	findQuery := bson.M{
-		"secret":     secret,
 		"deleted-at": nil,
+		"$or": []bson.M{
+			{"secret_hash": utils.HashSecret(secret)},
+			{"secret": secret},
+		},
 	}
 
 	if serviceID != "" {
 		ObjectID, _ := primitive.ObjectIDFromHex(serviceID)
-		findQuery["$or"] = []bson.M{
+		findQuery["$and"] = []bson.M{{"$or": []bson.M{
 			{"_id": ObjectID},
 			{"prn": serviceID},
-		}
+		}}}
 	}
 
 	tpApp := &TPApp{}

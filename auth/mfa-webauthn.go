@@ -301,6 +301,12 @@ func (a *App) handlePostWebauthnRegisterFinish(writer rest.ResponseWriter, r *re
 		}
 	}
 
+	factor := "a security key"
+	if session.IsPasskey {
+		factor = "a passkey"
+	}
+	notifyFactorEnrolled(account, factor)
+
 	noStore(writer)
 	writer.WriteJson(response)
 }
@@ -651,10 +657,21 @@ func (a *App) acceptAssertedCredential(ctx context.Context, writer rest.Response
 // @Failure 500 {object} utils.RError
 // @Failure 501 {object} utils.RError
 // @Router /auth/login/webauthn/begin [post]
+// passkeyBeginLimiter bounds unauthenticated passkey ceremony starts per
+// client: an honest sign-in needs one or two, so 30 at once and one every
+// two seconds sustained is generous while capping the CPU/DB amplification
+// an anonymous caller can cause.
+var passkeyBeginLimiter = utils.NewIPRateLimiter(0.5, 30)
+
 func (a *App) handlePostPasskeyLoginBegin(writer rest.ResponseWriter, r *rest.Request) {
 	userAgent := r.Header.Get("User-Agent")
 	if userAgent == "" {
 		utils.RestErrorWrapperUser(writer, "No Access (DOS) - no UserAgent", "Incompatible Client; upgrade pantavisor", http.StatusForbidden)
+		return
+	}
+
+	if !passkeyBeginLimiter.Allow(utils.ClientIP(r.Request)) {
+		utils.RestErrorWrapperUser(writer, "Too many attempts; try again later", "Too many attempts; try again later", http.StatusTooManyRequests)
 		return
 	}
 

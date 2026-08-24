@@ -53,22 +53,25 @@ const (
 
 // TPApp OAuth App Type
 type TPApp struct {
-	ID                  primitive.ObjectID `json:"id" bson:"_id"`
-	Name                string             `json:"name" bson:"name"`
-	Logo                string             `json:"logo" bson:"logo"`
-	Type                string             `json:"type" bson:"type"`
-	Nick                string             `json:"nick" bson:"nick"`
-	Prn                 string             `json:"prn" bson:"prn"`
-	Owner               string             `json:"owner"`
-	OwnerNick           string             `json:"owner-nick,omitempty" bson:"owner-nick,omitempty"`
-	Secret              string             `json:"secret,omitempty" bson:"secret"`
-	RedirectURIs        []string           `json:"redirect_uris,omitempty" bson:"redirect_uris,omitempty"`
-	Scopes              []utils.Scope      `json:"scopes,omitempty" bson:"scopes,omitempty"`
-	ExposedScopes       []utils.Scope      `json:"exposed_scopes,omitempty" bson:"exposed_scopes,omitempty"`
-	ExposedScopesLength int                `bson:"exposed_scopes_length,omit"`
-	TimeCreated         time.Time          `json:"time-created" bson:"time-created"`
-	TimeModified        time.Time          `json:"time-modified" bson:"time-modified"`
-	DeletedAt           *time.Time         `json:"deleted-at,omitempty" bson:"deleted-at,omitempty"`
+	ID        primitive.ObjectID `json:"id" bson:"_id"`
+	Name      string             `json:"name" bson:"name"`
+	Logo      string             `json:"logo" bson:"logo"`
+	Type      string             `json:"type" bson:"type"`
+	Nick      string             `json:"nick" bson:"nick"`
+	Prn       string             `json:"prn" bson:"prn"`
+	Owner     string             `json:"owner"`
+	OwnerNick string             `json:"owner-nick,omitempty" bson:"owner-nick,omitempty"`
+	// Secret is the client secret, returned only when it is (re)generated;
+	// SecretHash (sha256) is what is stored at rest.
+	Secret              string        `json:"secret,omitempty" bson:"-"`
+	SecretHash          string        `json:"-" bson:"secret_hash,omitempty"`
+	RedirectURIs        []string      `json:"redirect_uris,omitempty" bson:"redirect_uris,omitempty"`
+	Scopes              []utils.Scope `json:"scopes,omitempty" bson:"scopes,omitempty"`
+	ExposedScopes       []utils.Scope `json:"exposed_scopes,omitempty" bson:"exposed_scopes,omitempty"`
+	ExposedScopesLength int           `bson:"exposed_scopes_length,omit"`
+	TimeCreated         time.Time     `json:"time-created" bson:"time-created"`
+	TimeModified        time.Time     `json:"time-modified" bson:"time-modified"`
+	DeletedAt           *time.Time    `json:"deleted-at,omitempty" bson:"deleted-at,omitempty"`
 }
 
 // App thirdparty application manager
@@ -88,6 +91,25 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	if err != nil {
 		log.Fatalln(err.Error())
 		return nil
+	}
+
+	// idempotent: hash any client secret still stored in plaintext (kept
+	// until PANTAHUB_PURGE_PLAINTEXT_SECRETS drops it after the rollout)
+	migrateCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	if n, err := MigratePlaintextSecrets(migrateCtx, mongoClient.Database(utils.MongoDb)); err != nil {
+		log.Fatalln("can't migrate plaintext app secrets: " + err.Error())
+		return nil
+	} else if n > 0 {
+		log.Printf("apps: hashed %d plaintext client secrets", n)
+	}
+	if utils.GetEnv(utils.EnvPantahubPurgePlaintextSecrets) == "true" {
+		if n, err := PurgePlaintextSecrets(migrateCtx, mongoClient.Database(utils.MongoDb)); err != nil {
+			log.Fatalln("can't purge plaintext app secrets: " + err.Error())
+			return nil
+		} else if n > 0 {
+			log.Printf("apps: purged %d plaintext client secrets", n)
+		}
 	}
 
 	app.setupAPI()

@@ -20,19 +20,20 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"html/template"
 	"io"
 	"log"
 	"path/filepath"
-	"html/template"
 	"time"
 
 	"github.com/mailgun/mailgun-go/v4"
 )
 
 type emailData struct {
-	Nick  string
-	Email string
-	Link  string
+	Nick   string
+	Email  string
+	Link   string
+	Factor string
 }
 
 var mgun mailgun.Mailgun
@@ -218,16 +219,47 @@ func SendVerification(email, nick, id, u string, urlPrefix string) bool {
 }
 
 func execTemplate(name, email, nick, link string) (string, error) {
+	return execTemplateData(name, emailData{Email: email, Nick: nick, Link: link})
+}
+
+func execTemplateData(name string, data emailData) (string, error) {
 	htmlTemplatePath, _ := filepath.Abs(name)
-	t := template.Must(template.ParseFiles(htmlTemplatePath))
+	t, err := template.ParseFiles(htmlTemplatePath)
+	if err != nil {
+		return "", err
+	}
 
 	result := new(bytes.Buffer)
-	err := t.Execute(result, emailData{
-		Email: email,
-		Nick:  nick,
-		Link:  link,
-	})
+	err = t.Execute(result, data)
 	return result.String(), err
+}
+
+// SendMFAFactorEnrolled notifies the account holder that a second factor was
+// added to their account.
+func SendMFAFactorEnrolled(email, nick, factor string) error {
+	data := emailData{Email: email, Nick: nick, Factor: factor}
+	bodyPlain, err := execTemplateData("./tmpl/mails/mfa-enrolled.md", data)
+	if err != nil {
+		return err
+	}
+	bodyHTML, err := execTemplateData("./tmpl/mails/mfa-enrolled.html", data)
+	if err != nil {
+		return err
+	}
+
+	mg := getMailer()
+	message := mg.NewMessage(
+		GetEnv(EnvRegEmail),
+		"A new two-factor method was added to your Pantacor Hub account",
+		bodyPlain,
+		email)
+	message.SetHtml(bodyHTML)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	_, _, err = mg.Send(ctx, message)
+	return err
 }
 
 func addMedias(message *mailgun.Message) error {

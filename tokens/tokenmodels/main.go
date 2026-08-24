@@ -34,16 +34,24 @@ type AuthToken struct {
 
 	ID primitive.ObjectID `json:"id" bson:"_id"`
 
-	Name        string               `json:"name" bson:"name"`
-	Type        accounts.AccountType `json:"type" bson:"type"`
-	Prn         string               `json:"prn" bson:"prn"`
-	Owner       string               `json:"owner" bson:"owner"`
-	OwnerNick   string               `json:"owner-nick,omitempty" bson:"owner-nick,omitempty"`
-	Secret      string               `json:"secret,omitempty" bson:"secret"`
-	Scopes      []string             `json:"scopes,omitempty" bson:"scopes,omitempty"`
-	ParseScopes []utils.Scope        `json:"parse-scopes,omitempty" bson:"-,omitempty"`
-	Deleted     bool                 `json:"deleted" bson:"deleted"`
-	ExpireAt    time.Time            `json:"expire-at" bson:"expire-at"`
+	Name      string               `json:"name" bson:"name"`
+	Type      accounts.AccountType `json:"type" bson:"type"`
+	Prn       string               `json:"prn" bson:"prn"`
+	Owner     string               `json:"owner" bson:"owner"`
+	OwnerNick string               `json:"owner-nick,omitempty" bson:"owner-nick,omitempty"`
+	// Secret is the composite personal access token. It is populated only on
+	// the create response so the caller can record it; it is never persisted
+	// (see SecretHash).
+	Secret string `json:"secret,omitempty" bson:"-"`
+	// SecretHash is the hex SHA-256 of Secret and is what is stored at rest.
+	// A plain (fast) hash is deliberate: the secret carries 96 bits of CSPRNG
+	// entropy so a slow KDF adds nothing, and the hash is verified on every
+	// API request that uses the token as a Basic-auth credential.
+	SecretHash  string        `json:"-" bson:"secret_hash,omitempty"`
+	Scopes      []string      `json:"scopes,omitempty" bson:"scopes,omitempty"`
+	ParseScopes []utils.Scope `json:"parse-scopes,omitempty" bson:"-,omitempty"`
+	Deleted     bool          `json:"deleted" bson:"deleted"`
+	ExpireAt    time.Time     `json:"expire-at" bson:"expire-at"`
 }
 
 func DefaultType() accounts.AccountType {
@@ -54,4 +62,20 @@ func (token *AuthToken) ValidType() bool {
 	isValid, ok := validTypes[token.Type]
 
 	return ok && isValid
+}
+
+// HashSecret returns the hex-encoded SHA-256 digest of a personal access
+// token secret, the form in which secrets are stored at rest.
+func HashSecret(secret string) string {
+	return utils.HashSecret(secret)
+}
+
+// SecretMatches reports whether presented is the secret this token was
+// issued with, comparing digests in constant time. A token without a stored
+// hash never matches.
+func (token *AuthToken) SecretMatches(presented string) bool {
+	if token == nil {
+		return false
+	}
+	return utils.SecretHashMatches(token.SecretHash, presented)
 }

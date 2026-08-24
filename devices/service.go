@@ -17,6 +17,7 @@
 package devices
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -66,12 +67,16 @@ type ModelError struct {
 
 // Device device structure
 type Device struct {
-	ID                  primitive.ObjectID     `json:"id" bson:"_id"`
-	Prn                 string                 `json:"prn"`
-	Nick                string                 `json:"nick"`
-	Owner               string                 `json:"owner"`
-	OwnerNick           string                 `json:"owner-nick,omitempty" bson:"-"`
-	Secret              string                 `json:"secret,omitempty"`
+	ID        primitive.ObjectID `json:"id" bson:"_id"`
+	Prn       string             `json:"prn"`
+	Nick      string             `json:"nick"`
+	Owner     string             `json:"owner"`
+	OwnerNick string             `json:"owner-nick,omitempty" bson:"-"`
+	// Secret is returned on registration only; SecretHash (sha256) is what is
+	// stored at rest. Legacy rows still carry a plaintext "secret" field until
+	// the background migration and PANTAHUB_PURGE_PLAINTEXT_SECRETS remove it.
+	Secret              string                 `json:"secret,omitempty" bson:"-"`
+	SecretHash          string                 `json:"-" bson:"secret_hash,omitempty"`
 	TimeCreated         time.Time              `json:"time-created" bson:"timecreated"`
 	TimeModified        time.Time              `json:"time-modified" bson:"timemodified"`
 	MetaModified        time.Time              `json:"meta-modified" bson:"meta-modified"`
@@ -121,6 +126,10 @@ func New(jwtMiddleware *jwt.JWTMiddleware, subService subscriptions.Subscription
 		log.Println("Error creating indices for pantahub_devices_tokens: " + err.Error())
 		return nil
 	}
+
+	// hash legacy plaintext device secrets in small throttled batches in the
+	// background; devices that log in meanwhile upgrade themselves on the way
+	go RunSecretMigration(context.Background(), mongoClient.Database(utils.MongoDb).Collection("pantahub_devices"))
 
 	app.API = rest.NewApi()
 	// we dont use default stack because we dont want content type enforcement

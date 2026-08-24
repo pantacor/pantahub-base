@@ -365,3 +365,62 @@ func (r *Repo) GetPagination(ctx context.Context, ownerID string, filters bson.M
 	}
 	return querymongo.GetPaginationWithLink(*aspUrl, total, &elements[lastIndex], &elements[0])
 }
+
+// MigratePlaintextSecrets computes and stores the SHA-256 digest of every
+// token that still holds a plaintext secret but no secret_hash (documents
+// created before secrets were hashed at rest). The plaintext field is kept
+// so replicas still running the previous build keep verifying those tokens
+// during a rolling deploy; PurgePlaintextSecrets drops it afterwards.
+//
+// Idempotent: migrated documents no longer match the filter. Returns the
+// number of tokens migrated.
+func (r *Repo) MigratePlaintextSecrets(ctx context.Context) (int64, error) {
+	filter := bson.M{
+		"secret":      bson.M{"$exists": true, "$type": "string", "$ne": ""},
+		"secret_hash": bson.M{"$exists": false},
+	}
+
+	cursor, err := r.col.Find(ctx, filter, options.Find().SetProjection(bson.M{"_id": 1, "secret": 1}))
+	if err != nil {
+		return 0, err
+	}
+	defer cursor.Close(ctx)
+
+	var migrated int64
+	for cursor.Next(ctx) {
+		var legacy struct {
+			ID     primitive.ObjectID `bson:"_id"`
+			Secret string             `bson:"secret"`
+		}
+		if err := cursor.Decode(&legacy); err != nil {
+			return migrated, err
+		}
+
+		res, err := r.col.UpdateOne(ctx,
+			bson.M{"_id": legacy.ID, "secret": legacy.Secret, "secret_hash": bson.M{"$exists": false}},
+			bson.M{"$set": bson.M{"secret_hash": tokenmodels.HashSecret(legacy.Secret)}})
+		if err != nil {
+			return migrated, err
+		}
+		migrated += res.ModifiedCount
+	}
+
+	return migrated, cursor.Err()
+}
+
+// PurgePlaintextSecrets removes the legacy plaintext secret from every token
+// that already carries a secret_hash. Run only once no replica needs the
+// plaintext any more (see EnvPantahubTokensPurgePlaintextSecrets). Returns
+// the number of tokens purged.
+func (r *Repo) PurgePlaintextSecrets(ctx context.Context) (int64, error) {
+	res, err := r.col.UpdateMany(ctx,
+		bson.M{
+			"secret":      bson.M{"$exists": true},
+			"secret_hash": bson.M{"$exists": true, "$ne": ""},
+		},
+		bson.M{"$unset": bson.M{"secret": ""}})
+	if err != nil {
+		return 0, err
+	}
+	return res.ModifiedCount, nil
+}

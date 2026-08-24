@@ -389,6 +389,13 @@ const (
 	// The default is true.
 	EnvPantahubOAuthConnectedAccountsEnforce = "PANTAHUB_OAUTH_CONNECTED_ACCOUNTS_ENFORCE"
 
+	// EnvPantahubPurgePlaintextSecrets removes the legacy plaintext `secret`
+	// field from personal access tokens, OAuth client apps and devices that
+	// already carry a `secret_hash`. Leave it off until every replica runs a
+	// build that verifies secrets by hash; then set it to true for one
+	// rollout to drop the plaintext. The default is false (rollout-compat).
+	EnvPantahubPurgePlaintextSecrets = "PANTAHUB_PURGE_PLAINTEXT_SECRETS"
+
 	// EnvPantahubDisableQuota disable quota enforcement
 	EnvPantahubDisableQuota = "PANTAHUB_DISABLE_QUOTA"
 )
@@ -421,6 +428,7 @@ var defaultEnvs = map[string]string{
 	EnvPantahubDisableForgotPassword:         "false",
 	EnvPantahubDisableEmailPasswordLogin:     "false",
 	EnvPantahubOAuthConnectedAccountsEnforce: "true",
+	EnvPantahubPurgePlaintextSecrets:         "false",
 	EnvPantahubDisableQuota:                  "false",
 
 	EnvPantahubCaCert:          "",

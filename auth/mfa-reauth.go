@@ -209,8 +209,11 @@ func (a *App) handlePostReauthWebauthn(writer rest.ResponseWriter, r *rest.Reque
 		return
 	}
 
+	// "preferred" lets a plain second-factor key assert without UV while a
+	// passkey (which had to verify the user to sign in) performs UV again;
+	// the finish step then requires UV for passkeys only
 	assertion, sessionData, err := wa.BeginLogin(user,
-		webauthn.WithUserVerification(protocol.VerificationDiscouraged))
+		webauthn.WithUserVerification(protocol.VerificationPreferred))
 	if err != nil {
 		utils.RestErrorWrapper(writer, "Error starting WebAuthn reauth", http.StatusInternalServerError)
 		return
@@ -306,10 +309,10 @@ func (a *App) handlePostReauthWebauthnFinish(writer rest.ResponseWriter, r *rest
 		return
 	}
 
-	// reauth of an already-authenticated session: UV is discouraged
-	// (possession only), so do not reject a passkey that asserts without user
-	// verification here.
-	if ok := a.acceptAssertedCredential(ctx, writer, r, account.Prn, credential, false); !ok {
+	// a sudo grant authorises factor changes, so a passkey must not get one
+	// with a weaker (possession-only) assertion than the one it signs in
+	// with; plain second-factor keys are still accepted without UV
+	if ok := a.acceptAssertedCredential(ctx, writer, r, account.Prn, credential, true); !ok {
 		return
 	}
 

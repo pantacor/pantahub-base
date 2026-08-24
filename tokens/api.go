@@ -19,8 +19,10 @@ package tokens
 
 //
 import (
+	"context"
 	"log"
 	"os"
+	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
@@ -61,6 +63,27 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	if err := repo.SetIndexes(); err != nil {
 		log.Fatal("can't create indexes to tokens app: ", err)
 		return nil
+	}
+
+	// idempotent: add a sha256 digest to any token still stored in plaintext.
+	// The plaintext is kept until PANTAHUB_PURGE_PLAINTEXT_SECRETS is
+	// enabled, so a rolling deploy from a build that verifies the plaintext
+	// keeps working.
+	migrateCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	if n, err := repo.MigratePlaintextSecrets(migrateCtx); err != nil {
+		log.Fatal("can't migrate plaintext token secrets: ", err)
+		return nil
+	} else if n > 0 {
+		log.Printf("tokens: hashed %d plaintext token secrets", n)
+	}
+	if utils.GetEnv(utils.EnvPantahubPurgePlaintextSecrets) == "true" {
+		if n, err := repo.PurgePlaintextSecrets(migrateCtx); err != nil {
+			log.Fatal("can't purge plaintext token secrets: ", err)
+			return nil
+		} else if n > 0 {
+			log.Printf("tokens: purged %d plaintext token secrets", n)
+		}
 	}
 
 	app.API = rest.NewApi()

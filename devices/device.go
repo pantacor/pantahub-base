@@ -48,6 +48,7 @@ func createDevice(id, secret, owner string) (*Device, error) {
 	newDevice.ID = ObjectID
 	newDevice.Prn = "prn:::devices:/" + newDevice.ID.Hex()
 	newDevice.Secret = secret
+	newDevice.SecretHash = utils.HashSecret(secret)
 	newDevice.Owner = owner
 	newDevice.UserMeta = utils.BsonQuoteMap(&newDevice.UserMeta)
 	newDevice.DeviceMeta = map[string]interface{}{}

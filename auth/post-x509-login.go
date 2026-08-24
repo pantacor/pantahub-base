@@ -19,6 +19,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -65,8 +66,13 @@ func (a *App) handleAuthUsingDeviceCert(w rest.ResponseWriter, r *rest.Request) 
 		return
 	}
 
-	revoked, _ := revoke.VerifyCertificate(cert)
-	if revoked {
+	// fail closed: ok == false means the CRL/OCSP responder could not be
+	// consulted, so the revocation status is unknown, not "not revoked"
+	revoked, ok := revoke.VerifyCertificate(cert)
+	if revoked || !ok {
+		if !ok {
+			log.Printf("WARNING: x509 login: revocation status of %q could not be determined; refusing", cert.Subject.SerialNumber)
+		}
 		utils.RestErrorWrapper(w, "The certificate is not valid anymore, could be revoked or is expired", http.StatusForbidden)
 		return
 	}
@@ -80,6 +86,10 @@ func (a *App) handleAuthUsingDeviceCert(w rest.ResponseWriter, r *rest.Request) 
 	}
 
 	token, err := createToken(device)
+	if err != nil {
+		utils.RestErrorWrapper(w, "Error creating device token", http.StatusInternalServerError)
+		return
+	}
 
 	w.WriteJson(token)
 }
@@ -160,7 +170,10 @@ func tlsProxyCertFilter(w rest.ResponseWriter, req *rest.Request) *x509.Certific
 			utils.RestErrorWrapper(w, "No TLS Certificate available through TLS session", http.StatusInternalServerError)
 			return nil
 		}
-		cert = req.Request.TLS.PeerCertificates[len(req.Request.TLS.PeerCertificates)-1]
+		// PeerCertificates[0] is always the leaf the client proved possession
+		// of; the remaining entries are whatever chain it chose to send and
+		// must never be used as the identity
+		cert = req.Request.TLS.PeerCertificates[0]
 		return cert
 	}
 

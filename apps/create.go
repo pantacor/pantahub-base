@@ -109,6 +109,7 @@ func (app *App) handleCreateApp(w rest.ResponseWriter, r *rest.Request) {
 			utils.RestErrorWrapper(w, "Error generating secret", http.StatusInternalServerError)
 			return
 		}
+		newApp.SecretHash = utils.HashSecret(newApp.Secret)
 	}
 
 	if apptype == AppTypeConfidential && len(payload.ExposedScopes) > 0 {

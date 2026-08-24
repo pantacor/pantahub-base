@@ -212,9 +212,11 @@ func (a *App) handlePutDevice(w rest.ResponseWriter, r *rest.Request) {
 	// Build update document to avoid overwriting sensitive fields accidentally
 	// and to ensure we don't clobber metadata we didn't intend to change.
 	updateDoc := bson.M{
+		// a supplied secret replaces any legacy plaintext one with its hash
+		"$unset": bson.M{"secret": ""},
 		"$set": bson.M{
 			"nick":         newDevice.Nick,
-			"secret":       newDevice.Secret,
+			"secret_hash":  utils.HashSecret(newDevice.Secret),
 			"ispublic":     newDevice.IsPublic,
 			"timemodified": newDevice.TimeModified,
 			"challenge":    newDevice.Challenge,

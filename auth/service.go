@@ -61,12 +61,30 @@ type App struct {
 	webauthnRepo  *storage.WebauthnRepo
 }
 
+// demoAccountsEnabled tells whether the built-in demo accounts (admin:admin,
+// user1:user1, ...) run with their code-default passwords, given the value of
+// PANTAHUB_PRODUCTION. Fail closed: only an explicit "false"-like value
+// enables them; unset (not configured) is treated as production, so a
+// deployment that forgets the variable never ships admin:admin.
+func demoAccountsEnabled(production string) bool {
+	switch strings.ToLower(strings.TrimSpace(production)) {
+	case "false", "0", "no", "off":
+		return true
+	}
+	return false
+}
+
 func init() {
-	// if in production we disable all fixed accounts
-	if os.Getenv("PANTAHUB_PRODUCTION") == "" {
+	production := os.Getenv("PANTAHUB_PRODUCTION")
+	if demoAccountsEnabled(production) {
+		log.Println("PANTAHUB_PRODUCTION=" + production + ": development mode, built-in demo accounts enabled with default passwords")
 		return
 	}
+	if strings.TrimSpace(production) == "" {
+		log.Println("WARNING: PANTAHUB_PRODUCTION is not set; assuming production. Built-in demo accounts are disabled unless PANTAHUB_DEMOACCOUNTS_PASSWORD_<nick> is set. Set PANTAHUB_PRODUCTION=false for a development instance")
+	}
 
+	// production: keep only the demo accounts that have an explicit password
 	for k, v := range accountsdata.DefaultAccounts {
 		passwordOverwrite := os.Getenv("PANTAHUB_DEMOACCOUNTS_PASSWORD_" + v.Nick)
 		if passwordOverwrite == "" {

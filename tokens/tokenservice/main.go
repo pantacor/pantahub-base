@@ -162,7 +162,9 @@ func (s *Service) CreateToken(ctx context.Context, payload *AuthTokenReqPayload,
 	}
 	secretBytes := []byte(token.ID.Hex() + ":" + base64.RawURLEncoding.EncodeToString(randBytes))
 	secret64 := base64.RawURLEncoding.EncodeToString(secretBytes)
+	// the plaintext goes back to the caller exactly once; only its hash is stored
 	token.Secret = secret64
+	token.SecretHash = tokenmodels.HashSecret(secret64)
 	token.SetCreatedAt()
 	token.SetUpdatedAt()
 

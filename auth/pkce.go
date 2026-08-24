@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
@@ -278,6 +279,7 @@ func (app *App) HandlePKCEToken(w rest.ResponseWriter, r *rest.Request) {
 		for key, value := range accPayload {
 			claims[key] = value
 		}
+		applyPKCEScope(claims, pks.Scope)
 
 		timeoutStr := utils.GetEnv(utils.EnvPantahubJWTTimeoutMinutes)
 		timeout, err := strconv.Atoi(timeoutStr)
@@ -364,6 +366,7 @@ func (app *App) HandlePKCEToken(w rest.ResponseWriter, r *rest.Request) {
 	for key, value := range accPayload {
 		claims[key] = value
 	}
+	applyPKCEScope(claims, pks.Scope)
 
 	timeoutStr := utils.GetEnv(utils.EnvPantahubJWTTimeoutMinutes)
 	timeout, err := strconv.Atoi(timeoutStr)
@@ -475,4 +478,14 @@ func (app *App) HandlePKCEAuthorize(w rest.ResponseWriter, r *rest.Request) {
 	)
 
 	http.Redirect(w, r.Request, url, http.StatusTemporaryRedirect)
+}
+
+// applyPKCEScope narrows the minted token to the scope the user consented to
+// on the authorize page, exactly as POST /auth/login narrows a password
+// session to its requested scope. An empty scope keeps the account default.
+func applyPKCEScope(claims jwtgo.MapClaims, requested string) {
+	scopes := utils.ScopeStringFilterBy(strings.Fields(requested), "", "")
+	if len(scopes) > 0 {
+		claims["scopes"] = strings.Join(scopes, " ")
+	}
 }

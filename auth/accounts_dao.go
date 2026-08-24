@@ -18,8 +18,6 @@ package auth
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"time"
@@ -53,15 +51,17 @@ func getUserByEmail(ctx context.Context, email string, db *mongo.Collection) (*a
 }
 
 func createUser(ctx context.Context, email, nick, password, challenge string, db *mongo.Collection) (*accounts.Account, error) {
-	if password == "" {
-		b := make([]byte, 16)
-		rand.Read(b)
-		password = base64.URLEncoding.EncodeToString(b)
-	}
-
-	passwordBcrypt, err := utils.HashPassword(password, utils.CryptoMethods.BCrypt)
-	if err != nil {
-		return nil, err
+	// An account provisioned without a password (social login) gets none: a
+	// random placeholder the user never learns would make the account look
+	// password-protected to the MFA fresh-auth checks and lock it out of
+	// enrolling a factor. Password login on an empty hash always fails.
+	passwordBcrypt := ""
+	if password != "" {
+		var err error
+		passwordBcrypt, err = utils.HashPassword(password, utils.CryptoMethods.BCrypt)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	mgoid := primitive.NewObjectID()

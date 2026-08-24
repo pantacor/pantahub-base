@@ -179,6 +179,8 @@ func (a *App) handlePostDevice(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
+	newDevice.SecretHash = utils.HashSecret(newDevice.Secret)
+
 	const maxNickRetries = 5
 	for attempt := 0; ; attempt++ {
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)

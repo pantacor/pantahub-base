@@ -19,6 +19,7 @@ package auth
 import (
 	"context"
 	"crypto/rand"
+	"log"
 	"net/http"
 	"time"
 
@@ -79,6 +80,27 @@ func accountHasPassword(account *accounts.Account) bool {
 	return account.PasswordBcrypt != "" || account.Password != ""
 }
 
+// notifyFactorEnrolled mails the account holder that a new second factor was
+// added, so an enrollment they did not perform (e.g. from a stolen fresh
+// session on a still factor-less account) is not silent. Best effort, off
+// the request path.
+func notifyFactorEnrolled(account *accounts.Account, factor string) {
+	if account == nil || account.Email == "" {
+		return
+	}
+	go func(email, nick, factor string) {
+		if err := utils.SendMFAFactorEnrolled(email, nick, factor); err != nil {
+			log.Printf("WARNING: could not send MFA enrollment notice to %s: %v", email, err)
+		}
+	}(account.Email, account.Nick, factor)
+}
+
+// accountIsSocial tells whether the account can sign in through a connected
+// OAuth provider
+func accountIsSocial(account *accounts.Account) bool {
+	return len(account.ConnectedProviders) > 0
+}
+
 // checkPassword verifies a supplied password against the account
 func checkPassword(account *accounts.Account, password string) bool {
 	if password == "" {
@@ -131,7 +153,7 @@ func (a *App) hasAnyFactor(ctx context.Context, ownerPrn string) (bool, error) {
 // a change with a bare session: it must present a sudo token. This closes the
 // window where a stolen social/passkey session could add or remove factors.
 func (a *App) freshAuthOK(account *accounts.Account, password, sudoToken string, claims jwtgo.MapClaims) bool {
-	if accountHasPassword(account) {
+	if accountHasPassword(account) && password != "" {
 		return checkPassword(account, password)
 	}
 
@@ -140,6 +162,14 @@ func (a *App) freshAuthOK(account *accounts.Account, password, sudoToken string,
 		if err == nil && claimsSudo.Prn == account.Prn {
 			return true
 		}
+	}
+
+	// A password account must present its password or a sudo proof. Social
+	// accounts provisioned before placeholders were dropped still carry a
+	// random password nobody knows, so they fall through to the passwordless
+	// rules below when no password was supplied.
+	if accountHasPassword(account) && !accountIsSocial(account) {
+		return false
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -207,8 +237,9 @@ func (a *App) handleGetMFAStatus(writer rest.ResponseWriter, r *rest.Request) {
 	}
 
 	response := authmodels.MFAStatusResponse{
-		Webauthn:    []authmodels.WebauthnCredentialInfo{},
-		PasswordSet: accountHasPassword(account),
+		Webauthn:        []authmodels.WebauthnCredentialInfo{},
+		PasswordSet:     accountHasPassword(account),
+		SocialConnected: accountIsSocial(account),
 	}
 	if settings != nil {
 		response.MFAEnabled = settings.Enabled
@@ -374,6 +405,13 @@ func (a *App) handlePostTOTPConfirm(writer rest.ResponseWriter, r *rest.Request)
 		return
 	}
 
+	// same lockout as the login step-up: a pending enrollment must not be an
+	// unthrottled oracle for the freshly issued secret
+	if settings.IsLocked(time.Now()) {
+		utils.RestErrorWrapperUser(writer, "Too many attempts; try again later", "Too many attempts; try again later", http.StatusTooManyRequests)
+		return
+	}
+
 	secret, err := mfaservice.DecryptSecret(settings.TOTP.SecretEnc)
 	if err != nil {
 		utils.RestErrorWrapper(writer, "Error reading TOTP secret", http.StatusInternalServerError)
@@ -382,7 +420,7 @@ func (a *App) handlePostTOTPConfirm(writer rest.ResponseWriter, r *rest.Request)
 
 	step, valid := mfaservice.VerifyTOTPCode(secret, payload.Code, time.Now())
 	if !valid {
-		utils.RestErrorWrapperUser(writer, "Invalid authenticator code", "Invalid authenticator code", http.StatusUnauthorized)
+		a.mfaLoginFailure(writer, r, account.Prn)
 		return
 	}
 
@@ -402,6 +440,8 @@ func (a *App) handlePostTOTPConfirm(writer rest.ResponseWriter, r *rest.Request)
 		utils.RestErrorWrapper(writer, "Error with database connectivity", http.StatusInternalServerError)
 		return
 	}
+
+	notifyFactorEnrolled(account, "an authenticator app")
 
 	noStore(writer)
 	writer.WriteJson(authmodels.RecoveryCodesResponse{

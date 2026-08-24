@@ -29,7 +29,12 @@ func IsEmailDomainAllowed(email string) bool {
 	}
 
 	domains := strings.Split(allowedDomains, ",")
-	emailDomain := strings.Split(email, "@")[1]
+	at := strings.LastIndex(email, "@")
+	if at < 0 || at == len(email)-1 {
+		// malformed address: cannot belong to any allowed domain
+		return false
+	}
+	emailDomain := email[at+1:]
 
 	for _, domain := range domains {
 		if strings.TrimSpace(domain) == emailDomain {

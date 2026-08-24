@@ -36,12 +36,13 @@ env:
   PANTAHUB_DEMOACCOUNTS_PASSWORD_admin: "changeme"
 ```
 
-**Demo accounts**: unless `PANTAHUB_PRODUCTION` is set, base runs in dev mode
-and enables ALL built-in demo accounts with their code defaults — including
-`admin`/`admin`. The `PANTAHUB_DEMOACCOUNTS_PASSWORD_*` variables only take
-effect in production mode (`PANTAHUB_PRODUCTION=yes`), where accounts without
-a password set are disabled. For anything public, set `PANTAHUB_PRODUCTION`
-and explicit passwords.
+**Demo accounts**: base fails closed. Unless `PANTAHUB_PRODUCTION` is
+explicitly `"false"`, it runs in production mode: every built-in demo account
+(`admin`, `user1`–`user3`, …) is disabled except those given an explicit
+`PANTAHUB_DEMOACCOUNTS_PASSWORD_*`. Leaving `PANTAHUB_PRODUCTION` unset is
+the same as production. Only set `PANTAHUB_PRODUCTION: "false"` on a private
+development cluster — that enables ALL demo accounts with their code defaults,
+including `admin`/`admin`.
 
 Everything under `env:` is merged over the defaults in `values.yaml` (which
 mirror `env.default`, including the **dev-only** JWT/JWE keys — replace those

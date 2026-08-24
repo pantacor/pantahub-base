@@ -18,6 +18,8 @@ package auth
 
 import (
 	"context"
+	"errors"
+	"gitlab.com/pantacor/pantahub-base/auth/authservices"
 	"log"
 	"net/http"
 	"strconv"
@@ -237,6 +239,14 @@ func (a *App) handlePostAccount(w rest.ResponseWriter, r *rest.Request) {
 
 	if newAccount.Email == "" {
 		utils.RestError(w, nil, "Accounts must have an email address", http.StatusPreconditionFailed)
+		return
+	}
+
+	// same allowlist that gates login: refuse the signup up front instead of
+	// creating an account (and sending a verification mail) that can never
+	// sign in
+	if !authservices.IsEmailDomainAllowed(newAccount.Email) {
+		utils.RestError(w, nil, "Accounts with this email domain are not allowed", http.StatusForbidden)
 		return
 	}
 
@@ -520,6 +530,9 @@ func (a *App) handlePasswordReset(writer rest.ResponseWriter, r *rest.Request) {
 	}
 
 	token, err := jwtgo.ParseWithClaims(data.Token, &authmodels.ResetPasswordClaims{}, func(token *jwtgo.Token) (interface{}, error) {
+		if token.Method.Alg() != a.jwtMiddleware.SigningAlgorithm {
+			return nil, errors.New("invalid signing algorithm")
+		}
 		return a.jwtMiddleware.Pub, nil
 	})
 	if err != nil {
@@ -701,6 +714,9 @@ func (a *App) handlePostToken(writer rest.ResponseWriter, r *rest.Request) {
 	log.Println("Requesting code " + tokenRequest.Code)
 	// we parse the accessCode to see if we can swap it out.
 	tok, err := jwtgo.Parse(tokenRequest.Code, func(token *jwtgo.Token) (interface{}, error) {
+		if token.Method.Alg() != a.jwtMiddleware.SigningAlgorithm {
+			return nil, errors.New("invalid signing algorithm")
+		}
 		return a.jwtMiddleware.Pub, nil
 	})
 

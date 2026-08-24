@@ -90,6 +90,7 @@ type WebauthnCredentialInfo struct {
 type MFAStatusResponse struct {
 	MFAEnabled             bool                     `json:"mfa_enabled"`
 	PasswordSet            bool                     `json:"password_set"`
+	SocialConnected        bool                     `json:"social_connected"`
 	TOTP                   MFAStatusTOTP            `json:"totp"`
 	Webauthn               []WebauthnCredentialInfo `json:"webauthn"`
 	RecoveryCodesRemaining int                      `json:"recovery_codes_remaining"`
