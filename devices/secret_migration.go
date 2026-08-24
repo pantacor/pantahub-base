@@ -16,143 +16,31 @@ package devices
 import (
 	"context"
 	"log"
-	"time"
 
 	"gitlab.com/pantacor/pantahub-base/utils"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-const (
-	secretMigrationBatch = 500
-	secretMigrationPause = 250 * time.Millisecond
-)
-
-// RunSecretMigration hashes every device secret still stored only in
-// plaintext, in small throttled batches so a fleet of millions never puts a
-// spike on the database. It is idempotent and safe to run concurrently on
-// every replica: each update is predicated on the row still being
-// unmigrated, so a batch two replicas pick up at once is only applied once.
-// The plaintext field is kept until PANTAHUB_PURGE_PLAINTEXT_SECRETS=true,
-// after which a second batched pass removes it.
+// RunSecretMigration hashes legacy plaintext device secrets in throttled
+// batches (utils.MigrateSecrets) and, once PANTAHUB_PURGE_PLAINTEXT_SECRETS is
+// set, drops the plaintext (utils.PurgeSecrets). Meant to run in the
+// background at startup; devices that log in meanwhile upgrade themselves via
+// DeviceAuth. Safe to run on every replica.
 func RunSecretMigration(ctx context.Context, col *mongo.Collection) {
-	hashed, err := hashPlaintextDeviceSecrets(ctx, col)
-	if err != nil {
-		log.Printf("devices: secret migration stopped after %d rows: %v", hashed, err)
+	if n, err := utils.MigrateSecrets(ctx, col, 0); err != nil {
+		log.Printf("devices: secret migration stopped after %d rows: %v", n, err)
 		return
-	}
-	if hashed > 0 {
-		log.Printf("devices: hashed %d legacy plaintext device secrets", hashed)
+	} else if n > 0 {
+		log.Printf("devices: hashed %d legacy plaintext device secrets", n)
 	}
 
 	if utils.GetEnv(utils.EnvPantahubPurgePlaintextSecrets) != "true" {
 		return
 	}
-	purged, err := purgePlaintextDeviceSecrets(ctx, col)
-	if err != nil {
-		log.Printf("devices: plaintext secret purge stopped after %d rows: %v", purged, err)
+	if n, err := utils.PurgeSecrets(ctx, col, 0); err != nil {
+		log.Printf("devices: plaintext secret purge stopped after %d rows: %v", n, err)
 		return
-	}
-	if purged > 0 {
-		log.Printf("devices: purged %d legacy plaintext device secrets", purged)
-	}
-}
-
-func hashPlaintextDeviceSecrets(ctx context.Context, col *mongo.Collection) (int64, error) {
-	var total int64
-	for {
-		cursor, err := col.Find(ctx,
-			bson.M{"secret": bson.M{"$exists": true, "$type": "string", "$ne": ""}, "secret_hash": bson.M{"$exists": false}},
-			options.Find().SetProjection(bson.M{"_id": 1, "secret": 1}).SetLimit(secretMigrationBatch))
-		if err != nil {
-			return total, err
-		}
-
-		var batch int64
-		for cursor.Next(ctx) {
-			var legacy struct {
-				ID     primitive.ObjectID `bson:"_id"`
-				Secret string             `bson:"secret"`
-			}
-			if err := cursor.Decode(&legacy); err != nil {
-				cursor.Close(ctx)
-				return total, err
-			}
-			res, err := col.UpdateOne(ctx,
-				bson.M{"_id": legacy.ID, "secret": legacy.Secret, "secret_hash": bson.M{"$exists": false}},
-				bson.M{"$set": bson.M{"secret_hash": utils.HashSecret(legacy.Secret)}})
-			if err != nil {
-				cursor.Close(ctx)
-				return total, err
-			}
-			batch++
-			total += res.ModifiedCount
-		}
-		err = cursor.Err()
-		cursor.Close(ctx)
-		if err != nil {
-			return total, err
-		}
-		if batch < secretMigrationBatch {
-			return total, nil
-		}
-		if !sleepCtx(ctx, secretMigrationPause) {
-			return total, ctx.Err()
-		}
-	}
-}
-
-func purgePlaintextDeviceSecrets(ctx context.Context, col *mongo.Collection) (int64, error) {
-	var total int64
-	for {
-		cursor, err := col.Find(ctx,
-			bson.M{"secret": bson.M{"$exists": true}, "secret_hash": bson.M{"$exists": true, "$ne": ""}},
-			options.Find().SetProjection(bson.M{"_id": 1}).SetLimit(secretMigrationBatch))
-		if err != nil {
-			return total, err
-		}
-		ids := []primitive.ObjectID{}
-		for cursor.Next(ctx) {
-			var row struct {
-				ID primitive.ObjectID `bson:"_id"`
-			}
-			if err := cursor.Decode(&row); err != nil {
-				cursor.Close(ctx)
-				return total, err
-			}
-			ids = append(ids, row.ID)
-		}
-		err = cursor.Err()
-		cursor.Close(ctx)
-		if err != nil {
-			return total, err
-		}
-		if len(ids) == 0 {
-			return total, nil
-		}
-		res, err := col.UpdateMany(ctx,
-			bson.M{"_id": bson.M{"$in": ids}, "secret_hash": bson.M{"$exists": true, "$ne": ""}},
-			bson.M{"$unset": bson.M{"secret": ""}})
-		if err != nil {
-			return total, err
-		}
-		total += res.ModifiedCount
-		if len(ids) < secretMigrationBatch {
-			return total, nil
-		}
-		if !sleepCtx(ctx, secretMigrationPause) {
-			return total, ctx.Err()
-		}
-	}
-}
-
-func sleepCtx(ctx context.Context, d time.Duration) bool {
-	select {
-	case <-ctx.Done():
-		return false
-	case <-time.After(d):
-		return true
+	} else if n > 0 {
+		log.Printf("devices: purged %d legacy plaintext device secrets", n)
 	}
 }

@@ -72,50 +72,16 @@ func CreateOrUpdateApp(ctx context.Context, tpApp *TPApp, database *mongo.Databa
 	return tpApp, err
 }
 
-// MigratePlaintextSecrets stores the sha256 digest of every app secret still
-// held in plaintext without a secret_hash. The plaintext is kept so replicas
-// on the previous build keep authenticating apps during a rolling deploy;
-// PurgePlaintextSecrets removes it afterwards. Idempotent.
+// MigratePlaintextSecrets hashes any client secret still stored in plaintext,
+// keeping the plaintext until PurgePlaintextSecrets runs. See utils.MigrateSecrets.
 func MigratePlaintextSecrets(ctx context.Context, database *mongo.Database) (int64, error) {
-	collection := database.Collection(DBCollection)
-	cursor, err := collection.Find(ctx,
-		bson.M{"secret": bson.M{"$exists": true, "$type": "string", "$ne": ""}, "secret_hash": bson.M{"$exists": false}},
-		options.Find().SetProjection(bson.M{"_id": 1, "secret": 1}))
-	if err != nil {
-		return 0, err
-	}
-	defer cursor.Close(ctx)
-
-	var migrated int64
-	for cursor.Next(ctx) {
-		var legacy struct {
-			ID     primitive.ObjectID `bson:"_id"`
-			Secret string             `bson:"secret"`
-		}
-		if err := cursor.Decode(&legacy); err != nil {
-			return migrated, err
-		}
-		res, err := collection.UpdateOne(ctx,
-			bson.M{"_id": legacy.ID, "secret": legacy.Secret, "secret_hash": bson.M{"$exists": false}},
-			bson.M{"$set": bson.M{"secret_hash": utils.HashSecret(legacy.Secret)}})
-		if err != nil {
-			return migrated, err
-		}
-		migrated += res.ModifiedCount
-	}
-	return migrated, cursor.Err()
+	return utils.MigrateSecrets(ctx, database.Collection(DBCollection), 0)
 }
 
 // PurgePlaintextSecrets drops the legacy plaintext secret from apps that
-// already carry a secret_hash.
+// already carry a hash. See utils.PurgeSecrets.
 func PurgePlaintextSecrets(ctx context.Context, database *mongo.Database) (int64, error) {
-	res, err := database.Collection(DBCollection).UpdateMany(ctx,
-		bson.M{"secret": bson.M{"$exists": true}, "secret_hash": bson.M{"$exists": true, "$ne": ""}},
-		bson.M{"$unset": bson.M{"secret": ""}})
-	if err != nil {
-		return 0, err
-	}
-	return res.ModifiedCount, nil
+	return utils.PurgeSecrets(ctx, database.Collection(DBCollection), 0)
 }
 
 // LoginAsApp using and application id and secret

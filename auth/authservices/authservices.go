@@ -2,7 +2,6 @@ package authservices
 
 import (
 	"context"
-	"crypto/subtle"
 	"encoding/base64"
 	"errors"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -643,21 +642,15 @@ func DeviceAuth(deviceID string, secret string, mongoClient *mongo.Client) bool 
 		return false
 	}
 
-	if stored.SecretHash != "" {
-		return utils.SecretHashMatches(stored.SecretHash, secret)
+	ok, upgrade := utils.VerifyStoredSecret(stored.SecretHash, stored.Secret, secret)
+	if ok && upgrade != "" {
+		// legacy plaintext matched: upgrade the row in place so it no longer
+		// depends on the background migration (plaintext stays until purge)
+		_, _ = c.UpdateOne(ctx,
+			bson.M{"_id": deviceObjectID, utils.SecretHashField: bson.M{"$exists": false}},
+			bson.M{"$set": bson.M{utils.SecretHashField: upgrade}})
 	}
-
-	if stored.Secret == "" || subtle.ConstantTimeCompare([]byte(stored.Secret), []byte(secret)) != 1 {
-		return false
-	}
-
-	// legacy plaintext matched: opportunistically store the hash so this
-	// device is migrated without waiting for the background job (the
-	// plaintext stays until PANTAHUB_PURGE_PLAINTEXT_SECRETS removes it)
-	_, _ = c.UpdateOne(ctx,
-		bson.M{"_id": deviceObjectID, "secret_hash": bson.M{"$exists": false}},
-		bson.M{"$set": bson.M{"secret_hash": utils.HashSecret(secret)}})
-	return true
+	return ok
 }
 
 func DevicePayload(deviceID string, mongoClient *mongo.Client) map[string]interface{} {
