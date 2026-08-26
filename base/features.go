@@ -36,8 +36,26 @@ func ActiveFeatures() map[string]bool {
 // featuresHandler serves the active feature map as JSON. It is unauthenticated
 // (the UI needs it before login to decide what to render) and short-cacheable.
 func featuresHandler(w http.ResponseWriter, r *http.Request) {
+	// Read cross-origin by the web UI (hub.* and api.* are different origins).
+	// The shared API client sends Content-Type and credentials, so mirror the
+	// AllowAll CORS the other endpoints use: echo the origin, allow
+	// credentials, and answer the preflight.
+	if origin := r.Header.Get("Origin"); origin != "" {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+	} else {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+	}
+	w.Header().Set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+	w.Header().Set("Vary", "Origin")
+
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
-		w.Header().Set("Allow", "GET, HEAD")
+		w.Header().Set("Allow", "GET, HEAD, OPTIONS")
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
