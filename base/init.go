@@ -58,6 +58,10 @@ import (
 func DoInit() http.Handler {
 	mux := http.NewServeMux()
 
+	// GET /features — active optional features, for the UI to cache and gate on
+	mux.HandleFunc("/features", featuresHandler)
+	mux.HandleFunc("/features/", featuresHandler)
+
 	if err := LoadDynamicS3ByRegion(); err != nil {
 		panic(err)
 	}
@@ -200,9 +204,11 @@ func DoInit() http.Handler {
 		app := tokens.New(defaultJwtMiddleware, mongoClient)
 		mux.Handle("/tokens/", http.StripPrefix("/tokens", app.API.MakeHandler()))
 	}
-	{
+	if utils.FeatureEnabled(utils.EnvPantahubDisableWebhooks) {
 		app := webhooks.New(defaultJwtMiddleware)
 		mux.Handle("/webhooks/", http.StripPrefix("/webhooks", app.API.MakeHandler()))
+	} else {
+		log.Println("feature disabled: webhooks (PANTAHUB_DISABLE_WEBHOOKS)")
 	}
 
 	var fservermux FileUploadServer

@@ -17,6 +17,7 @@ package utils
 
 import (
 	"os"
+	"strings"
 )
 
 const (
@@ -398,6 +399,11 @@ const (
 
 	// EnvPantahubDisableQuota disable quota enforcement
 	EnvPantahubDisableQuota = "PANTAHUB_DISABLE_QUOTA"
+
+	// Opt-out flag for the webhooks feature: mounted by default; set to a
+	// truthy value (true/1/yes/on) to disable. See utils.FeatureEnabled and
+	// the GET /features endpoint.
+	EnvPantahubDisableWebhooks = "PANTAHUB_DISABLE_WEBHOOKS"
 )
 
 var defaultEnvs = map[string]string{
@@ -430,6 +436,7 @@ var defaultEnvs = map[string]string{
 	EnvPantahubOAuthConnectedAccountsEnforce: "true",
 	EnvPantahubPurgePlaintextSecrets:         "false",
 	EnvPantahubDisableQuota:                  "false",
+	EnvPantahubDisableWebhooks:               "false",
 
 	EnvPantahubCaCert:          "",
 	EnvPantahubCaRaUser:        "",
@@ -595,4 +602,15 @@ func GetEnvDefault(key, defaultValue string) string {
 	}
 
 	return v
+}
+
+// FeatureEnabled reports whether an opt-out feature is enabled. Features are
+// on by default; set the given PANTAHUB_DISABLE_* variable to a truthy value
+// (true/1/yes/on, case-insensitive) to turn the feature off.
+func FeatureEnabled(disableEnvVar string) bool {
+	switch strings.ToLower(strings.TrimSpace(GetEnv(disableEnvVar))) {
+	case "true", "1", "yes", "on":
+		return false
+	}
+	return true
 }
