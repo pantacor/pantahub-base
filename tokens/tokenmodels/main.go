@@ -22,10 +22,13 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+// Types a user may mint a personal access token as. SERVICE is deliberately
+// absent: bearer claims (type, roles) are derived from this enum, so a
+// self-service SERVICE PAT would satisfy every service-only gate (e.g. the
+// refresh-token caller check).
 var validTypes = map[accounts.AccountType]bool{
-	accounts.AccountTypeOrg:     true,
-	accounts.AccountTypeService: true,
-	accounts.AccountTypeClient:  true,
+	accounts.AccountTypeOrg:    true,
+	accounts.AccountTypeClient: true,
 }
 
 // AuthToken authentication tokens
