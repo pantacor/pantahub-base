@@ -41,7 +41,12 @@ func InitUserTypeFilterMiddleware(filterTypes []accounts.AccountType) *UserTypeF
 func UserTypeFilter(filterTypes []accounts.AccountType, handler rest.HandlerFunc) rest.HandlerFunc {
 	return func(w rest.ResponseWriter, r *rest.Request) {
 		authInfo := GetAuthInfo(r)
-		if authInfo != nil && len(filterTypes) > 0 {
+		if authInfo == nil {
+			// fail closed like ScopeFilter: no auth middleware ran
+			RestErrorWrapper(w, "Authentication Required", http.StatusUnauthorized)
+			return
+		}
+		if len(filterTypes) > 0 {
 			if _, found := find(filterTypes, authInfo.CallerType); !found {
 				RestErrorWrapper(w, "Type of user can't realize that action", http.StatusForbidden)
 				return
