@@ -109,6 +109,10 @@ func GetMongoSortingFromQuery(querystring url.Values) bson.M {
 
 		for _, key := range value {
 			match := strings.SplitN(key, ":", 2)
+			if len(match) != 2 {
+				sortBy[key] = 1
+				continue
+			}
 			switch match[0] {
 			case "asc":
 				sortBy[match[1]] = 1
@@ -285,7 +289,10 @@ func SetMongoPagination(q, s bson.M, pa map[string]interface{}, queryOptions *op
 	limit := int64(-1)
 	if pa != nil {
 		if l, ok := pa["limit"]; ok {
-			limit = int64(l.(int))
+			// processValue keeps non-numeric input as a string: assert, don't panic
+			if li, ok := l.(int); ok && li > 0 {
+				limit = int64(li)
+			}
 		}
 		if after, ok := pa["after"]; ok {
 			s["created_at"] = -1
@@ -361,7 +368,8 @@ func GetPaginationWithLink(u url.URL, total int64, last, first models.DatableSim
 	}
 
 	sizeInt, err := strconv.Atoi(size)
-	if err != nil {
+	if err != nil || sizeInt < 1 {
+		// also guards the offset/sizeInt division below against page[size]=0
 		sizeInt = DefaultPageSize
 	}
 	result.PageSize = sizeInt
