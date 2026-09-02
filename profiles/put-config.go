@@ -38,7 +38,10 @@ import (
 // @Router /profiles/metas [put]
 func (a *App) handlePutGlobalMeta(w rest.ResponseWriter, r *rest.Request) {
 	metas := map[string]interface{}{}
-	r.DecodeJsonPayload(&metas)
+	if err := r.DecodeJsonPayload(&metas); err != nil {
+		utils.RestErrorWrapper(w, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 	globalMeta := utils.BsonQuoteMap(&metas)
 
 	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
@@ -76,7 +79,7 @@ func (a *App) handlePutGlobalMeta(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if account.Prn != tokenOwner {
-		utils.RestErrorWrapperUser(w, err.Error(), "Only owners can write profile", http.StatusForbidden)
+		utils.RestErrorWrapperUser(w, "not the profile owner", "Only owners can write profile", http.StatusForbidden)
 		return
 	}
 

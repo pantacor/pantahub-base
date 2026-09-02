@@ -89,7 +89,7 @@ func (a *App) handleGetProfile(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if !profile.Public && account.Prn != tokenOwner {
-		utils.RestErrorWrapperUser(w, err.Error(), "Profile is not public", http.StatusForbidden)
+		utils.RestErrorWrapperUser(w, "profile is not public", "Profile is not public", http.StatusForbidden)
 		return
 	}
 

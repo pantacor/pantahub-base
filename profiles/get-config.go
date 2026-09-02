@@ -75,7 +75,7 @@ func (a *App) handleGetGlobalMeta(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if account.Prn != tokenOwner {
-		utils.RestErrorWrapperUser(w, err.Error(), "Profile is not public", http.StatusForbidden)
+		utils.RestErrorWrapperUser(w, "not the profile owner", "Profile is not public", http.StatusForbidden)
 		return
 	}
 
