@@ -206,7 +206,10 @@ func (a *App) handlePutStepsObject(w rest.ResponseWriter, r *rest.Request) {
 	nID := newObject.ID
 	nOwner := newObject.Owner
 	nStorageID := newObject.StorageID
-	r.DecodeJsonPayload(&newObject)
+	if err := r.DecodeJsonPayload(&newObject); err != nil {
+		utils.RestErrorWrapper(w, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	if newObject.ID != nID {
 		utils.RestErrorWrapper(w, "Illegal Call Parameter Id", http.StatusConflict)
@@ -241,9 +244,10 @@ func (a *App) handlePutStepsObject(w rest.ResponseWriter, r *rest.Request) {
 	if result.Total > quota {
 		utils.RestErrorWrapperUser(
 			w,
-			err.Error(),
+			"quota exceeded",
 			"Quota exceeded; delete some objects or request a quota bump from team@pantahub.com",
 			http.StatusPreconditionFailed)
+		return
 	}
 
 	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
@@ -258,12 +262,14 @@ func (a *App) handlePutStepsObject(w rest.ResponseWriter, r *rest.Request) {
 		updateOptions,
 	)
 	if err != nil {
-		w.WriteHeader(http.StatusConflict)
 		w.Header().Add("X-PH-Error", "Error inserting object into database "+err.Error())
-	}
-	if updateResult.MatchedCount == 0 {
 		w.WriteHeader(http.StatusConflict)
+		return
+	}
+	if updateResult.MatchedCount == 0 && updateResult.UpsertedCount == 0 {
 		w.Header().Add("X-PH-Error", "Error inserting object into database ")
+		w.WriteHeader(http.StatusConflict)
+		return
 	}
 
 	issuerURL := utils.GetAPIEndpoint("/trails")
