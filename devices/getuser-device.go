@@ -149,8 +149,12 @@ func (a *App) handleGetUserDevice(w rest.ResponseWriter, r *rest.Request) {
 			utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
 			return
 		}
-	} else if !callerIsDevice && !callerIsUser {
+	} else if authID != device.Prn && authID != device.Owner {
+		// public device, caller is neither the device nor the owner:
+		// same scrub as handleGetDevice
 		device.Challenge = ""
+		device.UserMeta = map[string]interface{}{}
+		device.DeviceMeta = map[string]interface{}{}
 	}
 
 	// we always hide the secret

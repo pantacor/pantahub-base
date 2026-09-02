@@ -90,22 +90,24 @@ func (a *App) handleDeleteDevice(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	if device.Owner == owner {
-		result, res, err := MarkDeviceAsGarbage(delID)
-		if err != nil {
-			utils.RestErrorWrapper(w, "Error calling GC API for Marking Device Garbage: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
+	if device.Owner != owner {
+		utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
+		return
+	}
 
-		if res.StatusCode() != 200 {
-			log.Print(res)
-			log.Print(result)
-			utils.RestErrorWrapper(w, "Error calling GC API for Marking Device Garbage", http.StatusInternalServerError)
-			return
-		}
-		if result.Status == 1 {
-			device.Garbage = true
-		}
+	result, res, err := MarkDeviceAsGarbage(delID)
+	if err != nil {
+		utils.RestErrorWrapper(w, "Error calling GC API for Marking Device Garbage: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if res.StatusCode() != 200 {
+		log.Printf("GC API error marking device %s garbage: status %d", delID, res.StatusCode())
+		utils.RestErrorWrapper(w, "Error calling GC API for Marking Device Garbage", http.StatusInternalServerError)
+		return
+	}
+	if result.Status == 1 {
+		device.Garbage = true
 	}
 
 	device.Secret = ""

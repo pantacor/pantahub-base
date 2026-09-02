@@ -210,7 +210,7 @@ func (a *App) handlePostDevice(w rest.ResponseWriter, r *rest.Request) {
 			continue
 		}
 
-		log.Print(newDevice)
+		log.Printf("Error saving device %s (nick %s): %s", newDevice.Prn, newDevice.Nick, err.Error())
 		if mongo.IsDuplicateKeyError(err) {
 			userMessage := "device already exists"
 			utils.RestErrorWrapperUser(w, err.Error(), userMessage, http.StatusConflict)
