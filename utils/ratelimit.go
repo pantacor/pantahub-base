@@ -83,13 +83,16 @@ func (l *IPRateLimiter) Allow(key string) bool {
 	return true
 }
 
-// ClientIP returns the originating client address of a request. Behind the
-// ingress the first X-Forwarded-For entry is the client; otherwise the
-// connection peer is.
+// ClientIP returns the originating client address of a request. The ingress
+// APPENDS the peer address to any X-Forwarded-For the client sent, so the
+// rightmost entry is the one the ingress observed; the leftmost is
+// client-forgeable, and keying rate limits on it would let a client rotate
+// its identity per request.
 func ClientIP(r *http.Request) string {
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		if first := strings.TrimSpace(strings.Split(xff, ",")[0]); first != "" {
-			return first
+		parts := strings.Split(xff, ",")
+		if last := strings.TrimSpace(parts[len(parts)-1]); last != "" {
+			return last
 		}
 	}
 	if xr := strings.TrimSpace(r.Header.Get("X-Real-Ip")); xr != "" {
