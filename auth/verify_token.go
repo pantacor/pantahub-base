@@ -47,7 +47,10 @@ type requestPayload struct {
 // @Router /auth/signature/verify [post]
 func (a *App) verifyToken(w rest.ResponseWriter, r *rest.Request) {
 	payload := &requestPayload{}
-	r.DecodeJsonPayload(payload)
+	if err := r.DecodeJsonPayload(payload); err != nil {
+		utils.RestErrorWrapper(w, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	col := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
 	err := utils.ValidateOwnerSig(r.Context(), payload.Signature, payload.TokenID, payload.Owner, payload.IDevIDName, col)

@@ -54,7 +54,10 @@ import (
 func (a *App) handlePutStepProgress(w rest.ResponseWriter, r *rest.Request) {
 
 	stepProgress := trailmodels.StepProgress{}
-	r.DecodeJsonPayload(&stepProgress)
+	if err := r.DecodeJsonPayload(&stepProgress); err != nil {
+		utils.RestErrorWrapper(w, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 	trailID := r.PathParam("id")
 	stepID := trailID + "-" + r.PathParam("rev")
 

@@ -98,6 +98,7 @@ func (lfs LocalFileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if objClaims.Sha == "" {
 		log.Println("Invalid objClaims Method; no Sha included")
 		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 
 	uniqueID := bson.NewObjectId().Hex()

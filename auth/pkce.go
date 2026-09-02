@@ -121,7 +121,10 @@ func (app *App) HandlePostPKCEAuthorize(w rest.ResponseWriter, r *rest.Request) 
 	req := struct {
 		SessionID string `json:"session_id"` // NEW: Replaces UserCode
 	}{}
-	r.DecodeJsonPayload(&req)
+	if err := r.DecodeJsonPayload(&req); err != nil {
+		utils.RestErrorWrapper(w, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	// SCENARIO B: Polling Flow (Session ID provided)
 	if req.SessionID != "" {

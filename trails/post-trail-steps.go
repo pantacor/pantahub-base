@@ -146,7 +146,10 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 
 	newStep := trailmodels.Step{}
 	previousStep := trailmodels.Step{}
-	r.DecodeJsonPayload(&newStep)
+	if err := r.DecodeJsonPayload(&newStep); err != nil {
+		utils.RestErrorWrapper(w, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	if newStep.Rev == -1 {
 		ctx, cancel := context.WithTimeout(rContext, 10*time.Second)

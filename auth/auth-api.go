@@ -221,7 +221,10 @@ func (a *App) handlePostSession(w rest.ResponseWriter, r *rest.Request) {
 func (a *App) handlePostAccount(w rest.ResponseWriter, r *rest.Request) {
 	newAccount := authmodels.AccountCreationPayload{}
 
-	r.DecodeJsonPayload(&newAccount)
+	if err := r.DecodeJsonPayload(&newAccount); err != nil {
+		utils.RestErrorWrapper(w, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	if utils.GetEnv(utils.EnvPantahubDisableSignup) == "true" {
 		utils.RestError(w, nil, "User signup is currently disabled", http.StatusForbidden)
@@ -517,7 +520,10 @@ func (a *App) handleVerify(w rest.ResponseWriter, r *rest.Request) {
 func (a *App) handlePasswordReset(writer rest.ResponseWriter, r *rest.Request) {
 	data := authmodels.PasswordReset{}
 
-	r.DecodeJsonPayload(&data)
+	if err := r.DecodeJsonPayload(&data); err != nil {
+		utils.RestError(writer, err, "Error decoding json payload", http.StatusBadRequest)
+		return
+	}
 
 	if data.Token == "" {
 		utils.RestError(writer, nil, exchangeTokenRequiredErr, http.StatusBadRequest)
@@ -626,7 +632,10 @@ func (a *App) handlePasswordRecovery(writer rest.ResponseWriter, r *rest.Request
 
 	data := authmodels.PasswordResetRequest{}
 
-	r.DecodeJsonPayload(&data)
+	if err := r.DecodeJsonPayload(&data); err != nil {
+		utils.RestError(writer, err, "Error decoding json payload", http.StatusBadRequest)
+		return
+	}
 
 	if data.Email == "" {
 		utils.RestError(writer, nil, emailRequiredForPasswordErr, http.StatusPreconditionFailed)

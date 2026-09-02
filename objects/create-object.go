@@ -48,7 +48,10 @@ func (a *App) handlePostObject(w rest.ResponseWriter, r *rest.Request) {
 
 	newObject := Object{}
 
-	r.DecodeJsonPayload(&newObject)
+	if err := r.DecodeJsonPayload(&newObject); err != nil {
+		utils.RestErrorWrapper(w, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	var ownerStr string
 

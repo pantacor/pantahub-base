@@ -54,7 +54,10 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 	rContext := context.WithoutCancel(r.Context())
 	initialState := map[string]interface{}{}
 
-	r.DecodeJsonPayload(&initialState)
+	if err := r.DecodeJsonPayload(&initialState); err != nil {
+		utils.RestErrorWrapper(w, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	device, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {

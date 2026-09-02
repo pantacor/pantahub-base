@@ -103,7 +103,10 @@ func (a *App) handlePostStepsObject(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	newObject := objects.Object{}
-	r.DecodeJsonPayload(&newObject)
+	if err := r.DecodeJsonPayload(&newObject); err != nil {
+		utils.RestErrorWrapper(w, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 	newObject.Owner = step.Owner
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")

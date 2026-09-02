@@ -50,9 +50,6 @@ import (
 // @Router /trails [get]
 func (a *App) handleGetTrails(w rest.ResponseWriter, r *rest.Request) {
 	fmt.Printf("handleGetTrails\n")
-	initialState := map[string]interface{}{}
-
-	r.DecodeJsonPayload(&initialState)
 
 	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
 	if !ok {

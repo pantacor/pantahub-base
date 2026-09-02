@@ -126,7 +126,10 @@ func (a *App) handlePutDevice(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	r.DecodeJsonPayload(&newDevice)
+	if err := r.DecodeJsonPayload(&newDevice); err != nil {
+		utils.RestErrorWrapper(w, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	if newDevice.ID.Hex() != putID {
 		utils.RestErrorWrapper(w, "Cannot change device Id in PUT", http.StatusForbidden)

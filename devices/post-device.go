@@ -50,7 +50,10 @@ import (
 // @Router /devices [post]
 func (a *App) handlePostDevice(w rest.ResponseWriter, r *rest.Request) {
 	newDevice := Device{}
-	r.DecodeJsonPayload(&newDevice)
+	if err := r.DecodeJsonPayload(&newDevice); err != nil {
+		utils.RestErrorWrapper(w, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	mgoid := bson.NewObjectId()
 	ObjectID, err := primitive.ObjectIDFromHex(mgoid.Hex())
