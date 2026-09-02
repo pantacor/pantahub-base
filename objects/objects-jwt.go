@@ -99,7 +99,7 @@ func NewObjectAccessForSec(
 func NewFromValidToken(encodedToken string) (*ObjectAccessToken, error) {
 	claim := ObjectAccessClaims{}
 	tok, err := jwt.ParseWithClaims(encodedToken, &claim, func(*jwt.Token) (interface{}, error) {
-		return []byte(utils.GetEnv(utils.EnvPantahubJWTObjectSecret)), nil
+		return utils.GetObjectTokenSecret(), nil
 	})
 
 	if err != nil {
@@ -116,5 +116,5 @@ func NewFromValidToken(encodedToken string) (*ObjectAccessToken, error) {
 
 // Sign sign a access token
 func (o *ObjectAccessToken) Sign() (string, error) {
-	return o.SignedString([]byte(utils.GetEnv(utils.EnvPantahubJWTObjectSecret)))
+	return o.SignedString(utils.GetObjectTokenSecret())
 }

@@ -15,10 +15,13 @@
 package utils
 
 import (
+	"crypto/hmac"
 	"crypto/rsa"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"sync"
 
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"github.com/go-jose/go-jose/v3"
@@ -51,6 +54,40 @@ var (
 	}
 	errMethodNotFound = errors.New("The only encrypt method supported are bcrypt and scrypt")
 )
+
+var (
+	objectTokenSecretOnce sync.Once
+	objectTokenSecret     []byte
+)
+
+// GetObjectTokenSecret returns the HMAC key for object access tokens.
+// An explicitly configured PANTAHUB_JWT_OBJECT_SECRET wins; when it is unset
+// (or left at the shipped placeholder), the key is derived from the mandatory
+// RSA JWT private key, so it is secret without extra configuration and stable
+// across replicas that share PANTAHUB_JWT_SECRET. Panics when neither a real
+// object secret nor a valid RSA key is configured.
+func GetObjectTokenSecret() []byte {
+	objectTokenSecretOnce.Do(func() {
+		configured := GetEnv(EnvPantahubJWTObjectSecret)
+		if configured != "" && configured != defaultEnvs[EnvPantahubJWTObjectSecret] {
+			objectTokenSecret = []byte(configured)
+			return
+		}
+
+		jwtSecretPem, err := base64.StdEncoding.DecodeString(GetEnv(EnvPantahubJWTAuthSecret))
+		if err != nil {
+			panic("PANTAHUB_JWT_OBJECT_SECRET is unset and PANTAHUB_JWT_SECRET is not valid base64; set one of them: " + err.Error())
+		}
+		if _, err := jwtgo.ParseRSAPrivateKeyFromPEM(jwtSecretPem); err != nil {
+			panic("PANTAHUB_JWT_OBJECT_SECRET is unset and PANTAHUB_JWT_SECRET is not a PEM RSA private key; set one of them: " + err.Error())
+		}
+
+		mac := hmac.New(sha256.New, jwtSecretPem)
+		mac.Write([]byte("pantahub-object-token-v1"))
+		objectTokenSecret = mac.Sum(nil)
+	})
+	return objectTokenSecret
+}
 
 // JwtRsaKeys Public and Private keys for Jwt
 type JwtRsaKeys struct {

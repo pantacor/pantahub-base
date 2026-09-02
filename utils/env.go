@@ -75,7 +75,10 @@ const (
 	// EnvPantahubUseCaptcha Pantahub Use Captcha. Set if captcha will be used by the API.
 	EnvPantahubUseCaptcha = "PANTAHUB_USE_CAPTCHA"
 
-	// EnvPantahubJWTObjectSecret Pantahub JWT Secret. THIS MUST BE SET TO SOMETHING SECRET!!
+	// EnvPantahubJWTObjectSecret HMAC secret for object access tokens.
+	// When unset (or left at the placeholder), a key is derived from the
+	// mandatory PANTAHUB_JWT_SECRET RSA key (see utils.GetObjectTokenSecret).
+	// Set it explicitly to rotate object tokens independently of the JWT key.
 	// default: "THIS MUST BE CHANGED"
 	EnvPantahubJWTObjectSecret = "PANTAHUB_JWT_OBJECT_SECRET"
 
