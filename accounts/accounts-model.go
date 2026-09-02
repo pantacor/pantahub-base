@@ -58,9 +58,13 @@ type Account struct {
 	Nick  string      `json:"nick" bson:"nick"`
 	Prn   string      `json:"prn" bson:"prn"`
 
+	// Password stays JSON-decodable: the account-creation payload embeds this
+	// struct and reads it from the request (handlers scrub it before replies).
+	// The hashes are never legitimate JSON input or output — account documents
+	// are written to responses in several handlers and the hashes were leaking.
 	Password       string `json:"password,omitempty" bson:"password"`
-	PasswordBcrypt string `json:"password_bcrypt,omitempty" bson:"password_bcrypt"`
-	PasswordScrypt string `json:"password_scrypt,omitempty" bson:"password_scrypt"`
+	PasswordBcrypt string `json:"-" bson:"password_bcrypt"`
+	PasswordScrypt string `json:"-" bson:"password_scrypt"`
 	Challenge      string `json:"challenge,omitempty" bson:"challenge"`
 
 	TimeCreated  time.Time `json:"time-created" bson:"time-created"`
