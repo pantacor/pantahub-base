@@ -192,11 +192,14 @@ func (i subscriptionService) LoadBySubject(pctx context.Context, subject utils.P
 }
 
 func (i subscriptionService) GetDefaultSubscription(subject utils.Prn) Subscription {
+	// copy the template and mutate only the copy: the package-global template
+	// must stay immutable — concurrent callers were racing on it and the
+	// returned copy carried the previous caller's Subject
 	sub := defaultSubscription
 	sub.service = i
-	defaultSubscription.LastModified = i.Now()
-	defaultSubscription.TimeCreated = defaultSubscription.LastModified
-	defaultSubscription.Subject = subject
+	sub.LastModified = i.Now()
+	sub.TimeCreated = sub.LastModified
+	sub.Subject = subject
 	return sub
 }
 
