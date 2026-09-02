@@ -18,8 +18,6 @@ package utils
 
 import (
 	crand "crypto/rand"
-	"math/rand"
-	"time"
 
 	"github.com/asaskevich/govalidator"
 )
@@ -38,15 +36,28 @@ func IsEmail(email string) bool {
 	return govalidator.IsEmail(email)
 }
 
-var r *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
-
 // GenerateChallenge create challenge string
 func GenerateChallenge() string {
 	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
 
 	result := make([]byte, 15)
-	for i := range result {
-		result[i] = chars[r.Intn(len(chars))]
+	buf := make([]byte, 32)
+	i := 0
+	for i < len(result) {
+		if _, err := crand.Read(buf); err != nil {
+			panic("crypto/rand unavailable: " + err.Error())
+		}
+		for _, b := range buf {
+			// reject bytes >= 252 (= 7*36) so the modulo below is unbiased
+			if b >= 252 {
+				continue
+			}
+			result[i] = chars[int(b)%len(chars)]
+			i++
+			if i == len(result) {
+				break
+			}
+		}
 	}
 
 	return string(result)
