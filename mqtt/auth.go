@@ -228,11 +228,17 @@ func (h *authHook) OnConnectAuthenticate(cl *mochi.Client, pk packets.Packet) bo
 // mayClaimSession reports whether the authenticated identity may open an MQTT
 // session under this client id. A device is bound to its own device id — the
 // id pvsm and every other device client already uses — so no device can take
-// over another device's session. User and session identities keep free ids:
-// their sessions are ephemeral dashboards, not something a device depends on.
+// over another device's session. User and session identities keep free ids
+// for their ephemeral dashboards, except ids shaped like a device id: the
+// broker's session takeover disconnects the occupant, so a user claiming a
+// device-shaped id could evict that device's push channel over and over.
 func mayClaimSession(cl *mochi.Client, clientID string) bool {
 	kind, subject := identity(cl)
-	return kind != kindDevice || clientID == subject
+	if kind == kindDevice {
+		return clientID == subject
+	}
+	_, err := primitive.ObjectIDFromHex(clientID)
+	return err != nil
 }
 
 // OnACLCheck authorizes a single publish (write) or subscribe (read). It never
