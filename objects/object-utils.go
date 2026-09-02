@@ -123,6 +123,24 @@ func (a *App) SaveObject(parentCtx context.Context, object *Object, localS3Check
 	updateOptions.SetUpsert(true)
 	ctx, cancel = context.WithTimeout(parentCtx, 1*time.Minute)
 	defer cancel()
+	defer func() {
+		// The pre-write quota check races concurrent posts (check-then-write):
+		// N requests can all pass it and all insert. Re-check once our own
+		// write is visible and undo the insert when the quota is genuinely
+		// blown — the last writers see the true total and compensate.
+		if err != nil || !post {
+			return
+		}
+		rctx, rcancel := context.WithTimeout(parentCtx, 1*time.Minute)
+		defer rcancel()
+		recheck, rerr := CalcUsageAfterPut(rctx, object.Owner, a.mongoClient, object.StorageID, object.SizeInt)
+		if rerr != nil || recheck.Total <= quota {
+			return
+		}
+		_, _ = collection.DeleteOne(rctx, bson.M{"_id": object.StorageID})
+		log.Println("Quota exceeded in post object (post-write re-check).")
+		err = utils.UserErrorNew("Quota exceeded; delete some objects or request a quota bump from team@pantahub.com")
+	}()
 	_, err = collection.UpdateOne(
 		ctx,
 		bson.M{"_id": object.StorageID},
