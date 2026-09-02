@@ -30,6 +30,7 @@ import (
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -81,6 +82,10 @@ func (a *App) handleGetTrailSummary(w rest.ResponseWriter, r *rest.Request) {
 		err := json.Unmarshal([]byte(filterParam), &m)
 		if err != nil {
 			utils.RestErrorWrapper(w, "Illegal Filter "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		if err := mongoutils.ValidateClientFilter(map[string]interface{}(m)); err != nil {
+			utils.RestErrorWrapper(w, "Illegal Filter: "+err.Error(), http.StatusBadRequest)
 			return
 		}
 	}

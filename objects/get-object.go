@@ -26,6 +26,7 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -63,7 +64,12 @@ func (a *App) handleGetObjects(w rest.ResponseWriter, r *rest.Request) {
 	if filter != "" {
 		err := json.Unmarshal([]byte(filter), &m)
 		if err != nil {
-			utils.RestErrorWrapper(w, "Error parsing filter json "+err.Error(), http.StatusInternalServerError)
+			utils.RestErrorWrapper(w, "Error parsing filter json "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		if err := mongoutils.ValidateClientFilter(m); err != nil {
+			utils.RestErrorWrapper(w, "Illegal filter: "+err.Error(), http.StatusBadRequest)
+			return
 		}
 	}
 	m["owner"] = owner

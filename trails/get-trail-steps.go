@@ -30,6 +30,7 @@ import (
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
 	"gitlab.com/pantacor/pantahub-base/utils/querymongo"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -125,6 +126,10 @@ func (a *App) handleGetSteps(w rest.ResponseWriter, r *rest.Request) {
 		if err != nil {
 			query["progress.status"] = progressStatus
 		} else {
+			if err := mongoutils.ValidateClientFilter(m); err != nil {
+				utils.RestErrorWrapper(w, "Illegal progress.status filter: "+err.Error(), http.StatusBadRequest)
+				return
+			}
 			query["progress.status"] = m
 		}
 	}
