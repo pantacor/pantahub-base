@@ -25,6 +25,7 @@ import (
 	"github.com/ant0ine/go-json-rest/rest"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-base/utils/caclient"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type registerReq struct {
@@ -171,6 +172,11 @@ func (a *App) handleRegister(w rest.ResponseWriter, r *rest.Request) {
 	// Create or update device with the new certificate
 	device.DeviceMeta["idevid"] = finalCert
 	_, err = device.save(r.Context(), a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices"))
+	if mongo.IsDuplicateKeyError(err) {
+		// the id exists under another owner; the owner-bound upsert refused it
+		utils.RestErrorWrapper(w, "Device id already in use", http.StatusConflict)
+		return
+	}
 	if err != nil {
 		utils.RestErrorWrapper(w, "Failed to save device:"+err.Error(), http.StatusBadRequest)
 		return

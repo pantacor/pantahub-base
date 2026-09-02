@@ -40,12 +40,15 @@ func GenerateDeviceNick() string {
 func createDevice(id, secret, owner string) (*Device, error) {
 	newDevice := &Device{}
 
-	mgoid := bson.ObjectIdHex(id)
-	ObjectID, err := primitive.ObjectIDFromHex(mgoid.Hex())
-	if err != nil {
-		return nil, err
+	if id == "" {
+		newDevice.ID = primitive.NewObjectID()
+	} else {
+		ObjectID, err := primitive.ObjectIDFromHex(id)
+		if err != nil {
+			return nil, err
+		}
+		newDevice.ID = ObjectID
 	}
-	newDevice.ID = ObjectID
 	newDevice.Prn = "prn:::devices:/" + newDevice.ID.Hex()
 	newDevice.Secret = secret
 	newDevice.SecretHash = utils.HashSecret(secret)
@@ -59,6 +62,11 @@ func createDevice(id, secret, owner string) (*Device, error) {
 	return newDevice, nil
 }
 
+// save upserts the device, binding the filter to the owner: a fresh id is
+// inserted, a re-register by the same owner is updated, and an id already
+// owned by someone else fails the filter and hits the duplicate-_id error on
+// the upsert insert — the id is client-supplied on /register, so an unbound
+// upsert would let anyone overwrite (take over) another owner's device.
 func (device *Device) save(ctx context.Context, collection *mongo.Collection) (*mongo.UpdateResult, error) {
 	if collection == nil {
 		return nil, errors.New("Error with Database connectivity")
@@ -70,7 +78,7 @@ func (device *Device) save(ctx context.Context, collection *mongo.Collection) (*
 	updateOptions.SetUpsert(true)
 	result, err := collection.UpdateOne(
 		ctxC,
-		bson.M{"_id": device.ID},
+		bson.M{"_id": device.ID, "owner": device.Owner},
 		bson.M{"$set": device},
 		updateOptions,
 	)
