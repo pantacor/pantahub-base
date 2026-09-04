@@ -151,10 +151,10 @@ func (a *App) handlePutDevice(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	if newDevice.Secret == "" {
-		utils.RestErrorWrapper(w, "Empty Secret not allowed for devices in PUT", http.StatusForbidden)
-		return
-	}
+	// The secret is generated once at registration and can never be changed
+	// through PUT; drop anything the client sent so it is neither stored nor
+	// echoed back.
+	newDevice.Secret = ""
 
 	if callerIsDevice && newDevice.IsPublic != isPublic {
 		utils.RestErrorWrapper(w, "Device cannot change its own 'public' state", http.StatusForbidden)
@@ -214,12 +214,10 @@ func (a *App) handlePutDevice(w rest.ResponseWriter, r *rest.Request) {
 
 	// Build update document to avoid overwriting sensitive fields accidentally
 	// and to ensure we don't clobber metadata we didn't intend to change.
+	// The secret/secret_hash fields are deliberately absent: PUT never touches them.
 	updateDoc := bson.M{
-		// a supplied secret replaces any legacy plaintext one with its hash
-		"$unset": bson.M{"secret": ""},
 		"$set": bson.M{
 			"nick":         newDevice.Nick,
-			"secret_hash":  utils.HashSecret(newDevice.Secret),
 			"ispublic":     newDevice.IsPublic,
 			"timemodified": newDevice.TimeModified,
 			"challenge":    newDevice.Challenge,
