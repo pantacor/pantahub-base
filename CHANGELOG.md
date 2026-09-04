@@ -1,4 +1,124 @@
 
+<a name="053"></a>
+## [053](https://gitlab.com/pantacor/pantahub-base/compare/052...053)
+
+> 2026-09-04
+
+### Chore
+
+* change certs folder
+* bump copyright headers to 2026
+
+### Ci
+
+* deploy to the dev cluster from develop only
+* bump go to 1.25.13 for the security scan
+* deploy feature/* and feat/* branches to the dev cluster
+
+### Feat
+
+* **apps:** return validation reason to the client on create/update
+* **auth:** hash secrets at rest and close security-review findings
+* **devices:** manual owner verification for device tokens
+* **features:** env feature flags for optional subsystems + GET /features
+* **mqtt:** device pull requests for user-meta and revision catch-up
+* **mqtt:** serve native MQTTS on the TCP listener
+* **mqtt:** add MQTT message plane for push-based OTA
+* **trails:** expose device meta-modified as last-seen in device summary
+
+### Fix
+
+* use proper relative path for the mounts
+* check every JSON decode; add missing returns after error writes
+* **accounts:** stop serializing password hashes in account responses
+* **auth:** accept passkeys as second factor without user verification
+* **auth:** generate account challenges with crypto/rand
+* **ci:** bump gorilla/websocket to v1.5.3 to clear GO-2026-6278
+* **devices:** stop honoring client-chosen _id takeover on /register
+* **devices:** 403 non-owner delete, scrub public metas, no secrets in logs
+* **devices:** let any logged-in user delete an unclaimed device
+* **devices:** accept body-less register and claim requests
+* **devices:** never touch the secret in PUT; unbreak device claims
+* **devices:** restore anonymous device self-registration
+* **features:** send CORS headers on GET /features
+* **mqtt:** store logs through the registered logs backend
+* **mqtt:** close five review findings in the OTA message plane
+* **mqtt:** close notifier reconcile and publish gaps
+* **mqtt:** users can no longer claim device-shaped session ids
+* **mqtt:** bind device sessions to their own client id
+* **oauth:** carry social-connect state in the signed state param, not cross-site cookies
+* **objects:** re-check disk quota after the object insert
+* **objects:** stop signing object tokens with the placeholder secret
+* **profiles:** reject bad meta payloads; 403s no longer nil-deref
+* **querymongo:** stop panicking on crafted pagination params
+* **subscriptions:** stop mutating the default-subscription template
+* **tokens:** answer caller errors with 400/409 instead of 500 on create
+* **tokens:** users can no longer mint SERVICE-type PATs
+* **trails:** quota 412 without nil-deref, missing returns, decode check
+* **utils:** UserTypeFilter fails closed without auth info
+* **utils:** rate-limit on the ingress-observed client address
+
+### Refactor
+
+* **secrets:** consolidate secret-at-rest logic into utils/secretstore
+
+### Security
+
+* revert CORS to permissive reflect-any-origin
+* stop storing the unused scrypt password hash (PH-M6)
+* harden auth and connect OAuth providers
+* constant-time compare of SA admin secret (PH-M7)
+* **apps:** reject malformed request body on create/update (PH-L16)
+* **apps:** validate redirect URIs at registration (PH-H16)
+* **auth:** make access-token and auth-code exp numeric (PH-H2)
+* **auth:** reject revoked device certificates (PH-H1)
+* **authz:** require write scope on token/meta writes (PH-H7)
+* **chart:** replace committed JWT/JWE keys with placeholders (PH-C2)
+* **devices:** scrub device secret from delete response (PH-H4)
+* **dos:** add ReadHeaderTimeout + IdleTimeout to HTTP servers (PH-H14 partial)
+* **mail:** auto-escape user data in HTML emails (PH-L17)
+* **tls:** restore outbound TLS verification (PH-H9)
+* **trails:** device may only post steps to its own trail (PH-H6)
+* **trails:** return after 403 on step write (PH-H5)
+
+
+<a name="052"></a>
+## [052](https://gitlab.com/pantacor/pantahub-base/compare/051...052)
+
+> 2026-08-10
+
+### Feat
+
+* **auth:** two-factor authentication and passkeys
+* **webhooks:** mount the webhooks reverse-proxy module
+
+### Fix
+
+* **chart:** review fixes — dep guards, checksums, ingress env, localstack
+* **fluentd:** bound memory buffers and drop ReqHeaders from access logs
+* **webhooks:** sign proxy requests with the v2 canonical form
+
+
+<a name="051"></a>
+## [051](https://gitlab.com/pantacor/pantahub-base/compare/050...051)
+
+> 2026-07-30
+
+### Auth
+
+* leave applications without registered callbacks unconstrained
+* validate OAuth redirect_uri against an allowlist
+
+### Feature
+
+* add pantahub Helm chart translating the docker-compose stack
+
+### Fix
+
+* **chart:** valid http01 solver when ingress.className is empty
+* **docs:** drop old and irrelevant walkthrough docs
+
+
 <a name="050"></a>
 ## [050](https://gitlab.com/pantacor/pantahub-base/compare/049...050)
 
