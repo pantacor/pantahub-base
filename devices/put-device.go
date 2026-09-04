@@ -126,7 +126,9 @@ func (a *App) handlePutDevice(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	if err := r.DecodeJsonPayload(&newDevice); err != nil {
+	// Pantavisor registers and pvr claims with a body-less request, so an
+	// empty payload is the same as "{}"; only malformed JSON is rejected.
+	if err := r.DecodeJsonPayload(&newDevice); err != nil && err != rest.ErrJsonPayloadEmpty {
 		utils.RestErrorWrapper(w, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
 		return
 	}
