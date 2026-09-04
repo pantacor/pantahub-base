@@ -90,7 +90,9 @@ func (a *App) handleDeleteDevice(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	if device.Owner != owner {
+	// Any logged-in caller may delete an unclaimed device (no owner yet);
+	// pantahub-gc would sweep it anyway. Owned devices need their owner.
+	if device.Owner != "" && device.Owner != owner {
 		utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
 		return
 	}
