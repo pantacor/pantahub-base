@@ -21,7 +21,6 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
-	"log"
 	"net/http"
 	"net/url"
 	"time"
@@ -38,22 +37,22 @@ import (
 // handleValidateOwnership validates the ownership of a device based on its OVMode.
 // @Summary Validates device ownership based on OVMode.
 // @Description Validates device ownership based on the configured OVMode (TLS, Manual, etc.).
-// @Description If OVMode is TLS, the client must use the 'root_of_trust' as the client TLS connection.
+// @Description If OVMode is TLS, the device itself must call this endpoint over a client TLS
+// @Description connection whose certificate chains to the token's 'root_of_trust'.
+// @Description If OVMode is manual, the device owner (a USER token) calls this endpoint to
+// @Description accept the device; the device itself may call it to poll its current status.
 // @Accept  json
 // @Produce  json
 // @Security ApiKeyAuth
 // @Tags devices
+// @Param id path string true "Device ID"
 // @Success 200 {object} models.OVModeExtension "Ownership validation successful. Returns OVMode details."
 // @Failure 400 {object} utils.RError "Invalid request or parameters."
+// @Failure 403 {object} utils.RError "Caller is not allowed to verify this device."
 // @Failure 404 {object} utils.RError "Device not found or ownership not verifiable."
 // @Failure 500 {object} utils.RError "Internal server error."
-// @Router /devices/{id}/ownership/validate [get]
+// @Router /devices/{id}/ownership/validate [post]
 func (a *App) handleValidateOwnership(w rest.ResponseWriter, r *rest.Request) {
-	for name, values := range r.Header {
-		for _, value := range values {
-			log.Printf("%s: %s", name, value)
-		}
-	}
 	id := r.PathParam("id")
 	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
 	if !ok {
@@ -317,42 +316,68 @@ func (a *App) validateTLSOwnership(w rest.ResponseWriter, r *rest.Request, ctx c
 	w.WriteJson(device.OVMode)
 }
 
+// validateManualOwnership handles the manual OVMode. Only the device owner
+// (a USER token whose prn matches device.Owner) can complete the verification;
+// the device itself may call the endpoint to poll its status, which it needs
+// because its credentials are restricted until the owner accepts it.
 func (a *App) validateManualOwnership(w rest.ResponseWriter, r *rest.Request, ctx context.Context, device *Device, jwtPayload any) {
 	if device.OVMode == nil {
 		utils.RestErrorWrapperUser(w, "Device does not have OVMode configured", "Device does not have OVMode configured", http.StatusNotFound)
 		return
 	}
 
-	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
-	ownerPrn, ok := jwtPayload.(jwtgo.MapClaims)["prn"].(string)
-
+	claims, ok := jwtPayload.(jwtgo.MapClaims)
 	if !ok {
-		utils.RestErrorWrapperUser(w, "Owner PRN not found in JWT payload", "Owner PRN not found in JWT payload", http.StatusBadRequest)
+		utils.RestErrorWrapperUser(w, "JWT Payload is not valid", "JWT Payload is not valid", http.StatusBadRequest)
 		return
 	}
 
-	if device.Owner != ownerPrn {
+	callerPrn, ok := claims["prn"].(string)
+	if !ok {
+		utils.RestErrorWrapperUser(w, "Caller PRN not found in JWT payload", "Caller PRN not found in JWT payload", http.StatusBadRequest)
+		return
+	}
+
+	tokenType, _ := claims["type"].(string)
+
+	// The device polling its own status: report it, never change it.
+	if tokenType == "DEVICE" {
+		if callerPrn != device.Prn {
+			utils.RestErrorWrapperUser(w, "Device can only query ownership of itself", "Device can only query ownership of itself", http.StatusForbidden)
+			return
+		}
+		device.OVMode.RootOfTrust = ""
+		w.WriteJson(device.OVMode)
+		return
+	}
+
+	if tokenType != "USER" && tokenType != "SESSION" {
+		utils.RestErrorWrapperUser(w, "Only the device owner can accept ownership", "Only the device owner can accept ownership", http.StatusForbidden)
+		return
+	}
+
+	if device.Owner == "" || device.Owner != callerPrn {
 		utils.RestErrorWrapperUser(w, "Token PRN does not match device owner", "Token PRN does not match device owner", http.StatusForbidden)
 		return
 	}
 
-	device.OVMode.Status = models.Completed
-
-	updateResult, err := collection.UpdateOne(
+	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
+	now := time.Now()
+	_, err := collection.UpdateOne(
 		ctx,
-		bson.M{"prn": device.Prn},
-		bson.M{"$set": bson.M{"ovmode.status": models.Completed}},
+		bson.M{"_id": device.ID},
+		bson.M{"$set": bson.M{
+			"ovmode.status":        models.Completed,
+			"ownership_unverified": false,
+			"timemodified":         now,
+		}},
 	)
-
 	if err != nil {
 		utils.RestErrorWrapperUser(w, err.Error(), "failed to update device status: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if updateResult.ModifiedCount == 0 {
-		utils.RestErrorWrapperUser(w, "failed to update device status: no document updated", "failed to update device status: no document updated", http.StatusInternalServerError)
-		return
-	}
-
+	device.OVMode.Status = models.Completed
+	device.OVMode.RootOfTrust = ""
 	w.WriteJson(device.OVMode)
 }

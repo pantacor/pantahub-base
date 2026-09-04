@@ -138,7 +138,10 @@ func (a *App) handlePostDevice(w rest.ResponseWriter, r *rest.Request) {
 				return
 			}
 
-			if autoInfo.OVMode != nil && autoInfo.OVMode.Mode.IsTLS() {
+			// TLS and manual modes gate the device until verified: TLS by
+			// the device presenting a cert chained to the token's root of
+			// trust, manual by the owner accepting the device explicitly.
+			if autoInfo.OVMode != nil && (autoInfo.OVMode.Mode.IsTLS() || autoInfo.OVMode.Mode.IsManual()) {
 				newDevice.OVMode = &models.OVModeExtension{
 					TokenID: autoInfo.TokenID,
 					Mode:    autoInfo.OVMode.Mode,

@@ -31,7 +31,6 @@ import (
 	"gitlab.com/pantacor/pantahub-base/auth/authservices"
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/utils"
-	"gitlab.com/pantacor/pantahub-base/utils/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -183,7 +182,7 @@ func (h *authHook) OnConnectAuthenticate(cl *mochi.Client, pk packets.Packet) bo
 	if device.Owner == "" {
 		return false
 	}
-	if device.OVMode != nil && device.OVMode.Mode == models.TLSVerification && device.OVMode.Status != models.Completed {
+	if device.OVMode.NeedsVerification() {
 		return false
 	}
 

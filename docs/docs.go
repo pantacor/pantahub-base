@@ -3644,13 +3644,13 @@ var doc = `{
             }
         },
         "/devices/{id}/ownership/validate": {
-            "get": {
+            "post": {
                 "security": [
                     {
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Validates device ownership based on the configured OVMode (TLS, Manual, etc.).\nIf OVMode is TLS, the client must use the 'root_of_trust' as the client TLS connection.",
+                "description": "Validates device ownership based on the configured OVMode (TLS, Manual, etc.).\nIf OVMode is TLS, the device itself must call this endpoint over a client TLS\nconnection whose certificate chains to the token's 'root_of_trust'.\nIf OVMode is manual, the device owner (a USER token) calls this endpoint to\naccept the device; the device itself may call it to poll its current status.",
                 "consumes": [
                     "application/json"
                 ],
@@ -3661,6 +3661,15 @@ var doc = `{
                     "devices"
                 ],
                 "summary": "Validates device ownership based on OVMode.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Device ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "Ownership validation successful. Returns OVMode details.",
@@ -3670,6 +3679,12 @@ var doc = `{
                     },
                     "400": {
                         "description": "Invalid request or parameters.",
+                        "schema": {
+                            "$ref": "#/definitions/utils.RError"
+                        }
+                    },
+                    "403": {
+                        "description": "Caller is not allowed to verify this device.",
                         "schema": {
                             "$ref": "#/definitions/utils.RError"
                         }

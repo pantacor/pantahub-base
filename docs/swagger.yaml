@@ -3169,12 +3169,21 @@ paths:
       tags:
       - devices
   /devices/{id}/ownership/validate:
-    get:
+    post:
       consumes:
       - application/json
       description: |-
         Validates device ownership based on the configured OVMode (TLS, Manual, etc.).
-        If OVMode is TLS, the client must use the 'root_of_trust' as the client TLS connection.
+        If OVMode is TLS, the device itself must call this endpoint over a client TLS
+        connection whose certificate chains to the token's 'root_of_trust'.
+        If OVMode is manual, the device owner (a USER token) calls this endpoint to
+        accept the device; the device itself may call it to poll its current status.
+      parameters:
+      - description: Device ID
+        in: path
+        name: id
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -3184,6 +3193,10 @@ paths:
             $ref: '#/definitions/models.OVModeExtension'
         "400":
           description: Invalid request or parameters.
+          schema:
+            $ref: '#/definitions/utils.RError'
+        "403":
+          description: Caller is not allowed to verify this device.
           schema:
             $ref: '#/definitions/utils.RError'
         "404":

@@ -91,6 +91,20 @@ func ParseStatus(s string) OvModeStatus {
 	}
 }
 
+// NeedsVerification reports whether an OVMode still gates the device: the
+// mode requires a verification step (TLS handshake or manual owner acceptance)
+// and that step has not completed yet. Devices in this state get restricted
+// credentials until the owner (manual) or the device itself (TLS) verifies.
+func (o *OVModeExtension) NeedsVerification() bool {
+	if o == nil {
+		return false
+	}
+	if !o.Mode.IsTLS() && !o.Mode.IsManual() {
+		return false
+	}
+	return o.Status != Completed && o.Status != ValidationNotNeeded
+}
+
 type OVModeExtension struct {
 	// Set the TokenID with own this
 	TokenID string `json:"-" bson:"token_id"`

@@ -19,6 +19,8 @@ package trailmodels
 import (
 	"time"
 
+	"gitlab.com/pantacor/pantahub-base/utils/models"
+
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -121,6 +123,9 @@ type TrailSummary struct {
 	FleetLocation    string    `json:"fleet-location" bson:"fleet_location"`
 	FleetRev         string    `json:"fleet-rev" bson:"fleet_rev"`
 	Owner            string    `json:"-" bson:"owner"`
+	// OVMode is filled by the API from the device document when the device
+	// still needs owner verification; it is not part of the summary stream.
+	OVMode *models.OVModeExtension `json:"ovmode,omitempty" bson:"-"`
 }
 
 // FillLastSeen falls back to Timestamp for summaries created before

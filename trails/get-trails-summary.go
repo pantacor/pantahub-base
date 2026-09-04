@@ -30,6 +30,7 @@ import (
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/models"
 	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/mgo.v2/bson"
@@ -124,5 +125,51 @@ func (a *App) handleGetTrailSummary(w rest.ResponseWriter, r *rest.Request) {
 		summaries = append(summaries, result)
 	}
 
+	a.attachPendingOwnership(ctx, owner, summaries)
+
 	w.WriteJson(summaries)
+}
+
+// attachPendingOwnership marks summaries of devices whose owner verification
+// is still pending, so the device list can offer to accept them. The summary
+// stream never carries ovmode, and only pending devices are looked up.
+func (a *App) attachPendingOwnership(ctx context.Context, owner interface{}, summaries []trailmodels.TrailSummary) {
+	if len(summaries) == 0 {
+		return
+	}
+	devicesCol := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
+	if devicesCol == nil {
+		return
+	}
+	cur, err := devicesCol.Find(ctx, bson.M{
+		"owner":         owner,
+		"garbage":       bson.M{"$ne": true},
+		"ovmode.mode":   bson.M{"$in": []string{models.TLSVerification.String(), models.ManualVerification.String()}},
+		"ovmode.status": bson.M{"$nin": []string{models.Completed.String(), models.ValidationNotNeeded.String()}},
+	}, options.Find().SetProjection(bson.M{"prn": 1, "ovmode": 1}))
+	if err != nil {
+		return
+	}
+	defer cur.Close(ctx)
+
+	pending := map[string]*models.OVModeExtension{}
+	for cur.Next(ctx) {
+		doc := struct {
+			Prn    string                  `bson:"prn"`
+			OVMode *models.OVModeExtension `bson:"ovmode"`
+		}{}
+		if err := cur.Decode(&doc); err != nil || doc.OVMode == nil {
+			continue
+		}
+		doc.OVMode.RootOfTrust = ""
+		pending[doc.Prn] = doc.OVMode
+	}
+	if len(pending) == 0 {
+		return
+	}
+	for i := range summaries {
+		if ov, ok := pending[summaries[i].Device]; ok {
+			summaries[i].OVMode = ov
+		}
+	}
 }
