@@ -4775,8 +4775,10 @@ paths:
       consumes:
       - application/json
       description: |-
-        Cancel a step that is in NEW state.
-        Only owner can cancel steps and only those steps still in NEW state.
+        Cancel a step that is in NEW, QUEUED or DOWNLOADING state.
+        Only owner can cancel steps and only those steps still in NEW, QUEUED or DOWNLOADING
+        state. The device acknowledges by reporting CANCEL itself; a device that keeps reporting
+        progress has not honored the request.
       parameters:
       - description: ID|NICK|PRN
         in: path
@@ -4809,7 +4811,7 @@ paths:
             $ref: '#/definitions/utils.RError'
       security:
       - ApiKeyAuth: []
-      summary: Cancel a step that is in NEW state.
+      summary: Cancel a step that is in NEW, QUEUED or DOWNLOADING state.
       tags:
       - trails
   /trails/{id}/steps/{rev}/meta:

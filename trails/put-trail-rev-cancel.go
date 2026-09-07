@@ -34,10 +34,12 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-// handlePutStepProgressCancel Cancel a step still in NEW state so device won't consume it.
-// @Summary Cancel a step that is in NEW state.
-// @Description Cancel a step that is in NEW state.
-// @Description Only owner can cancel steps and only those steps still in NEW state.
+// handlePutStepProgressCancel Cancel a step still in NEW, QUEUED or DOWNLOADING state.
+// @Summary Cancel a step that is in NEW, QUEUED or DOWNLOADING state.
+// @Description Cancel a step that is in NEW, QUEUED or DOWNLOADING state.
+// @Description Only owner can cancel steps and only those steps still in NEW, QUEUED or DOWNLOADING
+// @Description state. The device acknowledges by reporting CANCEL itself; a device that keeps reporting
+// @Description progress has not honored the request.
 // @Accept  json
 // @Produce  json
 // @Tags trails
@@ -79,7 +81,7 @@ func (a *App) handlePutStepProgressCancel(w rest.ResponseWriter, r *rest.Request
 	}
 
 	if authType != "USER" {
-		utils.RestErrorWrapper(w, "Only devices can update step status", http.StatusForbidden)
+		utils.RestErrorWrapper(w, "Only owners can cancel steps", http.StatusForbidden)
 		return
 	}
 
@@ -108,7 +110,7 @@ func (a *App) handlePutStepProgressCancel(w rest.ResponseWriter, r *rest.Request
 		bson.M{
 			"_id":             stepID,
 			"owner":           owner,
-			"progress.status": "NEW",
+			"progress.status": bson.M{"$in": []string{"NEW", "QUEUED", "DOWNLOADING"}},
 			"garbage":         bson.M{"$ne": true},
 		},
 		bson.M{"$set": bson.M{
@@ -124,7 +126,7 @@ func (a *App) handlePutStepProgressCancel(w rest.ResponseWriter, r *rest.Request
 	}
 
 	if updateResult.MatchedCount == 0 {
-		utils.RestErrorWrapper(w, "Error cancelling step. A step in state NEW was not found", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error cancelling step. A step in state NEW, QUEUED or DOWNLOADING was not found", http.StatusBadRequest)
 		return
 	}
 	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)

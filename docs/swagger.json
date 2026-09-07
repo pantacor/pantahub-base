@@ -5748,7 +5748,7 @@
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Cancel a step that is in NEW state.\nOnly owner can cancel steps and only those steps still in NEW state.",
+                "description": "Cancel a step that is in NEW, QUEUED or DOWNLOADING state.\nOnly owner can cancel steps and only those steps still in NEW, QUEUED or DOWNLOADING\nstate. The device acknowledges by reporting CANCEL itself; a device that keeps reporting\nprogress has not honored the request.",
                 "consumes": [
                     "application/json"
                 ],
@@ -5758,7 +5758,7 @@
                 "tags": [
                     "trails"
                 ],
-                "summary": "Cancel a step that is in NEW state.",
+                "summary": "Cancel a step that is in NEW, QUEUED or DOWNLOADING state.",
                 "parameters": [
                     {
                         "type": "string",
