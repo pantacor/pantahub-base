@@ -80,7 +80,7 @@ func (a *App) handlePutStepProgressCancel(w rest.ResponseWriter, r *rest.Request
 		return
 	}
 
-	if authType != "USER" {
+	if authType != "USER" && authType != "SESSION" {
 		utils.RestErrorWrapper(w, "Only owners can cancel steps", http.StatusForbidden)
 		return
 	}
