@@ -4775,10 +4775,11 @@ paths:
       consumes:
       - application/json
       description: |-
-        Cancel a step that is in NEW, QUEUED or DOWNLOADING state.
-        Only owner can cancel steps and only those steps still in NEW, QUEUED or DOWNLOADING
-        state. The device acknowledges by reporting CANCEL itself; a device that keeps reporting
-        progress has not honored the request.
+        Cancel a step that is in NEW, QUEUED, DOWNLOADING or INPROGRESS state.
+        Only owner can cancel steps and only those not finished yet. While QUEUED or
+        DOWNLOADING the device aborts the update and reports CANCEL itself; while INPROGRESS the
+        cancel only stops the device from retrying the step (the deprecated wontgo endpoint does the same).
+        A device that keeps reporting progress has not honored the request.
       parameters:
       - description: ID|NICK|PRN
         in: path
@@ -4811,7 +4812,7 @@ paths:
             $ref: '#/definitions/utils.RError'
       security:
       - ApiKeyAuth: []
-      summary: Cancel a step that is in NEW, QUEUED or DOWNLOADING state.
+      summary: Cancel a step that is in NEW, QUEUED, DOWNLOADING or INPROGRESS state.
       tags:
       - trails
   /trails/{id}/steps/{rev}/meta:
@@ -5202,7 +5203,7 @@ paths:
             $ref: '#/definitions/utils.RError'
       security:
       - ApiKeyAuth: []
-      summary: Mark as WONTGO a step still in INPROGRESS.
+      summary: Mark as WONTGO a step still in INPROGRESS. Deprecated: kept for existing devices, new tooling should use the cancel endpoint.
       tags:
       - trails
   /trails/{id}/summary:

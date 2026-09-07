@@ -5764,7 +5764,7 @@ var doc = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Cancel a step that is in NEW, QUEUED or DOWNLOADING state.\nOnly owner can cancel steps and only those steps still in NEW, QUEUED or DOWNLOADING\nstate. The device acknowledges by reporting CANCEL itself; a device that keeps reporting\nprogress has not honored the request.",
+                "description": "Cancel a step that is in NEW, QUEUED, DOWNLOADING or INPROGRESS state.\nOnly owner can cancel steps and only those not finished yet. While QUEUED or\nDOWNLOADING the device aborts the update and reports CANCEL itself; while INPROGRESS the\ncancel only stops the device from retrying the step (the deprecated wontgo endpoint does the same).\nA device that keeps reporting progress has not honored the request.",
                 "consumes": [
                     "application/json"
                 ],
@@ -5774,7 +5774,7 @@ var doc = `{
                 "tags": [
                     "trails"
                 ],
-                "summary": "Cancel a step that is in NEW, QUEUED or DOWNLOADING state.",
+                "summary": "Cancel a step that is in NEW, QUEUED, DOWNLOADING or INPROGRESS state.",
                 "parameters": [
                     {
                         "type": "string",
@@ -6364,7 +6364,7 @@ var doc = `{
                 "tags": [
                     "trails"
                 ],
-                "summary": "Mark as WONTGO a step still in INPROGRESS.",
+                "summary": "Mark as WONTGO a step still in INPROGRESS. Deprecated: kept for existing devices, new tooling should use the cancel endpoint.",
                 "parameters": [
                     {
                         "type": "string",

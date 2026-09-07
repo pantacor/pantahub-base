@@ -34,12 +34,13 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-// handlePutStepProgressCancel Cancel a step still in NEW, QUEUED or DOWNLOADING state.
-// @Summary Cancel a step that is in NEW, QUEUED or DOWNLOADING state.
-// @Description Cancel a step that is in NEW, QUEUED or DOWNLOADING state.
-// @Description Only owner can cancel steps and only those steps still in NEW, QUEUED or DOWNLOADING
-// @Description state. The device acknowledges by reporting CANCEL itself; a device that keeps reporting
-// @Description progress has not honored the request.
+// handlePutStepProgressCancel Cancel a step that has not finished yet.
+// @Summary Cancel a step that is in NEW, QUEUED, DOWNLOADING or INPROGRESS state.
+// @Description Cancel a step that is in NEW, QUEUED, DOWNLOADING or INPROGRESS state.
+// @Description Only owner can cancel steps and only those not finished yet. While QUEUED or
+// @Description DOWNLOADING the device aborts the update and reports CANCEL itself; while INPROGRESS the
+// @Description cancel only stops the device from retrying the step (the deprecated wontgo endpoint does the same).
+// @Description A device that keeps reporting progress has not honored the request.
 // @Accept  json
 // @Produce  json
 // @Tags trails
@@ -110,7 +111,7 @@ func (a *App) handlePutStepProgressCancel(w rest.ResponseWriter, r *rest.Request
 		bson.M{
 			"_id":             stepID,
 			"owner":           owner,
-			"progress.status": bson.M{"$in": []string{"NEW", "QUEUED", "DOWNLOADING"}},
+			"progress.status": bson.M{"$in": []string{"NEW", "QUEUED", "DOWNLOADING", "INPROGRESS"}},
 			"garbage":         bson.M{"$ne": true},
 		},
 		bson.M{"$set": bson.M{
@@ -126,7 +127,7 @@ func (a *App) handlePutStepProgressCancel(w rest.ResponseWriter, r *rest.Request
 	}
 
 	if updateResult.MatchedCount == 0 {
-		utils.RestErrorWrapper(w, "Error cancelling step. A step in state NEW, QUEUED or DOWNLOADING was not found", http.StatusBadRequest)
+		utils.RestErrorWrapper(w, "Error cancelling step. A step in state NEW, QUEUED, DOWNLOADING or INPROGRESS was not found", http.StatusBadRequest)
 		return
 	}
 	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
@@ -158,7 +159,7 @@ func (a *App) handlePutStepProgressCancel(w rest.ResponseWriter, r *rest.Request
 }
 
 // handlePutStepProgressWontgo Mark as WONTGO a step still in INPROGRESS.
-// @Summary  Mark as WONTGO a step still in INPROGRESS.
+// @Summary  Mark as WONTGO a step still in INPROGRESS. Deprecated: kept for existing devices, new tooling should use the cancel endpoint.
 // @Description  Mark as WONTGO a step still in INPROGRESS.
 // @Description  Mark as WONTGO a step still in INPROGRESS.
 // @Accept  json
