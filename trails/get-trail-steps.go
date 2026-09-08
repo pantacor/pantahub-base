@@ -145,8 +145,12 @@ func (a *App) handleGetSteps(w rest.ResponseWriter, r *rest.Request) {
 		query[key] = value
 	}
 
-	if asp.Fields != nil {
+	if len(asp.Fields) > 0 {
 		findOptions.Projection = querymongo.MergeDefaultProjection(asp.Fields)
+	} else {
+		// the progress log is per-step detail; keep list payloads flat unless
+		// the caller asks for it explicitly through ?fields=
+		findOptions.Projection = bson.M{trailmodels.ProgressLogField: 0}
 	}
 
 	querymongo.SetMongoPagination(query, sort, asp.Pagination, findOptions)

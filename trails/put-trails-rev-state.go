@@ -112,6 +112,13 @@ func (a *App) handlePutStepState(w rest.ResponseWriter, r *rest.Request) {
 	step.StepTime = time.Now()
 	step.ProgressTime = time.Unix(0, 0)
 	step.ID = trailID + "-" + rev
+	step.ProgressLog = trailmodels.AppendProgressLog(step.ProgressLog, trailmodels.ProgressLogEntry{
+		Time:      step.StepTime,
+		Source:    trailmodels.ProgressLogSourceOwner,
+		Status:    step.StepProgress.Status,
+		Progress:  step.StepProgress.Progress,
+		StatusMsg: "state replaced",
+	})
 
 	autoLink := true
 	autolinkValue, ok := r.URL.Query()["autolink"]

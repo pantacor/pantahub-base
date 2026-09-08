@@ -190,6 +190,12 @@ func (a *App) handlePostStep(w rest.ResponseWriter, r *rest.Request) {
 	}
 	newStep.TrailID = trail.ID
 	now := time.Now()
+	newStep.ProgressLog = []trailmodels.ProgressLogEntry{{
+		Time:      now,
+		Source:    trailmodels.ProgressLogSourceOwner,
+		Status:    newStep.StepProgress.Status,
+		StatusMsg: "step created",
+	}}
 	newStep.StepTime = now
 	newStep.ProgressTime = time.Unix(0, 0)
 	newStep.TimeCreated = now

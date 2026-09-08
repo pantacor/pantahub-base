@@ -30,8 +30,8 @@ import (
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"gopkg.in/mgo.v2/bson"
 )
 
 // handlePutStepProgress Post Step Progress information for a step.
@@ -58,6 +58,7 @@ func (a *App) handlePutStepProgress(w rest.ResponseWriter, r *rest.Request) {
 		utils.RestErrorWrapper(w, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
 		return
 	}
+	trailmodels.SanitizeStepProgress(&stepProgress)
 	trailID := r.PathParam("id")
 	stepID := trailID + "-" + r.PathParam("rev")
 
@@ -112,12 +113,13 @@ func (a *App) handlePutStepProgress(w rest.ResponseWriter, r *rest.Request) {
 			"device":  owner,
 			"garbage": bson.M{"$ne": true},
 		},
-		bson.M{"$set": bson.M{
-			"progress":      stepProgress,
+		// pipeline update: stores the report and appends a progress-log line
+		// (capped, deduplicated) in the same atomic write
+		trailmodels.ProgressUpdatePipeline(stepProgress, trailmodels.ProgressLogSourceDevice, progressTime, bson.M{
 			"progress-time": progressTime,
 			"timemodified":  time.Now(),
 			"ispublic":      isDevicePublic,
-		}},
+		}),
 	)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Cannot update step progress "+err.Error(), http.StatusForbidden)

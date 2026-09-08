@@ -328,9 +328,10 @@ func (h *bridgeHook) runJob(job bridgeJob) {
 	}
 }
 
-// putStepProgress mirrors trails.handlePutStepProgress: a blind $set of the
-// reported progress on the step document owned by the calling device, followed
-// by a best-effort bump of the trail's last-touched.
+// putStepProgress mirrors trails.handlePutStepProgress: the reported progress
+// replaces the one on the step document owned by the calling device (with a
+// capped progress-log line appended in the same write), followed by a
+// best-effort bump of the trail's last-touched.
 func (h *bridgeHook) putStepProgress(parentCtx context.Context, deviceObjectID primitive.ObjectID, rev int, progress trailmodels.StepProgress) error {
 	device := devices.Device{}
 	if err := h.devices.FindDeviceByID(parentCtx, deviceObjectID, &device); err != nil {
@@ -340,6 +341,7 @@ func (h *bridgeHook) putStepProgress(parentCtx context.Context, deviceObjectID p
 	trailID := deviceObjectID.Hex()
 	stepID := trailID + "-" + strconv.Itoa(rev)
 	progressTime := time.Now()
+	trailmodels.SanitizeStepProgress(&progress)
 
 	ctx, cancel := context.WithTimeout(parentCtx, bridgeWriteTimeout)
 	defer cancel()
@@ -352,12 +354,11 @@ func (h *bridgeHook) putStepProgress(parentCtx context.Context, deviceObjectID p
 			"device":  device.Prn,
 			"garbage": bson.M{"$ne": true},
 		},
-		bson.M{"$set": bson.M{
-			"progress":      progress,
+		trailmodels.ProgressUpdatePipeline(progress, trailmodels.ProgressLogSourceDevice, progressTime, bson.M{
 			"progress-time": progressTime,
 			"timemodified":  time.Now(),
 			"ispublic":      device.IsPublic,
-		}},
+		}),
 	)
 	if err != nil {
 		return fmt.Errorf("cannot update step progress: %w", err)

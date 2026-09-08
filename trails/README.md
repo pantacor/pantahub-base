@@ -254,3 +254,27 @@ X-Runtime: 0.002949
 }
 ```
 
+## Step progress log
+
+Every step carries a `progress-log`: a capped history of its progress
+changes, kept on the step document next to `progress`. A line is appended
+whenever the step is created, its state is replaced while still `NEW`, the
+device reports a change of status, progress number, status message or retry
+count, or a download crosses another 10% of its total size. Cancel and
+wontgo requested by the owner are logged with `"source": "owner"`.
+
+The log is hard-capped to the newest 200 entries by the database on every
+write, status messages are cut to 256 bytes and the free-text `progress.logs`
+a device may attach is cut to 64 KiB, so a step never grows without bound.
+
+`GET /trails/{id}/steps/{rev}` returns the log; `GET /trails/{id}/steps`
+leaves it out unless requested with `?fields=progress-log`.
+
+```json
+"progress-log": [
+    {"time": "2026-09-08T12:00:00Z", "source": "owner",  "status": "NEW",         "progress": 0,   "status-msg": "step created"},
+    {"time": "2026-09-08T12:00:06Z", "source": "device", "status": "QUEUED",      "progress": 0,   "status-msg": "Retrieving update"},
+    {"time": "2026-09-08T12:00:12Z", "source": "device", "status": "DOWNLOADING", "progress": 10,  "status-msg": "Downloading", "downloaded": 1048576, "total-size": 10485760},
+    {"time": "2026-09-08T12:01:30Z", "source": "device", "status": "DONE",        "progress": 100, "status-msg": "Update installed"}
+]
+```

@@ -62,6 +62,7 @@ type Step struct {
 	State               map[string]interface{} `json:"state"` // json blurb
 	StateSha            string                 `json:"state-sha" bson:"statesha"`
 	StepProgress        StepProgress           `json:"progress" bson:"progress"`
+	ProgressLog         []ProgressLogEntry     `json:"progress-log,omitempty" bson:"progress-log"` // capped history of progress changes, see progresslog.go
 	StepTime            time.Time              `json:"step-time" bson:"step-time"`
 	ProgressTime        time.Time              `json:"progress-time" bson:"progress-time"`
 	Meta                map[string]interface{} `json:"meta"` // json blurb
@@ -80,7 +81,7 @@ type StepProgress struct {
 	StatusMsg string           `json:"status-msg" bson:"statusmsg"` // message of progress status
 	Data      interface{}      `json:"data,omitempty" bson:"data"`  // data field that can hold things the device wants to remember
 	Status    string           `json:"status"`                      // status code
-	Logs      string           `json:"logs"`                        // log if available
+	Logs      string           `json:"logs"`                        // log if available (truncated to ProgressLogsFieldMax on write)
 	Retries   int              `json:"retries" bson:"retries"`      // number of retries attempted
 }
 

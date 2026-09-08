@@ -160,7 +160,7 @@ func GetMongoPaginationFromQuery(querystring url.Values) bson.M {
 // GetMongoFieldsFromQuery get mongo fields from query
 func GetMongoFieldsFromQuery(querystring url.Values) bson.M {
 	selectionFields := bson.M{}
-	re := regexp.MustCompile(`([+-])(.*)`)
+	re := regexp.MustCompile(`^([+-])(.*)$`)
 
 	for key, value := range querystring {
 		if value == nil {

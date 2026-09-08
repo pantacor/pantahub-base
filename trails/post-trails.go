@@ -129,6 +129,13 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 	newStep.StepTime = now // XXX this should be factory time not now
 	newStep.ProgressTime = now
 	newStep.StepProgress.Status = "DONE"
+	newStep.ProgressLog = []trailmodels.ProgressLogEntry{{
+		Time:      now,
+		Source:    trailmodels.ProgressLogSourceHub,
+		Status:    newStep.StepProgress.Status,
+		Progress:  100,
+		StatusMsg: "factory state",
+	}}
 	newStep.Meta = map[string]interface{}{}
 	newStep.TimeCreated = now
 	newStep.TimeModified = now

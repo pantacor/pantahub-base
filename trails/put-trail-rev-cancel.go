@@ -30,8 +30,8 @@ import (
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"gopkg.in/mgo.v2/bson"
 )
 
 // handlePutStepProgressCancel Cancel a step that has not finished yet.
@@ -114,12 +114,11 @@ func (a *App) handlePutStepProgressCancel(w rest.ResponseWriter, r *rest.Request
 			"progress.status": bson.M{"$in": []string{"NEW", "QUEUED", "DOWNLOADING", "INPROGRESS"}},
 			"garbage":         bson.M{"$ne": true},
 		},
-		bson.M{"$set": bson.M{
-			"progress":      stepProgress,
+		trailmodels.ProgressUpdatePipeline(stepProgress, trailmodels.ProgressLogSourceOwner, progressTime, bson.M{
 			"progress-time": progressTime,
 			"timemodified":  time.Now(),
 			"ispublic":      isDevicePublic,
-		}},
+		}),
 	)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Cannot canel step "+err.Error(), http.StatusForbidden)
@@ -235,12 +234,11 @@ func (a *App) handlePutStepProgressWontgo(w rest.ResponseWriter, r *rest.Request
 			"progress.status": "INPROGRESS",
 			"garbage":         bson.M{"$ne": true},
 		},
-		bson.M{"$set": bson.M{
-			"progress":      stepProgress,
+		trailmodels.ProgressUpdatePipeline(stepProgress, trailmodels.ProgressLogSourceOwner, progressTime, bson.M{
 			"progress-time": progressTime,
 			"timemodified":  time.Now(),
 			"ispublic":      isDevicePublic,
-		}},
+		}),
 	)
 	if err != nil {
 		utils.RestErrorWrapper(w, "Cannot canel step "+err.Error(), http.StatusForbidden)
