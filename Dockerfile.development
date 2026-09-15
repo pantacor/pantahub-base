@@ -1,4 +1,7 @@
-FROM golang:1.26-alpine
+# Pinned to an exact patch and kept identical to Dockerfile.security-scan, so
+# the security scan runs against the same standard library that ships. Bump all
+# three together.
+FROM golang:1.26.8-alpine
 
 ENV GO111MODULE=on
 

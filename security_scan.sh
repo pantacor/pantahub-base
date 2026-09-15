@@ -2,12 +2,12 @@
 # Run the Go vulnerability and static security scans.
 set -eu
 
-# Pinned, not @latest: the CI image is pinned to a Go release, but @latest
-# follows upstream, so a tool release that raises its own Go requirement breaks
-# this job on a day nobody touched the repo. govulncheck v1.8.0 did exactly
-# that -- it needs Go >= 1.26 against a golang:1.25.13 image. Bump these
-# together with the image.
-GOVULNCHECK_VERSION="${GOVULNCHECK_VERSION:-v1.7.0}"
+# Pinned, not @latest: @latest follows upstream, so a tool release that raises
+# its own Go requirement breaks this scan on a day nobody touched the repo --
+# govulncheck v1.8.0 needs Go >= 1.26 and did exactly that while the scan still
+# ran on 1.25. These belong to the Go release in Dockerfile.security-scan; bump
+# them together with it.
+GOVULNCHECK_VERSION="${GOVULNCHECK_VERSION:-v1.8.0}"
 GOSEC_VERSION="${GOSEC_VERSION:-v2.29.0}"
 
 go install "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}"

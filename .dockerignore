@@ -1,2 +1,10 @@
 .git
 .data
+
+# Build and scan artifacts. These are gitignored, so CI never sees them, but a
+# local build would otherwise bake a stale binary and a stale SAST report into
+# the image -- the binary is rebuilt by the builder stage anyway.
+pantahub-base
+pantahub-base.exe
+gosec.sarif
+govulncheck.out

@@ -7,11 +7,18 @@ image: docker:27.3.1-cli # Use a modern client
 
 security-scan:
     stage: security
-    image: golang:1.25.13
-    services: []
+    # Builds and runs Dockerfile.security-scan instead of naming a golang image
+    # here, so the Go release used by the scan is defined in one place and
+    # cannot drift from the one the application is built with. It also makes
+    # security_check.sh an exact local reproduction of this job.
     script:
-        - touch gosec.sarif
-        - ./security_scan.sh
+        - docker build -f Dockerfile.security-scan -t pantahub-base-security-scan .
+        - scan_status=0
+        - docker create --name security-scan-run pantahub-base-security-scan
+        - docker start --attach security-scan-run || scan_status=$?
+        # Keep the SAST artifact uploadable whether or not the scan passed.
+        - docker cp security-scan-run:/src/gosec.sarif gosec.sarif || touch gosec.sarif
+        - exit "$scan_status"
     artifacts:
         reports:
             sast: gosec.sarif
