@@ -37,7 +37,7 @@ go install "github.com/securego/gosec/v2/cmd/gosec@${GOSEC_VERSION}"
 # The report is written before the exit status is acted on, so a failing scan
 # still leaves an artifact to read.
 set +e
-gosec -fmt sarif -out gosec.sarif ./... >gosec.out 2>&1
+gosec -conf .gosec.json -fmt sarif -out gosec.sarif ./... >gosec.out 2>&1
 gosec_status=$?
 set -e
 cat gosec.out

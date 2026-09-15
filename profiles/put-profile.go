@@ -51,7 +51,7 @@ func (a *App) handlePostProfile(w rest.ResponseWriter, r *rest.Request) {
 
 	accountPrn := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"].(string)
 	content, _ := ioutil.ReadAll(r.Body)
-	r.Body.Close()
+	_ = r.Body.Close()
 
 	payload := &UpdateableProfile{}
 	err := json.Unmarshal(content, payload)

@@ -105,7 +105,7 @@ func (a *App) handleGetLogs(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	r.ParseForm()
+	_ = r.ParseForm()
 
 	startParam := r.FormValue("start")
 	pageParam := r.FormValue("page")

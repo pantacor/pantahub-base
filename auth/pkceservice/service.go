@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"log"
+	"sync/atomic"
 	"time"
 
 	"gitlab.com/pantacor/pantahub-base/auth/storage"
@@ -59,14 +61,37 @@ func CreatePKCEState(ctx context.Context, codeChallenge, codeChallengeMethod, re
 		return nil, err
 	}
 
+	sweepExpiredStates(pkceRepo)
+
+	return pks, nil
+}
+
+// expiredSweepRunning guards the cleanup goroutine below.
+var expiredSweepRunning atomic.Bool
+
+// sweepExpiredStates removes expired PKCE states in the background, with at
+// most one sweep in flight.
+//
+// Every call to CreatePKCEState used to spawn its own goroutine for this, so a
+// burst of device authorisations produced a burst of goroutines all issuing
+// the same delete, each holding a context alive for an hour. The work is
+// global rather than per-request, so one sweep at a time is enough and a
+// caller that finds one already running can simply move on.
+func sweepExpiredStates(pkceRepo *storage.PKCERepo) {
+	if !expiredSweepRunning.CompareAndSwap(false, true) {
+		return
+	}
+
 	go func() {
+		defer expiredSweepRunning.Store(false)
+
 		newCtx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
 		defer cancel()
 
-		pkceRepo.DeleteExpired(newCtx)
+		if err := pkceRepo.DeleteExpired(newCtx); err != nil {
+			log.Printf("WARNING: sweeping expired PKCE states failed: %v", err)
+		}
 	}()
-
-	return pks, nil
 }
 
 // GetPKCEState retrieves a PKCE state by its authorization code
@@ -220,5 +245,7 @@ func DeletePKCEState(ctx context.Context, authCode string) {
 	if err != nil {
 		return
 	}
-	pkceRepo.Delete(ctx, authCode)
+	if err := pkceRepo.Delete(ctx, authCode); err != nil {
+		log.Printf("WARNING: deleting PKCE state failed: %v", err)
+	}
 }

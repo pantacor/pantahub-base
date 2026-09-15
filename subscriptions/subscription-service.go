@@ -341,6 +341,8 @@ func NewService(
 	sub.admins = admins
 	sub.types = typeDefs
 
-	sub.ensureIndices()
+	if err := sub.ensureIndices(); err != nil {
+		log.Printf("WARNING: creating subscription indices failed: %v", err)
+	}
 	return sub
 }

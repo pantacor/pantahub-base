@@ -37,6 +37,8 @@ import (
 )
 
 // PantahubDevicesAutoTokenV1 device auto token name
+//
+// #nosec G101 -- the name of an HTTP header, not a token value
 const PantahubDevicesAutoTokenV1 = "Pantahub-Devices-Auto-Token-V1"
 const CreateIndexTimeout = 600 * time.Second
 

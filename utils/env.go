@@ -20,6 +20,18 @@ import (
 	"strings"
 )
 
+// Names of the environment variables the service reads. The value of each
+// constant is the variable's NAME, never its contents -- the contents are only
+// ever read at run time through GetEnv.
+//
+// gosec flags several of these as hardcoded credentials because the constant
+// is called something like EnvGithubOAuthClientSecret; what it is looking at
+// is the string "GITHUB_OAUTH_CLIENT_SECRET", which is a lookup key and not a
+// secret.
+//
+// #nosec G101 -- these are environment variable names, not credentials
+//
+//nolint:gosec // G101: env var names, not credentials
 const (
 	// EnvPantahubProductName Pantahub Product Name (branding)
 	EnvPantahubProductName = "PANTAHUB_PRODUCTNAME"
@@ -409,6 +421,11 @@ const (
 	EnvPantahubDisableWebhooks = "PANTAHUB_DISABLE_WEBHOOKS"
 )
 
+// Fallback values for the variables above. The entries gosec reads as
+// credentials are all the placeholder "YOU MUST CHANGE THIS", which exists
+// precisely so that an unconfigured deployment is obvious.
+//
+// #nosec G101 -- placeholder defaults, deliberately not usable secrets
 var defaultEnvs = map[string]string{
 	EnvPantahubProductName:                   "pantahub-personal",
 	EnvPantahubDemoAccountsPasswordService1:  "O9i8HlpSc",

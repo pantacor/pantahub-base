@@ -336,6 +336,7 @@ func generateStateOauthCookie(redirectURL string, w http.ResponseWriter) string 
 		return ""
 	}
 
+	//#nosec G124 -- Secure follows the deployment scheme (PANTAHUB_SCHEME)
 	http.SetCookie(w, &http.Cookie{
 		Name:     oauthCookie,
 		Value:    state,

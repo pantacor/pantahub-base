@@ -84,7 +84,7 @@ func (a *App) handleGetAccounts(w rest.ResponseWriter, r *rest.Request) {
 	var cur *mongo.Cursor
 
 	authInfo := utils.GetAuthInfo(r)
-	r.ParseForm()
+	_ = r.ParseForm()
 	asAdminMode := r.FormValue("asadmin")
 
 	if asAdminMode != "" && authInfo.Roles != "admin" {
@@ -441,7 +441,7 @@ func (a *App) handleVerify(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	r.ParseForm()
+	_ = r.ParseForm()
 	putID := r.FormValue("id")
 
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
@@ -497,7 +497,9 @@ func (a *App) handleVerify(w rest.ResponseWriter, r *rest.Request) {
 		urlPrefix += utils.GetEnv(utils.EnvPantahubPort)
 	}
 
-	utils.SendWelcome(newAccount.Email, newAccount.Nick, urlPrefix)
+	if err := utils.SendWelcome(newAccount.Email, newAccount.Nick, urlPrefix); err != nil {
+		log.Printf("WARNING: sending welcome mail to the new account failed: %v", err)
+	}
 
 	// always wipe secrets before sending over wire
 	newAccount.Password = ""

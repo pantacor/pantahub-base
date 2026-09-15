@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -198,7 +199,9 @@ func (a *App) HandleGetThirdPartyCallback(w rest.ResponseWriter, r *rest.Request
 					urlPrefix += ":"
 					urlPrefix += utils.GetEnv(utils.EnvPantahubPort)
 				}
-				utils.SendWelcome(account.Email, account.Nick, urlPrefix)
+				if err := utils.SendWelcome(account.Email, account.Nick, urlPrefix); err != nil {
+					log.Printf("WARNING: sending welcome mail to the new account failed: %v", err)
+				}
 			}
 		} else if connectedAccountsEnforced() {
 			processErr(w, r.Request, fmt.Errorf("OAuth provider is not connected to this account"), "This OAuth account is not connected; sign in with your password and connect it first", http.StatusForbidden, payload.RedirectTo)

@@ -37,7 +37,13 @@ func PantahubS3Path() string {
 	return basePath
 }
 
-// MakeLocalS3PathForName create a local S3 path for name
+// MakeLocalS3PathForName create a local S3 path for name.
+//
+// The returned path is always inside the storage base directory. Cleaning the
+// name on its own was not enough for that: path.Clean leaves a leading "..",
+// and filepath.Join then resolves it, so a name of "../../etc/passwd" used to
+// produce a path outside the base. Callers happen to pass server-issued
+// identifiers today, but containment is this function's job, not theirs.
 func MakeLocalS3PathForName(name string) (string, error) {
 	if filepath.Separator != '/' && strings.ContainsRune(name, filepath.Separator) ||
 		strings.Contains(name, "\x00") {
@@ -46,5 +52,17 @@ func MakeLocalS3PathForName(name string) (string, error) {
 
 	basePath := PantahubS3Path()
 
-	return filepath.Join(basePath, filepath.FromSlash(path.Clean(name))), nil
+	// Anchoring to "/" before cleaning drops any leading "..", the same way a
+	// static file server resolves a request path against its root.
+	anchored := path.Clean("/" + strings.ReplaceAll(name, "\\", "/"))
+	fullPath := filepath.Join(basePath, filepath.FromSlash(anchored))
+
+	// Belt and braces: confirm the result really is under the base, so a future
+	// change to the cleaning above cannot quietly reintroduce an escape.
+	relative, err := filepath.Rel(basePath, fullPath)
+	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return "", errors.New("http: file path escapes storage directory")
+	}
+
+	return fullPath, nil
 }

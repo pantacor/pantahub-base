@@ -112,7 +112,7 @@ func MigrateSecrets(ctx context.Context, col *mongo.Collection, batchSize int) (
 				Secret string      `bson:"secret"`
 			}
 			if err := cursor.Decode(&row); err != nil {
-				cursor.Close(ctx)
+				_ = cursor.Close(ctx)
 				return total, err
 			}
 			seen++
@@ -120,13 +120,13 @@ func MigrateSecrets(ctx context.Context, col *mongo.Collection, batchSize int) (
 				bson.M{"_id": row.ID, SecretPlainField: row.Secret, SecretHashField: bson.M{"$exists": false}},
 				bson.M{"$set": bson.M{SecretHashField: HashSecret(row.Secret)}})
 			if err != nil {
-				cursor.Close(ctx)
+				_ = cursor.Close(ctx)
 				return total, err
 			}
 			total += res.ModifiedCount
 		}
 		err = cursor.Err()
-		cursor.Close(ctx)
+		_ = cursor.Close(ctx)
 		if err != nil {
 			return total, err
 		}
@@ -164,13 +164,13 @@ func PurgeSecrets(ctx context.Context, col *mongo.Collection, batchSize int) (in
 				ID interface{} `bson:"_id"`
 			}
 			if err := cursor.Decode(&row); err != nil {
-				cursor.Close(ctx)
+				_ = cursor.Close(ctx)
 				return total, err
 			}
 			ids = append(ids, row.ID)
 		}
 		err = cursor.Err()
-		cursor.Close(ctx)
+		_ = cursor.Close(ctx)
 		if err != nil {
 			return total, err
 		}

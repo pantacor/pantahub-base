@@ -75,6 +75,7 @@ func New(jwtMiddleware *jwt.JWTMiddleware) *App {
 	}
 	u, err := url.Parse(backendStr)
 	if err != nil {
+		//#nosec G706 -- an operator-set env var, already quoted with %q
 		log.Fatalf("webhooks: invalid PANTAHUB_WEBHOOKS_BACKEND %q: %v", backendStr, err)
 	}
 	app.backend = u

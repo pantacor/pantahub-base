@@ -41,8 +41,9 @@ import (
 )
 
 const (
-	exchangeTokenRequiredErr    = "Exchange token is needed"
-	passwordIsNeededErr         = "New password is needed"
+	exchangeTokenRequiredErr = "Exchange token is needed"
+	passwordIsNeededErr      = "New password is needed"
+	//#nosec G101 -- an error message shown to the caller, not a token
 	tokenInvalidOrExpiredErr    = "Invalid or expired token"
 	emailRequiredForPasswordErr = "Email is required"
 	dbConnectionErr             = "Error with Database connectivity"
@@ -77,6 +78,7 @@ func demoAccountsEnabled(production string) bool {
 func init() {
 	production := os.Getenv("PANTAHUB_PRODUCTION")
 	if demoAccountsEnabled(production) {
+		//#nosec G706 -- PANTAHUB_PRODUCTION is set by the operator, not a caller
 		log.Println("PANTAHUB_PRODUCTION=" + production + ": development mode, built-in demo accounts enabled with default passwords")
 		return
 	}

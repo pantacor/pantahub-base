@@ -69,7 +69,7 @@ func (a *App) handleDisableTokens(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	r.ParseForm()
+	_ = r.ParseForm()
 	tokenID := r.PathParam("id")
 	tokenIDBson, err := primitive.ObjectIDFromHex(tokenID)
 	if err != nil {

@@ -1,6 +1,6 @@
 module gitlab.com/pantacor/pantahub-base
 
-go 1.25.0
+go 1.26.8
 
 require (
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751

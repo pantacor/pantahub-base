@@ -189,7 +189,7 @@ func (a *App) handlePatchDeviceData(w rest.ResponseWriter, r *rest.Request) {
 
 	data := map[string]interface{}{}
 	content, err := io.ReadAll(r.Body)
-	r.Body.Close()
+	_ = r.Body.Close()
 	if err != nil {
 		utils.RestErrorWrapper(w, "Error reading request device-meta body: "+err.Error(), http.StatusBadRequest)
 		return

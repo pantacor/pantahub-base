@@ -37,6 +37,8 @@ const (
 	HTTPHeaderPhClientCertificate = "Pantahub-TLS-Client-Cert"
 
 	// HTTPHeaderPhProxyTLSToken pantahub proxy token
+	//
+	//#nosec G101 -- the name of an HTTP header, not a token value
 	HTTPHeaderPhProxyTLSToken = "Pantahub-TLS-Proxy-Token"
 )
 

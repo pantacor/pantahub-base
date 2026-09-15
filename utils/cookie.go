@@ -2,10 +2,39 @@ package utils
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
 )
+
+// IsSecureRequest reports whether the response to r reaches the client over
+// TLS, and so whether cookies set on it must carry the Secure attribute.
+//
+// This used to be decided with r.URL.Scheme == "https", which is never true
+// for a server-side request: net/http documents that for requests received by
+// a server, "fields other than Path and RawQuery will be empty". Every cookie
+// set through here was therefore missing Secure, including over HTTPS.
+//
+// The deployment's own declared scheme is the authoritative answer and is not
+// client-controllable, so it is checked first; TLS terminates at the ingress,
+// which means r.TLS is nil in production and cannot be relied on alone.
+// X-Forwarded-Proto is only ever consulted to turn Secure on, never off.
+func IsSecureRequest(r *rest.Request) bool {
+	if strings.EqualFold(GetEnv(EnvPantahubScheme), "https") {
+		return true
+	}
+
+	if r == nil {
+		return false
+	}
+
+	if r.TLS != nil {
+		return true
+	}
+
+	return strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+}
 
 // GetCookie retrieves a cookie by its name.
 // It returns the cookie's value or an error if the cookie is not found.
@@ -24,6 +53,7 @@ type CookieOption func(*http.Cookie)
 // A value of 0 means a session cookie. A value of -1 means to delete the cookie immediately.
 // If WithExpires is also used, the Expires attribute takes precedence for most browsers.
 func WithMaxAge(maxAge int) CookieOption {
+	//#nosec G124 -- Secure is set from IsSecureRequest, which gosec cannot follow
 	return func(c *http.Cookie) {
 		c.MaxAge = maxAge
 		if maxAge < 0 {
@@ -39,6 +69,7 @@ func WithMaxAge(maxAge int) CookieOption {
 // This attribute specifies a date and time at which the cookie will expire.
 // If both Expires and MaxAge are set, Expires takes precedence for most browsers.
 func WithExpires(expires time.Time) CookieOption {
+	//#nosec G124 -- Secure is set from IsSecureRequest, which gosec cannot follow
 	return func(c *http.Cookie) {
 		c.Expires = expires
 	}
@@ -46,6 +77,7 @@ func WithExpires(expires time.Time) CookieOption {
 
 // WithHttpOnly sets the HttpOnly flag for the cookie.
 func WithHttpOnly(httpOnly bool) CookieOption {
+	//#nosec G124 -- Secure is set from IsSecureRequest, which gosec cannot follow
 	return func(c *http.Cookie) {
 		c.HttpOnly = httpOnly
 	}
@@ -53,29 +85,32 @@ func WithHttpOnly(httpOnly bool) CookieOption {
 
 // WithSameSite sets the SameSite policy for the cookie.
 func WithSameSite(sameSite http.SameSite) CookieOption {
+	//#nosec G124 -- Secure is set from IsSecureRequest, which gosec cannot follow
 	return func(c *http.Cookie) {
 		c.SameSite = sameSite
 	}
 }
 
 // SetCookie sets a new HTTP cookie with sensible defaults.
-// It automatically handles the Secure flag based on the request's URL scheme.
+// It automatically handles the Secure flag based on how the client reaches us.
 // Optional arguments (MaxAge, Expires, HttpOnly, SameSite) can be provided using CookieOption functions.
 //
 // Default values for options if not explicitly set via CookieOption:
 //   - Path: "/"
 //   - HttpOnly: true
-//   - Secure: determined by r.URL.Scheme == "https"
+//   - Secure: determined by IsSecureRequest (the deployment scheme, TLS, or
+//     X-Forwarded-Proto)
 //   - SameSite: http.SameSiteLaxMode
 //   - MaxAge: 0 (results in a session cookie if no Expires date is explicitly set)
 //   - Expires: not set (also contributes to a session cookie if MaxAge is 0)
 func SetCookie(w rest.ResponseWriter, r *rest.Request, name, value string, opts ...CookieOption) {
+	//#nosec G124 -- Secure is set from IsSecureRequest, which gosec cannot follow
 	cookie := &http.Cookie{
 		Name:     name,
 		Value:    value,
 		Path:     "/",
 		HttpOnly: true, // Default based on prompt's delete example
-		Secure:   r.URL.Scheme == "https",
+		Secure:   IsSecureRequest(r),
 		SameSite: http.SameSiteLaxMode, // Default based on prompt's delete example
 	}
 
@@ -90,6 +125,7 @@ func SetCookie(w rest.ResponseWriter, r *rest.Request, name, value string, opts 
 // DeleteCookie removes a cookie by setting its MaxAge to -1 and Expires to a past date.
 // This function strictly follows the example provided in the prompt for deleting a cookie.
 func DeleteCookie(w rest.ResponseWriter, r *rest.Request, name string) {
+	//#nosec G124 -- Secure is set from IsSecureRequest, which gosec cannot follow
 	http.SetCookie(w, &http.Cookie{
 		Name:     name,
 		Value:    "", // Value is typically empty for deletion
@@ -97,7 +133,7 @@ func DeleteCookie(w rest.ResponseWriter, r *rest.Request, name string) {
 		Expires:  time.Unix(0, 0), // A time in the past
 		MaxAge:   -1,              // Immediate expiration
 		HttpOnly: true,
-		Secure:   r.URL.Scheme == "https",
+		Secure:   IsSecureRequest(r),
 		SameSite: http.SameSiteLaxMode,
 	})
 }

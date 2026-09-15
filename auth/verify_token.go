@@ -60,5 +60,5 @@ func (a *App) verifyToken(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	response := []byte("ok")
-	w.Write(response)
+	_, _ = w.Write(response)
 }

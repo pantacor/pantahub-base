@@ -144,11 +144,16 @@ func (a *App) noOvm(w rest.ResponseWriter, r *rest.Request, ctx context.Context,
 		}
 
 		if device.OwnershipUnverify {
-			collection.UpdateOne(
+			// Reporting the new ownership state to the caller while the write
+			// that persists it silently failed would leave the two disagreeing.
+			if _, err := collection.UpdateOne(
 				ctx,
 				bson.M{"prn": device.Prn},
 				bson.M{"$set": bson.M{"ovmode": device.OVMode}},
-			)
+			); err != nil {
+				utils.RestErrorWrapper(w, "Error updating device ownership mode: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
 		}
 		w.WriteJson(device.OVMode)
 		return

@@ -32,6 +32,8 @@ import (
 
 const (
 	// WebauthnCredentialsCollection one doc per registered authenticator
+	//
+	//#nosec G101 -- a mongo collection name, not a credential
 	WebauthnCredentialsCollection = "pantahub_webauthn_credentials"
 
 	// WebauthnSessionsCollection short-lived WebAuthn ceremony state

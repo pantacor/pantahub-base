@@ -73,7 +73,7 @@ func (a *App) handleGetLogsCursor(w rest.ResponseWriter, r *rest.Request) {
 	}
 	// if body doesnt have the cursor lets try query
 	if nextCursorJWT == "" {
-		r.ParseForm()
+		_ = r.ParseForm()
 		nextCursorJWT = r.FormValue("next-cursor")
 	}
 

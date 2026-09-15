@@ -21,13 +21,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"gitlab.com/pantacor/pantahub-base/utils"
 	"io"
-	"math/rand"
 	"net/http"
 	"regexp"
 
 	"github.com/ant0ine/go-json-rest/rest"
-	"gitlab.com/pantacor/pantahub-base/utils"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
@@ -103,7 +102,7 @@ func GoogleCb(ctx context.Context, config *oauth2.Config, code string) (payload 
 	nick := fmt.Sprintf(
 		"%s%d",
 		re.ReplaceAllString(googlePayload.Email, ""),
-		rand.Intn(100),
+		utils.RandIntn(100),
 	)
 	return &ResponsePayload{
 		Email:      googlePayload.Email,

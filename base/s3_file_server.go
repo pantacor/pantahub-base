@@ -25,6 +25,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -137,7 +138,15 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// downloads can be resumed by the client after a network disruption
 		rangeHeader := r.Header.Get("Range")
 
+		// The url is always one this service just minted: every caller passes a
+		// presigned URL from provider.DownloadURL, whose host and scheme come
+		// from the configured S3 endpoint. The only caller-influenced part is
+		// the object key, which arrives in a claim of a token this service
+		// signed, is narrowed by MakeLocalS3PathForName and then reduced to a
+		// single path segment by path.Base -- so the request cannot be aimed
+		// at an arbitrary host.
 		requestObject := func(url string) (*http.Response, error) {
+			//#nosec G704 -- presigned URL from the configured S3 endpoint, host not caller-controlled
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 			if err != nil {
 				return nil, err
@@ -145,6 +154,7 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if rangeHeader != "" {
 				req.Header.Set("Range", rangeHeader)
 			}
+			//#nosec G704 -- see above: the URL is server-generated
 			return http.DefaultClient.Do(req)
 		}
 
@@ -193,7 +203,7 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				} else {
 					msg := fmt.Sprintf("ERROR: unexpected response from s3 server, status code %v\n", s3resp.StatusCode)
 					utils.LogError(msg, downloadUrl, s3resp.StatusCode)
-					s3resp.Body.Close()
+					_ = s3resp.Body.Close()
 				}
 			}
 		}
@@ -201,7 +211,7 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if s3resp.StatusCode != http.StatusOK && s3resp.StatusCode != http.StatusPartialContent {
 			msg := fmt.Sprintf("ERROR: unexpected response from s3 server, status code %v\ndownloadUrl: %s\n", s3resp.StatusCode, downloadUrl)
 			utils.HttpErrorWrapper(w, msg, s3resp.StatusCode)
-			s3resp.Body.Close()
+			_ = s3resp.Body.Close()
 			return
 		}
 		defer s3resp.Body.Close()
@@ -224,7 +234,11 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusPartialContent)
 		}
 
-		io.Copy(w, s3resp.Body)
+		// The response is already committed, so a short copy cannot be turned
+		// into an error status; log it so a truncated download is visible.
+		if _, err := io.Copy(w, s3resp.Body); err != nil {
+			log.Printf("WARNING: streaming object to client failed: %v", err)
+		}
 		return
 	}
 
