@@ -45,6 +45,10 @@ import (
 
 const defaultTimeoutSec = 30
 
+// sortTieBreaker makes the sort order total. See buildSearchSource for why it
+// is the ObjectID's keyword subfield and not the tsec/tnano event clock.
+const sortTieBreaker = "id.keyword"
+
 type elasticLogEntry struct {
 	*Entry
 
@@ -286,18 +290,32 @@ func buildSearchSource(start int64, page int64, before *time.Time, after *time.T
 		searchS = searchS.Sort(v, asc)
 	}
 
-	// The sort tuple has to be (near-)unique. `time-created` is a
-	// millisecond-precision date, so one device batch lands many entries on
-	// the same value; ordering between them is then decided per shard and is
-	// not stable between two requests. That breaks search_after -- it cannot
-	// tell where the previous page ended -- and it used to silently drop every
-	// entry sharing the boundary millisecond when the caller paged with an
-	// exclusive before/after bound instead. tsec/tnano hold the full
-	// nanosecond event clock, so appending them makes the order total.
-	for _, tieBreaker := range []string{"tsec", "tnano"} {
-		if !sorted[tieBreaker] {
-			searchS = searchS.Sort(tieBreaker, primaryAsc)
-		}
+	// The sort tuple has to be unique. `time-created` is a millisecond-
+	// precision date, so one device batch lands many entries on the same
+	// value; ordering between them is then decided per shard and is not stable
+	// between two requests. That breaks search_after -- it cannot tell where
+	// the previous page ended -- and it silently drops every entry sharing the
+	// boundary millisecond when the caller pages with an exclusive
+	// before/after bound instead.
+	//
+	// `id` is the per-entry ObjectID, set unconditionally on ingest, and it is
+	// the only unique field actually present in every index. tsec/tnano look
+	// like the natural choice but are tagged omitempty and are absent from
+	// most documents, so sorting on them throws
+	// "No mapping found for [tsec] in order to sort on" -- and because the
+	// search spans an index wildcard, that surfaces as a 200 with partially
+	// failed shards, i.e. entries silently missing from every index that
+	// lacks the field. unmapped_type keeps that from ever happening again.
+	//
+	// Note this relies on `id` keeping its dynamic text+keyword mapping; it
+	// must not be pinned to `keyword` in the template, or the `.keyword`
+	// subfield would stop existing on new indices.
+	if !sorted[sortTieBreaker] {
+		searchS = searchS.SortBy(
+			elastic.NewFieldSort(sortTieBreaker).
+				Order(primaryAsc).
+				UnmappedType("keyword"),
+		)
 	}
 
 	return searchS.Source()
@@ -674,24 +692,21 @@ func newElasticLogger() (*elasticLogger, error) {
 				"dev": bson.M{
 					"type": "keyword",
 				},
-				// These four are what queries actually filter and sort on, yet
-				// they had no mapping at all and relied on dynamic detection
-				// from whatever the first document of each daily index looked
-				// like. Pinning them keeps sorting well-defined (a `msg`-like
-				// text mapping would make `sort=time-created` fail outright)
-				// and consistent across indices.
+				// The field queries sort on. It had no mapping and relied on
+				// dynamic date detection from whichever document happened to
+				// create each daily index; existing indices all resolved to
+				// `date`, and pinning that keeps a stray document from ever
+				// making it `text`, which would fail the sort outright.
+				//
+				// Deliberately not pinned here: `id`, which must keep its
+				// dynamic text+keyword mapping so the `id.keyword` sort
+				// tiebreaker keeps existing, and `rev`, which existing indices
+				// map as text+keyword -- pinning it to keyword would diverge
+				// the type across indices for no gain, as the filter uses
+				// match_phrase either way.
 				"time-created": bson.M{
 					"type":   "date",
 					"format": "strict_date_optional_time||epoch_millis",
-				},
-				"tsec": bson.M{
-					"type": "long",
-				},
-				"tnano": bson.M{
-					"type": "long",
-				},
-				"rev": bson.M{
-					"type": "keyword",
 				},
 			},
 		},

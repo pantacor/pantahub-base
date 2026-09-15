@@ -18,6 +18,7 @@ package logs
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 )
@@ -93,7 +94,7 @@ func TestBuildSearchSourceDefaultsToNewestFirst(t *testing.T) {
 // entries on one value. Without a tiebreaker their relative order is decided
 // per shard and is not reproducible, which makes search_after unable to tell
 // where a page ended.
-func TestBuildSearchSourceAlwaysAppendsTieBreakers(t *testing.T) {
+func TestBuildSearchSourceAlwaysAppendsTieBreaker(t *testing.T) {
 	for _, sort := range []Sorts{
 		{},
 		{"time-created"},
@@ -108,37 +109,72 @@ func TestBuildSearchSourceAlwaysAppendsTieBreakers(t *testing.T) {
 			seen[k[0]] = k[1]
 		}
 
-		for _, tieBreaker := range []string{"tsec", "tnano"} {
-			if _, ok := seen[tieBreaker]; !ok {
-				t.Errorf("sort %v produced no %s tiebreaker (got %v)", sort, tieBreaker, keys)
-			}
+		direction, ok := seen[sortTieBreaker]
+		if !ok {
+			t.Errorf("sort %v produced no %s tiebreaker (got %v)", sort, sortTieBreaker, keys)
+			continue
 		}
 
-		// The tiebreakers have to run the same way as the primary key, or they
+		// The tiebreaker has to run the same way as the primary key, or it
 		// would walk the page backwards within a millisecond.
-		if len(keys) > 0 {
-			primary := keys[0][1]
-			if seen["tsec"] != primary || seen["tnano"] != primary {
-				t.Errorf("sort %v: tiebreakers %q/%q do not follow primary direction %q",
-					sort, seen["tsec"], seen["tnano"], primary)
-			}
+		if len(keys) > 0 && direction != keys[0][1] {
+			t.Errorf("sort %v: tiebreaker %q does not follow primary direction %q",
+				sort, direction, keys[0][1])
 		}
 	}
 }
 
+// The tiebreaker must only name fields that exist on every index the search
+// spans. tsec/tnano are tagged omitempty on Entry and are absent from most
+// stored documents; sorting on one raises "No mapping found for [tsec] in
+// order to sort on", and because the search runs against an index wildcard
+// that comes back as a 200 with partially failed shards -- entries silently
+// missing from every index lacking the field. The ObjectID is set on ingest
+// unconditionally, so it is present everywhere and is unique per entry.
+func TestBuildSearchSourceTieBreakerIsAlwaysPresentAndUnique(t *testing.T) {
+	source := sourceOf(t, 0, 50, nil, nil, &Entry{}, Sorts{}, nil)
+
+	for _, k := range sortKeys(t, source) {
+		if k[0] == "tsec" || k[0] == "tnano" {
+			t.Errorf("%s is absent from most documents and must not be sorted on", k[0])
+		}
+	}
+
+	if sortTieBreaker != "id.keyword" {
+		t.Errorf("expected the ObjectID keyword subfield as tiebreaker, got %q", sortTieBreaker)
+	}
+
+	// A missing mapping must degrade instead of failing the shard.
+	raw, _ := json.Marshal(source["sort"])
+	if !strings.Contains(string(raw), "unmapped_type") {
+		t.Errorf("tiebreaker carries no unmapped_type guard: %s", raw)
+	}
+}
+
 // An explicit sort must keep its direction and must not be listed twice when
-// it already names one of the tiebreakers.
+// it already names the tiebreaker.
 func TestBuildSearchSourceHonoursExplicitSort(t *testing.T) {
-	source := sourceOf(t, 0, 50, nil, nil, &Entry{}, Sorts{"-tsec", "-tnano"}, nil)
+	source := sourceOf(t, 0, 50, nil, nil, &Entry{}, Sorts{"-lvl"}, nil)
 	keys := sortKeys(t, source)
 
 	if len(keys) != 2 {
-		t.Fatalf("expected exactly the two requested sort keys, got %v", keys)
+		t.Fatalf("expected the requested key plus one tiebreaker, got %v", keys)
 	}
-	for _, k := range keys {
-		if k[1] != "desc" {
-			t.Errorf("expected %s to sort desc, got %q", k[0], k[1])
-		}
+	if keys[0][0] != "lvl" || keys[0][1] != "desc" {
+		t.Errorf("explicit sort key was not preserved: %v", keys[0])
+	}
+	if keys[1][0] != sortTieBreaker {
+		t.Errorf("expected %s as second key, got %v", sortTieBreaker, keys[1])
+	}
+}
+
+// Naming the tiebreaker explicitly must not list it twice.
+func TestBuildSearchSourceDoesNotDuplicateTieBreaker(t *testing.T) {
+	source := sourceOf(t, 0, 50, nil, nil, &Entry{}, Sorts{"-time-created", "-" + sortTieBreaker}, nil)
+	keys := sortKeys(t, source)
+
+	if len(keys) != 2 {
+		t.Fatalf("expected exactly two sort keys, got %v", keys)
 	}
 }
 
