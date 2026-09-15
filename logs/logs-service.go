@@ -42,6 +42,7 @@ import (
 	"gitlab.com/pantacor/pantahub-base/utils/tracer"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -149,42 +150,151 @@ func (a *App) ParseDeviceString(parentCtx context.Context, owner string, devices
 	components := strings.Split(devicesString, ",")
 	deviceObject := devices.Device{}
 	for _, device := range components {
+		device = strings.TrimSpace(device)
+		if device == "" {
+			continue
+		}
+
 		hasPrefix, _ := regexp.MatchString("^prn:(.*):devices:/(.+)$", device)
 		if hasPrefix {
 			devicePrns = append(devicePrns, device)
 			continue
 		}
-		deviceNick := ""
-		deviceObjectID, err := primitive.ObjectIDFromHex(device)
-		if err != nil {
-			deviceNick = device
+
+		query := bson.M{
+			"owner":   owner,
+			"garbage": bson.M{"$ne": true},
 		}
-		if deviceNick != "" {
-			err = collection.FindOne(ctx,
-				bson.M{
-					"owner":   owner,
-					"nick":    deviceNick,
-					"garbage": bson.M{"$ne": true},
-				}).
-				Decode(&deviceObject)
+
+		isPrefix := false
+		if deviceObjectID, err := primitive.ObjectIDFromHex(device); err == nil {
+			query["_id"] = deviceObjectID
+		} else if low, high, ok := objectIDPrefixRange(device); ok {
+			// A shortened id, as `pvr device logs 648b56a6` passes. An ObjectID
+			// hex prefix denotes a contiguous range of ids, so this stays an
+			// indexed lookup rather than a scan.
+			query["_id"] = bson.M{"$gte": low, "$lte": high}
+			isPrefix = true
 		} else {
-			err = collection.FindOne(ctx,
-				bson.M{
-					"_id":     deviceObjectID,
-					"owner":   owner,
-					"garbage": bson.M{"$ne": true},
-				}).
-				Decode(&deviceObject)
+			query["nick"] = device
 		}
+
+		if isPrefix {
+			// The leading bytes of an ObjectID are a timestamp, so a short
+			// prefix can name several devices registered in the same second.
+			// Picking one of them arbitrarily would show the wrong device's
+			// logs without saying so.
+			prn, err := resolveUniqueDevice(ctx, collection, query)
+			if err == nil {
+				devicePrns = append(devicePrns, prn)
+				continue
+			}
+			if !errors.Is(err, errNoSuchDevice) {
+				return "", fmt.Errorf("device %q: %w", device, err)
+			}
+
+			// Nothing has an id starting that way, but a nick can be valid hex
+			// too, so fall through and try it as one before giving up.
+			delete(query, "_id")
+			query["nick"] = device
+		}
+
+		err := collection.FindOne(ctx, query).Decode(&deviceObject)
 		if err != nil {
-			fmt.Print("Error finding device:" + device + ",err:" + err.Error())
-			continue
+			// Returning nothing for an unresolved device used to leave the
+			// filter empty, and an empty filter means "every device" -- so
+			// asking for one device you could not name quietly returned all of
+			// them. Say so instead.
+			return "", fmt.Errorf("no device matching %q", device)
 		}
-		if deviceObject.Nick != "" {
+
+		if deviceObject.Prn != "" {
 			devicePrns = append(devicePrns, deviceObject.Prn)
 		}
 	}
+
+	if len(devicePrns) == 0 {
+		return "", errors.New("no devices matched the requested filter")
+	}
+
 	return strings.Join(devicePrns, ","), nil
+}
+
+// errNoSuchDevice reports that a query matched nothing, so a caller can decide
+// whether another interpretation of the name is worth trying.
+var errNoSuchDevice = errors.New("no such device")
+
+// resolveUniqueDevice returns the PRN of the single device matching query, and
+// refuses when the match is ambiguous rather than picking one arbitrarily. It
+// reads two documents so that "more than one" costs no more than "exactly one".
+func resolveUniqueDevice(ctx context.Context, collection *mongo.Collection, query bson.M) (string, error) {
+	cursor, err := collection.Find(ctx, query, options.Find().SetLimit(2))
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+
+	matches := []devices.Device{}
+	for cursor.Next(ctx) {
+		match := devices.Device{}
+		if err := cursor.Decode(&match); err != nil {
+			return "", err
+		}
+		matches = append(matches, match)
+	}
+	if err := cursor.Err(); err != nil {
+		return "", err
+	}
+
+	switch len(matches) {
+	case 0:
+		return "", errNoSuchDevice
+	case 1:
+		if matches[0].Prn == "" {
+			return "", errors.New("device has no prn")
+		}
+		return matches[0].Prn, nil
+	default:
+		return "", errors.New("matches more than one device; use the full id")
+	}
+}
+
+// objectIDPrefixRange turns a partial ObjectID hex string into the inclusive
+// range of ids that begin with it.
+//
+// An ObjectID is 12 bytes rendered as 24 hex characters, so any prefix of
+// those characters describes a contiguous span: pad it with zeroes for the low
+// end and with fs for the high end. That keeps a lookup by shortened id on the
+// _id index instead of forcing a collection scan with a regex over $toString.
+//
+// Reports false when the string is not a usable prefix, so the caller can fall
+// back to treating it as a nick.
+func objectIDPrefixRange(prefix string) (primitive.ObjectID, primitive.ObjectID, bool) {
+	var low, high primitive.ObjectID
+
+	// A full-length id is handled by the exact-match path, and an odd number of
+	// characters would not land on a byte boundary when padded.
+	if len(prefix) == 0 || len(prefix) >= 24 || len(prefix)%2 != 0 {
+		return low, high, false
+	}
+
+	for _, r := range prefix {
+		if !strings.ContainsRune("0123456789abcdefABCDEF", r) {
+			return low, high, false
+		}
+	}
+
+	padding := 24 - len(prefix)
+	low, err := primitive.ObjectIDFromHex(prefix + strings.Repeat("0", padding))
+	if err != nil {
+		return low, high, false
+	}
+	high, err = primitive.ObjectIDFromHex(prefix + strings.Repeat("f", padding))
+	if err != nil {
+		return low, high, false
+	}
+
+	return low, high, true
 }
 
 func unmarshalBody(body []byte) ([]Entry, error) {
