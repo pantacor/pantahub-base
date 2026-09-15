@@ -25,7 +25,6 @@ require (
 	github.com/mailgun/mailgun-go/v4 v4.11.0
 	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/olivere/elastic/v7 v7.0.32
-	github.com/pantacor/go-json-rest-middleware-jwt v0.0.0-20190329235955-213479ac018c
 	github.com/pquerna/otp v1.5.0
 	github.com/prometheus/client_golang v1.16.0
 	github.com/rs/cors v1.8.2

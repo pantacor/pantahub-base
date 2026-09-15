@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/go-webauthn/webauthn/webauthn"
-	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
+	jwt "gitlab.com/pantacor/pantahub-base/utils/jwtmiddleware"
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
 	"gitlab.com/pantacor/pantahub-base/auth/mfaservice"

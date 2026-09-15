@@ -29,7 +29,7 @@ import (
 	"gitlab.com/pantacor/pantahub-base/testutils"
 	"gitlab.com/pantacor/pantahub-base/utils"
 
-	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
+	jwt "gitlab.com/pantacor/pantahub-base/utils/jwtmiddleware"
 )
 
 var (

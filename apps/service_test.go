@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
+	jwt "gitlab.com/pantacor/pantahub-base/utils/jwtmiddleware"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
