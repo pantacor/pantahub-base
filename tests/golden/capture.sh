@@ -63,6 +63,15 @@ PARAM_PATHS=(
   "/trails/{DEV}"
   "/trails/{DEV}/steps"
   "/trails/{DEV}/summary"
+  "/trails/{DEV}/steps/0"
+  # A revision that does not exist. This answers 500 {"code":500,"error":
+  # "REST-ERR-ID-..."}, NOT 404: trails/get-trails-rev.go maps every FindOne
+  # error, including mongo.ErrNoDocuments, to 500 "No access". Every device
+  # polling for its next revision hits this, minting an incident id and a
+  # fluentd forward on each poll. It is a latent bug -- but real Pantavisor
+  # devices see this status on every poll, so changing it is a deliberate,
+  # announced fix with its own device testing, never a side effect of the port.
+  "/trails/{DEV}/steps/999999"
 )
 
 # Malformed identifiers. These pin the CURRENT error behaviour, which is not
