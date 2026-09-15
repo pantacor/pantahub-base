@@ -30,3 +30,25 @@ if [ "$vuln_status" -ne 0 ] && ! grep -q '^Vulnerability #' govulncheck.out; the
 fi
 
 go install "github.com/securego/gosec/v2/cmd/gosec@${GOSEC_VERSION}"
+
+# gosec was installed here but never invoked, so the SARIF report CI uploads as
+# its SAST artifact was always the empty file the job touched. Run it.
+#
+# The report is written before the exit status is acted on, so a failing scan
+# still leaves an artifact to read.
+set +e
+gosec -fmt sarif -out gosec.sarif ./... >gosec.out 2>&1
+gosec_status=$?
+set -e
+cat gosec.out
+
+if [ "$gosec_status" -ne 0 ]; then
+    echo "gosec findings by rule:"
+    grep -o '"ruleId": *"[^"]*"' gosec.sarif |
+        sed 's/.*: *"//;s/"$//' |
+        sort | uniq -c | sort -rn
+    echo
+    echo "Build and deploy are gated on this: nothing ships while gosec reports."
+    echo "Full detail is in the SAST artifact (gosec.sarif)."
+    exit "$gosec_status"
+fi
