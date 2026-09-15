@@ -54,6 +54,28 @@ SLASH_PATHS=(
   /devices /trails /apps /objects /logs /profiles /subscriptions /tokens
 )
 
+# Path-parameter routes. go-json-rest spells these `#id`, echo spells them `:id`;
+# the rewrite is meant to be semantically identical, and this is what proves it.
+# {DEV} is substituted with an id discovered at capture time (see discover_ids).
+PARAM_PATHS=(
+  "/devices/{DEV}"
+  "/devices/{DEV}/user-meta"
+  "/trails/{DEV}"
+  "/trails/{DEV}/steps"
+  "/trails/{DEV}/summary"
+)
+
+# Malformed identifiers. These pin the CURRENT error behaviour, which is not
+# uniform: /devices/<bad> answers 400 while /trails/<bad> answers 500. The 500 is
+# very likely a latent bug, but it is the contract as shipped -- if the port
+# changes it, that must be a deliberate, announced fix rather than a side effect.
+BAD_ID='nonexistent0000000000000000'
+BADPARAM_PATHS=(
+  "/devices/$BAD_ID"
+  "/trails/$BAD_ID"
+  "/trails/$BAD_ID/steps"
+)
+
 slug() { echo "$1" | sed 's#^/##; s#/$##; s#/#_#g; s#[^A-Za-z0-9_.-]#-#g; s#^$#root#'; }
 
 # Endpoints whose bodies are inherently live (log streams, last-seen clocks).
@@ -69,9 +91,15 @@ BODY_SKIP='^/(logs|devices|dash)/$'
 normalise_body() {
   local f="$1"
   if command -v jq >/dev/null 2>&1 && jq -e . >/dev/null 2>&1 < "$f"; then
+    # device-meta is telemetry the DEVICE reports (freeram, load averages, disk
+    # free, uptime). It changes every second and is not part of the API contract
+    # we are pinning -- the contract is that the key exists and is an object. Its
+    # contents would otherwise make every diff fail.
     jq -S 'walk(if type == "object" then
                   with_entries(.value =
-                    if (.key | test("^(id|_id|timestamp|time-?modified|time-?created|last-?seen|rev|garbage|exp|iat|tsec|tnano|dev|device|trail-touched|status-changed)$"; "i"))
+                    if (.key | test("^(device-meta|sysinfo|storage)$"; "i"))
+                    then "<VOLATILE-SUBTREE>"
+                    elif (.key | test("^(id|_id|timestamp|time-?modified|time-?created|last-?seen|rev|garbage|exp|iat|tsec|tnano|dev|device|trail-touched|status-changed|meta-modified)$"; "i"))
                     then "<VAR>" else .value end)
                 else . end)' < "$f" 2>/dev/null \
       | sed -E 's/REST-ERR-ID-[0-9]+/REST-ERR-ID-<VAR>/g'
@@ -92,9 +120,35 @@ error_shape() {
   else echo 'empty'; fi
 }
 
+# Resolve the concrete ids the parameterised routes are probed with.
+#
+# The baseline run discovers a device id from /devices/ and records it. The
+# candidate run REUSES the id the baseline recorded, so both captures address the
+# same resource -- otherwise the bodies would differ for a reason that has
+# nothing to do with the migration.
+discover_ids() {
+  local outdir="$1" idfile="$HERE/baseline/IDS"
+  if [ "$outdir" != "$HERE/baseline" ] && [ -f "$idfile" ]; then
+    # shellcheck disable=SC1090
+    . "$idfile"; echo "reusing baseline ids: DEV=$DEV"
+  else
+    local tmp; tmp="$(mktemp)"
+    timeout 60 pvr curl -s -o "$tmp" -A "$UA" "$API/devices/" >/dev/null 2>&1
+    DEV="$(jq -r 'if type=="array" then .[0].id else (.devices[0].id // empty) end' < "$tmp" 2>/dev/null)"
+    rm -f "$tmp"
+    if [ -z "$DEV" ] || [ "$DEV" = "null" ]; then
+      echo "WARN: could not discover a device id; parameterised routes skipped" >&2
+      DEV=""
+    fi
+    echo "discovered ids: DEV=$DEV"
+  fi
+  mkdir -p "$outdir"; echo "DEV='$DEV'" > "$outdir/IDS"
+}
+
 capture() {
   local outdir="$1"
-  rm -rf "$outdir"; mkdir -p "$outdir/authed" "$outdir/unauth" "$outdir/slash"
+  rm -rf "$outdir"; mkdir -p "$outdir/authed" "$outdir/unauth" "$outdir/slash" "$outdir/param"
+  discover_ids "$outdir"
 
   echo "# API=$API" > "$outdir/MANIFEST"
   echo "# captured=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$outdir/MANIFEST"
@@ -113,6 +167,32 @@ capture() {
     curl -s -D "$outdir/unauth/$s.hdr.raw" -o "$outdir/unauth/$s.body.raw" \
       -A "$UA" --max-time 20 "$API$p" >/dev/null 2>&1
     finalise "$outdir/unauth/$s" "$p"
+  done
+
+  echo "== path-parameter routes (#id -> :id must be a no-op) =="
+  if [ -n "${DEV:-}" ]; then
+    for tpl in "${PARAM_PATHS[@]}"; do
+      local p s
+      p="${tpl//\{DEV\}/$DEV}"
+      # Slug from the TEMPLATE, not the concrete path, so filenames stay stable
+      # across environments and the diff lines up even if the id changes.
+      s="$(slug "${tpl//\{DEV\}/ID}")"
+      timeout 60 pvr curl -s -D "$outdir/param/$s.hdr.raw" -o "$outdir/param/$s.body.raw" \
+        -A "$UA" "$API$p" >/dev/null 2>&1
+      # Mask the concrete id so baseline and candidate agree textually.
+      sed -i "s/$DEV/<DEV>/g" "$outdir/param/$s.body.raw" 2>/dev/null
+      finalise "$outdir/param/$s" "$tpl"
+    done
+  else
+    echo "(skipped: no device id)"
+  fi
+
+  echo "== malformed identifiers (current behaviour, incl. the /trails 500) =="
+  for p in "${BADPARAM_PATHS[@]}"; do
+    local s; s="$(slug "$p")"
+    timeout 60 pvr curl -s -D "$outdir/param/$s.hdr.raw" -o "$outdir/param/$s.body.raw" \
+      -A "$UA" "$API$p" >/dev/null 2>&1
+    finalise "$outdir/param/$s" "$p"
   done
 
   echo "== trailing-slash pairs =="
