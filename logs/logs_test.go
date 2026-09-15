@@ -23,6 +23,7 @@
 package logs
 
 import (
+	"gitlab.com/pantacor/pantahub-base/testutils/mongotest"
 	"log"
 	"os"
 	"testing"
@@ -141,6 +142,20 @@ func TestUnmarshalBodyArrayEmpty(t *testing.T) {
 }
 
 func TestMain(m *testing.M) {
+	// The Mongo-backed tests in this package (TestMgo) connect through
+	// utils.GetMongoClient(), which defaults to localhost:27017. Nothing listens
+	// there -- the compose replica set publishes no host port -- so the tests
+	// used to fail on a refused connection and then nil-deref on the unusable
+	// client. Starting a throwaway replica set here makes the package runnable
+	// with no external setup.
+	//
+	// Set PANTAHUB_TEST_MONGO_EXTERNAL to point the run at your own MongoDB
+	// instead.
+	cleanup, code := mongotest.SetupEnv()
+	if code != 0 {
+		os.Exit(code)
+	}
+	defer cleanup()
 
 	exitCode := m.Run()
 
@@ -148,5 +163,7 @@ func TestMain(m *testing.M) {
 		log.Printf("error running tests %d\n", exitCode)
 	}
 
+	// os.Exit skips deferred functions, so release the container first.
+	cleanup()
 	os.Exit(exitCode)
 }

@@ -157,8 +157,17 @@ func testMongoDoGetLogs(t *testing.T) {
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
 		t.Fail()
-	} else if pager.Count != 2 {
-		t.Errorf("pager.Count should be 2, not %d", pager.Count)
+	} else if pager.Count != 3 {
+		// Count is the TOTAL number of matching entries, not the size of this
+		// page -- see the note in logs-elastic.go. This assertion used to read
+		// 2, encoding the old behaviour where Count was overwritten with the
+		// page length and no caller could tell how much was left.
+		t.Errorf("pager.Count should be 3 (total matches), not %d", pager.Count)
+		t.Fail()
+	} else if len(pager.Entries) != 2 {
+		// Paging itself is what this case exercises: from offset 1 of 3
+		// entries, a page of 3 yields 2.
+		t.Errorf("expected 2 entries from offset 1, got %d", len(pager.Entries))
 		t.Fail()
 	}
 
@@ -167,8 +176,11 @@ func testMongoDoGetLogs(t *testing.T) {
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
 		t.Fail()
-	} else if pager.Count != 1 {
-		t.Errorf("pager.Count should be 1, not %d", pager.Count)
+	} else if pager.Count != 3 {
+		t.Errorf("pager.Count should be 3 (total matches), not %d", pager.Count)
+		t.Fail()
+	} else if len(pager.Entries) != 1 {
+		t.Errorf("expected 1 entry for a page size of 1, got %d", len(pager.Entries))
 		t.Fail()
 	}
 }
