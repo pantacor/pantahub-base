@@ -203,7 +203,7 @@ func (a *App) mfaLoginSuccess(writer rest.ResponseWriter, r *rest.Request, claim
 		return
 	}
 
-	if err := a.mfaRepo.ConsumeJTI(ctx, claims.Id, time.Unix(claims.ExpiresAt, 0)); err != nil {
+	if err := a.mfaRepo.ConsumeJTI(ctx, claims.ID, claims.ExpiresAt.Time); err != nil {
 		utils.RestErrorWrapperUser(writer, "Authentication Failed", "Authentication Failed", http.StatusUnauthorized)
 		return
 	}

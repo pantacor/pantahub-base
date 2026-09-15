@@ -110,7 +110,11 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	objClaims := tok.Token.Claims.(*objects.ObjectAccessClaims)
-	storageID := objClaims.Audience
+	storageID, ok := objClaims.StorageID()
+	if !ok {
+		utils.HttpErrorWrapper(w, "ERROR: token does not carry exactly one audience", http.StatusForbidden)
+		return
+	}
 	p, _ := url.Parse(path.Join(dirName, storageID))
 	r.URL = r.URL.ResolveReference(p)
 	defer r.Body.Close()

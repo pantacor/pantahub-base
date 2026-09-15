@@ -32,7 +32,7 @@ import (
 	"strings"
 	"time"
 
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
 	jwt "gitlab.com/pantacor/pantahub-base/utils/jwtmiddleware"
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
@@ -100,7 +100,7 @@ type MFAPendingClaims struct {
 	Scope    string   `json:"mfa_scope,omitempty"`
 	Amr      []string `json:"amr"`
 	Methods  []string `json:"methods"`
-	jwtgo.StandardClaims
+	jwtgo.RegisteredClaims
 }
 
 // getEncKey loads and validates the AES-256 key for TOTP secrets at rest
@@ -312,10 +312,10 @@ func CreateMFAPendingToken(jwtMiddleware *jwt.JWTMiddleware, username, prn, scop
 		Scope:    scope,
 		Amr:      amr,
 		Methods:  methods,
-		StandardClaims: jwtgo.StandardClaims{
-			Id:        hex.EncodeToString(jti),
-			IssuedAt:  now.Unix(),
-			ExpiresAt: now.Add(PendingTokenTimeout()).Unix(),
+		RegisteredClaims: jwtgo.RegisteredClaims{
+			ID:        hex.EncodeToString(jti),
+			IssuedAt:  jwtgo.NewNumericDate(now),
+			ExpiresAt: jwtgo.NewNumericDate(now.Add(PendingTokenTimeout())),
 		},
 	}
 
@@ -342,7 +342,7 @@ func ParseMFAPendingToken(jwtMiddleware *jwt.JWTMiddleware, tokenString string) 
 		return nil, ErrInvalidPendingToken
 	}
 
-	if claims.TokenUse != MFAPendingTokenUse || claims.Prn == "" || claims.Id == "" {
+	if claims.TokenUse != MFAPendingTokenUse || claims.Prn == "" || claims.ID == "" {
 		return nil, ErrInvalidPendingToken
 	}
 
@@ -360,9 +360,9 @@ func CreateSudoToken(jwtMiddleware *jwt.JWTMiddleware, prn, factor string) (stri
 		TokenUse: MFASudoTokenUse,
 		Prn:      prn,
 		Amr:      []string{factor},
-		StandardClaims: jwtgo.StandardClaims{
-			IssuedAt:  now.Unix(),
-			ExpiresAt: now.Add(PendingTokenTimeout()).Unix(),
+		RegisteredClaims: jwtgo.RegisteredClaims{
+			IssuedAt:  jwtgo.NewNumericDate(now),
+			ExpiresAt: jwtgo.NewNumericDate(now.Add(PendingTokenTimeout())),
 		},
 	}
 	token := jwtgo.NewWithClaims(jwtgo.GetSigningMethod(jwtMiddleware.SigningAlgorithm), claims)

@@ -21,7 +21,7 @@ import (
 	"fmt"
 
 	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/dgrijalva/jwt-go"
+	jwt "github.com/golang-jwt/jwt/v5"
 
 	"errors"
 	"log"
@@ -29,6 +29,23 @@ import (
 	"strings"
 	"time"
 )
+
+func init() {
+	// Keep a single "aud" on the wire as a bare JSON string.
+	//
+	// dgrijalva/jwt-go v3 modelled Audience as a string and emitted
+	// {"aud":"x"}. golang-jwt/v5 models it as ClaimStrings and, with its
+	// default of MarshalSingleStringAsArray = true, would emit {"aud":["x"]}
+	// instead. The RFC permits both, but this is a wire-format change to every
+	// token this API mints, and consumers that compare "aud" as a string --
+	// pvr, devices, and the object file servers, which carry the storage id in
+	// this claim -- would silently stop matching.
+	//
+	// Set here rather than in main.go because every service links this package,
+	// and because tests must see the same encoding as production. Remove only
+	// with evidence that no consumer parses "aud" as a scalar.
+	jwt.MarshalSingleStringAsArray = false
+}
 
 // JWTMiddleware provides a Json-Web-Token authentication implementation. On failure, a 401 HTTP response
 // is returned. On success, the wrapped middleware is called, and the userId is made available as

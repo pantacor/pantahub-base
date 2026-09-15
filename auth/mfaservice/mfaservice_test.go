@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
 	jwt "gitlab.com/pantacor/pantahub-base/utils/jwtmiddleware"
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
@@ -273,13 +273,13 @@ func TestMFAPendingToken(t *testing.T) {
 		if claims.Username != "user1" ||
 			claims.Prn != "prn:pantahub.com:auth:/user1" ||
 			claims.TokenUse != MFAPendingTokenUse ||
-			claims.Id == "" {
+			claims.ID == "" {
 			t.Errorf("unexpected claims: %+v", claims)
 		}
 		if !claims.HasMethod("totp") || !claims.HasMethod("recovery") || claims.HasMethod("webauthn") {
 			t.Errorf("unexpected methods: %v", claims.Methods)
 		}
-		ttl := time.Until(time.Unix(claims.ExpiresAt, 0))
+		ttl := time.Until(claims.ExpiresAt.Time)
 		if ttl <= 0 || ttl > PendingTokenTimeout() {
 			t.Errorf("unexpected ttl: %s", ttl)
 		}
@@ -288,7 +288,7 @@ func TestMFAPendingToken(t *testing.T) {
 	t.Run("unique jti", func(t *testing.T) {
 		_, c1 := mint(t)
 		_, c2 := mint(t)
-		if c1.Id == c2.Id {
+		if c1.ID == c2.ID {
 			t.Error("jti must be unique per token")
 		}
 	})
@@ -313,10 +313,10 @@ func TestMFAPendingToken(t *testing.T) {
 		claims := &MFAPendingClaims{
 			TokenUse: MFAPendingTokenUse,
 			Prn:      "prn:pantahub.com:auth:/user1",
-			StandardClaims: jwtgo.StandardClaims{
-				Id:        "deadbeef",
-				IssuedAt:  time.Now().Add(-10 * time.Minute).Unix(),
-				ExpiresAt: time.Now().Add(-5 * time.Minute).Unix(),
+			RegisteredClaims: jwtgo.RegisteredClaims{
+				ID:        "deadbeef",
+				IssuedAt:  jwtgo.NewNumericDate(time.Now().Add(-10 * time.Minute)),
+				ExpiresAt: jwtgo.NewNumericDate(time.Now().Add(-5 * time.Minute)),
 			},
 		}
 		token := jwtgo.NewWithClaims(jwtgo.SigningMethodHS256, claims)

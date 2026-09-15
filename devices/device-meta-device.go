@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-base/utils/decoder"
 	"go.mongodb.org/mongo-driver/bson/primitive"

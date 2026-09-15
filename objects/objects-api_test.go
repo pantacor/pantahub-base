@@ -27,7 +27,7 @@ import (
 	"testing"
 
 	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
 	"github.com/jaswdr/faker"
 	jwt "gitlab.com/pantacor/pantahub-base/utils/jwtmiddleware"
 	"github.com/stretchr/testify/assert"

@@ -3,7 +3,7 @@ package authmodels
 import (
 	"time"
 
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -43,7 +43,7 @@ type PasswordReset struct {
 type ResetPasswordClaims struct {
 	Email        string    `json:"email"`
 	TimeModified time.Time `json:"time-modified"`
-	jwtgo.StandardClaims
+	jwtgo.RegisteredClaims
 }
 
 // this requests to swap access code with accesstoken

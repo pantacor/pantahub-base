@@ -26,7 +26,7 @@ import (
 	"net/http"
 
 	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
 
@@ -97,8 +97,16 @@ func (a *App) handleGetLogsCursor(w rest.ResponseWriter, r *rest.Request) {
 	if claims, ok := token.Claims.(*CursorClaim); ok && token.Valid {
 		var result *Pager
 
-		caller := claims.StandardClaims.Audience
-		if caller != own {
+		// Audience is jwt.ClaimStrings (a slice) in golang-jwt/v5, where
+		// dgrijalva/jwt-go v3 modelled it as a plain string. The v3 check was an
+		// exact equality test against that single audience, so require exactly
+		// that: one audience, equal to the caller.
+		//
+		// Deliberately NOT "own appears somewhere in the list" -- that would
+		// silently widen who is allowed to replay a cursor, which is the one
+		// thing this check exists to prevent.
+		caller := claims.RegisteredClaims.Audience
+		if len(caller) != 1 || caller[0] != own {
 			utils.RestErrorWrapper(w, "Calling user does not match owner of cursor-next", http.StatusForbidden)
 			return
 		}

@@ -1,9 +1,11 @@
 package jwtmiddleware
 
 import (
+	"encoding/base64"
+	"strings"
 	"testing"
 
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
 )
 
 // These tokens were minted by github.com/dgrijalva/jwt-go v3.2.0 -- the library
@@ -97,5 +99,35 @@ func TestWrongKeyIsRejected(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("a token signed with a different key was accepted")
+	}
+}
+
+// A single audience must serialise as a bare JSON string, the way
+// dgrijalva/jwt-go v3 emitted it -- not as a one-element array, which is
+// golang-jwt/v5's default. See the init() in auth_jwt.go.
+//
+// This is not cosmetic. The object file servers carry the storage id in "aud"
+// (objects.ObjectAccessClaims.StorageID), and pvr and devices compare "aud" as
+// a scalar. Emitting ["x"] where "x" was emitted before would break signed
+// object URLs and audience checks across the fleet.
+func TestSingleAudienceMarshalsAsBareString(t *testing.T) {
+	tok := jwtgo.NewWithClaims(jwtgo.SigningMethodHS256, jwtgo.RegisteredClaims{
+		Audience: jwtgo.ClaimStrings{"prn:pantahub.com:apis:/api"},
+	})
+	signed, err := tok.SignedString([]byte(fixtureKey))
+	if err != nil {
+		t.Fatalf("signing: %v", err)
+	}
+
+	payload, err := base64.RawURLEncoding.DecodeString(strings.Split(signed, ".")[1])
+	if err != nil {
+		t.Fatalf("decoding payload: %v", err)
+	}
+
+	const want = `"aud":"prn:pantahub.com:apis:/api"`
+	if !strings.Contains(string(payload), want) {
+		t.Errorf("payload = %s\nwant it to contain %s\n"+
+			"(if this shows [\"...\"] then MarshalSingleStringAsArray got re-enabled)",
+			payload, want)
 	}
 }

@@ -21,7 +21,7 @@ import (
 	"errors"
 	"net/http"
 
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/ant0ine/go-json-rest/rest"

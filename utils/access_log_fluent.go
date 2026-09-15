@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
 	"github.com/fatih/structs"
 	"github.com/fluent/fluent-logger-golang/fluent"
 )

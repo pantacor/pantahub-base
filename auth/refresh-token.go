@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/auth/authmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
@@ -76,7 +76,11 @@ func (a *App) handlePostTokenRefresh(writer rest.ResponseWriter, r *rest.Request
 	// Parse with signature verification but skip claim (exp/nbf/iat)
 	// validation so that a recently-expired token can still be refreshed by
 	// an active service.
-	parser := &jwtgo.Parser{SkipClaimsValidation: true}
+	// golang-jwt/v5 made the Parser's fields unexported and configures it with
+	// options instead; WithoutClaimsValidation is the direct equivalent of v3's
+	// SkipClaimsValidation, so the "recently expired tokens are still
+	// refreshable" behaviour above is preserved exactly.
+	parser := jwtgo.NewParser(jwtgo.WithoutClaimsValidation())
 	tok, err := parser.Parse(req.Token, func(t *jwtgo.Token) (interface{}, error) {
 		if jwtgo.GetSigningMethod(a.jwtMiddleware.SigningAlgorithm) != t.Method {
 			return nil, errors.New("invalid signing algorithm")

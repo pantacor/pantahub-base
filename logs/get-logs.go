@@ -29,7 +29,7 @@ import (
 	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
 
@@ -249,10 +249,10 @@ func (a *App) handleGetLogs(w rest.ResponseWriter, r *rest.Request) {
 func (a *App) signCursor(state *CursorState, owner string) (string, error) {
 	claims := CursorClaim{
 		State: state,
-		StandardClaims: jwtgo.StandardClaims{
-			ExpiresAt: time.Now().Add(cursorTTL).Unix(),
-			IssuedAt:  time.Now().Unix(),
-			Audience:  owner,
+		RegisteredClaims: jwtgo.RegisteredClaims{
+			ExpiresAt: jwtgo.NewNumericDate(time.Now().Add(cursorTTL)),
+			IssuedAt:  jwtgo.NewNumericDate(time.Now()),
+			Audience:  jwtgo.ClaimStrings{owner},
 		},
 	}
 	token := jwtgo.NewWithClaims(jwtgo.GetSigningMethod(a.jwtMiddleware.SigningAlgorithm), claims)

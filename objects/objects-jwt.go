@@ -20,7 +20,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	jwt "github.com/golang-jwt/jwt/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
 
@@ -41,7 +41,7 @@ type ObjectAccessToken struct {
 
 // ObjectAccessClaims object claims for access
 type ObjectAccessClaims struct {
-	jwt.StandardClaims
+	jwt.RegisteredClaims
 	DispositionName string
 	Size            int64
 	Method          string
@@ -62,12 +62,12 @@ func NewObjectAccessToken(
 	issuedAt int64,
 	expiresAt int64) *ObjectAccessToken {
 	claims := ObjectAccessClaims{
-		StandardClaims: jwt.StandardClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    issuer,
 			Subject:   subject,
-			Audience:  audience,
-			IssuedAt:  issuedAt,
-			ExpiresAt: expiresAt,
+			Audience:  jwt.ClaimStrings{audience},
+			IssuedAt:  jwt.NewNumericDate(time.Unix(issuedAt, 0)),
+			ExpiresAt: jwt.NewNumericDate(time.Unix(expiresAt, 0)),
 		},
 		DispositionName: name,
 		Size:            size,
@@ -117,4 +117,23 @@ func NewFromValidToken(encodedToken string) (*ObjectAccessToken, error) {
 // Sign sign a access token
 func (o *ObjectAccessToken) Sign() (string, error) {
 	return o.SignedString(utils.GetObjectTokenSecret())
+}
+
+// StorageID returns the single audience carried by an object access token,
+// which the file servers use as the on-disk / in-bucket object name.
+//
+// dgrijalva/jwt-go v3 modelled Audience as a plain string and callers used it
+// directly. golang-jwt/v5 models it as ClaimStrings, so this accessor restores
+// the v3 shape at the points where it is consumed.
+//
+// NewObjectAccessToken always mints exactly one audience, so any other count is
+// a malformed or hand-crafted token. It returns ok=false rather than an empty
+// string on its own, because an empty storage id would make path.Join resolve
+// to the containing directory instead of an object -- callers must reject it,
+// not paper over it.
+func (c ObjectAccessClaims) StorageID() (string, bool) {
+	if len(c.Audience) != 1 || c.Audience[0] == "" {
+		return "", false
+	}
+	return c.Audience[0], true
 }

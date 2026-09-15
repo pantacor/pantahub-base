@@ -84,7 +84,13 @@ func (lfs LocalFileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	objClaims := tok.Token.Claims.(*objects.ObjectAccessClaims)
-	storageID := objClaims.Audience
+	storageID, ok := objClaims.StorageID()
+	if !ok {
+		//#nosec G706 -- claim-derived, and %q escapes it
+		log.Printf("Invalid local-s3 token: expected exactly one audience, got %v", objClaims.Audience)
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
 	p, _ := url.Parse(path.Join(dirName, storageID))
 	r.URL = r.URL.ResolveReference(p)
 

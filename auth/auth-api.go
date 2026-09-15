@@ -30,7 +30,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/accounts/accountsdata"
 	"gitlab.com/pantacor/pantahub-base/auth/authmodels"
@@ -549,9 +549,11 @@ func (a *App) handlePasswordReset(writer rest.ResponseWriter, r *rest.Request) {
 	}
 
 	claims := token.Claims.(*authmodels.ResetPasswordClaims)
-	err = claims.Valid()
-	if err != nil {
-		utils.RestError(writer, err, tokenInvalidOrExpiredErr, http.StatusInternalServerError)
+	// golang-jwt/v5 removed Claims.Valid(): ParseWithClaims performs validation
+	// itself and reports the outcome through err and token.Valid. Checking
+	// token.Valid keeps the same rejection path the explicit call had.
+	if !token.Valid {
+		utils.RestError(writer, errors.New("invalid token claims"), tokenInvalidOrExpiredErr, http.StatusInternalServerError)
 		return
 	}
 
@@ -673,8 +675,8 @@ func (a *App) handlePasswordRecovery(writer rest.ResponseWriter, r *rest.Request
 	claims := authmodels.ResetPasswordClaims{
 		account.Email,
 		account.TimeModified,
-		jwtgo.StandardClaims{
-			ExpiresAt: time.Now().UTC().Add(time.Duration(restorePasswordTTL) * restorePasswordTTLUnit).Unix(),
+		jwtgo.RegisteredClaims{
+			ExpiresAt: jwtgo.NewNumericDate(time.Now().UTC().Add(time.Duration(restorePasswordTTL) * restorePasswordTTLUnit)),
 		},
 	}
 
@@ -737,9 +739,9 @@ func (a *App) handlePostToken(writer rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	err = tok.Claims.Valid()
-	if err != nil {
-		log.Println("ERROR: Failed validating the access Code claims: " + err.Error())
+	// See the note above on Claims.Valid(): v5 validates during parsing.
+	if !tok.Valid {
+		log.Println("ERROR: Failed validating the access Code claims")
 		utils.RestErrorWrapper(writer, "Failed validating the access Code claims", http.StatusUnauthorized)
 		return
 	}

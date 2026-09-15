@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"time"
 
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/alecthomas/units"

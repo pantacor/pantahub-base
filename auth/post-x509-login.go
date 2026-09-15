@@ -27,7 +27,7 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/cloudflare/cfssl/revoke"
-	"github.com/dgrijalva/jwt-go"
+	jwt "github.com/golang-jwt/jwt/v5"
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
