@@ -77,6 +77,14 @@ func (a *App) handleGetLogsCursor(w rest.ResponseWriter, r *rest.Request) {
 		nextCursorJWT = r.FormValue("next-cursor")
 	}
 
+	// A missing cursor is a malformed request, not an authentication problem.
+	// Answering 403 here made clients treat it as an expired session and send
+	// the user back to a login prompt.
+	if nextCursorJWT == "" {
+		utils.RestErrorWrapper(w, "no next-cursor supplied", http.StatusBadRequest)
+		return
+	}
+
 	token, err := jwtgo.ParseWithClaims(nextCursorJWT, &CursorClaim{}, func(token *jwtgo.Token) (interface{}, error) {
 		return a.jwtMiddleware.Pub, nil
 	})
@@ -114,25 +122,30 @@ func (a *App) handleGetLogsCursor(w rest.ResponseWriter, r *rest.Request) {
 			return
 		}
 
+		// Always hand a cursor back, so a follower polling an idle device keeps
+		// something valid to present. When the page was empty the position is
+		// unchanged, so the previous search_after is carried forward and the
+		// next call returns whatever arrived in the meantime.
+		nextState := &CursorState{
+			Filter:      filter,
+			Before:      state.Before,
+			After:       state.After,
+			Sort:        state.Sort,
+			Page:        state.Page,
+			SearchAfter: state.SearchAfter,
+		}
 		if result.NextCursor != "" {
-			nextState := &CursorState{
-				Filter: filter,
-				Before: state.Before,
-				After:  state.After,
-				Sort:   state.Sort,
-				Page:   state.Page,
-			}
 			if err := json.Unmarshal([]byte(result.NextCursor), &nextState.SearchAfter); err != nil {
 				utils.RestErrorWrapper(w, "ERROR: building next-cursor: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
-			ss, err := a.signCursor(nextState, own.(string))
-			if err != nil {
-				utils.RestErrorWrapper(w, "ERROR: signing next-cursor token: "+err.Error(), http.StatusInternalServerError)
-				return
-			}
-			result.NextCursor = ss
 		}
+		ss, err := a.signCursor(nextState, own.(string))
+		if err != nil {
+			utils.RestErrorWrapper(w, "ERROR: signing next-cursor token: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		result.NextCursor = ss
 
 		w.WriteJson(result)
 		return

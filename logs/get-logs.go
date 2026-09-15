@@ -211,7 +211,14 @@ func (a *App) handleGetLogs(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	if result.NextCursor != "" {
+	// A caller that asked for a cursor always gets one back, even when this
+	// page came up empty. Followers such as `pvr device logs` call the cursor
+	// endpoint with whatever they were last handed, so dropping the cursor on
+	// an empty page left them posting an empty one, which cannot be a valid
+	// token and came back as a 403 that clients read as "log in again". An
+	// empty page simply carries the position forward: re-presenting the cursor
+	// returns whatever has arrived since.
+	if cursor {
 		state := &CursorState{
 			Filter: *filter,
 			Before: before,
@@ -219,9 +226,11 @@ func (a *App) handleGetLogs(w rest.ResponseWriter, r *rest.Request) {
 			Sort:   logsSort,
 			Page:   pageParamInt,
 		}
-		if err := json.Unmarshal([]byte(result.NextCursor), &state.SearchAfter); err != nil {
-			utils.RestErrorWrapper(w, "ERROR: building next-cursor: "+err.Error(), http.StatusInternalServerError)
-			return
+		if result.NextCursor != "" {
+			if err := json.Unmarshal([]byte(result.NextCursor), &state.SearchAfter); err != nil {
+				utils.RestErrorWrapper(w, "ERROR: building next-cursor: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
 		}
 		ss, err := a.signCursor(state, own.(string))
 		if err != nil {
