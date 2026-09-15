@@ -1,11 +1,53 @@
 
+<a name="055"></a>
+## [055](https://gitlab.com/pantacor/pantahub-base/compare/054...055)
+
+> 2026-09-15
+
+### Ci
+
+* scan with the same pinned Go release the application ships
+* pin govulncheck and gosec instead of tracking [@latest](https://gitlab.com/latest)
+* **security:** actually run gosec and gate build and deploy on it
+
+### Fix
+
+* **ci:** address the scan container by id, not a fixed name
+* **logs:** resolve the shortened device ids that pvr prints
+* **logs:** always return a cursor, so followers are not bounced to login
+* **logs:** tiebreak the sort on id, not the absent tsec/tnano
+* **logs:** page with search_after and stop leaking scroll contexts
+* **security:** clear the gosec gate, fixing the real findings
+
+
+<a name="054"></a>
+## [054](https://gitlab.com/pantacor/pantahub-base/compare/053...054)
+
+> 2026-09-08
+
+### Feat
+
+* **trails:** keep a capped progress-log on every step
+* **trails:** let cancel cover INPROGRESS too, deprecate wontgo
+* **trails:** allow owners to cancel steps in QUEUED or DOWNLOADING
+
+### Fix
+
+* **trails:** accept session tokens for step cancel
+
+
 <a name="053"></a>
 ## [053](https://gitlab.com/pantacor/pantahub-base/compare/052...053)
 
 > 2026-09-04
 
+### Apps
+
+* return validation reason to the client on create/update
+
 ### Chore
 
+* update CHANGELOG.md for release 053
 * change certs folder
 * bump copyright headers to 2026
 
@@ -17,7 +59,6 @@
 
 ### Feat
 
-* **apps:** return validation reason to the client on create/update
 * **auth:** hash secrets at rest and close security-review findings
 * **devices:** manual owner verification for device tokens
 * **features:** env feature flags for optional subsystems + GET /features
@@ -28,7 +69,6 @@
 
 ### Fix
 
-* use proper relative path for the mounts
 * check every JSON decode; add missing returns after error writes
 * **accounts:** stop serializing password hashes in account responses
 * **auth:** accept passkeys as second factor without user verification
@@ -64,7 +104,6 @@
 
 ### Security
 
-* revert CORS to permissive reflect-any-origin
 * stop storing the unused scrypt password hash (PH-M6)
 * harden auth and connect OAuth providers
 * constant-time compare of SA admin secret (PH-M7)
