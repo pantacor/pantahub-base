@@ -12,12 +12,20 @@ security-scan:
     # cannot drift from the one the application is built with. It also makes
     # security_check.sh an exact local reproduction of this job.
     script:
+        # Create the artifact up front: if anything below fails before the scan
+        # produces one, the job still has a file to upload instead of erroring
+        # a second time on a missing artifact.
+        - touch gosec.sarif
         - docker build -f Dockerfile.security-scan -t pantahub-base-security-scan .
         - scan_status=0
-        - docker create --name security-scan-run pantahub-base-security-scan
-        - docker start --attach security-scan-run || scan_status=$?
+        # Addressed by id rather than by name. The docker-in-docker daemon keeps
+        # its state between pipelines, so a fixed --name collides with the
+        # container the previous run left behind.
+        - scan_container=$(docker create pantahub-base-security-scan)
+        - docker start --attach "$scan_container" || scan_status=$?
         # Keep the SAST artifact uploadable whether or not the scan passed.
-        - docker cp security-scan-run:/src/gosec.sarif gosec.sarif || touch gosec.sarif
+        - docker cp "$scan_container:/src/gosec.sarif" gosec.sarif || true
+        - docker rm -f "$scan_container" > /dev/null || true
         - exit "$scan_status"
     artifacts:
         reports:
