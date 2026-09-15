@@ -186,20 +186,15 @@ func (s *elasticLogger) unregister(deleteIndex bool) error {
 	return nil
 }
 
-func (s *elasticLogger) getLogs(pctx context.Context, start int64, page int64, before *time.Time,
-	after *time.Time, query Filters, sort Sorts, cursor bool) (*Pager, error) {
-	queryFmt := fmt.Sprintf("%s-*/_search", s.elasticIndexPrefix)
-
-	queryURL, err := url.Parse(queryFmt)
-
-	if err != nil {
-		return nil, err
-	}
-
-	queryURI := s.elasticURL.ResolveReference(queryURL)
+// buildSearchSource assembles the Elasticsearch query body for a log page:
+// filters, paging (offset or search_after) and the sort tuple. It is kept
+// free of I/O so the query shape can be asserted directly in tests.
+func buildSearchSource(start int64, page int64, before *time.Time, after *time.Time,
+	query Filters, sort Sorts, searchAfter []interface{}) (interface{}, error) {
 
 	// build query part
 	q := elastic.NewBoolQuery()
+
 	if query.Owner != "" {
 		q = q.Filter(elastic.NewMatchPhraseQuery("own", query.Owner))
 	}
@@ -253,11 +248,27 @@ func (s *elasticLogger) getLogs(pctx context.Context, start int64, page int64, b
 	// build search
 	searchS := elastic.NewSearchSource().
 		Query(q).
-		From(int(start)).
 		Size(int(page))
 
-		// lets do the sort part
-	for _, v := range sort {
+	// search_after continues from the previous page's sort values and cannot
+	// be combined with a from offset.
+	if len(searchAfter) > 0 {
+		searchS = searchS.SearchAfter(searchAfter...)
+	} else if start > 0 {
+		searchS = searchS.From(int(start))
+	}
+
+	// Mirror the mongo backend's default rather than leaving the search
+	// unsorted: every clause above is a Filter, so scores are constant and an
+	// unsorted search comes back in index order.
+	if len(sort) == 0 {
+		sort = Sorts{"-time-created"}
+	}
+
+	// lets do the sort part
+	sorted := map[string]bool{}
+	primaryAsc := true
+	for i, v := range sort {
 		var asc bool
 		if v[0] == '-' {
 			asc = false
@@ -268,97 +279,43 @@ func (s *elasticLogger) getLogs(pctx context.Context, start int64, page int64, b
 		if v[0] == '+' || v[0] == '-' {
 			v = v[1:]
 		}
+		if i == 0 {
+			primaryAsc = asc
+		}
+		sorted[v] = true
 		searchS = searchS.Sort(v, asc)
 	}
 
-	searchBody, err := searchS.Source()
-	if err != nil {
-		return nil, err
+	// The sort tuple has to be (near-)unique. `time-created` is a
+	// millisecond-precision date, so one device batch lands many entries on
+	// the same value; ordering between them is then decided per shard and is
+	// not stable between two requests. That breaks search_after -- it cannot
+	// tell where the previous page ended -- and it used to silently drop every
+	// entry sharing the boundary millisecond when the caller paged with an
+	// exclusive before/after bound instead. tsec/tnano hold the full
+	// nanosecond event clock, so appending them makes the order total.
+	for _, tieBreaker := range []string{"tsec", "tnano"} {
+		if !sorted[tieBreaker] {
+			searchS = searchS.Sort(tieBreaker, primaryAsc)
+		}
 	}
 
-	// add scroll to query; XXX: we need limits here for
-	if cursor {
-		q1 := queryURI.Query()
-		q1.Add("scroll", "1m")
-		queryURI.RawQuery = q1.Encode()
-	}
-
-	response, err := s.r(defaultTimeoutSec, false).SetContext(pctx).SetBody(searchBody).Post(queryURI.String())
-	if err != nil {
-		return nil, err
-	}
-
-	if response.StatusCode() != http.StatusOK {
-		errStr := fmt.Sprintf("WARN: getLogs call failed: %d - %s\n", response.StatusCode(), response.Body())
-		return nil, errors.New(errStr)
-	}
-
-	var elasticResult elastic.SearchResult
-
-	body := response.Body()
-	err = json.Unmarshal(body, &elasticResult)
-
-	if err != nil {
-		return nil, err
-	}
-
-	var pagerResult Pager
-
-	pagerResult.Count = elasticResult.TotalHits()
-	pagerResult.Start = start
-	pagerResult.Page = int64(len(elasticResult.Hits.Hits))
-	pagerResult.NextCursor = elasticResult.ScrollId
-
-	prototype := Entry{}
-	arr := elasticResult.Each(reflect.TypeOf(&prototype))
-
-	for _, v := range arr {
-		pagerResult.Entries = append(pagerResult.Entries, v.(*Entry))
-	}
-	pagerResult.Count = int64(len(arr))
-
-	return &pagerResult, nil
+	return searchS.Source()
 }
 
-func (s *elasticLogger) scrollBuildNextURL(pretty bool) (string, url.Values, error) {
-	path := "/_search/scroll"
-
-	// Add query string parameters
-	params := url.Values{}
-
-	if pretty {
-		params.Set("pretty", "1")
-	}
-
-	return path, params, nil
-}
-
-func (s *elasticLogger) scrollBuildBodyNext(keepAlive string, scrollID string) (interface{}, error) {
-	body := struct {
-		Scroll   string `json:"scroll"`
-		ScrollID string `json:"scroll_id,omitempty"`
-	}{
-		Scroll:   keepAlive,
-		ScrollID: scrollID,
-	}
-	return body, nil
-}
-
-func (s *elasticLogger) getLogsByCursor(pctx context.Context, nextCursor string) (*Pager, error) {
-	queryFmt, values, err := s.scrollBuildNextURL(false)
-	if err != nil {
-		return nil, err
-	}
+func (s *elasticLogger) getLogs(pctx context.Context, start int64, page int64, before *time.Time,
+	after *time.Time, query Filters, sort Sorts, searchAfter []interface{}, cursor bool) (*Pager, error) {
+	queryFmt := fmt.Sprintf("%s-*/_search", s.elasticIndexPrefix)
 
 	queryURL, err := url.Parse(queryFmt)
+
 	if err != nil {
 		return nil, err
 	}
 
-	queryURL.RawQuery = values.Encode()
 	queryURI := s.elasticURL.ResolveReference(queryURL)
 
-	searchBody, err := s.scrollBuildBodyNext("1m", nextCursor)
+	searchBody, err := buildSearchSource(start, page, before, after, query, sort, searchAfter)
 	if err != nil {
 		return nil, err
 	}
@@ -384,10 +341,12 @@ func (s *elasticLogger) getLogsByCursor(pctx context.Context, nextCursor string)
 
 	var pagerResult Pager
 
-	pagerResult.Count = elasticResult.TotalHits()
-	pagerResult.Start = 0
+	pagerResult.Start = start
 	pagerResult.Page = int64(len(elasticResult.Hits.Hits))
-	pagerResult.NextCursor = elasticResult.ScrollId
+	// Total matching entries, not the size of this page. This used to be
+	// assigned from TotalHits and then immediately overwritten with the page
+	// length, so no caller could tell how much was left.
+	pagerResult.Count = elasticResult.TotalHits()
 
 	prototype := Entry{}
 	arr := elasticResult.Each(reflect.TypeOf(&prototype))
@@ -395,7 +354,23 @@ func (s *elasticLogger) getLogsByCursor(pctx context.Context, nextCursor string)
 	for _, v := range arr {
 		pagerResult.Entries = append(pagerResult.Entries, v.(*Entry))
 	}
-	pagerResult.Count = int64(len(arr))
+
+	// Hand back the last entry's sort values so the caller can continue with
+	// search_after. This is emitted for a short page too: a caller tailing a
+	// device needs to resume from exactly where it stopped, and re-issuing the
+	// same cursor later simply returns whatever has arrived since. Callers
+	// paging through a finite result set should stop when a page comes back
+	// shorter than the one they asked for, not when the cursor runs out.
+	if cursor && len(elasticResult.Hits.Hits) > 0 {
+		lastHit := elasticResult.Hits.Hits[len(elasticResult.Hits.Hits)-1]
+		if len(lastHit.Sort) > 0 {
+			encoded, err := json.Marshal(lastHit.Sort)
+			if err != nil {
+				return nil, err
+			}
+			pagerResult.NextCursor = string(encoded)
+		}
+	}
 
 	return &pagerResult, nil
 }
@@ -697,6 +672,25 @@ func newElasticLogger() (*elasticLogger, error) {
 					"type": "keyword",
 				},
 				"dev": bson.M{
+					"type": "keyword",
+				},
+				// These four are what queries actually filter and sort on, yet
+				// they had no mapping at all and relied on dynamic detection
+				// from whatever the first document of each daily index looked
+				// like. Pinning them keeps sorting well-defined (a `msg`-like
+				// text mapping would make `sort=time-created` fail outright)
+				// and consistent across indices.
+				"time-created": bson.M{
+					"type":   "date",
+					"format": "strict_date_optional_time||epoch_millis",
+				},
+				"tsec": bson.M{
+					"type": "long",
+				},
+				"tnano": bson.M{
+					"type": "long",
+				},
+				"rev": bson.M{
 					"type": "keyword",
 				},
 			},

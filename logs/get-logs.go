@@ -22,6 +22,7 @@
 package logs
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -33,6 +34,12 @@ import (
 )
 
 var maxPagination = int64(500)
+
+// cursorTTL is how long a next-cursor token stays usable. The cursor is
+// stateless (it just replays the query with a search_after bound), so this is
+// only a replay window and no longer has to stay under any server-side scroll
+// keep-alive.
+const cursorTTL = 15 * time.Minute
 
 // ## GET /logs/
 //
@@ -197,7 +204,7 @@ func (a *App) handleGetLogs(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	cursor := r.FormValue("cursor") != ""
-	result, err = a.backend.getLogs(r.Context(), startParamInt, pageParamInt, before, after, filter, logsSort, cursor)
+	result, err = a.backend.getLogs(r.Context(), startParamInt, pageParamInt, before, after, filter, logsSort, nil, cursor)
 
 	if err != nil {
 		utils.RestErrorWrapper(w, "ERROR: getting logs failed "+err.Error(), http.StatusInternalServerError)
@@ -205,22 +212,40 @@ func (a *App) handleGetLogs(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if result.NextCursor != "" {
-		claims := CursorClaim{
-			NextCursor: result.NextCursor,
-			StandardClaims: jwtgo.StandardClaims{
-				ExpiresAt: time.Now().Add(time.Duration(time.Minute * 2)).Unix(),
-				IssuedAt:  time.Now().Unix(),
-				Audience:  own.(string),
-			},
+		state := &CursorState{
+			Filter: *filter,
+			Before: before,
+			After:  after,
+			Sort:   logsSort,
+			Page:   pageParamInt,
 		}
-		token := jwtgo.NewWithClaims(jwtgo.GetSigningMethod(a.jwtMiddleware.SigningAlgorithm), claims)
-		ss, err := token.SignedString(a.jwtMiddleware.Key)
+		if err := json.Unmarshal([]byte(result.NextCursor), &state.SearchAfter); err != nil {
+			utils.RestErrorWrapper(w, "ERROR: building next-cursor: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		ss, err := a.signCursor(state, own.(string))
 		if err != nil {
-			utils.RestErrorWrapper(w, "ERROR: signing scrollid token: "+err.Error(), http.StatusInternalServerError)
+			utils.RestErrorWrapper(w, "ERROR: signing next-cursor token: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		result.NextCursor = ss
 	}
 
 	w.WriteJson(result)
+}
+
+// signCursor wraps the state needed to fetch the next page in a short-lived
+// token addressed to the calling user, so that a cursor cannot be replayed by
+// anyone else.
+func (a *App) signCursor(state *CursorState, owner string) (string, error) {
+	claims := CursorClaim{
+		State: state,
+		StandardClaims: jwtgo.StandardClaims{
+			ExpiresAt: time.Now().Add(cursorTTL).Unix(),
+			IssuedAt:  time.Now().Unix(),
+			Audience:  owner,
+		},
+	}
+	token := jwtgo.NewWithClaims(jwtgo.GetSigningMethod(a.jwtMiddleware.SigningAlgorithm), claims)
+	return token.SignedString(a.jwtMiddleware.Key)
 }

@@ -89,9 +89,14 @@ type Pager struct {
 
 // Backend logs interface
 type Backend interface {
+	// getLogs runs one page of a log query. searchAfter, when non-empty,
+	// carries the sort values of the last entry of the previous page and
+	// continues from just after it (keyset pagination); it is mutually
+	// exclusive with a non-zero start. When cursor is true the backend fills
+	// Pager.NextCursor with the sort values needed to fetch the next page,
+	// or leaves it empty when the backend cannot paginate that way.
 	getLogs(ctx context.Context, start int64, page int64, before *time.Time, after *time.Time,
-		query Filters, sort Sorts, cursor bool) (*Pager, error)
-	getLogsByCursor(ctx context.Context, nextCursor string) (*Pager, error)
+		query Filters, sort Sorts, searchAfter []interface{}, cursor bool) (*Pager, error)
 	postLogs(parentCtx context.Context, e []Entry, debug bool) error
 	register() error
 	unregister(deleteIndices bool) error
@@ -103,9 +108,25 @@ var ErrCursorTimedOut error = errors.New("cursor Invalid or expired")
 // ErrCursorNotImplemented cursor not implemented
 var ErrCursorNotImplemented error = errors.New("cursor not supported by backend")
 
+// CursorState is everything needed to continue a log query, so that paging
+// holds no server-side state at all. Previously the cursor was an
+// Elasticsearch scroll id, which pinned a scroll context on the cluster for
+// every request that asked for one and was never released; callers that only
+// ever fetch the first page (the UI's poller did exactly this) leaked one
+// context per poll. Carrying the query plus the previous page's sort values
+// instead lets the next page be re-issued as a plain search_after query.
+type CursorState struct {
+	Filter      Entry         `json:"f"`
+	Before      *time.Time    `json:"b,omitempty"`
+	After       *time.Time    `json:"a,omitempty"`
+	Sort        Sorts         `json:"s,omitempty"`
+	Page        int64         `json:"p,omitempty"`
+	SearchAfter []interface{} `json:"sa,omitempty"`
+}
+
 // CursorClaim claim log cursor
 type CursorClaim struct {
-	NextCursor string `json:"next-cursor"`
+	State *CursorState `json:"state,omitempty"`
 	jwtgo.StandardClaims
 }
 

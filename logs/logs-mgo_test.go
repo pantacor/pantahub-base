@@ -102,7 +102,7 @@ func testMongoGetLogs(t *testing.T) {
 	sort := Sorts{}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	pager, err := mgoTestLogger.getLogs(ctx, 0, -1, nil, nil, filter, sort, false)
+	pager, err := mgoTestLogger.getLogs(ctx, 0, -1, nil, nil, filter, sort, nil, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
@@ -140,7 +140,7 @@ func testMongoDoGetLogs(t *testing.T) {
 	sort := Sorts{}
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
-	pager, err := mgoTestLogger.getLogs(ctx, 0, 3, nil, nil, filter, sort, false)
+	pager, err := mgoTestLogger.getLogs(ctx, 0, 3, nil, nil, filter, sort, nil, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
@@ -152,7 +152,7 @@ func testMongoDoGetLogs(t *testing.T) {
 
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
-	pager, err = mgoTestLogger.getLogs(ctx, 1, 3, nil, nil, filter, sort, false)
+	pager, err = mgoTestLogger.getLogs(ctx, 1, 3, nil, nil, filter, sort, nil, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
@@ -162,7 +162,7 @@ func testMongoDoGetLogs(t *testing.T) {
 		t.Fail()
 	}
 
-	pager, err = mgoTestLogger.getLogs(ctx, 1, 1, nil, nil, filter, sort, false)
+	pager, err = mgoTestLogger.getLogs(ctx, 1, 1, nil, nil, filter, sort, nil, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
@@ -199,7 +199,7 @@ func testMongoDoGetLogsAfter(t *testing.T) {
 
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
-	pager, err := mgoTestLogger.getLogs(ctx, 0, 3, &timeBase, nil, filter, sort, false)
+	pager, err := mgoTestLogger.getLogs(ctx, 0, 3, &timeBase, nil, filter, sort, nil, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
@@ -211,7 +211,7 @@ func testMongoDoGetLogsAfter(t *testing.T) {
 
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
-	pager, err = mgoTestLogger.getLogs(ctx, 1, 3, &timeBase, nil, filter, sort, false)
+	pager, err = mgoTestLogger.getLogs(ctx, 1, 3, &timeBase, nil, filter, sort, nil, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())

@@ -71,37 +71,46 @@ func testElasticDoGetLogs(t *testing.T) {
 	sort := Sorts{}
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
-	pager, err := elasticTestLogger.getLogs(ctx, 0, 3, nil, nil, filter, sort, false)
+	pager, err := elasticTestLogger.getLogs(ctx, 0, 3, nil, nil, filter, sort, nil, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
+		t.Fail()
+	} else if len(pager.Entries) != 3 {
+		t.Errorf("pager should carry 3 entries, not %d", len(pager.Entries))
 		t.Fail()
 	} else if pager.Count != 3 {
-		t.Errorf("pager.Count should be 3, not %d", pager.Count)
+		t.Errorf("pager.Count is the total match count and should be 3, not %d", pager.Count)
 		t.Fail()
 	}
 
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
-	pager, err = elasticTestLogger.getLogs(ctx, 1, 3, nil, nil, filter, sort, false)
+	pager, err = elasticTestLogger.getLogs(ctx, 1, 3, nil, nil, filter, sort, nil, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
 		t.Fail()
-	} else if pager.Count != 2 {
-		t.Errorf("pager.Count should be 2, not %d", pager.Count)
+	} else if len(pager.Entries) != 2 {
+		t.Errorf("pager should carry 2 entries, not %d", len(pager.Entries))
+		t.Fail()
+	} else if pager.Count != 3 {
+		t.Errorf("pager.Count is the total match count and should be 3, not %d", pager.Count)
 		t.Fail()
 	}
 
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
-	pager, err = elasticTestLogger.getLogs(ctx, 1, 1, nil, nil, filter, sort, false)
+	pager, err = elasticTestLogger.getLogs(ctx, 1, 1, nil, nil, filter, sort, nil, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
 		t.Fail()
-	} else if pager.Count != 1 {
-		t.Errorf("pager.Count should be 1, not %d", pager.Count)
+	} else if len(pager.Entries) != 1 {
+		t.Errorf("pager should carry 1 entries, not %d", len(pager.Entries))
+		t.Fail()
+	} else if pager.Count != 3 {
+		t.Errorf("pager.Count is the total match count and should be 3, not %d", pager.Count)
 		t.Fail()
 	}
 }
@@ -131,25 +140,31 @@ func testElasticDoGetLogsAfter(t *testing.T) {
 	sort := Sorts{}
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
-	pager, err := elasticTestLogger.getLogs(ctx, 0, 3, &timeBase, nil, filter, sort, false)
+	pager, err := elasticTestLogger.getLogs(ctx, 0, 3, &timeBase, nil, filter, sort, nil, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
 		t.Fail()
+	} else if len(pager.Entries) != 2 {
+		t.Errorf("pager should carry 2 entries, not %d", len(pager.Entries))
+		t.Fail()
 	} else if pager.Count != 2 {
-		t.Errorf("pager.Count should be 2, not %d", pager.Count)
+		t.Errorf("pager.Count is the total match count and should be 2, not %d", pager.Count)
 		t.Fail()
 	}
 
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
-	pager, err = elasticTestLogger.getLogs(ctx, 1, 3, &timeBase, nil, filter, sort, false)
+	pager, err = elasticTestLogger.getLogs(ctx, 1, 3, &timeBase, nil, filter, sort, nil, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
 		t.Fail()
-	} else if pager.Count != 1 {
-		t.Errorf("pager.Count should be 1, not %d", pager.Count)
+	} else if len(pager.Entries) != 1 {
+		t.Errorf("pager should carry 1 entries, not %d", len(pager.Entries))
+		t.Fail()
+	} else if pager.Count != 2 {
+		t.Errorf("pager.Count is the total match count and should be 2, not %d", pager.Count)
 		t.Fail()
 	}
 }

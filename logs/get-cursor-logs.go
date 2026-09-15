@@ -22,8 +22,8 @@
 package logs
 
 import (
+	"encoding/json"
 	"net/http"
-	"time"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/dgrijalva/jwt-go"
@@ -61,19 +61,15 @@ func (a *App) handleGetLogsCursor(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	jsonBody := map[string]interface{}{}
-	err = r.DecodeJsonPayload(&jsonBody)
-	if err != nil {
-		utils.RestErrorWrapper(w, "Error decoding json request body: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-
+	// This route is served for GET as well as POST, and a GET carries no body,
+	// so a body that is missing or unparseable is not an error here -- the
+	// cursor is then expected in the query string below.
 	var nextCursorJWT string
-	nextCursor := jsonBody["next-cursor"]
-	if nextCursor == nil {
-		nextCursorJWT = ""
-	} else {
-		nextCursorJWT = nextCursor.(string)
+	jsonBody := map[string]interface{}{}
+	if err = r.DecodeJsonPayload(&jsonBody); err == nil {
+		if nextCursor, ok := jsonBody["next-cursor"].(string); ok {
+			nextCursorJWT = nextCursor
+		}
 	}
 	// if body doesnt have the cursor lets try query
 	if nextCursorJWT == "" {
@@ -98,26 +94,41 @@ func (a *App) handleGetLogsCursor(w rest.ResponseWriter, r *rest.Request) {
 			utils.RestErrorWrapper(w, "Calling user does not match owner of cursor-next", http.StatusForbidden)
 			return
 		}
-		nextCursor := claims.NextCursor
-		result, err = a.backend.getLogsByCursor(r.Context(), nextCursor)
+
+		state := claims.State
+		if state == nil {
+			utils.RestErrorWrapper(w, "next-cursor carries no query state", http.StatusBadRequest)
+			return
+		}
+
+		// The owner is re-asserted from the caller's own token rather than
+		// trusted from the cursor, so a cursor can never widen what its bearer
+		// is allowed to read.
+		filter := state.Filter
+		filter.Owner = own.(string)
+
+		result, err = a.backend.getLogs(r.Context(), 0, state.Page, state.Before, state.After,
+			&filter, state.Sort, state.SearchAfter, true)
 		if err != nil {
 			utils.RestErrorWrapper(w, "ERROR: getting logs failed "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		if result.NextCursor != "" {
-			claims := CursorClaim{
-				NextCursor: result.NextCursor,
-				StandardClaims: jwtgo.StandardClaims{
-					ExpiresAt: time.Now().Add(time.Duration(time.Minute * 2)).Unix(),
-					IssuedAt:  time.Now().Unix(),
-					Audience:  own.(string),
-				},
+			nextState := &CursorState{
+				Filter: filter,
+				Before: state.Before,
+				After:  state.After,
+				Sort:   state.Sort,
+				Page:   state.Page,
 			}
-			token := jwtgo.NewWithClaims(jwtgo.GetSigningMethod(a.jwtMiddleware.SigningAlgorithm), claims)
-			ss, err := token.SignedString(a.jwtMiddleware.Key)
+			if err := json.Unmarshal([]byte(result.NextCursor), &nextState.SearchAfter); err != nil {
+				utils.RestErrorWrapper(w, "ERROR: building next-cursor: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			ss, err := a.signCursor(nextState, own.(string))
 			if err != nil {
-				utils.RestErrorWrapper(w, "ERROR: signing scrollid token: "+err.Error(), http.StatusInternalServerError)
+				utils.RestErrorWrapper(w, "ERROR: signing next-cursor token: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
 			result.NextCursor = ss
@@ -128,5 +139,4 @@ func (a *App) handleGetLogsCursor(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	utils.RestErrorWrapper(w, "Unexpected Code", http.StatusInternalServerError)
-	return
 }
