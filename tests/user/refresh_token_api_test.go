@@ -47,7 +47,7 @@ func testValidToken(t *testing.T) {
 		t.Error(res)
 	}
 	account := helpers.GetUser(t, "test@gmail.com", MongoDb)
-	_, res = helpers.VerifyUserAccount(t, account.Id.Hex(), account.Challenge)
+	_, res = helpers.VerifyUserAccount(t, account.ID.Hex(), account.Challenge)
 	if res.StatusCode() != 200 {
 		t.Errorf("%s", "Error Verifying User Account:Expected Response code:200 but got:"+strconv.Itoa(res.StatusCode()))
 		t.Error(res)

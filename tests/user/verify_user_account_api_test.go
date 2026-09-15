@@ -48,7 +48,7 @@ func testValidAccount(t *testing.T) {
 		t.Error(res)
 	}
 	account := helpers.GetUser(t, "test@gmail.com", MongoDb)
-	result, res := helpers.VerifyUserAccount(t, account.Id.Hex(), account.Challenge)
+	result, res := helpers.VerifyUserAccount(t, account.ID.Hex(), account.Challenge)
 	if res.StatusCode() != 200 {
 		t.Errorf("%s", "Expected Response code:200 OK but got:"+strconv.Itoa(res.StatusCode()))
 	}
@@ -56,7 +56,7 @@ func testValidAccount(t *testing.T) {
 		"type":  "USER",
 		"email": "test@gmail.com",
 		"nick":  "testnick",
-		"prn":   "prn:::accounts:/" + account.Id.Hex(),
+		"prn":   "prn:::accounts:/" + account.ID.Hex(),
 	}
 	if helpers.CheckResult(result, expectedResult) {
 		log.Print(" Case 1:Passed")
@@ -70,7 +70,7 @@ func testValidAccount(t *testing.T) {
 	}
 	//Trying to verify again
 	log.Print(" Case 2:Verying account which is already verified")
-	result, res = helpers.VerifyUserAccount(t, account.Id.Hex(), account.Challenge)
+	result, res = helpers.VerifyUserAccount(t, account.ID.Hex(), account.Challenge)
 	if res.StatusCode() != 412 {
 		t.Errorf("Expected Response code:412 Precondition failed, but got:" + strconv.Itoa(res.StatusCode()))
 	}
@@ -100,7 +100,7 @@ func testInvalidAccount(t *testing.T) {
 	ObjectID, _ := primitive.ObjectIDFromHex("5c4da57680123b2d60b28060")
 	account.ID = ObjectID
 
-	result, res := helpers.VerifyUserAccount(t, account.Id.Hex(), account.Challenge)
+	result, res := helpers.VerifyUserAccount(t, account.ID.Hex(), account.Challenge)
 
 	if res.StatusCode() != 403 {
 		t.Errorf("%s", "Expected Response code 403:Forbidden failed but got:"+strconv.Itoa(res.StatusCode()))

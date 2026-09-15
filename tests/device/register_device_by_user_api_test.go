@@ -42,7 +42,7 @@ func TestRegisterDeviceAccountByUser(t *testing.T) {
 		t.Error(res)
 	}
 	account := helpers.GetUser(t, "test@gmail.com", MongoDb)
-	_, res = helpers.VerifyUserAccount(t, account.Id.Hex(), account.Challenge)
+	_, res = helpers.VerifyUserAccount(t, account.ID.Hex(), account.Challenge)
 	if res.StatusCode() != 200 {
 		t.Errorf("%s", "Error Verifying User Account:Expected Response code:200 but got:"+strconv.Itoa(res.StatusCode()))
 		t.Error(res)
@@ -58,7 +58,7 @@ func TestRegisterDeviceAccountByUser(t *testing.T) {
 	}
 	expectedResult := devices.Device{}
 	expectedResult.Secret = "123"
-	expectedResult.Owner = "prn:::accounts:/" + account.Id.Hex()
+	expectedResult.Owner = "prn:::accounts:/" + account.ID.Hex()
 	if expectedResult.Secret == result.Secret &&
 		expectedResult.Owner == result.Owner {
 		log.Print(" Case 1:Passed")

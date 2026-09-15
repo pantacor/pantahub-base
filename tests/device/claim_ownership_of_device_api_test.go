@@ -46,7 +46,7 @@ func testClaimValidDevice(t *testing.T) {
 		t.Error(res)
 	}
 	user := helpers.GetUser(t, "test@gmail.com", MongoDb) //Error handled inside the function
-	_, res = helpers.VerifyUserAccount(t, user.Id.Hex(), user.Challenge)
+	_, res = helpers.VerifyUserAccount(t, user.ID.Hex(), user.Challenge)
 	if res.StatusCode() != 200 {
 		t.Errorf("%s", "Error Verifying User Account:Expected Response code:200 but got:"+strconv.Itoa(res.StatusCode()))
 		t.Error(res)

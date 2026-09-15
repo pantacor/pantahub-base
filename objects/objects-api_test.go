@@ -113,6 +113,18 @@ func (m mockResponseWriter) Count() uint64 {
 	return m.Called().Get(0).(uint64)
 }
 
+// Write satisfies rest.ResponseWriter. The Pantacor go-json-rest fork widened
+// that interface with Write and Count (upstream has neither), which is what
+// stopped this mock compiling.
+//
+// Unlike the other methods this does not go through m.Called(): no test sets an
+// expectation for Write, and mock.Mock panics on an unexpected call. Delegating
+// straight to the recorder keeps the bytes observable without forcing every
+// existing test to declare an expectation it does not care about.
+func (m mockResponseWriter) Write(b []byte) (int, error) {
+	return m.Recorder.Write(b)
+}
+
 func (m mockResponseWriter) EncodeJson(v interface{}) ([]byte, error) {
 	args := m.Called(v)
 	if args.Get(0) == nil {
