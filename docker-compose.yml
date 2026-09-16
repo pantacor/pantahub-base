@@ -145,7 +145,7 @@ services:
                 condition: service_started
             kafka-connect:
                 condition: service_healthy
-        restart: on-failure
+        restart: "no"
         command: /docker-entrypoint
 
     fluentd:
@@ -190,7 +190,7 @@ services:
         mem_limit: 1g
         cap_add:
             - IPC_LOCK
-        restart: always
+        restart: "no"
         volumes:
             - elastic-data:/usr/share/elasticsearch/data
 
@@ -216,7 +216,7 @@ services:
             memlock:
                 soft: -1
                 hard: -1
-        restart: always
+        restart: "no"
         depends_on:
             - elasticsearch
         ports:
@@ -458,7 +458,7 @@ services:
             - ./.env.local
         environment:
             - PANTAHUB_GC_API=http://gc:2000
-        restart: unless-stopped
+        restart: "no"
 
     nginx:
         image: nginx:alpine

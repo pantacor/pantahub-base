@@ -20,6 +20,7 @@
 package trails
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
@@ -30,6 +31,7 @@ import (
 	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-base/utils/querymongo"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -110,6 +112,20 @@ func (a *App) handleGetStep(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if err != nil {
+		// A revision that does not exist is the normal case, not a server
+		// fault: every Pantavisor device polls for its next revision before it
+		// has been created. Answering 500 here meant each poll from each device
+		// minted an incident id and forwarded it to fluentd -- on stage that was
+		// ~780 false incidents every three minutes -- and told the device its
+		// own read had failed rather than "nothing new yet".
+		//
+		// The query is already scoped by owner (users) or device, so a 404
+		// reveals only that the CALLER's own revision is absent; it is not an
+		// enumeration oracle over other accounts' trails.
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			utils.RestErrorWrapper(w, "No step "+rev+" for trail "+trailID, http.StatusNotFound)
+			return
+		}
 		utils.RestErrorWrapper(w, "No access", http.StatusInternalServerError)
 		return
 	}
