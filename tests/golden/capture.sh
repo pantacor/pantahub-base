@@ -107,7 +107,14 @@ normalise_body() {
                   with_entries(.value =
                     if (.key | test("^(device-meta|sysinfo|storage)$"; "i"))
                     then "<VOLATILE-SUBTREE>"
-                    elif (.key | test("^(id|_id|timestamp|time-?modified|time-?created|last-?seen|rev|garbage|exp|iat|tsec|tnano|dev|device|trail-touched|status-changed|meta-modified)$"; "i"))
+                    # Live fleet state: the Fleet service drives deployments on
+                    # these devices continuously, so user-meta fleet.* values and
+                    # the trail summary progress fields change between two
+                    # captures seconds apart. Key NAMES stay under contract; the
+                    # values are simulation state, not API behaviour.
+                    elif (.key | test("^(fleet\\.|progress-revision$|progress-time$|revision$|state-sha$|step-time$|trail-touched-time$)"; "i"))
+                    then "<VAR>"
+                    elif (.key | test("^(id|_id|timestamp|time-?modified|time-?created|last-?seen|rev|garbage|exp|iat|tsec|tnano|dev|device|trail-touched|status-changed|meta-modified|last-?touched|last-?insync)$"; "i"))
                     then "<VAR>" else .value end)
                 else . end)' < "$f" 2>/dev/null \
       | sed -E 's/REST-ERR-ID-[0-9]+/REST-ERR-ID-<VAR>/g'
@@ -153,6 +160,39 @@ discover_ids() {
   mkdir -p "$outdir"; echo "DEV='$DEV'" > "$outdir/IDS"
 }
 
+# Fetch a URL into <base>.hdr.raw / <base>.body.raw, retrying ONCE on a 5xx.
+#
+# Stage's Elasticsearch occasionally times out (observed:
+# "pv-elastic-sticky:9200 ... Client.Timeout exceeded while awaiting headers"),
+# which made /logs/ answer 500 in one capture and 200 in the next -- a diff that
+# looks like a contract regression but is infrastructure noise, and the fastest
+# way to teach everyone to ignore this tool's output.
+#
+# The retry is deliberately ONE attempt and it does NOT suppress the result: if
+# the endpoint is genuinely broken, the second try fails too and the 5xx is
+# recorded and diffed as it should be. A retry is reported on stderr so a
+# flapping endpoint stays visible rather than silently smoothed over.
+fetch() {
+  local base="$1" url="$2" authed="$3" noretry="${4:-}" attempt status
+  for attempt in 1 2; do
+    if [ "$authed" = "auth" ]; then
+      timeout 60 pvr curl -s -D "$base.hdr.raw" -o "$base.body.raw" -A "$UA" "$url" >/dev/null 2>&1
+    else
+      curl -s -D "$base.hdr.raw" -o "$base.body.raw" -A "$UA" --max-time 20 "$url" >/dev/null 2>&1
+    fi
+    status="$(head -1 "$base.hdr.raw" 2>/dev/null | tr -d '\r')"
+    case "$status" in
+      *" 5"*)
+        # Routes whose pinned contract IS a 5xx (the malformed-id probes) pass
+        # noretry: retrying them would waste a request and, worse, label a
+        # deterministic status "transient" in the output.
+        [ -n "$noretry" ] && break
+        [ "$attempt" = 1 ] && { echo "  retrying after transient $status on $url" >&2; sleep 2; continue; } ;;
+    esac
+    break
+  done
+}
+
 capture() {
   local outdir="$1"
   rm -rf "$outdir"; mkdir -p "$outdir/authed" "$outdir/unauth" "$outdir/slash" "$outdir/param"
@@ -164,16 +204,14 @@ capture() {
   echo "== authenticated (via pvr curl) =="
   for p in "${AUTHED_PATHS[@]}"; do
     local s; s="$(slug "$p")"
-    timeout 60 pvr curl -s -D "$outdir/authed/$s.hdr.raw" -o "$outdir/authed/$s.body.raw" \
-      -A "$UA" "$API$p" >/dev/null 2>&1
+    fetch "$outdir/authed/$s" "$API$p" auth
     finalise "$outdir/authed/$s" "$p"
   done
 
   echo "== unauthenticated (401 contract) =="
   for p in "${UNAUTH_PATHS[@]}"; do
     local s; s="$(slug "$p")"
-    curl -s -D "$outdir/unauth/$s.hdr.raw" -o "$outdir/unauth/$s.body.raw" \
-      -A "$UA" --max-time 20 "$API$p" >/dev/null 2>&1
+    fetch "$outdir/unauth/$s" "$API$p" noauth
     finalise "$outdir/unauth/$s" "$p"
   done
 
@@ -185,8 +223,7 @@ capture() {
       # Slug from the TEMPLATE, not the concrete path, so filenames stay stable
       # across environments and the diff lines up even if the id changes.
       s="$(slug "${tpl//\{DEV\}/ID}")"
-      timeout 60 pvr curl -s -D "$outdir/param/$s.hdr.raw" -o "$outdir/param/$s.body.raw" \
-        -A "$UA" "$API$p" >/dev/null 2>&1
+      fetch "$outdir/param/$s" "$API$p" auth
       # Mask the concrete id so baseline and candidate agree textually.
       sed -i "s/$DEV/<DEV>/g" "$outdir/param/$s.body.raw" 2>/dev/null
       finalise "$outdir/param/$s" "$tpl"
@@ -198,8 +235,7 @@ capture() {
   echo "== malformed identifiers (current behaviour, incl. the /trails 500) =="
   for p in "${BADPARAM_PATHS[@]}"; do
     local s; s="$(slug "$p")"
-    timeout 60 pvr curl -s -D "$outdir/param/$s.hdr.raw" -o "$outdir/param/$s.body.raw" \
-      -A "$UA" "$API$p" >/dev/null 2>&1
+    fetch "$outdir/param/$s" "$API$p" auth noretry
     finalise "$outdir/param/$s" "$p"
   done
 
