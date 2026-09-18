@@ -1,8 +1,45 @@
 
+<a name="056"></a>
+## [056](https://gitlab.com/pantacor/pantahub-base/compare/055...056)
+
+> 2026-09-18
+
+### Build
+
+* bump x/crypto, grpc and moby/go-archive out of known vulnerabilities
+
+### Feat
+
+* migrate the API from go-json-rest to echo
+
+### Fix
+
+* **trails:** answer 404, not 500, for a revision that does not exist
+
+### Refactor
+
+* **jwt:** vendor the go-json-rest JWT middleware fork
+
+### Test
+
+* repair the five test files that no longer compiled
+* **golden:** keep the harness stable against a live, moving fleet
+* **golden:** pin the 500 a device gets when polling for a missing revision
+* **golden:** cover path-parameter routes and malformed identifiers
+* **golden:** capture the HTTP contract before the echo migration
+* **jwt:** freeze v3-minted tokens as a wire-compatibility guard
+* **logs:** run the Mongo-backed tests, and correct their pager expectations
+* **mongo:** start a throwaway replica set with testcontainers
+
+
 <a name="055"></a>
 ## [055](https://gitlab.com/pantacor/pantahub-base/compare/054...055)
 
 > 2026-09-15
+
+### Chore
+
+* update CHANGELOG.md for release 055
 
 ### Ci
 
