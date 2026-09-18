@@ -1,4 +1,4 @@
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -104,10 +104,7 @@ func testCreateTrailOfInvalidDevice(t *testing.T) {
 		t.Errorf("%s", "Error Login User Account:Expected Response code:200 but got:"+strconv.Itoa(res.StatusCode()))
 		t.Error(res)
 	}
-	// models.Device.ID is a primitive.ObjectID, so the literal hex string this
-	// test used to assign no longer compiles. The id is deliberately one that
-	// does not exist -- the assertion below is that creating a trail for it is
-	// rejected with 401.
+	// Deliberately nonexistent device id.
 	invalidDeviceID, err := primitive.ObjectIDFromHex("5c4dcf7d80123b2f2c7e96e2")
 	if err != nil {
 		t.Fatalf("parsing the fixture device id: %v", err)

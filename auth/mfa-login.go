@@ -1,4 +1,4 @@
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,12 +22,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/auth/authmodels"
 	"gitlab.com/pantacor/pantahub-base/auth/authservices"
 	"gitlab.com/pantacor/pantahub-base/auth/mfaservice"
 	"gitlab.com/pantacor/pantahub-base/auth/storage"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 )
 
 // maybeStartMFALogin decides whether a password login must step up to a
@@ -37,7 +38,7 @@ import (
 //
 // Personal access tokens presented as the password are the machine channel
 // and stay exempt from the step-up (like the device x509 and session paths).
-func (a *App) maybeStartMFALogin(writer rest.ResponseWriter, r *rest.Request, payload *authmodels.LoginRequestPayload) (handled bool) {
+func (a *App) maybeStartMFALogin(c *echo.Context, payload *authmodels.LoginRequestPayload) (handled bool) {
 	if !mfaFeatureEnabled() || a.mfaRepo == nil {
 		return false
 	}
@@ -51,7 +52,7 @@ func (a *App) maybeStartMFALogin(writer rest.ResponseWriter, r *rest.Request, pa
 		return false
 	}
 
-	ctx, cancel := context.WithTimeout(r.Request.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
 	settings, err := a.mfaRepo.GetByOwner(ctx, account.Prn)
@@ -59,7 +60,7 @@ func (a *App) maybeStartMFALogin(writer rest.ResponseWriter, r *rest.Request, pa
 		// fail closed: if we cannot read the MFA state we must NOT fall
 		// through to a single-factor login for an account that may be
 		// MFA-protected. A DB blip must never strip the second factor.
-		utils.RestErrorWrapperUser(writer, "Error with database connectivity", "Please try again later", http.StatusServiceUnavailable)
+		_ = echoutil.RestErrorWrapperUser(c, "Error with database connectivity", "Please try again later", http.StatusServiceUnavailable)
 		return true
 	}
 	if settings == nil || !settings.Enabled {
@@ -73,8 +74,8 @@ func (a *App) maybeStartMFALogin(writer rest.ResponseWriter, r *rest.Request, pa
 
 	// MFA account with a password credential: verify it ourselves, then
 	// hand out the pending token instead of a session
-	if !a.jwtMiddleware.Authenticator(payload.Username, payload.Password) {
-		utils.RestErrorWrite(writer, &utils.RError{
+	if !a.jwtConfig.Authenticator(payload.Username, payload.Password) {
+		_ = echoutil.RestErrorWrite(c, &utils.RError{
 			Msg:   "Authentication Failed",
 			Error: "Authentication Failed",
 			Code:  http.StatusUnauthorized,
@@ -85,7 +86,7 @@ func (a *App) maybeStartMFALogin(writer rest.ResponseWriter, r *rest.Request, pa
 	methods := a.availableMFAMethods(ctx, settings)
 
 	mfaToken, err := mfaservice.CreateMFAPendingToken(
-		a.jwtMiddleware,
+		a.jwtConfig,
 		payload.Username,
 		account.Prn,
 		payload.Scope,
@@ -93,12 +94,12 @@ func (a *App) maybeStartMFALogin(writer rest.ResponseWriter, r *rest.Request, pa
 		methods,
 	)
 	if err != nil {
-		utils.RestErrorWrapper(writer, "Error creating MFA token", http.StatusInternalServerError)
+		_ = echoutil.RestErrorWrapper(c, "Error creating MFA token", http.StatusInternalServerError)
 		return true
 	}
 
-	noStore(writer)
-	writer.WriteJson(authmodels.MFARequiredResponse{
+	noStore(c)
+	_ = echoutil.WriteJSON(c, http.StatusOK, authmodels.MFARequiredResponse{
 		MFARequired: true,
 		MFAToken:    mfaToken,
 		Methods:     methods,
@@ -126,35 +127,35 @@ func (a *App) availableMFAMethods(ctx context.Context, settings *storage.MFASett
 
 // mfaPendingFromRequest validates the pending token and loads the matching
 // MFA settings; writes the (deliberately generic) error responses itself.
-func (a *App) mfaPendingFromRequest(writer rest.ResponseWriter, r *rest.Request, mfaToken string) (*mfaservice.MFAPendingClaims, *storage.MFASettings, bool) {
-	userAgent := r.Header.Get("User-Agent")
+func (a *App) mfaPendingFromRequest(c *echo.Context, mfaToken string) (*mfaservice.MFAPendingClaims, *storage.MFASettings, bool) {
+	userAgent := c.Request().Header.Get("User-Agent")
 	if userAgent == "" {
-		utils.RestErrorWrapperUser(writer, "No Access (DOS) - no UserAgent", "Incompatible Client; upgrade pantavisor", http.StatusForbidden)
+		_ = echoutil.RestErrorWrapperUser(c, "No Access (DOS) - no UserAgent", "Incompatible Client; upgrade pantavisor", http.StatusForbidden)
 		return nil, nil, false
 	}
 
 	if !mfaFeatureEnabled() || a.mfaRepo == nil {
-		utils.RestErrorWrapperUser(writer, "MFA is not enabled on this server", "MFA is not enabled on this server", http.StatusNotImplemented)
+		_ = echoutil.RestErrorWrapperUser(c, "MFA is not enabled on this server", "MFA is not enabled on this server", http.StatusNotImplemented)
 		return nil, nil, false
 	}
 
-	claims, err := mfaservice.ParseMFAPendingToken(a.jwtMiddleware, mfaToken)
+	claims, err := mfaservice.ParseMFAPendingToken(a.jwtConfig, mfaToken)
 	if err != nil {
-		utils.RestErrorWrapperUser(writer, "Authentication Failed", "Authentication Failed", http.StatusUnauthorized)
+		_ = echoutil.RestErrorWrapperUser(c, "Authentication Failed", "Authentication Failed", http.StatusUnauthorized)
 		return nil, nil, false
 	}
 
-	ctx, cancel := context.WithTimeout(r.Request.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
 	settings, err := a.mfaRepo.GetByOwner(ctx, claims.Prn)
 	if err != nil || settings == nil || !settings.Enabled {
-		utils.RestErrorWrapperUser(writer, "Authentication Failed", "Authentication Failed", http.StatusUnauthorized)
+		_ = echoutil.RestErrorWrapperUser(c, "Authentication Failed", "Authentication Failed", http.StatusUnauthorized)
 		return nil, nil, false
 	}
 
 	if settings.IsLocked(time.Now()) {
-		utils.RestErrorWrapperUser(writer, "Too many attempts; try again later", "Too many attempts; try again later", http.StatusTooManyRequests)
+		_ = echoutil.RestErrorWrapperUser(c, "Too many attempts; try again later", "Too many attempts; try again later", http.StatusTooManyRequests)
 		return nil, nil, false
 	}
 
@@ -163,23 +164,22 @@ func (a *App) mfaPendingFromRequest(writer rest.ResponseWriter, r *rest.Request,
 
 // mfaLoginFailure counts a failed proof and answers with a generic 401 (or
 // 429 when the failure crossed the lockout threshold)
-func (a *App) mfaLoginFailure(writer rest.ResponseWriter, r *rest.Request, ownerPrn string) {
-	ctx, cancel := context.WithTimeout(r.Request.Context(), 10*time.Second)
+func (a *App) mfaLoginFailure(c *echo.Context, ownerPrn string) error {
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
 	locked, err := a.mfaRepo.RegisterFailure(ctx, ownerPrn, mfaservice.MaxMFAFailures, mfaservice.MFALockDuration)
 	if err == nil && locked {
-		utils.RestErrorWrapperUser(writer, "Too many attempts; try again later", "Too many attempts; try again later", http.StatusTooManyRequests)
-		return
+		return echoutil.RestErrorWrapperUser(c, "Too many attempts; try again later", "Too many attempts; try again later", http.StatusTooManyRequests)
 	}
 
-	utils.RestErrorWrapperUser(writer, "Authentication Failed", "Authentication Failed", http.StatusUnauthorized)
+	return echoutil.RestErrorWrapperUser(c, "Authentication Failed", "Authentication Failed", http.StatusUnauthorized)
 }
 
 // mfaLoginSuccess consumes the single-use pending token and mints the full
 // session token with the authentication-methods (amr) trail
-func (a *App) mfaLoginSuccess(writer rest.ResponseWriter, r *rest.Request, claims *mfaservice.MFAPendingClaims, factor string) {
-	ctx, cancel := context.WithTimeout(r.Request.Context(), 10*time.Second)
+func (a *App) mfaLoginSuccess(c *echo.Context, claims *mfaservice.MFAPendingClaims, factor string) error {
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
 	payload := &authmodels.LoginRequestPayload{
@@ -197,19 +197,17 @@ func (a *App) mfaLoginSuccess(writer rest.ResponseWriter, r *rest.Request, claim
 	// the user retry instead of stranding a valid, already-proven login.
 	// Single-use is still enforced: the token is only released after
 	// ConsumeJTI succeeds (its unique insert rejects a replayed/raced jti).
-	tokenString, rerr := authservices.MintAuthenticatedUserToken(payload, extraClaims, a.jwtMiddleware, a.mongoClient)
+	tokenString, rerr := authservices.MintAuthenticatedUserToken(payload, extraClaims, a.jwtConfig, a.mongoClient)
 	if rerr != nil {
-		utils.RestErrorWrite(writer, rerr)
-		return
+		return echoutil.RestErrorWrite(c, rerr)
 	}
 
 	if err := a.mfaRepo.ConsumeJTI(ctx, claims.ID, claims.ExpiresAt.Time); err != nil {
-		utils.RestErrorWrapperUser(writer, "Authentication Failed", "Authentication Failed", http.StatusUnauthorized)
-		return
+		return echoutil.RestErrorWrapperUser(c, "Authentication Failed", "Authentication Failed", http.StatusUnauthorized)
 	}
 
-	noStore(writer)
-	writer.WriteJson(authmodels.TokenResponse{
+	noStore(c)
+	return echoutil.WriteJSON(c, http.StatusOK, authmodels.TokenResponse{
 		Token: tokenString,
 	})
 }
@@ -226,45 +224,40 @@ func (a *App) mfaLoginSuccess(writer rest.ResponseWriter, r *rest.Request, claim
 // @Failure 429 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /auth/login/mfa/totp [post]
-func (a *App) handlePostLoginMFATOTP(writer rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePostLoginMFATOTP(c *echo.Context) error {
 	payload := &authmodels.MFALoginRequest{}
-	if err := r.DecodeJsonPayload(payload); err != nil {
-		utils.RestErrorWrapper(writer, "Failed to decode request", http.StatusBadRequest)
-		return
+	if err := echoutil.DecodeJsonPayload(c, payload); err != nil {
+		return echoutil.RestErrorWrapper(c, "Failed to decode request", http.StatusBadRequest)
 	}
 
-	claims, settings, ok := a.mfaPendingFromRequest(writer, r, payload.MFAToken)
+	claims, settings, ok := a.mfaPendingFromRequest(c, payload.MFAToken)
 	if !ok {
-		return
+		return nil
 	}
 
 	if !claims.HasMethod(authmodels.MFAMethodTOTP) || !settings.HasConfirmedTOTP() {
-		utils.RestErrorWrapperUser(writer, "Authentication Failed", "Authentication Failed", http.StatusUnauthorized)
-		return
+		return echoutil.RestErrorWrapperUser(c, "Authentication Failed", "Authentication Failed", http.StatusUnauthorized)
 	}
 
 	secret, err := mfaservice.DecryptSecret(settings.TOTP.SecretEnc)
 	if err != nil {
-		utils.RestErrorWrapper(writer, "Error reading TOTP secret", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error reading TOTP secret", http.StatusInternalServerError)
 	}
 
 	step, valid := mfaservice.VerifyTOTPCode(secret, payload.Code, time.Now())
 	if !valid {
-		a.mfaLoginFailure(writer, r, claims.Prn)
-		return
+		return a.mfaLoginFailure(c, claims.Prn)
 	}
 
-	ctx, cancel := context.WithTimeout(r.Request.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
 	// atomic: rejects codes from an already-consumed time step (replay)
 	if err := a.mfaRepo.UseTOTPStep(ctx, claims.Prn, step); err != nil {
-		a.mfaLoginFailure(writer, r, claims.Prn)
-		return
+		return a.mfaLoginFailure(c, claims.Prn)
 	}
 
-	a.mfaLoginSuccess(writer, r, claims, "otp")
+	return a.mfaLoginSuccess(c, claims, "otp")
 }
 
 // @Summary Complete a pending login with a recovery code
@@ -279,37 +272,33 @@ func (a *App) handlePostLoginMFATOTP(writer rest.ResponseWriter, r *rest.Request
 // @Failure 429 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /auth/login/mfa/recovery [post]
-func (a *App) handlePostLoginMFARecovery(writer rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePostLoginMFARecovery(c *echo.Context) error {
 	payload := &authmodels.MFALoginRequest{}
-	if err := r.DecodeJsonPayload(payload); err != nil {
-		utils.RestErrorWrapper(writer, "Failed to decode request", http.StatusBadRequest)
-		return
+	if err := echoutil.DecodeJsonPayload(c, payload); err != nil {
+		return echoutil.RestErrorWrapper(c, "Failed to decode request", http.StatusBadRequest)
 	}
 
-	claims, settings, ok := a.mfaPendingFromRequest(writer, r, payload.MFAToken)
+	claims, settings, ok := a.mfaPendingFromRequest(c, payload.MFAToken)
 	if !ok {
-		return
+		return nil
 	}
 
 	if !claims.HasMethod(authmodels.MFAMethodRecovery) {
-		utils.RestErrorWrapperUser(writer, "Authentication Failed", "Authentication Failed", http.StatusUnauthorized)
-		return
+		return echoutil.RestErrorWrapperUser(c, "Authentication Failed", "Authentication Failed", http.StatusUnauthorized)
 	}
 
 	index, valid := mfaservice.VerifyRecoveryCode(settings.RecoveryCodes, payload.Code)
 	if !valid {
-		a.mfaLoginFailure(writer, r, claims.Prn)
-		return
+		return a.mfaLoginFailure(c, claims.Prn)
 	}
 
-	ctx, cancel := context.WithTimeout(r.Request.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
 	// atomic: a code can only ever be consumed once
 	if err := a.mfaRepo.UseRecoveryCode(ctx, claims.Prn, index); err != nil {
-		a.mfaLoginFailure(writer, r, claims.Prn)
-		return
+		return a.mfaLoginFailure(c, claims.Prn)
 	}
 
-	a.mfaLoginSuccess(writer, r, claims, "recovery")
+	return a.mfaLoginSuccess(c, claims, "recovery")
 }

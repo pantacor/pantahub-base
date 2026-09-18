@@ -1,0 +1,1126 @@
+{
+  "DELETE /webhooks/h1 token=all": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "DELETE",
+      "Path": "/webhooks/h1",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "prn:::accounts:/u1",
+      "Owner": "prn:::accounts:/u1",
+      "Type": "USER",
+      "Scopes": "prn:pantahub.com:apis:/base/all",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "DELETE /webhooks/h1 token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "Upstream": null
+  },
+  "DELETE /webhooks/h1 token=noscopes": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/all prn:pantahub.com:apis:/base/webhooks prn:pantahub.com:apis:/base/webhooks.write\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t",
+    "Body": "{\"error\":\"\u003cvolatile\u003e\",\"code\":403}",
+    "Upstream": null
+  },
+  "DELETE /webhooks/h1 token=readonly": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/all prn:pantahub.com:apis:/base/webhooks prn:pantahub.com:apis:/base/webhooks.write\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t",
+    "Body": "{\"error\":\"\u003cvolatile\u003e\",\"code\":403}",
+    "Upstream": null
+  },
+  "GET /webhooks/ token=all": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "GET",
+      "Path": "/webhooks/",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "prn:::accounts:/u1",
+      "Owner": "prn:::accounts:/u1",
+      "Type": "USER",
+      "Scopes": "prn:pantahub.com:apis:/base/all",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "GET /webhooks/ token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "Upstream": null
+  },
+  "GET /webhooks/ token=noscopes": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/all prn:pantahub.com:apis:/base/all.readonly prn:pantahub.com:apis:/base/webhooks prn:pantahub.com:apis:/base/webhooks.readonly\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t",
+    "Body": "{\"error\":\"\u003cvolatile\u003e\",\"code\":403}",
+    "Upstream": null
+  },
+  "GET /webhooks/ token=readonly": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "GET",
+      "Path": "/webhooks/",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "prn:::accounts:/u1",
+      "Owner": "prn:::accounts:/u1",
+      "Type": "USER",
+      "Scopes": "prn:pantahub.com:apis:/base/webhooks.readonly",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "GET /webhooks/?b=2\u0026a=1\u0026a=0 token=all": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "GET",
+      "Path": "/webhooks/",
+      "RawQuery": "b=2\u0026a=1\u0026a=0",
+      "Body": "",
+      "Caller": "prn:::accounts:/u1",
+      "Owner": "prn:::accounts:/u1",
+      "Type": "USER",
+      "Scopes": "prn:pantahub.com:apis:/base/all",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "GET /webhooks/?b=2\u0026a=1\u0026a=0 token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "Upstream": null
+  },
+  "GET /webhooks/?b=2\u0026a=1\u0026a=0 token=noscopes": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/all prn:pantahub.com:apis:/base/all.readonly prn:pantahub.com:apis:/base/webhooks prn:pantahub.com:apis:/base/webhooks.readonly\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t",
+    "Body": "{\"error\":\"\u003cvolatile\u003e\",\"code\":403}",
+    "Upstream": null
+  },
+  "GET /webhooks/?b=2\u0026a=1\u0026a=0 token=readonly": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "GET",
+      "Path": "/webhooks/",
+      "RawQuery": "b=2\u0026a=1\u0026a=0",
+      "Body": "",
+      "Caller": "prn:::accounts:/u1",
+      "Owner": "prn:::accounts:/u1",
+      "Type": "USER",
+      "Scopes": "prn:pantahub.com:apis:/base/webhooks.readonly",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "GET /webhooks/a/b/c/d token=all": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Body": "{\"Error\":\"Resource not found\"}",
+    "Upstream": null
+  },
+  "GET /webhooks/a/b/c/d token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "Upstream": null
+  },
+  "GET /webhooks/a/b/c/d token=noscopes": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Body": "{\"Error\":\"Resource not found\"}",
+    "Upstream": null
+  },
+  "GET /webhooks/a/b/c/d token=readonly": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Body": "{\"Error\":\"Resource not found\"}",
+    "Upstream": null
+  },
+  "GET /webhooks/event-types token=all": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "GET",
+      "Path": "/webhooks/event-types",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "",
+      "Owner": "",
+      "Type": "",
+      "Scopes": "",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "GET /webhooks/event-types token=none": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "GET",
+      "Path": "/webhooks/event-types",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "",
+      "Owner": "",
+      "Type": "",
+      "Scopes": "",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "GET /webhooks/event-types token=noscopes": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "GET",
+      "Path": "/webhooks/event-types",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "",
+      "Owner": "",
+      "Type": "",
+      "Scopes": "",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "GET /webhooks/event-types token=readonly": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "GET",
+      "Path": "/webhooks/event-types",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "",
+      "Owner": "",
+      "Type": "",
+      "Scopes": "",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "GET /webhooks/event-types/x token=all": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Body": "{\"Error\":\"Resource not found\"}",
+    "Upstream": null
+  },
+  "GET /webhooks/event-types/x token=none": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Body": "{\"Error\":\"Resource not found\"}",
+    "Upstream": null
+  },
+  "GET /webhooks/event-types/x token=noscopes": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Body": "{\"Error\":\"Resource not found\"}",
+    "Upstream": null
+  },
+  "GET /webhooks/event-types/x token=readonly": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Body": "{\"Error\":\"Resource not found\"}",
+    "Upstream": null
+  },
+  "GET /webhooks/events token=all": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "GET",
+      "Path": "/webhooks/events",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "prn:::accounts:/u1",
+      "Owner": "prn:::accounts:/u1",
+      "Type": "USER",
+      "Scopes": "prn:pantahub.com:apis:/base/all",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "GET /webhooks/events token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "Upstream": null
+  },
+  "GET /webhooks/events token=noscopes": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/all prn:pantahub.com:apis:/base/all.readonly prn:pantahub.com:apis:/base/webhooks prn:pantahub.com:apis:/base/webhooks.readonly\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t",
+    "Body": "{\"error\":\"\u003cvolatile\u003e\",\"code\":403}",
+    "Upstream": null
+  },
+  "GET /webhooks/events token=readonly": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "GET",
+      "Path": "/webhooks/events",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "prn:::accounts:/u1",
+      "Owner": "prn:::accounts:/u1",
+      "Type": "USER",
+      "Scopes": "prn:pantahub.com:apis:/base/webhooks.readonly",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "GET /webhooks/events/deliveries token=all": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "GET",
+      "Path": "/webhooks/events/deliveries",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "prn:::accounts:/u1",
+      "Owner": "prn:::accounts:/u1",
+      "Type": "USER",
+      "Scopes": "prn:pantahub.com:apis:/base/all",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "GET /webhooks/events/deliveries token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "Upstream": null
+  },
+  "GET /webhooks/events/deliveries token=noscopes": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/all prn:pantahub.com:apis:/base/all.readonly prn:pantahub.com:apis:/base/webhooks prn:pantahub.com:apis:/base/webhooks.readonly\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t",
+    "Body": "{\"error\":\"\u003cvolatile\u003e\",\"code\":403}",
+    "Upstream": null
+  },
+  "GET /webhooks/events/deliveries token=readonly": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "GET",
+      "Path": "/webhooks/events/deliveries",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "prn:::accounts:/u1",
+      "Owner": "prn:::accounts:/u1",
+      "Type": "USER",
+      "Scopes": "prn:pantahub.com:apis:/base/webhooks.readonly",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "GET /webhooks/events/e1 token=all": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "GET",
+      "Path": "/webhooks/events/e1",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "prn:::accounts:/u1",
+      "Owner": "prn:::accounts:/u1",
+      "Type": "USER",
+      "Scopes": "prn:pantahub.com:apis:/base/all",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "GET /webhooks/events/e1 token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "Upstream": null
+  },
+  "GET /webhooks/events/e1 token=noscopes": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/all prn:pantahub.com:apis:/base/all.readonly prn:pantahub.com:apis:/base/webhooks prn:pantahub.com:apis:/base/webhooks.readonly\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t",
+    "Body": "{\"error\":\"\u003cvolatile\u003e\",\"code\":403}",
+    "Upstream": null
+  },
+  "GET /webhooks/events/e1 token=readonly": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "GET",
+      "Path": "/webhooks/events/e1",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "prn:::accounts:/u1",
+      "Owner": "prn:::accounts:/u1",
+      "Type": "USER",
+      "Scopes": "prn:pantahub.com:apis:/base/webhooks.readonly",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "GET /webhooks/events/e1/deliveries token=all": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "GET",
+      "Path": "/webhooks/events/e1/deliveries",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "prn:::accounts:/u1",
+      "Owner": "prn:::accounts:/u1",
+      "Type": "USER",
+      "Scopes": "prn:pantahub.com:apis:/base/all",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "GET /webhooks/events/e1/deliveries token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "Upstream": null
+  },
+  "GET /webhooks/events/e1/deliveries token=noscopes": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/all prn:pantahub.com:apis:/base/all.readonly prn:pantahub.com:apis:/base/webhooks prn:pantahub.com:apis:/base/webhooks.readonly\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t",
+    "Body": "{\"error\":\"\u003cvolatile\u003e\",\"code\":403}",
+    "Upstream": null
+  },
+  "GET /webhooks/events/e1/deliveries token=readonly": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "GET",
+      "Path": "/webhooks/events/e1/deliveries",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "prn:::accounts:/u1",
+      "Owner": "prn:::accounts:/u1",
+      "Type": "USER",
+      "Scopes": "prn:pantahub.com:apis:/base/webhooks.readonly",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "GET /webhooks/h%2F1 token=all": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "GET",
+      "Path": "/webhooks/h/1",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "prn:::accounts:/u1",
+      "Owner": "prn:::accounts:/u1",
+      "Type": "USER",
+      "Scopes": "prn:pantahub.com:apis:/base/all",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "GET /webhooks/h%2F1 token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "Upstream": null
+  },
+  "GET /webhooks/h%2F1 token=noscopes": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/all prn:pantahub.com:apis:/base/all.readonly prn:pantahub.com:apis:/base/webhooks prn:pantahub.com:apis:/base/webhooks.readonly\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t",
+    "Body": "{\"error\":\"\u003cvolatile\u003e\",\"code\":403}",
+    "Upstream": null
+  },
+  "GET /webhooks/h%2F1 token=readonly": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "GET",
+      "Path": "/webhooks/h/1",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "prn:::accounts:/u1",
+      "Owner": "prn:::accounts:/u1",
+      "Type": "USER",
+      "Scopes": "prn:pantahub.com:apis:/base/webhooks.readonly",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "GET /webhooks/h1 token=all": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "GET",
+      "Path": "/webhooks/h1",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "prn:::accounts:/u1",
+      "Owner": "prn:::accounts:/u1",
+      "Type": "USER",
+      "Scopes": "prn:pantahub.com:apis:/base/all",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "GET /webhooks/h1 token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "Upstream": null
+  },
+  "GET /webhooks/h1 token=noscopes": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/all prn:pantahub.com:apis:/base/all.readonly prn:pantahub.com:apis:/base/webhooks prn:pantahub.com:apis:/base/webhooks.readonly\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t",
+    "Body": "{\"error\":\"\u003cvolatile\u003e\",\"code\":403}",
+    "Upstream": null
+  },
+  "GET /webhooks/h1 token=readonly": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "GET",
+      "Path": "/webhooks/h1",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "prn:::accounts:/u1",
+      "Owner": "prn:::accounts:/u1",
+      "Type": "USER",
+      "Scopes": "prn:pantahub.com:apis:/base/webhooks.readonly",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "GET /webhooks/h1/ token=all": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Body": "{\"Error\":\"Resource not found\"}",
+    "Upstream": null
+  },
+  "GET /webhooks/h1/ token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "Upstream": null
+  },
+  "GET /webhooks/h1/ token=noscopes": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Body": "{\"Error\":\"Resource not found\"}",
+    "Upstream": null
+  },
+  "GET /webhooks/h1/ token=readonly": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Body": "{\"Error\":\"Resource not found\"}",
+    "Upstream": null
+  },
+  "GET /webhooks/h1/deliveries token=all": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "GET",
+      "Path": "/webhooks/h1/deliveries",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "prn:::accounts:/u1",
+      "Owner": "prn:::accounts:/u1",
+      "Type": "USER",
+      "Scopes": "prn:pantahub.com:apis:/base/all",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "GET /webhooks/h1/deliveries token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "Upstream": null
+  },
+  "GET /webhooks/h1/deliveries token=noscopes": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/all prn:pantahub.com:apis:/base/all.readonly prn:pantahub.com:apis:/base/webhooks prn:pantahub.com:apis:/base/webhooks.readonly\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t",
+    "Body": "{\"error\":\"\u003cvolatile\u003e\",\"code\":403}",
+    "Upstream": null
+  },
+  "GET /webhooks/h1/deliveries token=readonly": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "GET",
+      "Path": "/webhooks/h1/deliveries",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "prn:::accounts:/u1",
+      "Owner": "prn:::accounts:/u1",
+      "Type": "USER",
+      "Scopes": "prn:pantahub.com:apis:/base/webhooks.readonly",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "GET /webhooks/h1/deliveries/d1 token=all": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "GET",
+      "Path": "/webhooks/h1/deliveries/d1",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "prn:::accounts:/u1",
+      "Owner": "prn:::accounts:/u1",
+      "Type": "USER",
+      "Scopes": "prn:pantahub.com:apis:/base/all",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "GET /webhooks/h1/deliveries/d1 token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "Upstream": null
+  },
+  "GET /webhooks/h1/deliveries/d1 token=noscopes": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/all prn:pantahub.com:apis:/base/all.readonly prn:pantahub.com:apis:/base/webhooks prn:pantahub.com:apis:/base/webhooks.readonly\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t",
+    "Body": "{\"error\":\"\u003cvolatile\u003e\",\"code\":403}",
+    "Upstream": null
+  },
+  "GET /webhooks/h1/deliveries/d1 token=readonly": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "GET",
+      "Path": "/webhooks/h1/deliveries/d1",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "prn:::accounts:/u1",
+      "Owner": "prn:::accounts:/u1",
+      "Type": "USER",
+      "Scopes": "prn:pantahub.com:apis:/base/webhooks.readonly",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "GET /webhooks/h1/deliveries/d1/replay token=all": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Body": "{\"Error\":\"Method not allowed\"}",
+    "Upstream": null
+  },
+  "GET /webhooks/h1/deliveries/d1/replay token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "Upstream": null
+  },
+  "GET /webhooks/h1/deliveries/d1/replay token=noscopes": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Body": "{\"Error\":\"Method not allowed\"}",
+    "Upstream": null
+  },
+  "GET /webhooks/h1/deliveries/d1/replay token=readonly": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Body": "{\"Error\":\"Method not allowed\"}",
+    "Upstream": null
+  },
+  "PATCH /webhooks/h1 token=all": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "PATCH",
+      "Path": "/webhooks/h1",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "prn:::accounts:/u1",
+      "Owner": "prn:::accounts:/u1",
+      "Type": "USER",
+      "Scopes": "prn:pantahub.com:apis:/base/all",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "PATCH /webhooks/h1 token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "Upstream": null
+  },
+  "PATCH /webhooks/h1 token=noscopes": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/all prn:pantahub.com:apis:/base/webhooks prn:pantahub.com:apis:/base/webhooks.write\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t",
+    "Body": "{\"error\":\"\u003cvolatile\u003e\",\"code\":403}",
+    "Upstream": null
+  },
+  "PATCH /webhooks/h1 token=readonly": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/all prn:pantahub.com:apis:/base/webhooks prn:pantahub.com:apis:/base/webhooks.write\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t",
+    "Body": "{\"error\":\"\u003cvolatile\u003e\",\"code\":403}",
+    "Upstream": null
+  },
+  "POST /webhooks/ token=all": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "POST",
+      "Path": "/webhooks/",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "prn:::accounts:/u1",
+      "Owner": "prn:::accounts:/u1",
+      "Type": "USER",
+      "Scopes": "prn:pantahub.com:apis:/base/all",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "POST /webhooks/ token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "Upstream": null
+  },
+  "POST /webhooks/ token=noscopes": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/all prn:pantahub.com:apis:/base/webhooks prn:pantahub.com:apis:/base/webhooks.write\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t",
+    "Body": "{\"error\":\"\u003cvolatile\u003e\",\"code\":403}",
+    "Upstream": null
+  },
+  "POST /webhooks/ token=readonly": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/all prn:pantahub.com:apis:/base/webhooks prn:pantahub.com:apis:/base/webhooks.write\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t",
+    "Body": "{\"error\":\"\u003cvolatile\u003e\",\"code\":403}",
+    "Upstream": null
+  },
+  "POST /webhooks/event-types token=all": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Body": "{\"Error\":\"Method not allowed\"}",
+    "Upstream": null
+  },
+  "POST /webhooks/event-types token=none": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Body": "{\"Error\":\"Method not allowed\"}",
+    "Upstream": null
+  },
+  "POST /webhooks/event-types token=noscopes": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Body": "{\"Error\":\"Method not allowed\"}",
+    "Upstream": null
+  },
+  "POST /webhooks/event-types token=readonly": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Body": "{\"Error\":\"Method not allowed\"}",
+    "Upstream": null
+  },
+  "POST /webhooks/events/e1/redeliver token=all": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "POST",
+      "Path": "/webhooks/events/e1/redeliver",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "prn:::accounts:/u1",
+      "Owner": "prn:::accounts:/u1",
+      "Type": "USER",
+      "Scopes": "prn:pantahub.com:apis:/base/all",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "POST /webhooks/events/e1/redeliver token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "Upstream": null
+  },
+  "POST /webhooks/events/e1/redeliver token=noscopes": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/all prn:pantahub.com:apis:/base/webhooks prn:pantahub.com:apis:/base/webhooks.write\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t",
+    "Body": "{\"error\":\"\u003cvolatile\u003e\",\"code\":403}",
+    "Upstream": null
+  },
+  "POST /webhooks/events/e1/redeliver token=readonly": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/all prn:pantahub.com:apis:/base/webhooks prn:pantahub.com:apis:/base/webhooks.write\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t",
+    "Body": "{\"error\":\"\u003cvolatile\u003e\",\"code\":403}",
+    "Upstream": null
+  },
+  "POST /webhooks/h1 token=all": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Body": "{\"Error\":\"Method not allowed\"}",
+    "Upstream": null
+  },
+  "POST /webhooks/h1 token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "Upstream": null
+  },
+  "POST /webhooks/h1 token=noscopes": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Body": "{\"Error\":\"Method not allowed\"}",
+    "Upstream": null
+  },
+  "POST /webhooks/h1 token=readonly": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Body": "{\"Error\":\"Method not allowed\"}",
+    "Upstream": null
+  },
+  "POST /webhooks/h1/deliveries/d1/replay token=all": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "POST",
+      "Path": "/webhooks/h1/deliveries/d1/replay",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "prn:::accounts:/u1",
+      "Owner": "prn:::accounts:/u1",
+      "Type": "USER",
+      "Scopes": "prn:pantahub.com:apis:/base/all",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "POST /webhooks/h1/deliveries/d1/replay token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "Upstream": null
+  },
+  "POST /webhooks/h1/deliveries/d1/replay token=noscopes": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/all prn:pantahub.com:apis:/base/webhooks prn:pantahub.com:apis:/base/webhooks.write\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t",
+    "Body": "{\"error\":\"\u003cvolatile\u003e\",\"code\":403}",
+    "Upstream": null
+  },
+  "POST /webhooks/h1/deliveries/d1/replay token=readonly": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/all prn:pantahub.com:apis:/base/webhooks prn:pantahub.com:apis:/base/webhooks.write\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t",
+    "Body": "{\"error\":\"\u003cvolatile\u003e\",\"code\":403}",
+    "Upstream": null
+  },
+  "POST /webhooks/h1/rotate-secret token=all": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "POST",
+      "Path": "/webhooks/h1/rotate-secret",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "prn:::accounts:/u1",
+      "Owner": "prn:::accounts:/u1",
+      "Type": "USER",
+      "Scopes": "prn:pantahub.com:apis:/base/all",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "POST /webhooks/h1/rotate-secret token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "Upstream": null
+  },
+  "POST /webhooks/h1/rotate-secret token=noscopes": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/all prn:pantahub.com:apis:/base/webhooks prn:pantahub.com:apis:/base/webhooks.write\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t",
+    "Body": "{\"error\":\"\u003cvolatile\u003e\",\"code\":403}",
+    "Upstream": null
+  },
+  "POST /webhooks/h1/rotate-secret token=readonly": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/all prn:pantahub.com:apis:/base/webhooks prn:pantahub.com:apis:/base/webhooks.write\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t",
+    "Body": "{\"error\":\"\u003cvolatile\u003e\",\"code\":403}",
+    "Upstream": null
+  },
+  "POST /webhooks/h1/test token=all": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "POST",
+      "Path": "/webhooks/h1/test",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "prn:::accounts:/u1",
+      "Owner": "prn:::accounts:/u1",
+      "Type": "USER",
+      "Scopes": "prn:pantahub.com:apis:/base/all",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "POST /webhooks/h1/test token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "Upstream": null
+  },
+  "POST /webhooks/h1/test token=noscopes": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/all prn:pantahub.com:apis:/base/webhooks prn:pantahub.com:apis:/base/webhooks.write\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t",
+    "Body": "{\"error\":\"\u003cvolatile\u003e\",\"code\":403}",
+    "Upstream": null
+  },
+  "POST /webhooks/h1/test token=readonly": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/all prn:pantahub.com:apis:/base/webhooks prn:pantahub.com:apis:/base/webhooks.write\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t",
+    "Body": "{\"error\":\"\u003cvolatile\u003e\",\"code\":403}",
+    "Upstream": null
+  },
+  "PUT /webhooks/h1 token=all": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "PUT",
+      "Path": "/webhooks/h1",
+      "RawQuery": "",
+      "Body": "",
+      "Caller": "prn:::accounts:/u1",
+      "Owner": "prn:::accounts:/u1",
+      "Type": "USER",
+      "Scopes": "prn:pantahub.com:apis:/base/all",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "PUT /webhooks/h1 token=all body": {
+    "Status": 418,
+    "ContentType": "application/json",
+    "WWWAuthenticate": "",
+    "Body": "{\"upstream\":true}",
+    "Upstream": {
+      "Method": "PUT",
+      "Path": "/webhooks/h1",
+      "RawQuery": "",
+      "Body": "{\"url\":\"https://x\"}",
+      "Caller": "prn:::accounts:/u1",
+      "Owner": "prn:::accounts:/u1",
+      "Type": "USER",
+      "Scopes": "prn:pantahub.com:apis:/base/all",
+      "HasAuthorization": false,
+      "HasCookie": false,
+      "SignatureOK": true
+    }
+  },
+  "PUT /webhooks/h1 token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "Upstream": null
+  },
+  "PUT /webhooks/h1 token=none body": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "Upstream": null
+  },
+  "PUT /webhooks/h1 token=noscopes": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/all prn:pantahub.com:apis:/base/webhooks prn:pantahub.com:apis:/base/webhooks.write\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t",
+    "Body": "{\"error\":\"\u003cvolatile\u003e\",\"code\":403}",
+    "Upstream": null
+  },
+  "PUT /webhooks/h1 token=noscopes body": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/all prn:pantahub.com:apis:/base/webhooks prn:pantahub.com:apis:/base/webhooks.write\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t",
+    "Body": "{\"error\":\"\u003cvolatile\u003e\",\"code\":403}",
+    "Upstream": null
+  },
+  "PUT /webhooks/h1 token=readonly": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/all prn:pantahub.com:apis:/base/webhooks prn:pantahub.com:apis:/base/webhooks.write\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t",
+    "Body": "{\"error\":\"\u003cvolatile\u003e\",\"code\":403}",
+    "Upstream": null
+  },
+  "PUT /webhooks/h1 token=readonly body": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/all prn:pantahub.com:apis:/base/webhooks prn:pantahub.com:apis:/base/webhooks.write\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t",
+    "Body": "{\"error\":\"\u003cvolatile\u003e\",\"code\":403}",
+    "Upstream": null
+  }
+}

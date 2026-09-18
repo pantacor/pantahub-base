@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017-2023 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,10 +26,11 @@ import (
 
 	"context"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
 	"gitlab.com/pantacor/pantahub-base/utils/querymongo"
 	"go.mongodb.org/mongo-driver/bson"
@@ -58,43 +59,38 @@ var filterByKeys = map[string]bool{}
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /trails/{id}/steps [get]
-func (a *App) handleGetSteps(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetSteps(c *echo.Context) error {
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	owner, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in", http.StatusForbidden)
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+	authType, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["type"]
 	if !ok {
-		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in", http.StatusForbidden)
 	}
 
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 	if coll == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
-	asp := querymongo.GetAllQueryPagination(r.URL, filterByKeys)
+	asp := querymongo.GetAllQueryPagination(c.Request().URL, filterByKeys)
 	steps := make([]trailmodels.Step, 0)
 
-	trailID := r.PathParam("id")
+	trailID := c.Param("id")
 	query := bson.M{}
 
-	isPublic, err := a.isTrailPublic(r.Context(), trailID)
+	isPublic, err := a.isTrailPublic(c.Request().Context(), trailID)
 
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error getting trail public:"+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error getting trail public:"+err.Error(), http.StatusInternalServerError)
 	}
 	trailObjectID, err := primitive.ObjectIDFromHex(trailID)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 	}
 	if isPublic {
 		query = bson.M{
@@ -119,7 +115,7 @@ func (a *App) handleGetSteps(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	// allow override of progress.status defaults
-	progressStatus := r.URL.Query().Get("progress.status")
+	progressStatus := c.Request().URL.Query().Get("progress.status")
 	if progressStatus != "" {
 		m := map[string]interface{}{}
 		err := json.Unmarshal([]byte(progressStatus), &m)
@@ -127,8 +123,7 @@ func (a *App) handleGetSteps(w rest.ResponseWriter, r *rest.Request) {
 			query["progress.status"] = progressStatus
 		} else {
 			if err := mongoutils.ValidateClientFilter(m); err != nil {
-				utils.RestErrorWrapper(w, "Illegal progress.status filter: "+err.Error(), http.StatusBadRequest)
-				return
+				return echoutil.RestErrorWrapper(c, "Illegal progress.status filter: "+err.Error(), http.StatusBadRequest)
 			}
 			query["progress.status"] = m
 		}
@@ -155,12 +150,11 @@ func (a *App) handleGetSteps(w rest.ResponseWriter, r *rest.Request) {
 
 	querymongo.SetMongoPagination(query, sort, asp.Pagination, findOptions)
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	cur, err := coll.Find(ctx, query, findOptions)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error on fetching steps:"+err.Error(), http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Error on fetching steps:"+err.Error(), http.StatusForbidden)
 	}
 	defer cur.Close(ctx)
 
@@ -168,12 +162,11 @@ func (a *App) handleGetSteps(w rest.ResponseWriter, r *rest.Request) {
 		result := trailmodels.Step{}
 		err := cur.Decode(&result)
 		if err != nil {
-			utils.RestErrorWrapper(w, "Cursor Decode Error:"+err.Error(), http.StatusInternalServerError)
-			return
+			return echoutil.RestErrorWrapper(c, "Cursor Decode Error:"+err.Error(), http.StatusInternalServerError)
 		}
 		result.Meta = utils.BsonUnquoteMap(&result.Meta)
 		result.State = utils.BsonUnquoteMap(&result.State)
 		steps = append(steps, result)
 	}
-	w.WriteJson(steps)
+	return echoutil.WriteJSON(c, http.StatusOK, steps)
 }

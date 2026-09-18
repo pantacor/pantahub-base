@@ -1,4 +1,4 @@
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,14 +17,16 @@
 package apps
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/ant0ine/go-json-rest/rest/test"
-	jwt "gitlab.com/pantacor/pantahub-base/utils/jwtmiddleware"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 )
 
 const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjI1NzY3MDM3MTMsImlkIjoiaGlnaGVyLnZuZkBnbWFpbC5jb20iLCJuaWNrIjoiaGlnaGVyY29tdmUiLCJvcmlnX2lhdCI6MTU3NjY5MjkxMywicHJuIjoicHJuOjo6YWNjb3VudHM6LzVjOGY5M2RjZWVhODIzMDAwODc2YzRmYSIsInJvbGVzIjoidXNlciIsInNjb3BlcyI6InBybjpwYW50YWh1Yi5jb206YXBpczovYmFzZS9hbGwiLCJ0eXBlIjoiVVNFUiJ9.B3lnQR0UJDJdHvZVSkbFL7mzh4mQFdWiBikn68h1cdo"
@@ -37,26 +39,15 @@ func TestApp_handleCreateApp(t *testing.T) {
 		return
 	}
 	app := new(App)
-	app.jwtMiddleware = &jwt.JWTMiddleware{
+	app.jwtConfig = &jwtauth.Config{
 		Key:              []byte("1234567890"),
 		Realm:            "pantahub services",
 		SigningAlgorithm: "HS256",
-		Authenticator:    func(userId string, password string) bool { return true },
 	}
 	app.mongoClient = client
 
-	app.API = rest.NewApi()
-	app.API.Use(app.jwtMiddleware)
-
-	router, err := rest.MakeRouter(
-		rest.Post("/", app.handleCreateApp),
-	)
-
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	app.API.SetApp(router)
+	e := echoutil.New()
+	e.POST("/", app.handleCreateApp, echoutil.JWT(app.jwtConfig))
 
 	type args struct {
 		body interface{}
@@ -238,15 +229,17 @@ func TestApp_handleCreateApp(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			request := test.MakeSimpleRequest("POST", "http://1.2.3.4/", tt.args.body)
-			request.Header.Set("Authorization", "Bearer "+TOKEN)
-			recorded := test.RunRequest(t, app.API.MakeHandler(), request)
-			raw, err := recorded.DecodedBody()
+			b, err := json.Marshal(tt.args.body)
 			if err != nil {
 				t.Error(tt.name + "::" + err.Error())
 				return
 			}
-			err = tt.expect(raw)
+			req := httptest.NewRequest(http.MethodPost, "http://1.2.3.4/", bytes.NewReader(b))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+TOKEN)
+			rec := httptest.NewRecorder()
+			e.ServeHTTP(rec, req)
+			err = tt.expect(rec.Body.Bytes())
 			if err != nil {
 				t.Error(tt.name + "::" + err.Error())
 				return

@@ -1,17 +1,1 @@
-{
-  "_comment": [
-    "gosec configuration, used by security_scan.sh in CI and locally.",
-    "",
-    "G104 flags every call whose error is discarded. Writing the HTTP response",
-    "body is the one case where there is nothing to do with that error: the",
-    "status line and headers have already gone out, so the handler cannot turn a",
-    "failed write into a different status, and the only honest reaction is to",
-    "carry on. Whitelisting it here keeps the rule useful for the calls where",
-    "the error does mean something, instead of burying them under ~130 response",
-    "writes. Everywhere else the error is either handled or discarded",
-    "explicitly with `_ =`, which records the decision at the call site."
-  ],
-  "G104": {
-    "github.com/ant0ine/go-json-rest/rest.ResponseWriter": ["WriteJson"]
-  }
-}
+{}

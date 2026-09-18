@@ -1,0 +1,42 @@
+{
+  "TestIfMatchesGoJSONRest/protected,_authed|gjr": {
+    "Result": {
+      "Status": 200,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "\"ok\""
+    },
+    "WWWAuth": ""
+  },
+  "TestIfMatchesGoJSONRest/protected,_no_auth|gjr": {
+    "Result": {
+      "Status": 401,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "{\"Error\":\"Not Authorized\"}"
+    },
+    "WWWAuth": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\""
+  },
+  "TestIfMatchesGoJSONRest/same_path_other_method,_no_auth|gjr": {
+    "Result": {
+      "Status": 401,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "{\"Error\":\"Not Authorized\"}"
+    },
+    "WWWAuth": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\""
+  },
+  "TestIfMatchesGoJSONRest/whitelisted,_no_auth|gjr": {
+    "Result": {
+      "Status": 200,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "\"ok\""
+    },
+    "WWWAuth": ""
+  },
+  "TestIfMatchesGoJSONRest/whitelisted_prefix,_no_auth|gjr": {
+    "Result": {
+      "Status": 200,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "\"ok\""
+    },
+    "WWWAuth": ""
+  }
+}

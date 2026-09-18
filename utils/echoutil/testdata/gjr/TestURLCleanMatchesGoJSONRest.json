@@ -1,0 +1,67 @@
+{
+  "TestURLCleanMatchesGoJSONRest/GET_/svc//|gjr": {
+    "Status": 307,
+    "ContentType": "text/html; charset=utf-8",
+    "Body": "\u003ca href=\"/svc/\"\u003eTemporary Redirect\u003c/a\u003e.\n\n"
+  },
+  "TestURLCleanMatchesGoJSONRest/GET_/svc/admin/subscription|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestURLCleanMatchesGoJSONRest/GET_/svc/nope/|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestURLCleanMatchesGoJSONRest/GET_/svc/things/a%2Fb/|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestURLCleanMatchesGoJSONRest/GET_/svc/things/a%2Fb|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"/things/a/b|a%2Fb\""
+  },
+  "TestURLCleanMatchesGoJSONRest/GET_/svc/things/a/|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"/things/a|a\""
+  },
+  "TestURLCleanMatchesGoJSONRest/GET_/svc/things/a|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"/things/a|a\""
+  },
+  "TestURLCleanMatchesGoJSONRest/GET_/svc/things/|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestURLCleanMatchesGoJSONRest/GET_/svc/|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"|\""
+  },
+  "TestURLCleanMatchesGoJSONRest/GET_/svc|gjr": {
+    "Status": 307,
+    "ContentType": "text/html; charset=utf-8",
+    "Body": "\u003ca href=\"/svc/\"\u003eTemporary Redirect\u003c/a\u003e.\n\n"
+  },
+  "TestURLCleanMatchesGoJSONRest/PUT_/svc/admin/subscription//|gjr": {
+    "Status": 307,
+    "ContentType": "",
+    "Body": ""
+  },
+  "TestURLCleanMatchesGoJSONRest/PUT_/svc/admin/subscription/|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"/admin/subscription|\""
+  },
+  "TestURLCleanMatchesGoJSONRest/PUT_/svc/admin/subscription|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"/admin/subscription|\""
+  }
+}

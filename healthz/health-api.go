@@ -1,5 +1,5 @@
 //
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,9 +26,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
-	"gitlab.com/pantacor/pantahub-base/utils/tracer"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -41,7 +41,6 @@ var (
 
 // App health rest application
 type App struct {
-	API         *rest.Api
 	mongoClient *mongo.Client
 }
 
@@ -71,39 +70,35 @@ type responseDoc struct {
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /healthz [get]
-func (a *App) handleHealthz(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleHealthz(c *echo.Context) error {
 	m.Lock()
 	defer m.Unlock()
 
 	if time.Now().Before(lastResponseTime.Add(30 * time.Second)) {
-		w.WriteJson(lastResponse)
-		return
+		return echoutil.WriteJSON(c, http.StatusOK, lastResponse)
 	}
 
 	response := Response{}
 
 	response.Start = time.Now()
 
-	user := r.Env["REMOTE_USER"].(string)
+	user, _ := c.Get(echoutil.KeyRemoteUser).(string)
 
 	if user == "" {
-		utils.RestErrorWrapper(w, "Not authorized", http.StatusUnauthorized)
-		return
+		return echoutil.RestErrorWrapper(c, "Not authorized", http.StatusUnauthorized)
 	}
 
 	// check DB
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 	val := map[string]interface{}{}
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	err := collection.FindOne(ctx, bson.M{}).Decode(&val)
 	if err != nil && err != mongo.ErrNoDocuments {
-		utils.RestErrorWrapper(w, "Error with Database query:"+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database query:"+err.Error(), http.StatusInternalServerError)
 	}
 
 	end := time.Now()
@@ -112,7 +107,7 @@ func (a *App) handleHealthz(w rest.ResponseWriter, r *rest.Request) {
 	lastResponse = response
 	lastResponseTime = time.Now()
 
-	w.WriteJson(response)
+	return echoutil.WriteJSON(c, http.StatusOK, response)
 }
 
 // New create a new rest application
@@ -121,35 +116,28 @@ func New(mongoClient *mongo.Client) *App {
 	app := new(App)
 	app.mongoClient = mongoClient
 
-	app.API = rest.NewApi()
-	// we dont use default stack because we dont want content type enforcement
-	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
-		"/health:", log.Lshortfile)})
-	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "health"})
+	return app
+}
 
-	app.API.Use(rest.DefaultCommonStack...)
+// Mount registers healthz on echo.
+func (app *App) Mount(s *echoutil.Server) {
+	const prefix = "/healthz"
 
 	saAdminSecret := utils.GetEnv(utils.EnvPantahubSaAdminSecret)
-
-	basicAuthMW := &rest.AuthBasicMiddleware{
+	basicAuthMW := echoutil.BasicAuthConfig{
 		Realm: "Pantahub Health @ " + utils.GetEnv(utils.EnvPantahubAuth),
-		Authenticator: func(userId string, password string) bool {
-			return saAdminSecret != "" && userId == "saadmin" && subtle.ConstantTimeCompare([]byte(password), []byte(saAdminSecret)) == 1
+		Authenticator: func(userID string, password string) bool {
+			return saAdminSecret != "" && userID == "saadmin" && subtle.ConstantTimeCompare([]byte(password), []byte(saAdminSecret)) == 1
 		},
 	}
 
-	// no authentication needed for /login
-	app.API.Use(basicAuthMW)
-
-	// /auth_status endpoints
-	apiRouter, _ := rest.MakeRouter(
-		rest.Get("/", app.handleHealthz),
+	g := s.Mount(prefix,
+		echoutil.AccessLogJSON(log.New(os.Stdout, "/health:", log.Lshortfile), prefix),
+		echoutil.AccessLogFluent(&utils.AccessLogFluentMiddleware{Prefix: "health"}, prefix),
+		echoutil.Instrument(),
+		echoutil.Recover(),
+		echoutil.AuthBasic(basicAuthMW),
 	)
-	app.API.Use(&tracer.OtelMiddleware{
-		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
-		Router:      apiRouter,
-	})
-	app.API.SetApp(apiRouter)
 
-	return app
+	g.GET("/", app.handleHealthz)
 }

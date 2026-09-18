@@ -1,0 +1,702 @@
+{
+  "TestDevicesRoutingMatchesGoJSONRest/DELETE_/a/b/c/d|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/DELETE_/auth_status/public|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"DELETE /#id/public auth_status\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/DELETE_/auth_status|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"DELETE /#id auth_status\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/DELETE_/d1/device-meta|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/DELETE_/d1/nope|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/DELETE_/d1/ownership/validate|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/DELETE_/d1/public|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"DELETE /#id/public d1\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/DELETE_/d1/user-meta|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/DELETE_/d1/|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/DELETE_/d1|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"DELETE /#id d1\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/DELETE_/np/public|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"DELETE /#id/public np\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/DELETE_/np/u1/d1/x|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/DELETE_/np/u1/d1|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/DELETE_/np/u1|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/DELETE_/np/user-meta|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/DELETE_/np|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"DELETE /#id np\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/DELETE_/register/ownership/validate|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/DELETE_/register/public|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"DELETE /#id/public register\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/DELETE_/register|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"DELETE /#id register\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/DELETE_/tokens/device-meta|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"DELETE /tokens/#id device-meta\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/DELETE_/tokens/ownership/validate|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/DELETE_/tokens/public|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"DELETE /tokens/#id public\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/DELETE_/tokens/t1/public|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/DELETE_/tokens/t1|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"DELETE /tokens/#id t1\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/DELETE_/tokens/user-meta|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"DELETE /tokens/#id user-meta\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/DELETE_/tokens/|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/DELETE_/tokens|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"DELETE /#id tokens\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/DELETE_/|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/GET_/a/b/c/d|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/GET_/auth_status/public|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/GET_/auth_status|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /auth_status \""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/GET_/d1/device-meta|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/GET_/d1/nope|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/GET_/d1/ownership/validate|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/GET_/d1/public|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/GET_/d1/user-meta|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /#id/user-meta d1\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/GET_/d1/|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/GET_/d1|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /#id d1\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/GET_/np/public|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/GET_/np/u1/d1/x|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/GET_/np/u1/d1|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /np/#usernick/#devicenick u1,d1\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/GET_/np/u1|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/GET_/np/user-meta|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /#id/user-meta np\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/GET_/np|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /#id np\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/GET_/register/ownership/validate|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/GET_/register/public|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/GET_/register|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /#id register\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/GET_/tokens/device-meta|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /tokens/#id device-meta\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/GET_/tokens/ownership/validate|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/GET_/tokens/public|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /tokens/#id public\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/GET_/tokens/t1/public|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/GET_/tokens/t1|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /tokens/#id t1\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/GET_/tokens/user-meta|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /tokens/#id user-meta\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/GET_/tokens/|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/GET_/tokens|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /tokens \""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/GET_/|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET / \""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PATCH_/a/b/c/d|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PATCH_/auth_status/public|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PATCH_/auth_status|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PATCH /#id auth_status\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PATCH_/d1/device-meta|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PATCH /#id/device-meta d1\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PATCH_/d1/nope|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PATCH_/d1/ownership/validate|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PATCH_/d1/public|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PATCH_/d1/user-meta|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PATCH /#id/user-meta d1\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PATCH_/d1/|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PATCH_/d1|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PATCH /#id d1\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PATCH_/np/public|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PATCH_/np/u1/d1/x|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PATCH_/np/u1/d1|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PATCH_/np/u1|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PATCH_/np/user-meta|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PATCH /#id/user-meta np\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PATCH_/np|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PATCH /#id np\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PATCH_/register/ownership/validate|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PATCH_/register/public|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PATCH_/register|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PATCH /#id register\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PATCH_/tokens/device-meta|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PATCH /tokens/#id device-meta\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PATCH_/tokens/ownership/validate|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PATCH_/tokens/public|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PATCH /tokens/#id public\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PATCH_/tokens/t1/public|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PATCH_/tokens/t1|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PATCH /tokens/#id t1\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PATCH_/tokens/user-meta|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PATCH /tokens/#id user-meta\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PATCH_/tokens/|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PATCH_/tokens|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PATCH /#id tokens\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PATCH_/|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/POST_/a/b/c/d|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/POST_/auth_status/public|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/POST_/auth_status|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/POST_/d1/device-meta|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/POST_/d1/nope|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/POST_/d1/ownership/validate|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"POST /#id/ownership/validate d1\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/POST_/d1/public|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/POST_/d1/user-meta|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/POST_/d1/|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/POST_/d1|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/POST_/np/public|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/POST_/np/u1/d1/x|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/POST_/np/u1/d1|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/POST_/np/u1|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/POST_/np/user-meta|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/POST_/np|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/POST_/register/ownership/validate|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"POST /#id/ownership/validate register\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/POST_/register/public|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/POST_/register|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"POST /register \""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/POST_/tokens/device-meta|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/POST_/tokens/ownership/validate|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"POST /#id/ownership/validate tokens\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/POST_/tokens/public|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/POST_/tokens/t1/public|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/POST_/tokens/t1|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/POST_/tokens/user-meta|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/POST_/tokens/|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/POST_/tokens|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"POST /tokens \""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/POST_/|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"POST / \""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PUT_/a/b/c/d|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PUT_/auth_status/public|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PUT /#id/public auth_status\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PUT_/auth_status|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PUT /#id auth_status\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PUT_/d1/device-meta|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PUT /#id/device-meta d1\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PUT_/d1/nope|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PUT_/d1/ownership/validate|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PUT_/d1/public|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PUT /#id/public d1\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PUT_/d1/user-meta|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PUT /#id/user-meta d1\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PUT_/d1/|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PUT_/d1|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PUT /#id d1\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PUT_/np/public|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PUT /#id/public np\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PUT_/np/u1/d1/x|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PUT_/np/u1/d1|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PUT_/np/u1|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PUT_/np/user-meta|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PUT /#id/user-meta np\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PUT_/np|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PUT /#id np\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PUT_/register/ownership/validate|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PUT_/register/public|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PUT /#id/public register\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PUT_/register|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PUT /#id register\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PUT_/tokens/device-meta|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PUT /#id/device-meta tokens\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PUT_/tokens/ownership/validate|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PUT_/tokens/public|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PUT /#id/public tokens\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PUT_/tokens/t1/public|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PUT_/tokens/t1|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PUT_/tokens/user-meta|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PUT /#id/user-meta tokens\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PUT_/tokens/|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PUT_/tokens|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PUT /#id tokens\""
+  },
+  "TestDevicesRoutingMatchesGoJSONRest/PUT_/|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  }
+}

@@ -1,5 +1,5 @@
 //
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,15 +28,16 @@ import (
 
 	"gitlab.com/pantacor/pantahub-base/testutils"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 
-	jwt "gitlab.com/pantacor/pantahub-base/utils/jwtmiddleware"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 )
 
 var (
 	recorder         *httptest.ResponseRecorder
 	server           *httptest.Server
-	jwtMWA           *jwt.JWTMiddleware
-	jwtMWR           *jwt.JWTMiddleware
+	jwtMWA           *jwtauth.Config
+	jwtMWR           *jwtauth.Config
 	serverURL        *url.URL
 	authTokenUser1   string
 	authTokenClient1 string
@@ -51,7 +52,7 @@ func setUp(t *testing.T) {
 		t.Fail()
 	}
 
-	jwtMWA = &jwt.JWTMiddleware{
+	jwtMWA = &jwtauth.Config{
 		Key:        []byte("secret key"),
 		Realm:      "pantahub services",
 		Timeout:    time.Minute * 60,
@@ -61,7 +62,9 @@ func setUp(t *testing.T) {
 	authApp := New(jwtMWA, mongoClient)
 
 	recorder = httptest.NewRecorder()
-	server = httptest.NewServer(authApp.API.MakeHandler())
+	authEcho := echoutil.NewServer("test")
+	authApp.Mount(authEcho)
+	server = httptest.NewServer(authEcho.E)
 	serverURL, err = url.Parse(server.URL)
 
 	if err != nil {
@@ -76,7 +79,7 @@ func tearDown(t *testing.T) {
 func testNoCredsLogin401(t *testing.T) {
 
 	u := *serverURL
-	u.Path = "/login"
+	u.Path = "/auth/login"
 
 	res, err := utils.R().SetBody(map[string]string{}).Post(u.String())
 
@@ -93,7 +96,7 @@ func testNoCredsLogin401(t *testing.T) {
 func testBadCredsLogin401(t *testing.T) {
 
 	u := *serverURL
-	u.Path = "/login"
+	u.Path = "/auth/login"
 
 	res, err := utils.R().SetBody(map[string]string{
 		"username": "NOTEXISTuser1",
@@ -113,7 +116,7 @@ func testBadCredsLogin401(t *testing.T) {
 func testGoodLogin(t *testing.T) {
 
 	u := serverURL
-	u.Path = "/login"
+	u.Path = "/auth/login"
 
 	res, err := utils.R().SetBody(map[string]string{
 		"username": "user1",
@@ -132,7 +135,7 @@ func testGoodLogin(t *testing.T) {
 
 func testRefreshToken(t *testing.T) {
 	u := *serverURL
-	u.Path = "/login"
+	u.Path = "/auth/login"
 
 	res, err := utils.R().SetAuthToken(authTokenUser1).Get(u.String())
 
@@ -178,7 +181,7 @@ func TestAuthLogin(t *testing.T) {
 
 func testAuthAuthTokenGood(t *testing.T) {
 	u := *serverURL
-	u.Path = "/authorize"
+	u.Path = "/auth/authorize"
 
 	body := map[string]interface{}{}
 
@@ -256,7 +259,7 @@ func testAuthAuthTokenGood(t *testing.T) {
 
 func testAuthAuthTokenBadURL(t *testing.T) {
 	u := *serverURL
-	u.Path = "/authorize"
+	u.Path = "/auth/authorize"
 
 	body := map[string]interface{}{}
 
@@ -278,7 +281,7 @@ func testAuthAuthTokenBadURL(t *testing.T) {
 
 func testAuthAuthTokenBadClient(t *testing.T) {
 	u := *serverURL
-	u.Path = "/authorize"
+	u.Path = "/auth/authorize"
 
 	body := map[string]interface{}{}
 
@@ -300,7 +303,7 @@ func testAuthAuthTokenBadClient(t *testing.T) {
 
 func testAuthAuthTokenPreservesState(t *testing.T) {
 	u := *serverURL
-	u.Path = "/authorize"
+	u.Path = "/auth/authorize"
 
 	body := map[string]interface{}{}
 
@@ -347,7 +350,7 @@ func testAuthAuthTokenClientUse(t *testing.T) {
 	}
 
 	u := *serverURL
-	u.Path = "/auth_status"
+	u.Path = "/auth/auth_status"
 	res, err := utils.R().SetAuthToken(authTokenClient1).Get(u.String())
 
 	if err != nil {

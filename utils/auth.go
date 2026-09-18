@@ -1,5 +1,5 @@
 //
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,19 +25,14 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
-	"net/http"
 	"strings"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/golang-jwt/jwt/v5"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gopkg.in/mgo.v2/bson"
 )
-
-// AuthMiddleware authentication default middleware
-type AuthMiddleware struct{}
 
 // AuthInfo authentication information
 type AuthInfo struct {
@@ -51,92 +46,70 @@ type AuthInfo struct {
 	RemoteUser string
 }
 
-// GetAuthInfo get authentication information from a request
-func GetAuthInfo(r *rest.Request) *AuthInfo {
-	authInfo, ok := r.Env["PH_AUTH_INFO"]
+// ResolveCaller derives the effective caller (applying call-as) from verified JWT
+// claims; forbidden is set when the caller cannot be identified. Shared with
+// utils/echoutil.
+func ResolveCaller(origCallerClaims jwtgo.MapClaims) (callerClaims jwtgo.MapClaims, authInfo AuthInfo, forbidden string) {
+	callerClaims = origCallerClaims
+
+	if callerClaims["call-as"] != nil {
+		callerClaims = jwtgo.MapClaims(callerClaims["call-as"].(map[string]interface{}))
+		callerClaims["exp"] = origCallerClaims["exp"]
+		callerClaims["orig_iat"] = origCallerClaims["orig_iat"]
+	}
+
+	caller, ok := callerClaims["prn"]
 	if !ok {
-		return nil
+		// XXX: find right error
+		return callerClaims, authInfo, "You need to be logged in"
 	}
-	rs := authInfo.(AuthInfo)
-	return &rs
-}
+	callerStr := caller.(string)
+	prn := Prn(callerStr)
+	authInfo.Caller = prn
 
-// MiddlewareFunc authentication middleware function
-func (s *AuthMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFunc {
-	return func(w rest.ResponseWriter, r *rest.Request) {
-		var origCallerClaims, callerClaims jwtgo.MapClaims
-		env := r.Env
-
-		origCallerClaims = r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)
-		callerClaims = origCallerClaims
-
-		if callerClaims["call-as"] != nil {
-			callerClaims = jwtgo.MapClaims(callerClaims["call-as"].(map[string]interface{}))
-			callerClaims["exp"] = origCallerClaims["exp"]
-			callerClaims["orig_iat"] = origCallerClaims["orig_iat"]
-		}
-		r.Env["JWT_PAYLOAD"] = callerClaims
-		r.Env["JWT_ORIG_PAYLOAD"] = origCallerClaims
-
-		authInfo := AuthInfo{}
-		caller, ok := callerClaims["prn"]
-		if !ok {
-			// XXX: find right error
-			RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
-			return
-		}
-		callerStr := caller.(string)
-		prn := Prn(callerStr)
-		authInfo.Caller = prn
-
-		authType, ok := callerClaims["type"]
-		if !ok {
-			// XXX: find right error
-			RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
-			return
-		}
-		authTypeStr := authType.(string)
-		authInfo.CallerType = authTypeStr
-
-		owner, ok := callerClaims["owner"]
-		if ok {
-			ownerStr := owner.(string)
-			prn := Prn(ownerStr)
-			authInfo.Owner = prn
-		}
-		roles, ok := callerClaims["roles"]
-		if ok {
-			rolesStr := roles.(string)
-			authInfo.Roles = rolesStr
-		}
-		aud, ok := callerClaims["aud"]
-		if ok {
-			audStr := aud.(string)
-			authInfo.Audience = audStr
-		}
-		scopes, ok := callerClaims["scopes"]
-		if ok {
-			scopesStr := scopes.(string)
-			authInfo.Scopes = strings.Fields(scopesStr)
-		}
-		nick, ok := callerClaims["nick"]
-		if ok {
-			nickStr := nick.(string)
-			authInfo.Nick = nickStr
-		}
-		origNick, ok := origCallerClaims["nick"]
-		if ok {
-			origNickStr := origNick.(string)
-			authInfo.RemoteUser = origNickStr + "==>" + authInfo.Nick
-		} else {
-			authInfo.RemoteUser = "_unknown_==>" + authInfo.Nick
-		}
-
-		env["PH_AUTH_INFO"] = authInfo
-
-		r.Env = env
-		handler(w, r)
+	authType, ok := callerClaims["type"]
+	if !ok {
+		// XXX: find right error
+		return callerClaims, authInfo, "You need to be logged in"
 	}
+	authTypeStr := authType.(string)
+	authInfo.CallerType = authTypeStr
+
+	owner, ok := callerClaims["owner"]
+	if ok {
+		ownerStr := owner.(string)
+		prn := Prn(ownerStr)
+		authInfo.Owner = prn
+	}
+	roles, ok := callerClaims["roles"]
+	if ok {
+		rolesStr := roles.(string)
+		authInfo.Roles = rolesStr
+	}
+	aud, ok := callerClaims["aud"]
+	if ok {
+		audStr := aud.(string)
+		authInfo.Audience = audStr
+	}
+	scopes, ok := callerClaims["scopes"]
+	if ok {
+		scopesStr := scopes.(string)
+		authInfo.Scopes = strings.Fields(scopesStr)
+	}
+	nick, ok := callerClaims["nick"]
+	if ok {
+		nickStr := nick.(string)
+		authInfo.Nick = nickStr
+	}
+	origNick, ok := origCallerClaims["nick"]
+	if ok {
+		origNickStr := origNick.(string)
+		authInfo.RemoteUser = origNickStr + "==>" + authInfo.Nick
+	} else {
+		authInfo.RemoteUser = "_unknown_==>" + authInfo.Nick
+	}
+
+	return callerClaims, authInfo, ""
 }
 
 // ValidateOwnerSig valdiate a owner signature

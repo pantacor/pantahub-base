@@ -60,7 +60,6 @@ HTTP/1.1 200 OK
 Content-Length: 152
 Content-Type: application/json; charset=utf-8
 Date: Fri, 19 Aug 2016 12:24:58 GMT
-X-Powered-By: go-json-rest
 
 {
     "id": "57b6fa9ac094f67942000002", 
@@ -84,7 +83,6 @@ HTTP/1.1 200 OK
 Content-Length: 941
 Content-Type: application/json; charset=utf-8
 Date: Fri, 19 Aug 2016 12:26:41 GMT
-X-Powered-By: go-json-rest
 
 {
     "expire-time": "900", 

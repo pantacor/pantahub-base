@@ -84,7 +84,6 @@ Date: Mon, 05 Mar 2018 20:54:40 GMT
 Server: nginx/1.13.5
 Strict-Transport-Security: max-age=15724800; includeSubDomains;
 Transfer-Encoding: chunked
-X-Powered-By: go-json-rest
 
 {
     "Page": -1,
@@ -141,7 +140,6 @@ Date: Mon, 05 Mar 2018 20:55:53 GMT
 Server: nginx/1.13.5
 Strict-Transport-Security: max-age=15724800; includeSubDomains;
 Transfer-Encoding: chunked
-X-Powered-By: go-json-rest
 
 {
     "nick": "user1",

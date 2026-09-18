@@ -1,4 +1,4 @@
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,13 +19,12 @@ package apps
 import (
 	"testing"
 
-	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/labstack/echo/v5"
 )
 
 func TestApp_handleGetApp(t *testing.T) {
 	type args struct {
-		w rest.ResponseWriter
-		r *rest.Request
+		c *echo.Context
 	}
 	tests := []struct {
 		name string
@@ -36,15 +35,14 @@ func TestApp_handleGetApp(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.app.handleGetApp(tt.args.w, tt.args.r)
+			_ = tt.app.handleGetApp(tt.args.c)
 		})
 	}
 }
 
 func TestApp_handleGetApps(t *testing.T) {
 	type args struct {
-		w rest.ResponseWriter
-		r *rest.Request
+		c *echo.Context
 	}
 	tests := []struct {
 		name string
@@ -55,7 +53,7 @@ func TestApp_handleGetApps(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.app.handleGetApps(tt.args.w, tt.args.r)
+			_ = tt.app.handleGetApps(tt.args.c)
 		})
 	}
 }

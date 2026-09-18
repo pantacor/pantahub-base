@@ -1,5 +1,5 @@
 //
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,43 +17,13 @@
 package utils
 
 import (
-	"net/http"
-
-	"github.com/ant0ine/go-json-rest/rest"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 )
 
-type UserTypeFilterMiddleware struct {
-	filterTypes []accounts.AccountType
-}
-
-func (m *UserTypeFilterMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFunc {
-	return UserTypeFilter(m.filterTypes, handler)
-}
-
-func InitUserTypeFilterMiddleware(filterTypes []accounts.AccountType) *UserTypeFilterMiddleware {
-	return &UserTypeFilterMiddleware{
-		filterTypes,
-	}
-}
-
-// UserTypeFilter filter request by user type
-func UserTypeFilter(filterTypes []accounts.AccountType, handler rest.HandlerFunc) rest.HandlerFunc {
-	return func(w rest.ResponseWriter, r *rest.Request) {
-		authInfo := GetAuthInfo(r)
-		if authInfo == nil {
-			// fail closed like ScopeFilter: no auth middleware ran
-			RestErrorWrapper(w, "Authentication Required", http.StatusUnauthorized)
-			return
-		}
-		if len(filterTypes) > 0 {
-			if _, found := find(filterTypes, authInfo.CallerType); !found {
-				RestErrorWrapper(w, "Type of user can't realize that action", http.StatusForbidden)
-				return
-			}
-		}
-		handler(w, r)
-	}
+// AllowsCallerType reports whether callerType is in filterTypes; shared with utils/echoutil.
+func AllowsCallerType(filterTypes []accounts.AccountType, callerType string) bool {
+	_, found := find(filterTypes, callerType)
+	return found
 }
 
 func find(slice []accounts.AccountType, val string) (int, bool) {

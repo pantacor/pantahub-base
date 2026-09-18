@@ -1,5 +1,5 @@
 //
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -34,12 +34,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/golang-jwt/jwt/v5"
-	jwt "gitlab.com/pantacor/pantahub-base/utils/jwtmiddleware"
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/utils"
-	"gitlab.com/pantacor/pantahub-base/utils/tracer"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -48,10 +47,9 @@ import (
 
 // App logs rest application
 type App struct {
-	jwtMiddleware *jwt.JWTMiddleware
-	API           *rest.Api
-	mongoClient   *mongo.Client
-	backend       Backend
+	jwtConfig   *jwtauth.Config
+	mongoClient *mongo.Client
+	backend     Backend
 }
 
 // Filters uses a prototype Entry instance to filter
@@ -316,10 +314,10 @@ func unmarshalBody(body []byte) ([]Entry, error) {
 }
 
 // New create a new logs rest application
-func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
+func New(jwtConfig *jwtauth.Config, mongoClient *mongo.Client) *App {
 	var err error
 	app := new(App)
-	app.jwtMiddleware = jwtMiddleware
+	app.jwtConfig = jwtConfig
 	app.mongoClient = mongoClient
 
 	loggerType := "elastic"
@@ -347,73 +345,51 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 
 	log.Printf("INFO: %s Logger started\n", loggerType)
 
-	app.API = rest.NewApi()
-
-	// we dont use default stack because we dont want content type enforcement
-	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
-		"/logs:", log.Lshortfile)})
-	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "logs"})
-
-	app.API.Use(rest.DefaultCommonStack...)
-
-	// we allow calls from other domains to allow webapps; XXX: review
-	app.API.Use(&rest.CorsMiddleware{
-		RejectNonCorsRequests: false,
-		OriginValidator: func(origin string, request *rest.Request) bool {
-			return true
-		},
-		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{
-			"Accept",
-			"Content-Type",
-			"Content-Length",
-			"X-Custom-Header",
-			"Origin",
-			"Authorization",
-			"X-Trace-ID",
-			"Trace-Id",
-			"x-request-id",
-			"X-Request-ID",
-			"TraceID",
-			"ParentID",
-			"Uber-Trace-ID",
-			"uber-trace-id",
-			"traceparent",
-			"tracestate",
-		},
-		AccessControlAllowCredentials: true,
-		AccessControlMaxAge:           3600,
-	})
-
-	app.API.Use(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtMiddleware, Mongo: app.mongoClient})
-	app.API.Use(&rest.IfMiddleware{
-		Condition: func(request *rest.Request) bool {
-			return true
-		},
-		IfTrue: app.jwtMiddleware,
-	})
-
-	app.API.Use(&rest.IfMiddleware{
-		Condition: func(request *rest.Request) bool {
-			return true
-		},
-		IfTrue: &utils.AuthMiddleware{},
-	})
-
-	// XXX: this is all needs to be done so that paths that do not trail with /
-	//      get a MOVED PERMANTENTLY error with the redir path with / like the main
-	//      API routers (bad rest.MakeRouter I suspect)
-	apiRouter, _ := rest.MakeRouter(
-		rest.Get("/", app.handleGetLogs),
-		rest.Get("/cursor", app.handleGetLogsCursor),
-		rest.Post("/cursor", app.handleGetLogsCursor),
-		rest.Post("/", app.handlePostLogs),
-	)
-	app.API.Use(&tracer.OtelMiddleware{
-		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
-		Router:      apiRouter,
-	})
-	app.API.SetApp(apiRouter)
-
 	return app
+}
+
+// Mount registers logs on echo with its previous middleware stack.
+func (app *App) Mount(s *echoutil.Server) {
+	const prefix = "/logs"
+
+	g := s.Mount(prefix,
+		echoutil.AccessLogJSON(log.New(os.Stdout, "/logs:", log.Lshortfile), prefix),
+		echoutil.AccessLogFluent(&utils.AccessLogFluentMiddleware{Prefix: "logs"}, prefix),
+		echoutil.Instrument(),
+		echoutil.Recover(),
+		// we allow calls from other domains to allow webapps; XXX: review
+		echoutil.CORS(echoutil.CORSConfig{
+			RejectNonCorsRequests: false,
+			OriginValidator:       echoutil.AllowAllOrigins,
+			AllowedMethods:        []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+			AllowedHeaders: []string{
+				"Accept",
+				"Content-Type",
+				"Content-Length",
+				"X-Custom-Header",
+				"Origin",
+				"Authorization",
+				"X-Trace-ID",
+				"Trace-Id",
+				"x-request-id",
+				"X-Request-ID",
+				"TraceID",
+				"ParentID",
+				"Uber-Trace-ID",
+				"uber-trace-id",
+				"traceparent",
+				"tracestate",
+			},
+			AccessControlAllowCredentials: true,
+			AccessControlMaxAge:           3600,
+		}),
+		echoutil.BasicAuthToBearer(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtConfig, Mongo: app.mongoClient}),
+		echoutil.JWT(app.jwtConfig),
+		echoutil.Auth(),
+	)
+
+	g.GET("/", app.handleGetLogs)
+	g.GET("/cursor", app.handleGetLogsCursor)
+	g.POST("/cursor", app.handleGetLogsCursor)
+	g.POST("/", app.handlePostLogs)
 }

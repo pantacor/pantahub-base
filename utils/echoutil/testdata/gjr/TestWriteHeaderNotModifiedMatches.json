@@ -1,0 +1,7 @@
+{
+  "TestWriteHeaderNotModifiedMatches|gjr": {
+    "Status": 304,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": ""
+  }
+}

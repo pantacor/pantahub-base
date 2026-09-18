@@ -1,5 +1,5 @@
 //
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,15 +30,15 @@ import (
 
 	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/subscriptions"
-	"gitlab.com/pantacor/pantahub-base/utils/tracer"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 
-	jwt "gitlab.com/pantacor/pantahub-base/utils/jwtmiddleware"
+	"github.com/labstack/echo/v5"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/alecthomas/units"
-	"github.com/ant0ine/go-json-rest/rest"
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
 
@@ -55,10 +55,9 @@ const (
 
 // App objects rest application
 type App struct {
-	jwtMiddleware *jwt.JWTMiddleware
-	API           *rest.Api
-	mongoClient   *mongo.Client
-	subService    subscriptions.SubscriptionService
+	jwtConfig   *jwtauth.Config
+	mongoClient *mongo.Client
+	subService  subscriptions.SubscriptionService
 
 	awsS3Bucket string
 	awsRegion   string
@@ -98,9 +97,9 @@ func PantahubS3DevURL() string {
 	return pantahubHTTPSURL
 }
 
-func handleAuth(w rest.ResponseWriter, r *rest.Request) {
-	jwtClaims := r.Env["JWT_PAYLOAD"]
-	w.WriteJson(jwtClaims)
+func handleAuth(c *echo.Context) error {
+	jwtClaims := c.Get(echoutil.KeyJWTPayload)
+	return echoutil.WriteJSON(c, http.StatusOK, jwtClaims)
 }
 
 // MakeStorageID crerate a new storage ID
@@ -215,14 +214,14 @@ func MakeObjAccessible(Issuer string, Subject string, obj Object, storageID stri
 }
 
 // New create a new object rest application
-func New(jwtMiddleware *jwt.JWTMiddleware, subService subscriptions.SubscriptionService,
+func New(jwtConfig *jwtauth.Config, subService subscriptions.SubscriptionService,
 	mongoClient *mongo.Client) *App {
 
 	app := new(App)
 	if defaultObjectsApp == nil {
 		defaultObjectsApp = app
 	}
-	app.jwtMiddleware = jwtMiddleware
+	app.jwtConfig = jwtConfig
 	app.mongoClient = mongoClient
 	app.subService = subService
 
@@ -254,56 +253,48 @@ func New(jwtMiddleware *jwt.JWTMiddleware, subService subscriptions.Subscription
 		return nil
 	}
 
-	app.API = rest.NewApi()
-	// we dont use default stack because we dont want content type enforcement
-	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
-		"/objects:", log.Lshortfile)})
-	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "objects"})
-	app.API.Use(&rest.StatusMiddleware{})
-	app.API.Use(&metrics.Middleware{})
+	return app
+}
 
-	app.API.Use(rest.DefaultCommonStack...)
-	app.API.Use(&rest.CorsMiddleware{
-		RejectNonCorsRequests: false,
-		OriginValidator: func(origin string, request *rest.Request) bool {
-			return true
-		},
-		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{
-			"Accept",
-			"Content-Type",
-			"Content-Length",
-			"X-Custom-Header",
-			"Origin",
-			"Authorization",
-			"X-Trace-ID",
-			"Trace-Id",
-			"x-request-id",
-			"X-Request-ID",
-			"TraceID",
-			"ParentID",
-			"Uber-Trace-ID",
-			"uber-trace-id",
-			"traceparent",
-			"tracestate",
-		},
-		AccessControlAllowCredentials: true,
-		AccessControlMaxAge:           3600,
-	})
+// Mount registers objects on echo with its previous middleware stack.
+func (app *App) Mount(s *echoutil.Server) {
+	const prefix = "/objects"
 
-	app.API.Use(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtMiddleware, Mongo: app.mongoClient})
-	app.API.Use(&rest.IfMiddleware{
-		Condition: func(request *rest.Request) bool {
-			return true
-		},
-		IfTrue: app.jwtMiddleware,
-	})
-	app.API.Use(&rest.IfMiddleware{
-		Condition: func(request *rest.Request) bool {
-			return true
-		},
-		IfTrue: &utils.AuthMiddleware{},
-	})
+	g := s.Mount(prefix,
+		echoutil.AccessLogJSON(log.New(os.Stdout, "/objects:", log.Lshortfile), prefix),
+		echoutil.AccessLogFluent(&utils.AccessLogFluentMiddleware{Prefix: "objects"}, prefix),
+		metrics.EchoMiddleware(prefix),
+		echoutil.Instrument(),
+		echoutil.Recover(),
+		echoutil.CORS(echoutil.CORSConfig{
+			RejectNonCorsRequests: false,
+			OriginValidator:       echoutil.AllowAllOrigins,
+			AllowedMethods:        []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+			AllowedHeaders: []string{
+				"Accept",
+				"Content-Type",
+				"Content-Length",
+				"X-Custom-Header",
+				"Origin",
+				"Authorization",
+				"X-Trace-ID",
+				"Trace-Id",
+				"x-request-id",
+				"X-Request-ID",
+				"TraceID",
+				"ParentID",
+				"Uber-Trace-ID",
+				"uber-trace-id",
+				"traceparent",
+				"tracestate",
+			},
+			AccessControlAllowCredentials: true,
+			AccessControlMaxAge:           3600,
+		}),
+		echoutil.BasicAuthToBearer(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtConfig, Mongo: app.mongoClient}),
+		echoutil.JWT(app.jwtConfig),
+		echoutil.Auth(),
+	)
 
 	readObjectsScopes := []utils.Scope{
 		utils.Scopes.API,
@@ -318,21 +309,11 @@ func New(jwtMiddleware *jwt.JWTMiddleware, subService subscriptions.Subscription
 		utils.Scopes.WriteObjects,
 	}
 
-	// /auth_status endpoints
-	apiRouter, _ := rest.MakeRouter(
-		rest.Get("/auth_status", utils.ScopeFilter(readObjectsScopes, handleAuth)),
-		rest.Get("/", utils.ScopeFilter(readObjectsScopes, app.handleGetObjects)),
-		rest.Post("/", utils.ScopeFilter(writeObjectScopes, app.handlePostObject)),
-		rest.Get("/#id", utils.ScopeFilter(readObjectsScopes, app.handleGetObject)),
-		rest.Get("/#id/blob", utils.ScopeFilter(readObjectsScopes, app.handleGetObjectFile)),
-		rest.Put("/#id", utils.ScopeFilter(writeObjectScopes, app.handlePutObject)),
-		rest.Delete("/#id", utils.ScopeFilter(writeObjectScopes, app.handleDeleteObject)),
-	)
-	app.API.Use(&tracer.OtelMiddleware{
-		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
-		Router:      apiRouter,
-	})
-	app.API.SetApp(apiRouter)
-
-	return app
+	g.GET("/auth_status", echoutil.ScopeFilter(readObjectsScopes, handleAuth))
+	g.GET("/", echoutil.ScopeFilter(readObjectsScopes, app.handleGetObjects))
+	g.POST("/", echoutil.ScopeFilter(writeObjectScopes, app.handlePostObject))
+	g.GET("/:id", echoutil.ScopeFilter(readObjectsScopes, app.handleGetObject))
+	g.GET("/:id/blob", echoutil.ScopeFilter(readObjectsScopes, app.handleGetObjectFile))
+	g.PUT("/:id", echoutil.ScopeFilter(writeObjectScopes, app.handlePutObject))
+	g.DELETE("/:id", echoutil.ScopeFilter(writeObjectScopes, app.handleDeleteObject))
 }

@@ -1,18 +1,19 @@
-// Package mongotest starts a throwaway MongoDB for tests.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
-// It exists because the Mongo-backed tests in this repo were effectively
-// unrunnable: they connect via utils.GetMongoClient(), which reads MONGO_HOST /
-// MONGO_PORT / MONGO_RS from the environment and defaults to localhost:27017.
-// The docker-compose replica set publishes no host port, so that default
-// refuses the connection and several tests then nil-deref on the failed client
-// rather than skipping. The result is a suite nobody can run locally and CI
-// never ran at all.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// A container started here is addressed by a published random port, so it needs
-// no compose file, no fixed port, and nothing already running. It is also a
-// real single-node replica set: utils.GetMongoClient() applies majority read
-// and write concern (see utils/db.go), which a standalone mongod rejects, so a
-// plain `mongo:` service image is not a substitute.
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+
+// Package mongotest starts a throwaway MongoDB replica set for tests. A replica
+// set is required: utils/db.go uses majority read/write concern.
 package mongotest
 
 import (
@@ -28,9 +29,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/mongodb"
 )
 
-// Image is the MongoDB image used for tests. Keep it aligned with the server
-// version deployed to stage and production; a test suite passing against a
-// different major version proves less than it appears to.
+// Image should track the server version deployed to stage/prod.
 const Image = "mongo:6.0"
 
 // startTimeout bounds container pull plus replica-set election.
@@ -90,26 +89,8 @@ func (c *Container) Stop(ctx context.Context) error {
 	return c.terminate(ctx)
 }
 
-// SetupEnv starts a MongoDB and points this process's Mongo environment at it,
-// so that existing callers of utils.GetMongoClient and utils.GetMongoClientTest
-// reach the container without being modified. It returns a cleanup function.
-//
-// Intended for TestMain:
-//
-//	func TestMain(m *testing.M) {
-//		cleanup, code := mongotest.SetupEnv()
-//		if cleanup != nil {
-//			defer cleanup()
-//		}
-//		if code != 0 {
-//			os.Exit(code)
-//		}
-//		os.Exit(m.Run())
-//	}
-//
-// If PANTAHUB_TEST_MONGO_EXTERNAL is set, no container is started and whatever
-// MONGO_* values are already in the environment are used unchanged -- for
-// pointing a run at an existing replica set, or at a CI `services:` entry.
+// SetupEnv starts MongoDB and points MONGO_* at it, for TestMain. Set
+// PANTAHUB_TEST_MONGO_EXTERNAL to use the existing environment instead.
 func SetupEnv() (cleanup func(), exitCode int) {
 	if os.Getenv("PANTAHUB_TEST_MONGO_EXTERNAL") != "" {
 		return func() {}, 0
@@ -141,10 +122,7 @@ func SetupEnv() (cleanup func(), exitCode int) {
 	}, 0
 }
 
-// Setup is the *testing.T flavour of SetupEnv, for a single test or subtree
-// that wants its own database. It skips rather than fails when no container
-// runtime is reachable, so a developer without Docker still gets a green run
-// on the tests that do not need Mongo.
+// Setup is SetupEnv for a single test; it skips if no container runtime.
 func Setup(t *testing.T) *Container {
 	t.Helper()
 

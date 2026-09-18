@@ -1,4 +1,4 @@
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,10 +21,11 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/auth/authmodels"
 	"gitlab.com/pantacor/pantahub-base/auth/authservices"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 )
 
 // @Summary Get login token using username and password
@@ -41,19 +42,18 @@ import (
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /auth/login [post]
-func (a *App) getTokenUsingPassword(writer rest.ResponseWriter, r *rest.Request) {
-	userAgent := r.Header.Get("User-Agent")
+func (a *App) getTokenUsingPassword(c *echo.Context) error {
+	userAgent := c.Request().Header.Get("User-Agent")
 	if userAgent == "" {
-		utils.RestErrorWrapperUser(writer, "No Access (DOS) - no UserAgent", "Incompatible Client; upgrade pantavisor", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapperUser(c, "No Access (DOS) - no UserAgent", "Incompatible Client; upgrade pantavisor", http.StatusForbidden)
 	}
 
 	payload := &authmodels.LoginRequestPayload{}
 
 	// Prefer Authorization: Basic if present.
-	authz := r.Header.Get("Authorization")
+	authz := c.Request().Header.Get("Authorization")
 	if strings.HasPrefix(authz, "Basic ") {
-		user, pass, ok := r.Request.BasicAuth()
+		user, pass, ok := c.Request().BasicAuth()
 		if ok && user != "" {
 			payload.Username = user
 			payload.Password = pass
@@ -62,23 +62,21 @@ func (a *App) getTokenUsingPassword(writer rest.ResponseWriter, r *rest.Request)
 
 	// Fall back to JSON body when no Basic auth credentials were extracted.
 	if payload.Username == "" {
-		err := r.DecodeJsonPayload(payload)
+		err := echoutil.DecodeJsonPayload(c, payload)
 		if err != nil {
-			utils.RestErrorWrapper(writer, "Failed to decode token Request", http.StatusBadRequest)
-			return
+			return echoutil.RestErrorWrapper(c, "Failed to decode token Request", http.StatusBadRequest)
 		}
 	}
 
 	// accounts with two-factor authentication enabled get an MFA challenge
 	// instead of a session token (personal access tokens stay single-step)
-	if handled := a.maybeStartMFALogin(writer, r, payload); handled {
-		return
+	if handled := a.maybeStartMFALogin(c, payload); handled {
+		return nil
 	}
 
-	tokenString, rerr := authservices.CreateUserToken(payload, a.jwtMiddleware, a.mongoClient)
+	tokenString, rerr := authservices.CreateUserToken(payload, a.jwtConfig, a.mongoClient)
 	if rerr != nil {
-		utils.RestErrorWrite(writer, rerr)
-		return
+		return echoutil.RestErrorWrite(c, rerr)
 	}
 
 	if tokenString == "" {
@@ -87,11 +85,10 @@ func (a *App) getTokenUsingPassword(writer rest.ResponseWriter, r *rest.Request)
 			Error: "Authentication Failed",
 			Code:  http.StatusUnauthorized,
 		}
-		utils.RestErrorWrite(writer, rerr)
-		return
+		return echoutil.RestErrorWrite(c, rerr)
 	}
 
-	writer.WriteJson(authmodels.TokenResponse{
+	return echoutil.WriteJSON(c, http.StatusOK, authmodels.TokenResponse{
 		Token: tokenString,
 	})
 

@@ -1,5 +1,5 @@
 //
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,28 +20,26 @@ import (
 	"log"
 	"os"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwt "gitlab.com/pantacor/pantahub-base/utils/jwtmiddleware"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/utils"
-	"gitlab.com/pantacor/pantahub-base/utils/tracer"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // App define a new rest application for profiles
 type App struct {
-	jwtMiddleware *jwt.JWTMiddleware
-	API           *rest.Api
-	mongoClient   *mongo.Client
+	jwtConfig   *jwtauth.Config
+	mongoClient *mongo.Client
 }
 
 // New create a profiles rest application
-func New(jwtMiddleware *jwt.JWTMiddleware,
+func New(jwtConfig *jwtauth.Config,
 	mongoClient *mongo.Client) *App {
 
 	app := new(App)
-	app.jwtMiddleware = jwtMiddleware
+	app.jwtConfig = jwtConfig
 	app.mongoClient = mongoClient
 
 	err := app.setIndexes()
@@ -49,58 +47,13 @@ func New(jwtMiddleware *jwt.JWTMiddleware,
 		log.Fatalln("Error setting up index for pantahub_profiles: " + err.Error())
 		return nil
 	}
-	app.API = rest.NewApi()
-	// we dont use default stack because we dont want content type enforcement
-	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
-		"/profiles:", log.Lshortfile)})
-	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "profiles"})
-	app.API.Use(&rest.StatusMiddleware{})
-	app.API.Use(&metrics.Middleware{})
-	app.API.Use(rest.DefaultCommonStack...)
-	app.API.Use(&rest.CorsMiddleware{
-		RejectNonCorsRequests: false,
-		OriginValidator: func(origin string, request *rest.Request) bool {
-			return true
-		},
-		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{
-			"Accept",
-			"Content-Type",
-			"Content-Length",
-			"X-Custom-Header",
-			"Origin",
-			"Authorization",
-			"X-Trace-ID",
-			"Trace-Id",
-			"x-request-id",
-			"X-Request-ID",
-			"TraceID",
-			"ParentID",
-			"Uber-Trace-ID",
-			"uber-trace-id",
-			"traceparent",
-			"tracestate",
-		},
-		AccessControlAllowCredentials: true,
-		AccessControlMaxAge:           3600,
-	})
 
-	app.API.Use(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtMiddleware, Mongo: app.mongoClient})
-	app.API.Use(&rest.IfMiddleware{
-		Condition: func(request *rest.Request) bool {
-			// all need auth
-			return true
-		},
-		IfTrue: app.jwtMiddleware,
-	})
+	return app
+}
 
-	app.API.Use(&rest.IfMiddleware{
-		Condition: func(request *rest.Request) bool {
-			// all need auth
-			return true
-		},
-		IfTrue: &utils.AuthMiddleware{},
-	})
+// Mount registers profiles on the echo server.
+func (app *App) Mount(s *echoutil.Server) {
+	const prefix = "/profiles"
 
 	readProfileScopes := []utils.Scope{
 		utils.Scopes.API,
@@ -117,62 +70,46 @@ func New(jwtMiddleware *jwt.JWTMiddleware,
 		accounts.AccountTypeUser,
 	}
 
-	apiRouter, _ := rest.MakeRouter(
-		rest.Get(
-			"/",
-			rest.WrapMiddlewares(
-				[]rest.Middleware{
-					utils.InitUserTypeFilterMiddleware(onlyUserFilter),
-					utils.InitScopeFilterMiddleware(readProfileScopes),
-				},
-				app.handleGetProfiles,
-			),
-		),
-		rest.Put(
-			"/",
-			rest.WrapMiddlewares(
-				[]rest.Middleware{
-					utils.InitUserTypeFilterMiddleware(onlyUserFilter),
-					utils.InitScopeFilterMiddleware(writeProfileScopes),
-				},
-				app.handlePostProfile,
-			),
-		),
-		rest.Get(
-			"/config/meta",
-			rest.WrapMiddlewares(
-				[]rest.Middleware{
-					utils.InitScopeFilterMiddleware(readProfileScopes),
-				},
-				app.handleGetGlobalMeta,
-			),
-		),
-		rest.Put(
-			"/config/meta",
-			rest.WrapMiddlewares(
-				[]rest.Middleware{
-					utils.InitScopeFilterMiddleware(writeProfileScopes),
-				},
-				app.handlePutGlobalMeta,
-			),
-		),
-		rest.Get(
-			"/#nick",
-			rest.WrapMiddlewares(
-				[]rest.Middleware{
-					utils.InitUserTypeFilterMiddleware(onlyUserFilter),
-					utils.InitScopeFilterMiddleware(readProfileScopes),
-				},
-				app.handleGetProfile,
-			),
-		),
+	g := s.Mount(prefix,
+		echoutil.AccessLogJSON(log.New(os.Stdout, "/profiles:", log.Lshortfile), prefix),
+		echoutil.AccessLogFluent(&utils.AccessLogFluentMiddleware{Prefix: "profiles"}, prefix),
+		metrics.EchoMiddleware(prefix),
+		echoutil.Instrument(),
+		echoutil.Recover(),
+		echoutil.CORS(echoutil.CORSConfig{
+			RejectNonCorsRequests: false,
+			OriginValidator:       echoutil.AllowAllOrigins,
+			AllowedMethods:        []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+			AllowedHeaders: []string{
+				"Accept",
+				"Content-Type",
+				"Content-Length",
+				"X-Custom-Header",
+				"Origin",
+				"Authorization",
+				"X-Trace-ID",
+				"Trace-Id",
+				"x-request-id",
+				"X-Request-ID",
+				"TraceID",
+				"ParentID",
+				"Uber-Trace-ID",
+				"uber-trace-id",
+				"traceparent",
+				"tracestate",
+			},
+			AccessControlAllowCredentials: true,
+			AccessControlMaxAge:           3600,
+		}),
+		echoutil.BasicAuthToBearer(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtConfig, Mongo: app.mongoClient}),
+		echoutil.JWT(app.jwtConfig),
+		echoutil.Auth(),
 	)
 
-	app.API.Use(&tracer.OtelMiddleware{
-		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
-		Router:      apiRouter,
-	})
-	app.API.SetApp(apiRouter)
-
-	return app
+	onlyUser := echoutil.UserTypeFilterMW(onlyUserFilter)
+	g.GET("/", app.handleGetProfiles, onlyUser, echoutil.ScopeFilterMW(readProfileScopes))
+	g.PUT("/", app.handlePostProfile, onlyUser, echoutil.ScopeFilterMW(writeProfileScopes))
+	g.GET("/config/meta", app.handleGetGlobalMeta, echoutil.ScopeFilterMW(readProfileScopes))
+	g.PUT("/config/meta", app.handlePutGlobalMeta, echoutil.ScopeFilterMW(writeProfileScopes))
+	g.GET("/:nick", app.handleGetProfile, onlyUser, echoutil.ScopeFilterMW(readProfileScopes))
 }

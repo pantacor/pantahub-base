@@ -21,7 +21,6 @@ HTTP/1.1 200 OK
 Content-Encoding: gzip
 Content-Length: 1421
 Content-Type: text/plain; version=0.0.4; charset=utf-8
-X-Powered-By: go-json-rest
 X-Runtime: 0.000796
 
 # HELP go_gc_duration_seconds A summary of the GC invocation durations.

@@ -1,0 +1,482 @@
+{
+  "TestTrailsRoutingMatchesGoJSONRest/DELETE_/auth_status/steps/1|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/DELETE_/auth_status|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/DELETE_/summary/steps|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/DELETE_/summary/summary|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/DELETE_/summary|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/DELETE_/t1/.pvrremote|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/DELETE_/t1/nope|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/DELETE_/t1/steps/1/.pvrremote|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/DELETE_/t1/steps/1/cancel|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/DELETE_/t1/steps/1/meta|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/DELETE_/t1/steps/1/objects/o1/blob/x|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/DELETE_/t1/steps/1/objects/o1/blob|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/DELETE_/t1/steps/1/objects/o1|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/DELETE_/t1/steps/1/objects|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/DELETE_/t1/steps/1/progress|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/DELETE_/t1/steps/1/state|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/DELETE_/t1/steps/1/wontgo|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/DELETE_/t1/steps/1|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/DELETE_/t1/steps/meta|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/DELETE_/t1/steps/objects/objects|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/DELETE_/t1/steps|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/DELETE_/t1/summary|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/DELETE_/t1|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/DELETE_/|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/GET_/auth_status/steps/1|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /#id/steps/#rev auth_status,1\""
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/GET_/auth_status|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /auth_status \""
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/GET_/summary/steps|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /#id/steps summary\""
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/GET_/summary/summary|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /#id/summary summary\""
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/GET_/summary|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /summary \""
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/GET_/t1/.pvrremote|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /#id/.pvrremote t1\""
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/GET_/t1/nope|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/GET_/t1/steps/1/.pvrremote|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /#id/steps/#rev/.pvrremote t1,1\""
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/GET_/t1/steps/1/cancel|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/GET_/t1/steps/1/meta|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /#id/steps/#rev/meta t1,1\""
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/GET_/t1/steps/1/objects/o1/blob/x|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/GET_/t1/steps/1/objects/o1/blob|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /#id/steps/#rev/objects/#obj/blob t1,1,o1\""
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/GET_/t1/steps/1/objects/o1|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /#id/steps/#rev/objects/#obj t1,1,o1\""
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/GET_/t1/steps/1/objects|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /#id/steps/#rev/objects t1,1\""
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/GET_/t1/steps/1/progress|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/GET_/t1/steps/1/state|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /#id/steps/#rev/state t1,1\""
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/GET_/t1/steps/1/wontgo|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/GET_/t1/steps/1|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /#id/steps/#rev t1,1\""
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/GET_/t1/steps/meta|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /#id/steps/#rev t1,meta\""
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/GET_/t1/steps/objects/objects|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /#id/steps/#rev/objects t1,objects\""
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/GET_/t1/steps|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /#id/steps t1\""
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/GET_/t1/summary|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /#id/summary t1\""
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/GET_/t1|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET /#id t1\""
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/GET_/|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"GET / \""
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/POST_/auth_status/steps/1|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/POST_/auth_status|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/POST_/summary/steps|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"POST /#id/steps summary\""
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/POST_/summary/summary|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/POST_/summary|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/POST_/t1/.pvrremote|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/POST_/t1/nope|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/POST_/t1/steps/1/.pvrremote|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/POST_/t1/steps/1/cancel|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/POST_/t1/steps/1/meta|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/POST_/t1/steps/1/objects/o1/blob/x|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/POST_/t1/steps/1/objects/o1/blob|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/POST_/t1/steps/1/objects/o1|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/POST_/t1/steps/1/objects|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"POST /#id/steps/#rev/objects t1,1\""
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/POST_/t1/steps/1/progress|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/POST_/t1/steps/1/state|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/POST_/t1/steps/1/wontgo|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/POST_/t1/steps/1|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/POST_/t1/steps/meta|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/POST_/t1/steps/objects/objects|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"POST /#id/steps/#rev/objects t1,objects\""
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/POST_/t1/steps|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"POST /#id/steps t1\""
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/POST_/t1/summary|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/POST_/t1|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/POST_/|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"POST / \""
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/PUT_/auth_status/steps/1|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/PUT_/auth_status|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/PUT_/summary/steps|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/PUT_/summary/summary|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/PUT_/summary|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/PUT_/t1/.pvrremote|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/PUT_/t1/nope|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/PUT_/t1/steps/1/.pvrremote|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/PUT_/t1/steps/1/cancel|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PUT /#id/steps/#rev/cancel t1,1\""
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/PUT_/t1/steps/1/meta|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PUT /#id/steps/#rev/meta t1,1\""
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/PUT_/t1/steps/1/objects/o1/blob/x|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/PUT_/t1/steps/1/objects/o1/blob|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/PUT_/t1/steps/1/objects/o1|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/PUT_/t1/steps/1/objects|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/PUT_/t1/steps/1/progress|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PUT /#id/steps/#rev/progress t1,1\""
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/PUT_/t1/steps/1/state|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PUT /#id/steps/#rev/state t1,1\""
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/PUT_/t1/steps/1/wontgo|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"PUT /#id/steps/#rev/wontgo t1,1\""
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/PUT_/t1/steps/1|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/PUT_/t1/steps/meta|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/PUT_/t1/steps/objects/objects|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/PUT_/t1/steps|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/PUT_/t1/summary|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/PUT_/t1|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "TestTrailsRoutingMatchesGoJSONRest/PUT_/|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  }
+}

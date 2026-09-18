@@ -31,7 +31,6 @@ HTTP/1.1 200 OK
 Content-Length: 80
 Content-Type: application/json; charset=utf-8
 Date: Thu, 29 Jun 2017 21:50:28 GMT
-X-Powered-By: go-json-rest
 
 {
     "code": 0,

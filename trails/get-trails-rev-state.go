@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017-2023 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,10 +25,11 @@ import (
 
 	"context"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -46,44 +47,40 @@ import (
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /trails/{id}/steps/{rev}/state [get]
-func (a *App) handleGetStepState(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetStepState(c *echo.Context) error {
 
 	var err error
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	owner, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in", http.StatusForbidden)
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+	authType, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["type"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in", http.StatusForbidden)
 	}
 
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
 	if coll == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
 	step := trailmodels.Step{}
 
-	trailID := r.PathParam("id")
-	rev := r.PathParam("rev")
+	trailID := c.Param("id")
+	rev := c.Param("rev")
 
-	isPublic, err := a.isTrailPublic(r.Context(), trailID)
+	isPublic, err := a.isTrailPublic(c.Request().Context(), trailID)
 
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error getting trail public:"+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error getting trail public:"+err.Error(), http.StatusInternalServerError)
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
 	if isPublic {
@@ -105,5 +102,5 @@ func (a *App) handleGetStepState(w rest.ResponseWriter, r *rest.Request) {
 		}).Decode(&step)
 	}
 
-	w.WriteJson(utils.BsonUnquoteMap(&step.State))
+	return echoutil.WriteJSON(c, http.StatusOK, utils.BsonUnquoteMap(&step.State))
 }

@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017-2023 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,11 +25,12 @@ import (
 
 	"context"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -49,34 +50,32 @@ import (
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /trails/{id}/steps/{rev}/objects [post]
-func (a *App) handlePostStepsObject(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePostStepsObject(c *echo.Context) error {
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	status := http.StatusOK
+	owner, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in", http.StatusForbidden)
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+	authType, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["type"]
 
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
 	if coll == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
 	step := trailmodels.Step{}
 
-	trailID := r.PathParam("id")
-	rev := r.PathParam("rev")
+	trailID := c.Param("id")
+	rev := c.Param("rev")
 
 	if authType != "DEVICE" && authType != "USER" && authType != "SESSION" {
-		utils.RestErrorWrapper(w, "Unknown AuthType", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Unknown AuthType", http.StatusBadRequest)
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	err := coll.FindOne(ctx, bson.M{
 		"_id":     trailID + "-" + rev,
@@ -84,42 +83,36 @@ func (a *App) handlePostStepsObject(w rest.ResponseWriter, r *rest.Request) {
 	}).
 		Decode(&step)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Not Accessible Resource Id", http.StatusForbidden)
 	}
 
 	if authType == "DEVICE" && step.Device != owner {
-		utils.RestErrorWrapper(w, "No access for device", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "No access for device", http.StatusForbidden)
 	} else if (authType == "USER" || authType == "SESSION") && step.Owner != owner {
-		utils.RestErrorWrapper(w, "No access for 'foreign' user/session", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "No access for 'foreign' user/session", http.StatusForbidden)
 	}
 
 	autoLink := true
-	autolinkValue, ok := r.URL.Query()["autolink"]
+	autolinkValue, ok := c.Request().URL.Query()["autolink"]
 	if ok && autolinkValue[0] == "no" {
 		autoLink = false
 	}
 
 	newObject := objects.Object{}
-	if err := r.DecodeJsonPayload(&newObject); err != nil {
-		utils.RestErrorWrapper(w, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
-		return
+	if err := echoutil.DecodeJsonPayload(c, &newObject); err != nil {
+		return echoutil.RestErrorWrapper(c, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
 	}
 	newObject.Owner = step.Owner
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 
 	if collection == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
 	// check preconditions
 	if newObject.Sha == "" {
-		utils.RestErrorWrapper(w, "Post New Object must set a sha", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Post New Object must set a sha", http.StatusBadRequest)
 	}
 
 	if newObject.ID == "" {
@@ -127,65 +120,59 @@ func (a *App) handlePostStepsObject(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if newObject.ID != newObject.Sha {
-		utils.RestErrorWrapper(w, "Post New Object must not have conflicting id and sha field", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Post New Object must not have conflicting id and sha field", http.StatusBadRequest)
 	}
 
 	shabyte, err := utils.DecodeSha256HexString(newObject.Sha)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Object sha must be a valid sha256:"+err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Object sha must be a valid sha256:"+err.Error(), http.StatusBadRequest)
 	}
 
 	newObject.StorageID = objects.MakeStorageID(owner.(string), shabyte)
 
 	objectsapp := objects.Build(a.mongoClient)
 
-	resolvedObject, err := objectsapp.ResolveObjectWithBacking(r.Context(), owner.(string), newObject.Sha)
+	resolvedObject, err := objectsapp.ResolveObjectWithBacking(c.Request().Context(), owner.(string), newObject.Sha)
 
 	if err != nil && err != objects.ErrNoBackingFile && err != mongo.ErrNoDocuments {
-		utils.RestErrorWrapper(w, "Error resolving Object "+err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Error resolving Object "+err.Error(), http.StatusBadRequest)
 	}
 
 	// if there was a backing file we have a conflict
 	if resolvedObject != nil {
-		w.Header().Add(objects.HttpHeaderPantahubObjectType, objects.ObjectTypeObject)
-		w.WriteHeader(http.StatusConflict)
+		c.Response().Header().Add(objects.HttpHeaderPantahubObjectType, objects.ObjectTypeObject)
+		status = http.StatusConflict
 		newObject = *resolvedObject
 		goto conflict
 	}
 
 	// here we had no backing file to link to and no object at all
 	// we will try to create a link to an object available in a public step
-	resolvedObject, err = objectsapp.ResolveObjectWithLinks(r.Context(), owner.(string), newObject.Sha, autoLink)
+	resolvedObject, err = objectsapp.ResolveObjectWithLinks(c.Request().Context(), owner.(string), newObject.Sha, autoLink)
 
 	// if this was possible, we use this object with adjusted Name from newObject
 	// and store it in our object collection
 	if err == nil {
 		resolvedObject.ObjectName = newObject.ObjectName
-		err = objectsapp.SaveObject(r.Context(), resolvedObject, false)
+		err = objectsapp.SaveObject(c.Request().Context(), resolvedObject, false)
 		if err != nil {
-			utils.RestErrorWrapper(w, "Error saving our linkified object "+err.Error(), http.StatusInternalServerError)
-			return
+			return echoutil.RestErrorWrapper(c, "Error saving our linkified object "+err.Error(), http.StatusInternalServerError)
 		}
 		// we have a gettable object in our db now so we conflict
-		w.Header().Add(objects.HttpHeaderPantahubObjectType, objects.ObjectTypeLink)
-		w.WriteHeader(http.StatusConflict)
+		c.Response().Header().Add(objects.HttpHeaderPantahubObjectType, objects.ObjectTypeLink)
+		status = http.StatusConflict
 		newObject = *resolvedObject
 		goto conflict
 	} else if err != objects.ErrNoLinkTargetAvail && err != mongo.ErrNoDocuments && err != objects.ErrNoBackingFile {
-		utils.RestErrorWrapper(w, "Internal issue loading looking up object "+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Internal issue loading looking up object "+err.Error(), http.StatusInternalServerError)
 	}
 
-	err = objectsapp.SaveObject(r.Context(), &newObject, false)
+	err = objectsapp.SaveObject(c.Request().Context(), &newObject, false)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error saving our linkified object "+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error saving our linkified object "+err.Error(), http.StatusInternalServerError)
 	}
 
 conflict:
 	newObjectWithAccess := objects.GetObjectWithAccess(newObject, "/trails")
-	w.WriteJson(newObjectWithAccess)
+	return echoutil.WriteJSON(c, status, newObjectWithAccess)
 }

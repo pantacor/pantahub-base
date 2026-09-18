@@ -1,4 +1,4 @@
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,9 +25,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/golang-jwt/jwt/v5"
-	"gitlab.com/pantacor/pantahub-base/utils"
+	"github.com/labstack/echo/v5"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 )
 
 // handleGetLogsCursor Get or postlog cursor
@@ -43,22 +43,20 @@ import (
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /logs/cursor [get]
-func (a *App) handleGetLogsCursor(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetLogsCursor(c *echo.Context) error {
 
 	var err error
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+	authType, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["type"]
 
 	if authType != "USER" && authType != "SESSION" {
-		utils.RestErrorWrapper(w, "Need to be logged in as USER/SESSION user to get logs", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Need to be logged in as USER/SESSION user to get logs", http.StatusForbidden)
 	}
 
-	own, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	own, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in", http.StatusForbidden)
 	}
 
 	// This route is served for GET as well as POST, and a GET carries no body,
@@ -66,55 +64,44 @@ func (a *App) handleGetLogsCursor(w rest.ResponseWriter, r *rest.Request) {
 	// cursor is then expected in the query string below.
 	var nextCursorJWT string
 	jsonBody := map[string]interface{}{}
-	if err = r.DecodeJsonPayload(&jsonBody); err == nil {
+	if err = echoutil.DecodeJsonPayload(c, &jsonBody); err == nil {
 		if nextCursor, ok := jsonBody["next-cursor"].(string); ok {
 			nextCursorJWT = nextCursor
 		}
 	}
 	// if body doesnt have the cursor lets try query
 	if nextCursorJWT == "" {
-		_ = r.ParseForm()
-		nextCursorJWT = r.FormValue("next-cursor")
+		_ = c.Request().ParseForm()
+		nextCursorJWT = c.Request().FormValue("next-cursor")
 	}
 
 	// A missing cursor is a malformed request, not an authentication problem.
 	// Answering 403 here made clients treat it as an expired session and send
 	// the user back to a login prompt.
 	if nextCursorJWT == "" {
-		utils.RestErrorWrapper(w, "no next-cursor supplied", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "no next-cursor supplied", http.StatusBadRequest)
 	}
 
 	token, err := jwtgo.ParseWithClaims(nextCursorJWT, &CursorClaim{}, func(token *jwtgo.Token) (interface{}, error) {
-		return a.jwtMiddleware.Pub, nil
+		return a.jwtConfig.Pub, nil
 	})
 
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error decoding JWT token for next-cursor: "+err.Error(), http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Error decoding JWT token for next-cursor: "+err.Error(), http.StatusForbidden)
 	}
 
 	if claims, ok := token.Claims.(*CursorClaim); ok && token.Valid {
 		var result *Pager
 
-		// Audience is jwt.ClaimStrings (a slice) in golang-jwt/v5, where
-		// dgrijalva/jwt-go v3 modelled it as a plain string. The v3 check was an
-		// exact equality test against that single audience, so require exactly
-		// that: one audience, equal to the caller.
-		//
-		// Deliberately NOT "own appears somewhere in the list" -- that would
-		// silently widen who is allowed to replay a cursor, which is the one
-		// thing this check exists to prevent.
+		// v5 Audience is a slice; require exactly one, equal to the caller (not membership).
 		caller := claims.RegisteredClaims.Audience
 		if len(caller) != 1 || caller[0] != own {
-			utils.RestErrorWrapper(w, "Calling user does not match owner of cursor-next", http.StatusForbidden)
-			return
+			return echoutil.RestErrorWrapper(c, "Calling user does not match owner of cursor-next", http.StatusForbidden)
 		}
 
 		state := claims.State
 		if state == nil {
-			utils.RestErrorWrapper(w, "next-cursor carries no query state", http.StatusBadRequest)
-			return
+			return echoutil.RestErrorWrapper(c, "next-cursor carries no query state", http.StatusBadRequest)
 		}
 
 		// The owner is re-asserted from the caller's own token rather than
@@ -123,11 +110,10 @@ func (a *App) handleGetLogsCursor(w rest.ResponseWriter, r *rest.Request) {
 		filter := state.Filter
 		filter.Owner = own.(string)
 
-		result, err = a.backend.getLogs(r.Context(), 0, state.Page, state.Before, state.After,
+		result, err = a.backend.getLogs(c.Request().Context(), 0, state.Page, state.Before, state.After,
 			&filter, state.Sort, state.SearchAfter, true)
 		if err != nil {
-			utils.RestErrorWrapper(w, "ERROR: getting logs failed "+err.Error(), http.StatusInternalServerError)
-			return
+			return echoutil.RestErrorWrapper(c, "ERROR: getting logs failed "+err.Error(), http.StatusInternalServerError)
 		}
 
 		// Always hand a cursor back, so a follower polling an idle device keeps
@@ -144,20 +130,17 @@ func (a *App) handleGetLogsCursor(w rest.ResponseWriter, r *rest.Request) {
 		}
 		if result.NextCursor != "" {
 			if err := json.Unmarshal([]byte(result.NextCursor), &nextState.SearchAfter); err != nil {
-				utils.RestErrorWrapper(w, "ERROR: building next-cursor: "+err.Error(), http.StatusInternalServerError)
-				return
+				return echoutil.RestErrorWrapper(c, "ERROR: building next-cursor: "+err.Error(), http.StatusInternalServerError)
 			}
 		}
 		ss, err := a.signCursor(nextState, own.(string))
 		if err != nil {
-			utils.RestErrorWrapper(w, "ERROR: signing next-cursor token: "+err.Error(), http.StatusInternalServerError)
-			return
+			return echoutil.RestErrorWrapper(c, "ERROR: signing next-cursor token: "+err.Error(), http.StatusInternalServerError)
 		}
 		result.NextCursor = ss
 
-		w.WriteJson(result)
-		return
+		return echoutil.WriteJSON(c, http.StatusOK, result)
 	}
 
-	utils.RestErrorWrapper(w, "Unexpected Code", http.StatusInternalServerError)
+	return echoutil.RestErrorWrapper(c, "Unexpected Code", http.StatusInternalServerError)
 }

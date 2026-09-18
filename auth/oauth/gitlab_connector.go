@@ -1,4 +1,4 @@
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/gitlab"
@@ -68,12 +68,13 @@ func GetGitlabConfig() *oauth2.Config {
 }
 
 // GitlabAuthorize use google to authorize user
-func GitlabAuthorize(redirectURI string, config *oauth2.Config, w rest.ResponseWriter, r *rest.Request) {
+func GitlabAuthorize(redirectURI string, config *oauth2.Config, c *echo.Context) error {
 	// Create oauthState cookie
-	oauthState := generateStateOauthCookie(redirectURI, w)
+	oauthState := generateStateOauthCookie(redirectURI, c.Response())
 
 	u := config.AuthCodeURL(oauthState)
-	http.Redirect(w, r.Request, u, http.StatusTemporaryRedirect)
+	http.Redirect(c.Response(), c.Request(), u, http.StatusTemporaryRedirect)
+	return nil
 }
 
 // GitlabCb use code to retrive service user data

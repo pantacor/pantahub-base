@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017-2023 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,10 +26,11 @@ import (
 
 	"context"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"gitlab.com/pantacor/pantahub-base/utils/models"
 	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -48,46 +49,41 @@ import (
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /trails/summary [get]
-func (a *App) handleGetTrailSummary(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetTrailSummary(c *echo.Context) error {
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	owner, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in", http.StatusForbidden)
 	}
 
 	summaryCol := a.mongoClient.Database("pantabase_devicesummary").Collection("device_summary_short_new_v2")
 
 	if summaryCol == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+	authType, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["type"]
 
 	if authType != "USER" && authType != "SESSION" {
-		utils.RestErrorWrapper(w, "Need to be logged in as USER/SESSION user to get trail summary", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Need to be logged in as USER/SESSION user to get trail summary", http.StatusForbidden)
 	}
 
-	sortParam := r.FormValue("sort")
+	sortParam := c.Request().FormValue("sort")
 
 	if sortParam == "" {
 		sortParam = "-timestamp"
 	}
 
 	m := bson.M{}
-	filterParam := r.FormValue("filter")
+	filterParam := c.Request().FormValue("filter")
 	if filterParam != "" {
 		err := json.Unmarshal([]byte(filterParam), &m)
 		if err != nil {
-			utils.RestErrorWrapper(w, "Illegal Filter "+err.Error(), http.StatusBadRequest)
-			return
+			return echoutil.RestErrorWrapper(c, "Illegal Filter "+err.Error(), http.StatusBadRequest)
 		}
 		if err := mongoutils.ValidateClientFilter(map[string]interface{}(m)); err != nil {
-			utils.RestErrorWrapper(w, "Illegal Filter: "+err.Error(), http.StatusBadRequest)
-			return
+			return echoutil.RestErrorWrapper(c, "Illegal Filter: "+err.Error(), http.StatusBadRequest)
 		}
 	}
 
@@ -106,20 +102,18 @@ func (a *App) handleGetTrailSummary(w rest.ResponseWriter, r *rest.Request) {
 		findOptions.SetSort(bson.M{sortParam: 1})
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	cur, err := summaryCol.Find(ctx, m, findOptions)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error on fetching summaries:"+err.Error(), http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Error on fetching summaries:"+err.Error(), http.StatusForbidden)
 	}
 	defer cur.Close(ctx)
 	for cur.Next(ctx) {
 		result := trailmodels.TrailSummary{}
 		err := cur.Decode(&result)
 		if err != nil {
-			utils.RestErrorWrapper(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
-			return
+			return echoutil.RestErrorWrapper(c, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
 		}
 		result.FillLastSeen()
 		summaries = append(summaries, result)
@@ -127,7 +121,7 @@ func (a *App) handleGetTrailSummary(w rest.ResponseWriter, r *rest.Request) {
 
 	a.attachPendingOwnership(ctx, owner, summaries)
 
-	w.WriteJson(summaries)
+	return echoutil.WriteJSON(c, http.StatusOK, summaries)
 }
 
 // attachPendingOwnership marks summaries of devices whose owner verification

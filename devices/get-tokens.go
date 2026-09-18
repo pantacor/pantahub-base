@@ -1,5 +1,5 @@
 //
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,9 +21,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"gopkg.in/mgo.v2/bson"
@@ -41,37 +42,33 @@ import (
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /devices/tokens [get]
-func (a *App) handleGetTokens(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetTokens(c *echo.Context) error {
 
-	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
+	jwtPayload, ok := echoutil.Lookup(c, echoutil.KeyJWTPayload)
 	if !ok {
-		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Missing JWT_PAYLOAD", http.StatusBadRequest)
 	}
 
 	var caller interface{}
 	caller, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
 	if !ok {
-		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
 	}
 
 	var authType interface{}
 	authType, ok = jwtPayload.(jwtgo.MapClaims)["type"]
 	if !ok {
-		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
 	}
 
 	if authType != "USER" && authType != "SESSION" {
-		utils.RestErrorWrapper(w, "Can only be updated by Device: handle_posttoken", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Can only be updated by Device: handle_posttoken", http.StatusBadRequest)
 	}
 
 	res := []utils.PantahubDevicesJoinToken{}
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
 	findOptions := options.Find()
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	cur, err := collection.Find(ctx, bson.M{
 		"owner":    caller.(string),
@@ -79,8 +76,7 @@ func (a *App) handleGetTokens(w rest.ResponseWriter, r *rest.Request) {
 	}, findOptions)
 
 	if err != nil {
-		utils.RestErrorWrapper(w, "error getting device tokens for user:"+err.Error(), http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "error getting device tokens for user:"+err.Error(), http.StatusForbidden)
 	}
 
 	defer cur.Close(ctx)
@@ -88,8 +84,7 @@ func (a *App) handleGetTokens(w rest.ResponseWriter, r *rest.Request) {
 		result := utils.PantahubDevicesJoinToken{}
 		err := cur.Decode(&result)
 		if err != nil {
-			utils.RestErrorWrapper(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
-			return
+			return echoutil.RestErrorWrapper(c, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
 		}
 		// lets not reveal details about token when collection gets queried
 		result.TokenSha = nil
@@ -97,5 +92,5 @@ func (a *App) handleGetTokens(w rest.ResponseWriter, r *rest.Request) {
 		res = append(res, result)
 	}
 
-	w.WriteJson(res)
+	return echoutil.WriteJSON(c, http.StatusOK, res)
 }

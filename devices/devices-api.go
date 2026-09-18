@@ -1,5 +1,5 @@
 //
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,11 +22,13 @@ import (
 	"errors"
 	"log"
 	"math/rand"
+	"net/http"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/gcapi"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -152,9 +154,9 @@ func (app *App) EnsureDevicesIndices() error {
 	return nil
 }
 
-func handleAuth(w rest.ResponseWriter, r *rest.Request) {
-	jwtClaims := r.Env["JWT_PAYLOAD"]
-	w.WriteJson(jwtClaims)
+func handleAuth(c *echo.Context) error {
+	jwtClaims := c.Get(echoutil.KeyJWTPayload)
+	return echoutil.WriteJSON(c, http.StatusOK, jwtClaims)
 }
 
 // ResolveDeviceIDOrNick : Parse DeviceID Or Nick from the given string and return device objectID

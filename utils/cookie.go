@@ -1,11 +1,23 @@
+// Copyright (c) 2017-2026 Pantacor Ltd.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+
 package utils
 
 import (
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/ant0ine/go-json-rest/rest"
 )
 
 // IsSecureRequest reports whether the response to r reaches the client over
@@ -20,7 +32,7 @@ import (
 // client-controllable, so it is checked first; TLS terminates at the ingress,
 // which means r.TLS is nil in production and cannot be relied on alone.
 // X-Forwarded-Proto is only ever consulted to turn Secure on, never off.
-func IsSecureRequest(r *rest.Request) bool {
+func IsSecureRequest(r *http.Request) bool {
 	if strings.EqualFold(GetEnv(EnvPantahubScheme), "https") {
 		return true
 	}
@@ -38,7 +50,7 @@ func IsSecureRequest(r *rest.Request) bool {
 
 // GetCookie retrieves a cookie by its name.
 // It returns the cookie's value or an error if the cookie is not found.
-func GetCookie(r *rest.Request, name string) string {
+func GetCookie(r *http.Request, name string) string {
 	var cookie string
 	if c, err := r.Cookie(name); err == nil {
 		cookie = c.Value
@@ -103,7 +115,7 @@ func WithSameSite(sameSite http.SameSite) CookieOption {
 //   - SameSite: http.SameSiteLaxMode
 //   - MaxAge: 0 (results in a session cookie if no Expires date is explicitly set)
 //   - Expires: not set (also contributes to a session cookie if MaxAge is 0)
-func SetCookie(w rest.ResponseWriter, r *rest.Request, name, value string, opts ...CookieOption) {
+func SetCookie(w http.ResponseWriter, r *http.Request, name, value string, opts ...CookieOption) {
 	//#nosec G124 -- Secure is set from IsSecureRequest, which gosec cannot follow
 	cookie := &http.Cookie{
 		Name:     name,
@@ -124,7 +136,7 @@ func SetCookie(w rest.ResponseWriter, r *rest.Request, name, value string, opts 
 
 // DeleteCookie removes a cookie by setting its MaxAge to -1 and Expires to a past date.
 // This function strictly follows the example provided in the prompt for deleting a cookie.
-func DeleteCookie(w rest.ResponseWriter, r *rest.Request, name string) {
+func DeleteCookie(w http.ResponseWriter, r *http.Request, name string) {
 	//#nosec G124 -- Secure is set from IsSecureRequest, which gosec cannot follow
 	http.SetCookie(w, &http.Cookie{
 		Name:     name,

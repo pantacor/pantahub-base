@@ -1,5 +1,5 @@
 //
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,9 +23,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"gopkg.in/mgo.v2/bson"
@@ -45,70 +46,61 @@ import (
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /devices/{id} [patch]
-func (a *App) handlePatchDevice(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePatchDevice(c *echo.Context) error {
 	newDevice := Device{}
-	patchID := r.PathParam("id")
+	patchID := c.Param("id")
 
-	authID, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	authID, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in.", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in.", http.StatusForbidden)
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+	authType, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["type"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in with a known authentication type.", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in with a known authentication type.", http.StatusForbidden)
 	}
 
 	if authType != "USER" && authType != "SESSION" && !strings.HasSuffix(authID.(string), "/"+patchID) {
-		utils.RestErrorWrapper(w, "Devices can only change their own nick.", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Devices can only change their own nick.", http.StatusForbidden)
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
 	if collection == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	deviceID, err := primitive.ObjectIDFromHex(patchID)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 	}
 	err = collection.FindOne(ctx, bson.M{
 		"_id":     deviceID,
 		"garbage": bson.M{"$ne": true},
 	}).Decode(&newDevice)
 	if err != nil && mongoutils.IsNotFound(err) {
-		utils.RestErrorWrapper(w, "Device not found", http.StatusNotFound)
-		return
+		return echoutil.RestErrorWrapper(c, "Device not found", http.StatusNotFound)
 	}
 	if err != nil {
-		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Not Accessible Resource Id", http.StatusForbidden)
 	}
 
 	if newDevice.Owner == "" || (authType == "USER" && newDevice.Owner != authID) ||
 		(authType == "SESSION" && newDevice.Owner != authID) {
-		utils.RestErrorWrapper(w, "Not User/Device Accessible Resource Id", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Not User/Device Accessible Resource Id", http.StatusForbidden)
 	}
 
 	patch := Device{}
 	patched := false
 
-	err = r.DecodeJsonPayload(&patch)
+	err = echoutil.DecodeJsonPayload(c, &patch)
 
 	if err != nil {
-		utils.RestErrorWrapper(w, "Internal Error (decode patch)", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Internal Error (decode patch)", http.StatusInternalServerError)
 	}
 	if patch.Nick != "" {
 		newDevice.Nick = patch.Nick
@@ -116,12 +108,10 @@ func (a *App) handlePatchDevice(w rest.ResponseWriter, r *rest.Request) {
 	}
 	isValidNick, err := regexp.MatchString(DeviceNickRule, newDevice.Nick)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error Validating Device nick "+err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Error Validating Device nick "+err.Error(), http.StatusBadRequest)
 	}
 	if !isValidNick {
-		utils.RestErrorWrapper(w, "Invalid Device Nick(Only allowed characters:[A-Za-z0-9-_+%])", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Invalid Device Nick(Only allowed characters:[A-Za-z0-9-_+%])", http.StatusBadRequest)
 	}
 
 	if patched {
@@ -135,13 +125,12 @@ func (a *App) handlePatchDevice(w rest.ResponseWriter, r *rest.Request) {
 			}},
 		)
 		if err != nil {
-			utils.RestErrorWrapper(w, "Error updating patched device state", http.StatusForbidden)
-			return
+			return echoutil.RestErrorWrapper(c, "Error updating patched device state", http.StatusForbidden)
 		}
 	}
 
 	newDevice.Challenge = ""
 	newDevice.Secret = ""
 
-	w.WriteJson(newDevice)
+	return echoutil.WriteJSON(c, http.StatusOK, newDevice)
 }

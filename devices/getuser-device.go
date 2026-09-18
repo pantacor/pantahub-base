@@ -1,5 +1,5 @@
 //
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,11 +22,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/accounts/accountsdata"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -45,27 +46,25 @@ import (
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /devices/np/{usernick}/{devicenick} [get]
-func (a *App) handleGetUserDevice(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetUserDevice(c *echo.Context) error {
 
 	var device Device
 	var account accounts.Account
 
-	usernick := r.PathParam("usernick")
-	devicenick := r.PathParam("devicenick")
+	usernick := c.Param("usernick")
+	devicenick := c.Param("devicenick")
 
-	authID, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	authID, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in.", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in.", http.StatusForbidden)
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+	authType, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["type"]
 
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in with a known authentication type.", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in with a known authentication type.", http.StatusForbidden)
 	}
 
 	callerIsUser := false
@@ -76,8 +75,7 @@ func (a *App) handleGetUserDevice(w rest.ResponseWriter, r *rest.Request) {
 	} else if authType == "USER" || authType == "SESSION" {
 		callerIsUser = true
 	} else {
-		utils.RestErrorWrapper(w, "You need to be logged in with either USER or DEVICE account type.", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in with either USER or DEVICE account type.", http.StatusForbidden)
 	}
 
 	// first check if we refer to a default accoutn
@@ -95,11 +93,10 @@ func (a *App) handleGetUserDevice(w rest.ResponseWriter, r *rest.Request) {
 
 		collAccounts := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
 		if collAccounts == nil {
-			utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-			return
+			return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 		}
 
-		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 		defer cancel()
 		err := collAccounts.FindOne(ctx,
 			bson.M{"nick": usernick}).
@@ -107,19 +104,17 @@ func (a *App) handleGetUserDevice(w rest.ResponseWriter, r *rest.Request) {
 
 		if err != nil {
 			log.Println("ERROR: error getting account by nick; will return Forbidden to cover up details from backend: " + err.Error())
-			utils.RestErrorWrapper(w, "Forbidden", http.StatusForbidden)
-			return
+			return echoutil.RestErrorWrapper(c, "Forbidden", http.StatusForbidden)
 		}
 	}
 
 	collDevices := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
 	if collDevices == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	err := collDevices.FindOne(ctx, bson.M{
 		"owner":   account.Prn,
@@ -127,27 +122,23 @@ func (a *App) handleGetUserDevice(w rest.ResponseWriter, r *rest.Request) {
 		"garbage": bson.M{"$ne": true},
 	}).Decode(&device)
 	if err != nil && mongoutils.IsNotFound(err) {
-		utils.RestErrorWrapper(w, "Device not found", http.StatusNotFound)
-		return
+		return echoutil.RestErrorWrapper(c, "Device not found", http.StatusNotFound)
 	}
 
 	if err != nil {
 		log.Println("ERROR: error getting device by nick: " + err.Error())
-		utils.RestErrorWrapper(w, "Forbidden", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Forbidden", http.StatusForbidden)
 	}
 
 	if !device.IsPublic {
 		// XXX: fixme; needs delegation of authorization for device accessing its resources
 		// could be subscriptions, but also something else
 		if callerIsDevice && device.Prn != authID {
-			utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
-			return
+			return echoutil.RestErrorWrapper(c, "No Access", http.StatusForbidden)
 		}
 
 		if callerIsUser && device.Owner != authID {
-			utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
-			return
+			return echoutil.RestErrorWrapper(c, "No Access", http.StatusForbidden)
 		}
 	} else if authID != device.Prn && authID != device.Owner {
 		// public device, caller is neither the device nor the owner:
@@ -162,5 +153,5 @@ func (a *App) handleGetUserDevice(w rest.ResponseWriter, r *rest.Request) {
 	device.UserMeta = utils.BsonUnquoteMap(&device.UserMeta)
 	device.DeviceMeta = utils.BsonUnquoteMap(&device.DeviceMeta)
 
-	w.WriteJson(device)
+	return echoutil.WriteJSON(c, http.StatusOK, device)
 }

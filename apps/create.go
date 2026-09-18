@@ -1,4 +1,4 @@
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,11 +22,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/golang-jwt/jwt/v5"
 	petname "github.com/dustinkirkland/golang-petname"
+	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/auth/redirecturi"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -55,42 +56,37 @@ type CreateAppPayload struct {
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /apps/ [post]
-func (app *App) handleCreateApp(w rest.ResponseWriter, r *rest.Request) {
+func (app *App) handleCreateApp(c *echo.Context) error {
 	newApp := &TPApp{}
 	payload := &CreateAppPayload{Logo: ""}
-	if err := r.DecodeJsonPayload(payload); err != nil {
-		utils.RestErrorWrapperUser(w, err.Error(), "invalid request body", http.StatusBadRequest)
-		return
+	if err := echoutil.DecodeJsonPayload(c, payload); err != nil {
+		return echoutil.RestErrorWrapperUser(c, err.Error(), "invalid request body", http.StatusBadRequest)
 	}
 
 	var owner interface{}
 	var ownerNick interface{}
-	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
+	jwtPayload, ok := echoutil.Lookup(c, echoutil.KeyJWTPayload)
 	if ok {
 		owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
 		ownerNick, ok = jwtPayload.(jwtgo.MapClaims)["nick"]
 	} else {
-		utils.RestErrorWrapper(w, "Owner can't be defined", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Owner can't be defined", http.StatusBadRequest)
 	}
 
 	err := validatePayload(payload)
 	if err != nil {
-		utils.RestErrorWrapperUser(w, err.Error(), err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapperUser(c, err.Error(), err.Error(), http.StatusBadRequest)
 	}
 
 	mgoid := bson.NewObjectId()
 	ObjectID, err := primitive.ObjectIDFromHex(mgoid.Hex())
 	if err != nil {
-		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 	}
 
 	apptype, err := parseType(payload.Type)
 	if err != nil {
-		utils.RestErrorWrapperUser(w, err.Error(), err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapperUser(c, err.Error(), err.Error(), http.StatusBadRequest)
 	}
 
 	if payload.Nick == "" {
@@ -99,15 +95,13 @@ func (app *App) handleCreateApp(w rest.ResponseWriter, r *rest.Request) {
 
 	scopes, err := parseScopes(payload.Scopes, payload.Nick)
 	if err != nil {
-		utils.RestErrorWrapperUser(w, err.Error(), err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapperUser(c, err.Error(), err.Error(), http.StatusBadRequest)
 	}
 
 	if apptype == AppTypeConfidential {
 		newApp.Secret, err = utils.GenerateSecret(30)
 		if err != nil {
-			utils.RestErrorWrapper(w, "Error generating secret", http.StatusInternalServerError)
-			return
+			return echoutil.RestErrorWrapper(c, "Error generating secret", http.StatusInternalServerError)
 		}
 		newApp.SecretHash = utils.HashSecret(newApp.Secret)
 	}
@@ -115,8 +109,7 @@ func (app *App) handleCreateApp(w rest.ResponseWriter, r *rest.Request) {
 	if apptype == AppTypeConfidential && len(payload.ExposedScopes) > 0 {
 		newApp.ExposedScopes, err = parseScopes(payload.ExposedScopes, payload.Nick)
 		if err != nil {
-			utils.RestErrorWrapperUser(w, err.Error(), err.Error(), http.StatusBadRequest)
-			return
+			return echoutil.RestErrorWrapperUser(c, err.Error(), err.Error(), http.StatusBadRequest)
 		}
 	}
 
@@ -134,13 +127,12 @@ func (app *App) handleCreateApp(w rest.ResponseWriter, r *rest.Request) {
 	newApp.TimeModified = newApp.TimeCreated
 	newApp.DeletedAt = nil
 
-	_, err = CreateOrUpdateApp(r.Context(), newApp, app.mongoClient.Database(utils.MongoDb))
+	_, err = CreateOrUpdateApp(c.Request().Context(), newApp, app.mongoClient.Database(utils.MongoDb))
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error creating third party application "+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error creating third party application "+err.Error(), http.StatusInternalServerError)
 	}
 
-	w.WriteJson(newApp)
+	return echoutil.WriteJSON(c, http.StatusOK, newApp)
 }
 
 func parseType(typeofApp string) (string, error) {

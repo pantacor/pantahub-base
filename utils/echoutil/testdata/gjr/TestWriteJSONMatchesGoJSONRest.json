@@ -1,0 +1,7 @@
+{
+  "TestWriteJSONMatchesGoJSONRest|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"count\":3,\"nested\":{\"list\":[1,2,3]},\"nick\":\"\\u003cdevice\\u003e \\u0026 \\\"quoted\\\"\",\"utf8\":\"ñandú\"}"
+  }
+}

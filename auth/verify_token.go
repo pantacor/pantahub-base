@@ -1,4 +1,4 @@
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,8 +19,9 @@ package auth
 import (
 	"net/http"
 
-	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 )
 
 // requestPayload payload to verify token
@@ -45,20 +46,20 @@ type requestPayload struct {
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /auth/signature/verify [post]
-func (a *App) verifyToken(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) verifyToken(c *echo.Context) error {
 	payload := &requestPayload{}
-	if err := r.DecodeJsonPayload(payload); err != nil {
-		utils.RestErrorWrapper(w, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
-		return
+	if err := echoutil.DecodeJsonPayload(c, payload); err != nil {
+		return echoutil.RestErrorWrapper(c, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
 	}
 
 	col := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
-	err := utils.ValidateOwnerSig(r.Context(), payload.Signature, payload.TokenID, payload.Owner, payload.IDevIDName, col)
+	err := utils.ValidateOwnerSig(c.Request().Context(), payload.Signature, payload.TokenID, payload.Owner, payload.IDevIDName, col)
 	if err != nil {
-		rest.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.Error(c, err.Error(), http.StatusBadRequest)
 	}
 
 	response := []byte("ok")
-	_, _ = w.Write(response)
+	_ = echoutil.WriteHeader(c, http.StatusOK)
+	_, _ = c.Response().Write(response)
+	return nil
 }

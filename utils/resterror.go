@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017-2023 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,7 +24,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/fatih/structs"
 	"github.com/fluent/fluent-logger-golang/fluent"
 )
@@ -57,24 +56,6 @@ func IsUserError(err error) bool {
 // UserErrorNew user error factory
 func UserErrorNew(msg string) *UserError {
 	return &UserError{Msg: msg}
-}
-
-// RestErrorUser Create a rest error with id and log
-func RestErrorUser(w rest.ResponseWriter, err error, message string, statusCode int) {
-	errStr := "<nil>"
-	if err != nil {
-		errStr = err.Error()
-	}
-	RestErrorWrapperUser(w, errStr, message, statusCode)
-}
-
-// RestError Create a rest error with id and log
-func RestError(w rest.ResponseWriter, err error, message string, statusCode int) {
-	errStr := "<nil>"
-	if err != nil {
-		errStr = err.Error()
-	}
-	RestErrorWrapper(w, message+" "+errStr, statusCode)
 }
 
 func getLogger() *fluent.Fluent {
@@ -118,7 +99,9 @@ func LogError(errorMsg, userMsg string, code int) {
 	}
 }
 
-func restErrorWrapperInternal(w rest.ResponseWriter, errorStr, userMsg string, code int) {
+// MintRestError mints an incident id, logs and forwards the detail to fluentd, and
+// returns the client-safe body. Shared by go-json-rest and utils/echoutil.
+func MintRestError(errorStr, userMsg string, code int) RError {
 	incidentID := time.Now().UnixNano()
 
 	incidentStr := fmt.Sprintf("REST-ERR-ID-%d", incidentID)
@@ -139,30 +122,11 @@ func restErrorWrapperInternal(w rest.ResponseWriter, errorStr, userMsg string, c
 		}
 	}
 
-	w.WriteHeader(code)
-	err := w.WriteJson(RError{
+	return RError{
 		Error: incidentStr,
 		Msg:   userMsg,
 		Code:  code,
-	})
-	if err != nil {
-		panic(err)
 	}
-}
-
-// RestErrorWrapperUser wrap the normal rest error in an struct
-func RestErrorWrapperUser(w rest.ResponseWriter, errorStr, userMessage string, code int) {
-	restErrorWrapperInternal(w, errorStr, userMessage, code)
-}
-
-// RestErrorWrite write error
-func RestErrorWrite(w rest.ResponseWriter, err *RError) {
-	restErrorWrapperInternal(w, err.Error, "", err.Code)
-}
-
-// RestErrorWrapper wrap the normal rest error in an struct
-func RestErrorWrapper(w rest.ResponseWriter, errorStr string, code int) {
-	restErrorWrapperInternal(w, errorStr, "", code)
 }
 
 func HttpErrorWrapper(w http.ResponseWriter, errorStr string, code int) {

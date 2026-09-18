@@ -1,4 +1,18 @@
-package jwtmiddleware
+// Copyright (c) 2017-2026 Pantacor Ltd.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+
+package jwtauth
 
 import (
 	"encoding/base64"
@@ -8,19 +22,8 @@ import (
 	jwtgo "github.com/golang-jwt/jwt/v5"
 )
 
-// These tokens were minted by github.com/dgrijalva/jwt-go v3.2.0 -- the library
-// this repo shipped before the move to golang-jwt/jwt/v5 -- and are frozen here
-// deliberately.
-//
-// Devices and pvr clients hold long-lived tokens. If the v5 move changed how a
-// token is parsed or validated in any way that matters, these fixtures stop
-// verifying and this test fails, instead of the whole fleet silently failing to
-// authenticate against a deployed build. Do not regenerate them: a fixture that
-// is regenerated after a behaviour change tests nothing.
-//
-// Both were signed with fixtureKey using HS256. exp is year 2123 so they do not
-// rot. Note the struct-claims token spells "aud" as a bare JSON string, which is
-// what v3 emitted; v5 models Audience as ClaimStrings and must still accept it.
+// Tokens minted by dgrijalva/jwt-go v3.2.0 before the v5 move. Do not regenerate:
+// they prove old device tokens still verify. HS256, exp in 2123.
 const (
 	fixtureKey = "fixture-hmac-key-do-not-use-in-prod"
 
@@ -63,9 +66,17 @@ func TestV3MapClaimsTokenStillVerifies(t *testing.T) {
 	}
 }
 
-// The typed-claims token is parsed as MapClaims here on purpose: this asserts
-// the token BYTES, independent of which Go struct models them, so the test
-// survives the StandardClaims -> RegisteredClaims rename.
+// The production verifier (ParseAuthorizationHeader) must accept the same token.
+func TestV3MapClaimsTokenVerifiesThroughConfig(t *testing.T) {
+	c := &Config{Realm: "r", Key: []byte(fixtureKey)}
+	c.ApplyDefaults()
+	tok, err := c.ParseAuthorizationHeader("Bearer " + v3MapClaimsToken)
+	if err != nil || !tok.Valid {
+		t.Fatalf("v3 token rejected by Config: %v", err)
+	}
+}
+
+// Parsed as MapClaims to check the token bytes, independent of the claims type.
 func TestV3StructClaimsTokenStillVerifies(t *testing.T) {
 	tok, err := jwtgo.Parse(v3StructClaimsToken, keyFunc)
 	if err != nil {
@@ -102,14 +113,7 @@ func TestWrongKeyIsRejected(t *testing.T) {
 	}
 }
 
-// A single audience must serialise as a bare JSON string, the way
-// dgrijalva/jwt-go v3 emitted it -- not as a one-element array, which is
-// golang-jwt/v5's default. See the init() in auth_jwt.go.
-//
-// This is not cosmetic. The object file servers carry the storage id in "aud"
-// (objects.ObjectAccessClaims.StorageID), and pvr and devices compare "aud" as
-// a scalar. Emitting ["x"] where "x" was emitted before would break signed
-// object URLs and audience checks across the fleet.
+// A single audience must encode as a string, not an array (see init).
 func TestSingleAudienceMarshalsAsBareString(t *testing.T) {
 	tok := jwtgo.NewWithClaims(jwtgo.SigningMethodHS256, jwtgo.RegisteredClaims{
 		Audience: jwtgo.ClaimStrings{"prn:pantahub.com:apis:/api"},

@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017-2023 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,10 +26,11 @@ import (
 
 	"context"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -51,60 +52,53 @@ import (
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /trails/{id}/steps/{rev}/progress [put]
-func (a *App) handlePutStepProgress(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePutStepProgress(c *echo.Context) error {
 
 	stepProgress := trailmodels.StepProgress{}
-	if err := r.DecodeJsonPayload(&stepProgress); err != nil {
-		utils.RestErrorWrapper(w, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
-		return
+	if err := echoutil.DecodeJsonPayload(c, &stepProgress); err != nil {
+		return echoutil.RestErrorWrapper(c, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
 	}
 	trailmodels.SanitizeStepProgress(&stepProgress)
-	trailID := r.PathParam("id")
-	stepID := trailID + "-" + r.PathParam("rev")
+	trailID := c.Param("id")
+	stepID := trailID + "-" + c.Param("rev")
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	owner, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in", http.StatusForbidden)
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+	authType, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["type"]
 
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
 	if coll == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
 	collTrails := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_trails")
 
 	if collTrails == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity - trails", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity - trails", http.StatusInternalServerError)
 	}
 
 	if authType != "DEVICE" {
-		utils.RestErrorWrapper(w, "Only devices can update step status", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Only devices can update step status", http.StatusForbidden)
 	}
 
 	progressTime := time.Now()
 
 	deviceID, err := primitive.ObjectIDFromHex(trailID)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Invalid device ID:"+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Invalid device ID:"+err.Error(), http.StatusInternalServerError)
 	}
 
-	isDevicePublic, err := a.IsDevicePublic(r.Context(), deviceID)
+	isDevicePublic, err := a.IsDevicePublic(c.Request().Context(), deviceID)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error checking device is public or not:"+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error checking device is public or not:"+err.Error(), http.StatusInternalServerError)
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	updateResult, err := coll.UpdateOne(
 		ctx,
@@ -122,20 +116,17 @@ func (a *App) handlePutStepProgress(w rest.ResponseWriter, r *rest.Request) {
 		}),
 	)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Cannot update step progress "+err.Error(), http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Cannot update step progress "+err.Error(), http.StatusForbidden)
 	}
 
 	if updateResult.MatchedCount == 0 {
-		utils.RestErrorWrapper(w, "Error updating trail: not found", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Error updating trail: not found", http.StatusBadRequest)
 	}
-	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel = context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	trailObjectID, err := primitive.ObjectIDFromHex(trailID)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 	}
 	updateResult, err = collTrails.UpdateOne(
 		ctx,
@@ -151,9 +142,8 @@ func (a *App) handlePutStepProgress(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if updateResult.MatchedCount == 0 {
-		utils.RestErrorWrapper(w, "Error updating trail: not found", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Error updating trail: not found", http.StatusBadRequest)
 	}
 
-	w.WriteJson(stepProgress)
+	return echoutil.WriteJSON(c, http.StatusOK, stepProgress)
 }

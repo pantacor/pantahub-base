@@ -1,3 +1,17 @@
+// Copyright (c) 2017-2026 Pantacor Ltd.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+
 package auth
 
 import (
@@ -7,10 +21,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/auth/oauth"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -30,8 +45,8 @@ type connectedProviderResponse struct {
 	ConnectedAt time.Time `json:"connected_at,omitempty"`
 }
 
-func socialConnectAccountPRN(r *rest.Request) (string, error) {
-	authInfo := utils.GetAuthInfo(r)
+func socialConnectAccountPRN(c *echo.Context) (string, error) {
+	authInfo := echoutil.AuthInfo(c)
 	if authInfo == nil || authInfo.Caller == "" {
 		return "", errors.New("you need to be logged in")
 	}
@@ -40,21 +55,19 @@ func socialConnectAccountPRN(r *rest.Request) (string, error) {
 
 // handleGetConnectedProviders lists the external identities connected to the
 // authenticated account.
-func (a *App) handleGetConnectedProviders(w rest.ResponseWriter, r *rest.Request) {
-	accountPRN, err := socialConnectAccountPRN(r)
+func (a *App) handleGetConnectedProviders(c *echo.Context) error {
+	accountPRN, err := socialConnectAccountPRN(c)
 	if err != nil {
-		utils.RestError(w, err, err.Error(), http.StatusUnauthorized)
-		return
+		return echoutil.RestError(c, err, err.Error(), http.StatusUnauthorized)
 	}
 
-	providers, err := listConnectedProviders(r.Context(), accountPRN, a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts"))
+	providers, err := listConnectedProviders(c.Request().Context(), accountPRN, a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts"))
 	if err != nil {
 		status := http.StatusInternalServerError
 		if err == mongo.ErrNoDocuments {
 			status = http.StatusNotFound
 		}
-		utils.RestError(w, err, "Unable to list connected providers", status)
-		return
+		return echoutil.RestError(c, err, "Unable to list connected providers", status)
 	}
 	response := make([]connectedProviderResponse, 0, len(providers))
 	for _, provider := range providers {
@@ -64,58 +77,52 @@ func (a *App) handleGetConnectedProviders(w rest.ResponseWriter, r *rest.Request
 			ConnectedAt: provider.ConnectedAt,
 		})
 	}
-	w.WriteJson(response)
+	return echoutil.WriteJSON(c, http.StatusOK, response)
 }
 
 // handlePostConnectedProvider starts an authenticated OAuth connect flow. The
 // signed cookie binds the callback to the account that initiated this request;
 // the callback never trusts an account PRN supplied by the browser.
-func (a *App) handlePostConnectedProvider(w rest.ResponseWriter, r *rest.Request) {
-	accountPRN, err := socialConnectAccountPRN(r)
+func (a *App) handlePostConnectedProvider(c *echo.Context) error {
+	accountPRN, err := socialConnectAccountPRN(c)
 	if err != nil {
-		utils.RestError(w, err, err.Error(), http.StatusUnauthorized)
-		return
+		return echoutil.RestError(c, err, err.Error(), http.StatusUnauthorized)
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
-	account, err := getUserByPRN(r.Context(), accountPRN, collection)
+	account, err := getUserByPRN(c.Request().Context(), accountPRN, collection)
 	if err != nil {
-		utils.RestError(w, err, "Account not found", http.StatusUnauthorized)
-		return
+		return echoutil.RestError(c, err, "Account not found", http.StatusUnauthorized)
 	}
 	if account.Type != accounts.AccountTypeUser && account.Type != accounts.AccountTypeAdmin {
-		utils.RestError(w, nil, "This account type cannot connect OAuth providers", http.StatusForbidden)
-		return
+		return echoutil.RestError(c, nil, "This account type cannot connect OAuth providers", http.StatusForbidden)
 	}
 
 	payload := connectedProviderConnectRequest{}
-	if strings.Contains(strings.ToLower(r.Header.Get("Content-Type")), "application/json") {
-		if err := r.DecodeJsonPayload(&payload); err != nil {
-			utils.RestError(w, err, "Invalid connect payload", http.StatusBadRequest)
-			return
+	if strings.Contains(strings.ToLower(c.Request().Header.Get("Content-Type")), "application/json") {
+		if err := echoutil.DecodeJsonPayload(c, &payload); err != nil {
+			return echoutil.RestError(c, err, "Invalid connect payload", http.StatusBadRequest)
 		}
 	} else {
-		_ = r.ParseForm()
-		payload.Service = r.FormValue("service")
-		payload.RedirectTo = r.FormValue("redirect_uri")
+		_ = c.Request().ParseForm()
+		payload.Service = c.Request().FormValue("service")
+		payload.RedirectTo = c.Request().FormValue("redirect_uri")
 	}
 
 	service := oauth.ServiceType(strings.ToLower(strings.TrimSpace(payload.Service)))
 	if _, ok := oauth.ServicesConfigs[service]; !ok {
-		utils.RestError(w, nil, "We can't connect to that service", http.StatusBadRequest)
-		return
+		return echoutil.RestError(c, nil, "We can't connect to that service", http.StatusBadRequest)
 	}
 
 	redirectTo := payload.RedirectTo
-	if queryRedirect := r.URL.Query().Get("redirect_uri"); queryRedirect != "" {
+	if queryRedirect := c.Request().URL.Query().Get("redirect_uri"); queryRedirect != "" {
 		redirectTo = queryRedirect
 	}
 	if redirectTo != "" {
-		audit := auditContext(r, "social_connect")
+		audit := auditContext(c.Request(), "social_connect")
 		audit.Service = string(service)
 		if err := validateSocialRedirectURI(redirectTo, audit); err != nil {
-			utils.RestError(w, err, err.Error(), http.StatusBadRequest)
-			return
+			return echoutil.RestError(c, err, err.Error(), http.StatusBadRequest)
 		}
 	}
 
@@ -125,69 +132,63 @@ func (a *App) handlePostConnectedProvider(w rest.ResponseWriter, r *rest.Request
 	// we signed here, and the caller is authenticated at this point.
 	authorizeURL, err := oauth.AuthorizationURLByServiceWithConnect(service, redirectTo, accountPRN)
 	if err != nil {
-		utils.RestError(w, err, "Unable to start OAuth connect flow", http.StatusInternalServerError)
-		return
+		return echoutil.RestError(c, err, "Unable to start OAuth connect flow", http.StatusInternalServerError)
 	}
-	w.WriteJson(map[string]string{"authorize_url": authorizeURL})
+	return echoutil.WriteJSON(c, http.StatusOK, map[string]string{"authorize_url": authorizeURL})
 }
 
 // handleDeleteConnectedProvider disconnects one provider identity. A missing
 // provider_id is accepted for compatibility and removes all identities for
 // the requested service.
-func (a *App) handleDeleteConnectedProvider(w rest.ResponseWriter, r *rest.Request) {
-	accountPRN, err := socialConnectAccountPRN(r)
+func (a *App) handleDeleteConnectedProvider(c *echo.Context) error {
+	accountPRN, err := socialConnectAccountPRN(c)
 	if err != nil {
-		utils.RestError(w, err, err.Error(), http.StatusUnauthorized)
-		return
+		return echoutil.RestError(c, err, err.Error(), http.StatusUnauthorized)
 	}
 
 	payload := connectedProviderDisconnectRequest{}
-	if strings.Contains(strings.ToLower(r.Header.Get("Content-Type")), "application/json") {
-		if err := r.DecodeJsonPayload(&payload); err != nil {
-			utils.RestError(w, err, "Invalid disconnect payload", http.StatusBadRequest)
-			return
+	if strings.Contains(strings.ToLower(c.Request().Header.Get("Content-Type")), "application/json") {
+		if err := echoutil.DecodeJsonPayload(c, &payload); err != nil {
+			return echoutil.RestError(c, err, "Invalid disconnect payload", http.StatusBadRequest)
 		}
 	} else {
-		_ = r.ParseForm()
-		payload.Service = r.FormValue("service")
-		payload.ProviderID = r.FormValue("provider_id")
+		_ = c.Request().ParseForm()
+		payload.Service = c.Request().FormValue("service")
+		payload.ProviderID = c.Request().FormValue("provider_id")
 	}
 	if payload.Service == "" {
-		payload.Service = r.URL.Query().Get("service")
+		payload.Service = c.Request().URL.Query().Get("service")
 	}
 	if payload.ProviderID == "" {
-		payload.ProviderID = r.URL.Query().Get("provider_id")
+		payload.ProviderID = c.Request().URL.Query().Get("provider_id")
 	}
 	service := strings.ToLower(strings.TrimSpace(payload.Service))
 	if service == "" {
-		utils.RestError(w, nil, "Provider service is required", http.StatusBadRequest)
-		return
+		return echoutil.RestError(c, nil, "Provider service is required", http.StatusBadRequest)
 	}
 
-	if err := disconnectProvider(r.Context(), accountPRN, service, payload.ProviderID,
+	if err := disconnectProvider(c.Request().Context(), accountPRN, service, payload.ProviderID,
 		a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")); err != nil {
 		status := http.StatusInternalServerError
 		if err == mongo.ErrNoDocuments {
 			status = http.StatusNotFound
 		}
-		utils.RestError(w, err, "Connected provider not found", status)
-		return
+		return echoutil.RestError(c, err, "Connected provider not found", status)
 	}
-	w.WriteJson(true)
+	return echoutil.WriteJSON(c, http.StatusOK, true)
 }
 
-func redirectAfterProviderConnect(w rest.ResponseWriter, r *rest.Request, redirectTo string, provider accounts.ConnectedProvider) {
+func redirectAfterProviderConnect(c *echo.Context, redirectTo string, provider accounts.ConnectedProvider) error {
 	if redirectTo == "" {
-		w.WriteJson(provider)
-		return
+		return echoutil.WriteJSON(c, http.StatusOK, provider)
 	}
 	u, err := url.Parse(redirectTo)
 	if err != nil {
-		utils.RestError(w, err, "Invalid redirect URI", http.StatusBadRequest)
-		return
+		return echoutil.RestError(c, err, "Invalid redirect URI", http.StatusBadRequest)
 	}
 	query := u.Query()
 	query.Set("connected_provider", provider.Service)
 	u.RawQuery = query.Encode()
-	http.Redirect(w, r.Request, u.String(), http.StatusTemporaryRedirect)
+	http.Redirect(c.Response(), c.Request(), u.String(), http.StatusTemporaryRedirect)
+	return nil
 }

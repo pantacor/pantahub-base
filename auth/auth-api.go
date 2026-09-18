@@ -1,4 +1,4 @@
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,12 +29,13 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/accounts/accountsdata"
 	"gitlab.com/pantacor/pantahub-base/auth/authmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -61,9 +62,9 @@ type accountClaims struct {
 // @Failure 404 {object} utils.RError "Account not found"
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /auth/auth_status [get]
-func handleAuthStatus(w rest.ResponseWriter, r *rest.Request) {
-	jwtClaims := r.Env["JWT_PAYLOAD"]
-	w.WriteJson(jwtClaims)
+func handleAuthStatus(c *echo.Context) error {
+	jwtClaims := c.Get(echoutil.KeyJWTPayload)
+	return echoutil.WriteJSON(c, http.StatusOK, jwtClaims)
 }
 
 // handleGetAccounts Get list of accounts
@@ -79,30 +80,28 @@ func handleAuthStatus(w rest.ResponseWriter, r *rest.Request) {
 // @Failure 404 {object} utils.RError "Account not found"
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /auth/accounts [get]
-func (a *App) handleGetAccounts(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetAccounts(c *echo.Context) error {
 	var err error
 	var cur *mongo.Cursor
 
-	authInfo := utils.GetAuthInfo(r)
-	_ = r.ParseForm()
-	asAdminMode := r.FormValue("asadmin")
+	authInfo := echoutil.AuthInfo(c)
+	_ = c.Request().ParseForm()
+	asAdminMode := c.Request().FormValue("asadmin")
 
 	if asAdminMode != "" && authInfo.Roles != "admin" {
-		utils.RestError(w, nil, "user has no admin role", http.StatusForbidden)
-		return
+		return echoutil.RestError(c, nil, "user has no admin role", http.StatusForbidden)
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
 
 	if collection == nil {
-		utils.RestError(w, nil, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestError(c, nil, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
 	resultSet := make([]accounts.AccountPublic, 0)
 	findOptions := options.Find()
 	findOptions.SetNoCursorTimeout(true)
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
 	// NO ADMIN: FILTER
@@ -122,8 +121,7 @@ func (a *App) handleGetAccounts(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if err != nil {
-		utils.RestError(w, err, "Error on fetching accounts.", http.StatusInternalServerError)
-		return
+		return echoutil.RestError(c, err, "Error on fetching accounts.", http.StatusInternalServerError)
 	}
 	defer cur.Close(ctx)
 
@@ -131,13 +129,12 @@ func (a *App) handleGetAccounts(w rest.ResponseWriter, r *rest.Request) {
 		result := accounts.AccountPublic{}
 		err := cur.Decode(&result)
 		if err != nil {
-			utils.RestError(w, err, "Cursor Decode Error", http.StatusInternalServerError)
-			return
+			return echoutil.RestError(c, err, "Cursor Decode Error", http.StatusInternalServerError)
 		}
 		resultSet = append(resultSet, result)
 	}
 
-	w.WriteJson(&resultSet)
+	return echoutil.WriteJSON(c, http.StatusOK, &resultSet)
 }
 
 // handlePostSession Create an anonymous "session" account without password
@@ -149,7 +146,7 @@ func (a *App) handleGetAccounts(w rest.ResponseWriter, r *rest.Request) {
 // @Success 200 {object} accounts.Account
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /auth/sessions [post]
-func (a *App) handlePostSession(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePostSession(c *echo.Context) error {
 
 	sessionAccount := accounts.Account{}
 	sessionAccount.ID = primitive.NewObjectID()
@@ -163,7 +160,7 @@ func (a *App) handlePostSession(w rest.ResponseWriter, r *rest.Request) {
 	sessionAccount.TimeModified = sessionAccount.TimeCreated
 
 	opts := options.InsertOneOptions{}
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
 	_, err := collection.InsertOne(
@@ -172,37 +169,35 @@ func (a *App) handlePostSession(w rest.ResponseWriter, r *rest.Request) {
 		&opts,
 	)
 	if err != nil {
-		utils.RestError(w, err, err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestError(c, err, err.Error(), http.StatusInternalServerError)
 	}
 
-	token := jwtgo.New(jwtgo.GetSigningMethod(a.jwtMiddleware.SigningAlgorithm))
+	token := jwtgo.New(jwtgo.GetSigningMethod(a.jwtConfig.SigningAlgorithm))
 	tokenClaims := token.Claims.(jwtgo.MapClaims)
 
 	// lets get the standard payload for a user and modify it so its a service accesstoken
-	if a.jwtMiddleware.PayloadFunc != nil {
-		for key, value := range a.jwtMiddleware.PayloadFunc(sessionAccount.Prn) {
+	if a.jwtConfig.PayloadFunc != nil {
+		for key, value := range a.jwtConfig.PayloadFunc(sessionAccount.Prn) {
 			tokenClaims[key] = value
 		}
 	}
 
 	tokenClaims["id"] = sessionAccount.Nick
-	tokenClaims["exp"] = time.Now().Add(a.jwtMiddleware.Timeout).Unix()
-	if a.jwtMiddleware.MaxRefresh != 0 {
+	tokenClaims["exp"] = time.Now().Add(a.jwtConfig.Timeout).Unix()
+	if a.jwtConfig.MaxRefresh != 0 {
 		tokenClaims["orig_iat"] = time.Now().Unix()
 	}
 
-	tokenString, err := token.SignedString(a.jwtMiddleware.Key)
+	tokenString, err := token.SignedString(a.jwtConfig.Key)
 
 	if err != nil {
-		utils.RestErrorWrapper(w, "error creating one time token "+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "error creating one time token "+err.Error(), http.StatusInternalServerError)
 	}
 
 	sessionAccount.Password = ""
 	sessionAccount.Challenge = ""
 
-	w.WriteJson(bson.M{"token": tokenString})
+	return echoutil.WriteJSON(c, http.StatusOK, bson.M{"token": tokenString})
 }
 
 // handlePostAccount Create a new account
@@ -218,69 +213,59 @@ func (a *App) handlePostSession(w rest.ResponseWriter, r *rest.Request) {
 // @Failure 404 {object} utils.RError "Account not found"
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /auth/accounts [post]
-func (a *App) handlePostAccount(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePostAccount(c *echo.Context) error {
 	newAccount := authmodels.AccountCreationPayload{}
 
-	if err := r.DecodeJsonPayload(&newAccount); err != nil {
-		utils.RestErrorWrapper(w, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
-		return
+	if err := echoutil.DecodeJsonPayload(c, &newAccount); err != nil {
+		return echoutil.RestErrorWrapper(c, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
 	}
 
 	if utils.GetEnv(utils.EnvPantahubDisableSignup) == "true" {
-		utils.RestError(w, nil, "User signup is currently disabled", http.StatusForbidden)
-		return
+		return echoutil.RestError(c, nil, "User signup is currently disabled", http.StatusForbidden)
 	}
 
 	// if encrypted account data exist decryted and continue with validation
 	if newAccount.EncryptedAccount != "" {
 		err := utils.ParseJWE(newAccount.EncryptedAccount, &newAccount.Account)
 		if err != nil {
-			utils.RestError(w, err, err.Error(), http.StatusInternalServerError)
-			return
+			return echoutil.RestError(c, err, err.Error(), http.StatusInternalServerError)
 		}
 	}
 
 	if newAccount.Email == "" {
-		utils.RestError(w, nil, "Accounts must have an email address", http.StatusPreconditionFailed)
-		return
+		return echoutil.RestError(c, nil, "Accounts must have an email address", http.StatusPreconditionFailed)
 	}
 
 	// same allowlist that gates login: refuse the signup up front instead of
 	// creating an account (and sending a verification mail) that can never
 	// sign in
 	if !authservices.IsEmailDomainAllowed(newAccount.Email) {
-		utils.RestError(w, nil, "Accounts with this email domain are not allowed", http.StatusForbidden)
-		return
+		return echoutil.RestError(c, nil, "Accounts with this email domain are not allowed", http.StatusForbidden)
 	}
 
 	if newAccount.Password == "" {
-		utils.RestError(w, nil, "Accounts must have a password set", http.StatusPreconditionFailed)
-		return
+		return echoutil.RestError(c, nil, "Accounts must have a password set", http.StatusPreconditionFailed)
 	}
 
 	if newAccount.Nick == "" {
-		utils.RestError(w, nil, "Accounts must have a nick set", http.StatusPreconditionFailed)
-		return
+		return echoutil.RestError(c, nil, "Accounts must have a nick set", http.StatusPreconditionFailed)
 	}
 
 	if !utils.IsNick(newAccount.Nick) {
-		utils.RestError(w, nil, "Accounts must have a a valid nick", http.StatusPreconditionFailed)
-		return
+		return echoutil.RestError(c, nil, "Accounts must have a a valid nick", http.StatusPreconditionFailed)
 	}
 
 	if !newAccount.ID.IsZero() {
-		utils.RestError(w, nil, "Accounts cannot have id before creation", http.StatusPreconditionFailed)
-		return
+		return echoutil.RestError(c, nil, "Accounts cannot have id before creation", http.StatusPreconditionFailed)
 	}
 
 	// Validate if user already exist
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
 
 	if collection == nil {
-		utils.RestError(w, nil, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestError(c, nil, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
 	usersCount, _ := collection.CountDocuments(ctx,
@@ -292,8 +277,7 @@ func (a *App) handlePostAccount(w rest.ResponseWriter, r *rest.Request) {
 		},
 	)
 	if usersCount > 0 {
-		utils.RestErrorUser(w, nil, "Email or Nick already in use", http.StatusPreconditionFailed)
-		return
+		return echoutil.RestErrorUser(c, nil, "Email or Nick already in use", http.StatusPreconditionFailed)
 	}
 
 	// if account creation doesn't have captcha encrypt data and send a redirect link to finish the process
@@ -301,28 +285,24 @@ func (a *App) handlePostAccount(w rest.ResponseWriter, r *rest.Request) {
 	if newAccount.Captcha == "" && useCaptcha {
 		response, err := handleGetEncryptedAccount(&newAccount)
 		if err != nil {
-			utils.RestError(w, err, err.Error(), http.StatusInternalServerError)
+			return echoutil.RestError(c, err, err.Error(), http.StatusInternalServerError)
 		}
-		w.WriteJson(response)
-		return
+		return echoutil.WriteJSON(c, http.StatusOK, response)
 	}
 
 	if useCaptcha {
 		validCaptcha, err := utils.VerifyReCaptchaToken(newAccount.Captcha)
 		if err != nil {
-			utils.RestError(w, err, err.Error(), http.StatusPreconditionFailed)
-			return
+			return echoutil.RestError(c, err, err.Error(), http.StatusPreconditionFailed)
 		}
 		if !validCaptcha {
-			utils.RestError(w, nil, "Invalid captcha", http.StatusPreconditionFailed)
-			return
+			return echoutil.RestError(c, nil, "Invalid captcha", http.StatusPreconditionFailed)
 		}
 	}
 
 	passwordBcrypt, err := utils.HashPassword(newAccount.Password, utils.CryptoMethods.BCrypt)
 	if err != nil {
-		utils.RestError(w, err, err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestError(c, err, err.Error(), http.StatusInternalServerError)
 	}
 
 	newAccount.Password = ""
@@ -331,8 +311,7 @@ func (a *App) handlePostAccount(w rest.ResponseWriter, r *rest.Request) {
 	mgoid := primitive.NewObjectID()
 	ObjectID, err := primitive.ObjectIDFromHex(mgoid.Hex())
 	if err != nil {
-		utils.RestError(w, err, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestError(c, err, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 	}
 
 	newAccount.ID = ObjectID
@@ -344,7 +323,7 @@ func (a *App) handlePostAccount(w rest.ResponseWriter, r *rest.Request) {
 
 	updateOptions := options.Update()
 	updateOptions.SetUpsert(true)
-	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel = context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	_, err = collection.UpdateOne(
 		ctx,
@@ -353,8 +332,7 @@ func (a *App) handlePostAccount(w rest.ResponseWriter, r *rest.Request) {
 		updateOptions,
 	)
 	if err != nil {
-		utils.RestError(w, err, err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestError(c, err, err.Error(), http.StatusInternalServerError)
 	}
 
 	urlPrefix := utils.GetEnv(utils.EnvPantahubScheme) + "://" + utils.GetEnv(utils.EnvPantahubWWWHost)
@@ -367,7 +345,7 @@ func (a *App) handlePostAccount(w rest.ResponseWriter, r *rest.Request) {
 
 	newAccount.Password = ""
 	newAccount.Challenge = ""
-	w.WriteJson(newAccount)
+	return echoutil.WriteJSON(c, http.StatusOK, newAccount)
 }
 
 // handleGetProfile Get user profile
@@ -383,14 +361,13 @@ func (a *App) handlePostAccount(w rest.ResponseWriter, r *rest.Request) {
 // @Failure 404 {object} utils.RError "Account not found"
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /auth [get]
-func (a *App) handleGetProfile(w rest.ResponseWriter, r *rest.Request) {
-	jwtClaims := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)
+func (a *App) handleGetProfile(c *echo.Context) error {
+	jwtClaims := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)
 
 	accountPrn := jwtClaims["prn"].(string)
 
 	if accountPrn == "" {
-		utils.RestErrorWrapper(w, "Not logged in", http.StatusPreconditionFailed)
-		return
+		return echoutil.RestErrorWrapper(c, "Not logged in", http.StatusPreconditionFailed)
 	}
 
 	var account accounts.Account
@@ -398,7 +375,7 @@ func (a *App) handleGetProfile(w rest.ResponseWriter, r *rest.Request) {
 
 	if account, ok = accountsdata.DefaultAccounts[accountPrn]; !ok {
 		col := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
-		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 		defer cancel()
 		err := col.FindOne(ctx, bson.M{"prn": accountPrn}).Decode(&account)
 		// always unset credentials so we dont end up sending them out
@@ -410,13 +387,12 @@ func (a *App) handleGetProfile(w rest.ResponseWriter, r *rest.Request) {
 		if err != nil {
 			switch err.(type) {
 			default:
-				utils.RestErrorWrapper(w, "Account "+err.Error(), http.StatusInternalServerError)
-				return
+				return echoutil.RestErrorWrapper(c, "Account "+err.Error(), http.StatusInternalServerError)
 			}
 		}
 	}
 
-	w.WriteJson(account)
+	return echoutil.WriteJSON(c, http.StatusOK, account)
 }
 
 // handleVerify Verify account payload
@@ -430,26 +406,24 @@ func (a *App) handleGetProfile(w rest.ResponseWriter, r *rest.Request) {
 // @Failure 404 {object} utils.RError "Account not found"
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /auth/verify [get]
-func (a *App) handleVerify(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleVerify(c *echo.Context) error {
 
 	newAccount := accounts.Account{}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
 
 	if collection == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
-	_ = r.ParseForm()
-	putID := r.FormValue("id")
+	_ = c.Request().ParseForm()
+	putID := c.Request().FormValue("id")
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	ObjectID, err := primitive.ObjectIDFromHex(putID)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 	}
 	err = collection.FindOne(ctx,
 		bson.M{
@@ -457,24 +431,21 @@ func (a *App) handleVerify(w rest.ResponseWriter, r *rest.Request) {
 		}).
 		Decode(&newAccount)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Not Accessible Resource Id", http.StatusForbidden)
 	}
 
 	challenge := newAccount.Challenge
-	challengeVal := r.FormValue("challenge")
+	challengeVal := c.Request().FormValue("challenge")
 
 	/* in case someone claims the device like this, update owner */
 	if len(challenge) > 0 {
 		if challenge == challengeVal {
 			newAccount.Challenge = ""
 		} else {
-			utils.RestErrorWrapper(w, "Invalid Challenge (wrong, used or never existed)", http.StatusPreconditionFailed)
-			return
+			return echoutil.RestErrorWrapper(c, "Invalid Challenge (wrong, used or never existed)", http.StatusPreconditionFailed)
 		}
 	} else {
-		utils.RestErrorWrapper(w, "Invalid Challenge (wrong, used or never existed)", http.StatusPreconditionFailed)
-		return
+		return echoutil.RestErrorWrapper(c, "Invalid Challenge (wrong, used or never existed)", http.StatusPreconditionFailed)
 	}
 
 	newAccount.TimeModified = time.Now()
@@ -487,8 +458,7 @@ func (a *App) handleVerify(w rest.ResponseWriter, r *rest.Request) {
 		updateOptions,
 	)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error on Updating", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error on Updating", http.StatusInternalServerError)
 	}
 
 	urlPrefix := utils.GetEnv(utils.EnvPantahubScheme) + "://" + utils.GetEnv(utils.EnvPantahubWWWHost)
@@ -504,7 +474,7 @@ func (a *App) handleVerify(w rest.ResponseWriter, r *rest.Request) {
 	// always wipe secrets before sending over wire
 	newAccount.Password = ""
 	newAccount.Challenge = ""
-	w.WriteJson(newAccount)
+	return echoutil.WriteJSON(c, http.StatusOK, newAccount)
 }
 
 // handlePasswordReset gets the recovery token and validate it in order to overwrite the user password
@@ -519,48 +489,40 @@ func (a *App) handleVerify(w rest.ResponseWriter, r *rest.Request) {
 // @Failure 404 {object} utils.RError "Account not found"
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /auth/password [post]
-func (a *App) handlePasswordReset(writer rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePasswordReset(c *echo.Context) error {
 	data := authmodels.PasswordReset{}
 
-	if err := r.DecodeJsonPayload(&data); err != nil {
-		utils.RestError(writer, err, "Error decoding json payload", http.StatusBadRequest)
-		return
+	if err := echoutil.DecodeJsonPayload(c, &data); err != nil {
+		return echoutil.RestError(c, err, "Error decoding json payload", http.StatusBadRequest)
 	}
 
 	if data.Token == "" {
-		utils.RestError(writer, nil, exchangeTokenRequiredErr, http.StatusBadRequest)
-		return
+		return echoutil.RestError(c, nil, exchangeTokenRequiredErr, http.StatusBadRequest)
 	}
 
 	if data.Password == "" {
-		utils.RestError(writer, nil, passwordIsNeededErr, http.StatusBadRequest)
-		return
+		return echoutil.RestError(c, nil, passwordIsNeededErr, http.StatusBadRequest)
 	}
 
 	token, err := jwtgo.ParseWithClaims(data.Token, &authmodels.ResetPasswordClaims{}, func(token *jwtgo.Token) (interface{}, error) {
-		if token.Method.Alg() != a.jwtMiddleware.SigningAlgorithm {
+		if token.Method.Alg() != a.jwtConfig.SigningAlgorithm {
 			return nil, errors.New("invalid signing algorithm")
 		}
-		return a.jwtMiddleware.Pub, nil
+		return a.jwtConfig.Pub, nil
 	})
 	if err != nil {
-		utils.RestError(writer, err, tokenInvalidOrExpiredErr, http.StatusInternalServerError)
-		return
+		return echoutil.RestError(c, err, tokenInvalidOrExpiredErr, http.StatusInternalServerError)
 	}
 
 	claims := token.Claims.(*authmodels.ResetPasswordClaims)
-	// golang-jwt/v5 removed Claims.Valid(): ParseWithClaims performs validation
-	// itself and reports the outcome through err and token.Valid. Checking
-	// token.Valid keeps the same rejection path the explicit call had.
+	// v5 validates claims during parsing (Claims.Valid was removed).
 	if !token.Valid {
-		utils.RestError(writer, errors.New("invalid token claims"), tokenInvalidOrExpiredErr, http.StatusInternalServerError)
-		return
+		return echoutil.RestError(c, errors.New("invalid token claims"), tokenInvalidOrExpiredErr, http.StatusInternalServerError)
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
 	if collection == nil {
-		utils.RestError(writer, nil, dbConnectionErr, http.StatusInternalServerError)
-		return
+		return echoutil.RestError(c, nil, dbConnectionErr, http.StatusInternalServerError)
 	}
 
 	filter := bson.M{
@@ -568,25 +530,22 @@ func (a *App) handlePasswordReset(writer rest.ResponseWriter, r *rest.Request) {
 		"garbage": bson.M{"$ne": true},
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
 	account := accounts.AccountPublic{}
 	err = collection.FindOne(ctx, filter).Decode(&account)
 	if err != nil {
-		utils.RestError(writer, nil, emailNotFoundErr, http.StatusNotFound)
-		return
+		return echoutil.RestError(c, nil, emailNotFoundErr, http.StatusNotFound)
 	}
 
 	if !account.TimeModified.Equal(claims.TimeModified) {
-		utils.RestError(writer, nil, tokenInvalidOrExpiredErr, http.StatusBadRequest)
-		return
+		return echoutil.RestError(c, nil, tokenInvalidOrExpiredErr, http.StatusBadRequest)
 	}
 
 	passwordBcrypt, err := utils.HashPassword(data.Password, utils.CryptoMethods.BCrypt)
 	if err != nil {
-		utils.RestError(writer, err, err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestError(c, err, err.Error(), http.StatusInternalServerError)
 	}
 	update := bson.M{
 		"$set": bson.M{
@@ -599,7 +558,7 @@ func (a *App) handlePasswordReset(writer rest.ResponseWriter, r *rest.Request) {
 	}
 
 	updateOptions := options.Update()
-	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel = context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
 	_, err = collection.UpdateOne(
@@ -609,11 +568,10 @@ func (a *App) handlePasswordReset(writer rest.ResponseWriter, r *rest.Request) {
 		updateOptions,
 	)
 	if err != nil {
-		utils.RestError(writer, err, err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestError(c, err, err.Error(), http.StatusInternalServerError)
 	}
 
-	writer.WriteJson(true)
+	return echoutil.WriteJSON(c, http.StatusOK, true)
 }
 
 // handlePasswordRecovery send email with token to user in order to reset password to given user
@@ -628,31 +586,27 @@ func (a *App) handlePasswordReset(writer rest.ResponseWriter, r *rest.Request) {
 // @Failure 404 {object} utils.RError "Account not found"
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /auth/recover [post]
-func (a *App) handlePasswordRecovery(writer rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePasswordRecovery(c *echo.Context) error {
 	if utils.GetEnv(utils.EnvPantahubDisableForgotPassword) == "true" {
-		utils.RestError(writer, nil, "Recover password feature is disabled", http.StatusForbidden)
-		return
+		return echoutil.RestError(c, nil, "Recover password feature is disabled", http.StatusForbidden)
 	}
 
 	data := authmodels.PasswordResetRequest{}
 
-	if err := r.DecodeJsonPayload(&data); err != nil {
-		utils.RestError(writer, err, "Error decoding json payload", http.StatusBadRequest)
-		return
+	if err := echoutil.DecodeJsonPayload(c, &data); err != nil {
+		return echoutil.RestError(c, err, "Error decoding json payload", http.StatusBadRequest)
 	}
 
 	if data.Email == "" {
-		utils.RestError(writer, nil, emailRequiredForPasswordErr, http.StatusPreconditionFailed)
-		return
+		return echoutil.RestError(c, nil, emailRequiredForPasswordErr, http.StatusPreconditionFailed)
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
 	if collection == nil {
-		utils.RestError(writer, nil, dbConnectionErr, http.StatusInternalServerError)
-		return
+		return echoutil.RestError(c, nil, dbConnectionErr, http.StatusInternalServerError)
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
 	account := accounts.AccountPublic{}
@@ -663,13 +617,12 @@ func (a *App) handlePasswordRecovery(writer rest.ResponseWriter, r *rest.Request
 
 	err := collection.FindOne(ctx, filter).Decode(&account)
 	if err != nil {
-		utils.RestError(writer, nil, emailNotFoundErr, http.StatusNotFound)
-		return
+		return echoutil.RestError(c, nil, emailNotFoundErr, http.StatusNotFound)
 	}
 
 	restorePasswordTTL, err := strconv.Atoi(utils.GetEnv(utils.EnvPantahubRecoverJWTTimeoutMinutes))
 	if err != nil {
-		utils.RestError(writer, err, err.Error(), http.StatusInternalServerError)
+		return echoutil.RestError(c, err, err.Error(), http.StatusInternalServerError)
 	}
 
 	claims := authmodels.ResetPasswordClaims{
@@ -680,21 +633,19 @@ func (a *App) handlePasswordRecovery(writer rest.ResponseWriter, r *rest.Request
 		},
 	}
 
-	token := jwtgo.NewWithClaims(jwtgo.GetSigningMethod(a.jwtMiddleware.SigningAlgorithm), claims)
+	token := jwtgo.NewWithClaims(jwtgo.GetSigningMethod(a.jwtConfig.SigningAlgorithm), claims)
 
-	tokenString, err := token.SignedString(a.jwtMiddleware.Key)
+	tokenString, err := token.SignedString(a.jwtConfig.Key)
 	if err != nil {
-		utils.RestError(writer, err, tokenCreationErr, http.StatusInternalServerError)
-		return
+		return echoutil.RestError(c, err, tokenCreationErr, http.StatusInternalServerError)
 	}
 
 	err = utils.SendResetPasswordEmail(account.Email, account.Nick, tokenString)
 	if err != nil {
-		utils.RestError(writer, err, sendEmailErr, http.StatusInternalServerError)
-		return
+		return echoutil.RestError(c, err, sendEmailErr, http.StatusInternalServerError)
 	}
 
-	writer.WriteJson(true)
+	return echoutil.WriteJSON(c, http.StatusOK, true)
 }
 
 // handlePostToken can be used by services to swap an accessCode to a long living accessToken.
@@ -713,37 +664,34 @@ func (a *App) handlePasswordRecovery(writer rest.ResponseWriter, r *rest.Request
 // @Failure 404 {object} utils.RError "Account not found"
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /auth/token [post]
-func (a *App) handlePostToken(writer rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePostToken(c *echo.Context) error {
 	tokenRequest := authmodels.TokenRequest{}
-	err := r.DecodeJsonPayload(&tokenRequest)
+	err := echoutil.DecodeJsonPayload(c, &tokenRequest)
 	if err != nil {
-		utils.RestErrorWrapper(writer, "Failed to decode token Request", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Failed to decode token Request", http.StatusBadRequest)
 	}
 
 	// this is the claim of the service authenticating itself
-	caller := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"].(string)
+	caller := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"].(string)
 
 	log.Println("Requesting code " + tokenRequest.Code)
 	// we parse the accessCode to see if we can swap it out.
 	tok, err := jwtgo.Parse(tokenRequest.Code, func(token *jwtgo.Token) (interface{}, error) {
-		if token.Method.Alg() != a.jwtMiddleware.SigningAlgorithm {
+		if token.Method.Alg() != a.jwtConfig.SigningAlgorithm {
 			return nil, errors.New("invalid signing algorithm")
 		}
-		return a.jwtMiddleware.Pub, nil
+		return a.jwtConfig.Pub, nil
 	})
 
 	if err != nil {
 		log.Println("ERROR: Failed parsing the access Code " + err.Error())
-		utils.RestErrorWrapper(writer, "Failed parsing the access Code", http.StatusUnauthorized)
-		return
+		return echoutil.RestErrorWrapper(c, "Failed parsing the access Code", http.StatusUnauthorized)
 	}
 
 	// See the note above on Claims.Valid(): v5 validates during parsing.
 	if !tok.Valid {
 		log.Println("ERROR: Failed validating the access Code claims")
-		utils.RestErrorWrapper(writer, "Failed validating the access Code claims", http.StatusUnauthorized)
-		return
+		return echoutil.RestErrorWrapper(c, "Failed validating the access Code claims", http.StatusUnauthorized)
 	}
 
 	claims := tok.Claims.(jwtgo.MapClaims)
@@ -758,16 +706,15 @@ func (a *App) handlePostToken(writer rest.ResponseWriter, r *rest.Request) {
 
 	if service != caller {
 		log.Println("WARNING: invalid service (" + service + " != " + caller + ") tries to swap an accesscode")
-		utils.RestErrorWrapper(writer, "invalid service ("+service+" != "+caller+") tries to swap an accesscode", http.StatusUnauthorized)
-		return
+		return echoutil.RestErrorWrapper(c, "invalid service ("+service+" != "+caller+") tries to swap an accesscode", http.StatusUnauthorized)
 	}
 
-	token := jwtgo.New(jwtgo.GetSigningMethod(a.jwtMiddleware.SigningAlgorithm))
+	token := jwtgo.New(jwtgo.GetSigningMethod(a.jwtConfig.SigningAlgorithm))
 	tokenClaims := token.Claims.(jwtgo.MapClaims)
 
 	// lets get the standard payload for a user and modify it so its a service accesstoken
-	if a.jwtMiddleware.PayloadFunc != nil {
-		for key, value := range a.jwtMiddleware.PayloadFunc(user) {
+	if a.jwtConfig.PayloadFunc != nil {
+		for key, value := range a.jwtConfig.PayloadFunc(user) {
 			tokenClaims[key] = value
 		}
 	}
@@ -789,19 +736,17 @@ func (a *App) handlePostToken(writer rest.ResponseWriter, r *rest.Request) {
 	tokenClaims["exp"] = time.Now().Add(time.Minute * time.Duration(authorizeTimeout)).Unix()
 	tokenClaims["orig_iat"] = time.Now().Unix()
 
-	tokenString, err := token.SignedString(a.jwtMiddleware.Key)
+	tokenString, err := token.SignedString(a.jwtConfig.Key)
 
 	if err != nil {
 		log.Println("WARNING: invalid service (" + service + " != " + caller + ") tries to swap an accesscode")
-		utils.RestErrorWrapper(writer, "invalid service ("+service+" != "+caller+") tries to swap an accesscode", http.StatusUnauthorized)
-		return
+		return echoutil.RestErrorWrapper(c, "invalid service ("+service+" != "+caller+") tries to swap an accesscode", http.StatusUnauthorized)
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_oauth_accesstokens")
 
 	if collection == nil {
-		utils.RestErrorWrapper(writer, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
 	tokenStore := authmodels.TokenStore{
@@ -812,12 +757,11 @@ func (a *App) handlePostToken(writer rest.ResponseWriter, r *rest.Request) {
 		Claims:  tokenClaims,
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	_, err = collection.InsertOne(ctx, &tokenStore)
 	if err != nil {
-		utils.RestErrorWrapper(writer, "Error storing issued token in DB", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error storing issued token in DB", http.StatusInternalServerError)
 	}
 
 	tokenResult := authmodels.TokenResponse{
@@ -826,5 +770,5 @@ func (a *App) handlePostToken(writer rest.ResponseWriter, r *rest.Request) {
 		Scopes:    scopes,
 	}
 
-	writer.WriteJson(tokenResult)
+	return echoutil.WriteJSON(c, http.StatusOK, tokenResult)
 }

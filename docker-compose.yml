@@ -242,45 +242,13 @@ services:
         command: /docker-entrypoint
         ports:
             - 27017:27017
-        links:
-            - mongo2
-            - mongo3
 
-    mongo2:
-        networks:
-            - base
-        image: mongo:4.4.3
-        container_name: mongo2
-        environment:
-            MONGO_INITDB_ROOT_USERNAME: admin
-            MONGO_INITDB_ROOT_PASSWORD: admin
-            MONGO_RS: rs0
-            MONGO_PORT: 30002
-        command: ["/docker-entrypoint"]
-        volumes:
-            - ./entrypoints/mongo-cluster-secondary-entrypoint:/docker-entrypoint
-            - ./.data/mongo-2:/data/db
-            - ./entrypoints/mongokey.yaml:/keys/mongokey.yaml
-        ports:
-            - 30002:30002
-
-    mongo3:
-        networks:
-            - base
-        image: mongo:4.4.3
-        container_name: mongo3
-        environment:
-            MONGO_INITDB_ROOT_USERNAME: admin
-            MONGO_INITDB_ROOT_PASSWORD: admin
-            MONGO_RS: rs0
-            MONGO_PORT: 30003
-        command: ["/docker-entrypoint"]
-        volumes:
-            - ./entrypoints/mongo-cluster-secondary-entrypoint:/docker-entrypoint
-            - ./.data/mongo-3:/data/db
-            - ./entrypoints/mongokey.yaml:/keys/mongokey.yaml
-        ports:
-            - 30003:30003
+    # mongo2 / mongo3 were the other two members of rs0. The local stack now runs a single-node
+    # replica set (rs0 with just `mongo`): change streams still work for Kafka Connect, and the
+    # data dir is a third of the size. Existing dev machines need one force reconfig:
+    #   docker exec mongo mongo -u admin -p admin --eval \
+    #     'rs.reconfig({_id: "rs0", members: [{_id: 0, host: "mongo:27017"}]}, {force: true})'
+    # then remove the mongo2/mongo3 containers and their .data/mongo-{2,3} dirs.
 
     zookeeper:
         networks:

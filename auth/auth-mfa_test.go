@@ -1,4 +1,4 @@
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,13 +28,14 @@ import (
 	"time"
 
 	"github.com/go-webauthn/webauthn/webauthn"
-	jwt "gitlab.com/pantacor/pantahub-base/utils/jwtmiddleware"
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
 	"gitlab.com/pantacor/pantahub-base/auth/mfaservice"
 	"gitlab.com/pantacor/pantahub-base/auth/storage"
 	"gitlab.com/pantacor/pantahub-base/testutils"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -69,7 +70,7 @@ func mfaSetUp(t *testing.T) *mfaTestEnv {
 	_ = db.Collection(storage.MFASettingsCollection).Drop(ctx)
 	_ = db.Collection(storage.MFAUsedJTICollection).Drop(ctx)
 
-	jwtMW := &jwt.JWTMiddleware{
+	jwtMW := &jwtauth.Config{
 		Key:        []byte("secret key"),
 		Realm:      "pantahub services",
 		Timeout:    time.Minute * 60,
@@ -77,7 +78,9 @@ func mfaSetUp(t *testing.T) *mfaTestEnv {
 	}
 
 	app := New(jwtMW, mongoClient)
-	server := httptest.NewServer(app.API.MakeHandler())
+	authEcho := echoutil.NewServer("test")
+	app.Mount(authEcho)
+	server := httptest.NewServer(authEcho.E)
 	t.Cleanup(server.Close)
 
 	serverURL, err := url.Parse(server.URL)
@@ -90,7 +93,7 @@ func mfaSetUp(t *testing.T) *mfaTestEnv {
 
 func (e *mfaTestEnv) url(path string) string {
 	u := *e.serverURL
-	u.Path = path
+	u.Path = "/auth" + path
 	return u.String()
 }
 

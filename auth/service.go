@@ -1,4 +1,4 @@
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,8 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwt "gitlab.com/pantacor/pantahub-base/utils/jwtmiddleware"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/accounts/accountsdata"
 	"gitlab.com/pantacor/pantahub-base/auth/authmodels"
@@ -34,7 +33,8 @@ import (
 	"gitlab.com/pantacor/pantahub-base/auth/storage"
 	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/utils"
-	"gitlab.com/pantacor/pantahub-base/utils/tracer"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -55,11 +55,10 @@ const (
 
 // App define auth rest application
 type App struct {
-	jwtMiddleware *jwt.JWTMiddleware
-	API           *rest.Api
-	mongoClient   *mongo.Client
-	mfaRepo       *storage.MFARepo
-	webauthnRepo  *storage.WebauthnRepo
+	jwtConfig    *jwtauth.Config
+	mongoClient  *mongo.Client
+	mfaRepo      *storage.MFARepo
+	webauthnRepo *storage.WebauthnRepo
 }
 
 // demoAccountsEnabled tells whether the built-in demo accounts (admin:admin,
@@ -99,37 +98,33 @@ func init() {
 	}
 }
 
-// safeRefreshHandler wraps jwtMiddleware.RefreshHandler to recover from panics
-// caused by tokens missing the "orig_iat" claim (e.g. from x509, third-party,
-// or implicit auth flows). The upstream RefreshHandler has an unchecked type
-// assertion on orig_iat that panics when the claim is nil.
-func (app *App) safeRefreshHandler(w rest.ResponseWriter, r *rest.Request) {
-	defer func() {
-		if rec := recover(); rec != nil {
-			log.Printf("WARN: RefreshHandler recovered from panic: %v", rec)
-			w.Header().Set("WWW-Authenticate", "JWT realm="+app.jwtMiddleware.Realm)
-			rest.Error(w, "Token is not refreshable", http.StatusUnauthorized)
-		}
-	}()
-
-	originalTimeout := app.jwtMiddleware.Timeout
+// safeRefreshHandler refreshes the bearer token with the authorize timeout.
+// Tokens without orig_iat (x509, third-party, implicit flows) answer "Token is
+// not refreshable". The timeout is passed per call: mutating the shared
+// config raced with concurrent logins.
+func (app *App) safeRefreshHandler(c *echo.Context) error {
 	timeoutStr := utils.GetEnv(utils.EnvPantahubAuthorizeJWTTimeoutMinutes)
 	authorizeTimeout, err := strconv.Atoi(timeoutStr)
 	if err != nil {
 		authorizeTimeout = 1920
 	}
-	app.jwtMiddleware.Timeout = time.Minute * time.Duration(authorizeTimeout)
-	defer func() {
-		app.jwtMiddleware.Timeout = originalTimeout
-	}()
 
-	app.jwtMiddleware.RefreshHandler(w, r)
+	token, err := app.jwtConfig.Refresh(c.Request().Header.Get("Authorization"), time.Minute*time.Duration(authorizeTimeout))
+	if err != nil {
+		c.Response().Header().Set("WWW-Authenticate", app.jwtConfig.WWWAuthenticate())
+		if err == jwtauth.ErrNotRefreshable {
+			log.Printf("WARN: refresh of a token without orig_iat")
+			return echoutil.Error(c, "Token is not refreshable", http.StatusUnauthorized)
+		}
+		return echoutil.Error(c, "Not Authorized", http.StatusUnauthorized)
+	}
+	return echoutil.WriteJSON(c, http.StatusOK, map[string]string{"token": token})
 }
 
 // New create a new auth rest application
-func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
+func New(jwtConfig *jwtauth.Config, mongoClient *mongo.Client) *App {
 	app := new(App)
-	app.jwtMiddleware = jwtMiddleware
+	app.jwtConfig = jwtConfig
 	app.mongoClient = mongoClient
 
 	//key := flag.String("nick", "", "The field you'd like to place an index on")
@@ -220,8 +215,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	}
 
 	// Set Authenticate with user password and generate payload
-	jwtMiddleware.Authenticator = authservices.AuthWithUserPassFactory(mongoClient)
-	jwtMiddleware.PayloadFunc = authservices.AuthenticatePayloadFactory(mongoClient, jwtMiddleware)
+	jwtConfig.Authenticator = authservices.AuthWithUserPassFactory(mongoClient)
+	jwtConfig.PayloadFunc = authservices.AuthenticatePayloadFactory(mongoClient, jwtConfig)
 
 	app.mfaRepo = storage.NewMFARepo(mongoClient)
 	if err := app.mfaRepo.SetIndexes(context.Background()); err != nil {
@@ -235,107 +230,93 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		return nil
 	}
 
-	app.API = rest.NewApi()
-	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
-		"/auth:", log.Lshortfile)})
-	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "auth"})
-	app.API.Use(&rest.StatusMiddleware{})
-	app.API.Use(&metrics.Middleware{})
-	app.API.Use(rest.DefaultCommonStack...)
-	app.API.Use(&rest.CorsMiddleware{
-		RejectNonCorsRequests: false,
-		OriginValidator: func(origin string, request *rest.Request) bool {
-			return true
-		},
-		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{
-			"Accept",
-			"Content-Type",
-			"Content-Length",
-			"X-Custom-Header",
-			"Origin",
-			"Authorization",
-			"X-Trace-ID",
-			"Trace-Id",
-			"x-request-id",
-			"X-Request-ID",
-			"TraceID",
-			"ParentID",
-			"Uber-Trace-ID",
-			"uber-trace-id",
-			"traceparent",
-			"tracestate",
-		},
-		AccessControlAllowCredentials: true,
-		AccessControlMaxAge:           3600,
-	})
-
-	// no authentication needed for
-	app.API.Use(&rest.IfMiddleware{
-		Condition: isWhiteListedForAuthentication,
-		IfTrue:    app.jwtMiddleware,
-	})
-
-	// no authentication needed for
-	app.API.Use(&rest.IfMiddleware{
-		Condition: isWhiteListedForAuthentication,
-		IfTrue:    &utils.AuthMiddleware{},
-	})
-
-	// /login /auth_status and /refresh_token endpoints
-	apiRouter, _ := rest.MakeRouter(
-		rest.Get("/", app.handleGetProfile),
-		rest.Post("/login", app.getTokenUsingPassword),
-		rest.Post("/login/mfa/totp", app.handlePostLoginMFATOTP),
-		rest.Post("/login/mfa/recovery", app.handlePostLoginMFARecovery),
-		rest.Post("/login/mfa/webauthn", app.handlePostLoginMFAWebauthn),
-		rest.Post("/login/mfa/webauthn/finish", app.handlePostLoginMFAWebauthnFinish),
-		rest.Post("/login/webauthn/begin", app.handlePostPasskeyLoginBegin),
-		rest.Post("/login/webauthn/finish", app.handlePostPasskeyLoginFinish),
-		rest.Get("/mfa", app.handleGetMFAStatus),
-		rest.Post("/mfa/totp", app.handlePostTOTPEnroll),
-		rest.Post("/mfa/totp/confirm", app.handlePostTOTPConfirm),
-		rest.Delete("/mfa/totp", app.handleDeleteTOTP),
-		rest.Post("/mfa/recovery/regenerate", app.handlePostRecoveryRegenerate),
-		rest.Post("/mfa/reauth/totp", app.handlePostReauthTOTP),
-		rest.Post("/mfa/reauth/recovery", app.handlePostReauthRecovery),
-		rest.Post("/mfa/reauth/webauthn", app.handlePostReauthWebauthn),
-		rest.Post("/mfa/reauth/webauthn/finish", app.handlePostReauthWebauthnFinish),
-		rest.Post("/mfa/webauthn/register", app.handlePostWebauthnRegister),
-		rest.Post("/mfa/webauthn/register/finish", app.handlePostWebauthnRegisterFinish),
-		rest.Patch("/mfa/webauthn/credentials/#id", app.handlePatchWebauthnCredential),
-		rest.Delete("/mfa/webauthn/credentials/#id", app.handleDeleteWebauthnCredential),
-		rest.Get("/connected-providers", app.handleGetConnectedProviders),
-		rest.Post("/connected-providers", app.handlePostConnectedProvider),
-		rest.Delete("/connected-providers", app.handleDeleteConnectedProvider),
-		rest.Post("/token", app.handlePostToken),
-		rest.Post("/token/refresh", app.handlePostTokenRefresh),
-		rest.Get("/auth_status", handleAuthStatus),
-		rest.Get("/login", app.safeRefreshHandler),
-		rest.Get("/accounts", app.handleGetAccounts),
-		rest.Post("/accounts", app.handlePostAccount),
-		rest.Post("/sessions", app.handlePostSession),
-		rest.Get("/verify", app.handleVerify),
-		rest.Post("/recover", app.handlePasswordRecovery),
-		rest.Post("/password", app.handlePasswordReset),
-		rest.Post("/authorize", app.handlePostAuthorizeToken),
-		rest.Post("/code", app.handlePostCode),
-		rest.Post("/signature/verify", app.verifyToken),
-		rest.Post("/x509/login", app.handleAuthUsingDeviceCert),
-		rest.Get("/oauth/login/#service", app.HandleGetThirdPartyLogin),
-		rest.Get("/oauth/callback/#service", app.HandleGetThirdPartyCallback),
-		rest.Post("/oauth/token", app.HandlePKCEToken),
-		rest.Get("/oauth/authorize", app.HandlePKCEAuthorize),
-		rest.Post("/oauth/authorize", app.HandlePostPKCEAuthorize),
-		rest.Post("/oauth/pkce/init", app.HandlePostPKCEInit),
-	)
-	app.API.Use(&tracer.OtelMiddleware{
-		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
-		Router:      apiRouter,
-	})
-	app.API.SetApp(apiRouter)
-
 	return app
+}
+
+// Mount registers auth on echo with its previous middleware stack.
+func (app *App) Mount(s *echoutil.Server) {
+	const prefix = "/auth"
+
+	g := s.Mount(prefix,
+		echoutil.AccessLogJSON(log.New(os.Stdout, "/auth:", log.Lshortfile), prefix),
+		echoutil.AccessLogFluent(&utils.AccessLogFluentMiddleware{Prefix: "auth"}, prefix),
+		metrics.EchoMiddleware(prefix),
+		echoutil.Instrument(),
+		echoutil.Recover(),
+		echoutil.CORS(echoutil.CORSConfig{
+			RejectNonCorsRequests: false,
+			OriginValidator:       echoutil.AllowAllOrigins,
+			AllowedMethods:        []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+			AllowedHeaders: []string{
+				"Accept",
+				"Content-Type",
+				"Content-Length",
+				"X-Custom-Header",
+				"Origin",
+				"Authorization",
+				"X-Trace-ID",
+				"Trace-Id",
+				"x-request-id",
+				"X-Request-ID",
+				"TraceID",
+				"ParentID",
+				"Uber-Trace-ID",
+				"uber-trace-id",
+				"traceparent",
+				"tracestate",
+			},
+			AccessControlAllowCredentials: true,
+			AccessControlMaxAge:           3600,
+		}),
+		// isWhiteListedForAuthentication returns false for routes without auth
+		echoutil.If(prefix, isWhiteListedForAuthentication, echoutil.JWT(app.jwtConfig)),
+		echoutil.If(prefix, isWhiteListedForAuthentication, echoutil.Auth()),
+	)
+
+	g.GET("/", app.handleGetProfile)
+	g.POST("/login", app.getTokenUsingPassword)
+	g.POST("/login/mfa/totp", app.handlePostLoginMFATOTP)
+	g.POST("/login/mfa/recovery", app.handlePostLoginMFARecovery)
+	g.POST("/login/mfa/webauthn", app.handlePostLoginMFAWebauthn)
+	g.POST("/login/mfa/webauthn/finish", app.handlePostLoginMFAWebauthnFinish)
+	g.POST("/login/webauthn/begin", app.handlePostPasskeyLoginBegin)
+	g.POST("/login/webauthn/finish", app.handlePostPasskeyLoginFinish)
+	g.GET("/mfa", app.handleGetMFAStatus)
+	g.POST("/mfa/totp", app.handlePostTOTPEnroll)
+	g.POST("/mfa/totp/confirm", app.handlePostTOTPConfirm)
+	g.DELETE("/mfa/totp", app.handleDeleteTOTP)
+	g.POST("/mfa/recovery/regenerate", app.handlePostRecoveryRegenerate)
+	g.POST("/mfa/reauth/totp", app.handlePostReauthTOTP)
+	g.POST("/mfa/reauth/recovery", app.handlePostReauthRecovery)
+	g.POST("/mfa/reauth/webauthn", app.handlePostReauthWebauthn)
+	g.POST("/mfa/reauth/webauthn/finish", app.handlePostReauthWebauthnFinish)
+	g.POST("/mfa/webauthn/register", app.handlePostWebauthnRegister)
+	g.POST("/mfa/webauthn/register/finish", app.handlePostWebauthnRegisterFinish)
+	g.PATCH("/mfa/webauthn/credentials/:id", app.handlePatchWebauthnCredential)
+	g.DELETE("/mfa/webauthn/credentials/:id", app.handleDeleteWebauthnCredential)
+	g.GET("/connected-providers", app.handleGetConnectedProviders)
+	g.POST("/connected-providers", app.handlePostConnectedProvider)
+	g.DELETE("/connected-providers", app.handleDeleteConnectedProvider)
+	g.POST("/token", app.handlePostToken)
+	g.POST("/token/refresh", app.handlePostTokenRefresh)
+	g.GET("/auth_status", handleAuthStatus)
+	g.GET("/login", app.safeRefreshHandler)
+	g.GET("/accounts", app.handleGetAccounts)
+	g.POST("/accounts", app.handlePostAccount)
+	g.POST("/sessions", app.handlePostSession)
+	g.GET("/verify", app.handleVerify)
+	g.POST("/recover", app.handlePasswordRecovery)
+	g.POST("/password", app.handlePasswordReset)
+	g.POST("/authorize", app.handlePostAuthorizeToken)
+	g.POST("/code", app.handlePostCode)
+	g.POST("/signature/verify", app.verifyToken)
+	g.POST("/x509/login", app.handleAuthUsingDeviceCert)
+	g.GET("/oauth/login/:service", app.HandleGetThirdPartyLogin)
+	g.GET("/oauth/callback/:service", app.HandleGetThirdPartyCallback)
+	g.POST("/oauth/token", app.HandlePKCEToken)
+	g.GET("/oauth/authorize", app.HandlePKCEAuthorize)
+	g.POST("/oauth/authorize", app.HandlePostPKCEAuthorize)
+	g.POST("/oauth/pkce/init", app.HandlePostPKCEInit)
 }
 
 func handleGetEncryptedAccount(accountData *authmodels.AccountCreationPayload) (*authmodels.EncryptedAccountToken, error) {
@@ -412,7 +393,7 @@ func (a *App) accessCodePayload(userIDEmailNick string, serviceIDEmailNick strin
 
 	return accessCodePayload
 }
-func isWhiteListedForAuthentication(request *rest.Request) bool {
+func isWhiteListedForAuthentication(request *http.Request) bool {
 	// This function determines if authentication middleware should be applied.
 	// It returns `true` if authentication is REQUIRED for the request.
 	// It returns `false` if authentication is NOT REQUIRED (i.e., the path is whitelisted for skipping authentication).

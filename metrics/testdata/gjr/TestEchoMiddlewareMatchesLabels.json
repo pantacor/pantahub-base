@@ -1,0 +1,14 @@
+{
+  "TestEchoMiddlewareMatchesLabels/param_path|gjr": {
+    "code=200;endpoint=/items/abc;method=GET;": 1
+  },
+  "TestEchoMiddlewareMatchesLabels/root|gjr": {
+    "code=200;endpoint=/;method=GET;": 1
+  },
+  "TestEchoMiddlewareMatchesLabels/unknown_route|gjr": {
+    "code=404;endpoint=/nope;method=GET;": 1
+  },
+  "TestEchoMiddlewareMatchesLabels/wrong_method|gjr": {
+    "code=405;endpoint=/;method=DELETE;": 1
+  }
+}

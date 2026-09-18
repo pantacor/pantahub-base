@@ -1,0 +1,17 @@
+{
+  "TestUserTypeFilterMatchesGoJSONRest/DEVICE|gjr": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"error\":\"REST-ERR-ID-N\",\"code\":403}"
+  },
+  "TestUserTypeFilterMatchesGoJSONRest/SERVICE|gjr": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"error\":\"REST-ERR-ID-N\",\"code\":403}"
+  },
+  "TestUserTypeFilterMatchesGoJSONRest/USER|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"ok\""
+  }
+}

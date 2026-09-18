@@ -1,4 +1,4 @@
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,10 +23,10 @@ import (
 	"time"
 
 	jwtgo "github.com/golang-jwt/jwt/v5"
-	jwt "gitlab.com/pantacor/pantahub-base/utils/jwtmiddleware"
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 )
 
 func setEncKey(t *testing.T) {
@@ -38,8 +38,8 @@ func setEncKey(t *testing.T) {
 	t.Setenv(utils.EnvPantahubMfaEncKey, base64.StdEncoding.EncodeToString(key))
 }
 
-func testMiddleware() *jwt.JWTMiddleware {
-	return &jwt.JWTMiddleware{
+func testMiddleware() *jwtauth.Config {
+	return &jwtauth.Config{
 		Key:              []byte("test secret key"),
 		Realm:            "pantahub services",
 		SigningAlgorithm: "HS256",

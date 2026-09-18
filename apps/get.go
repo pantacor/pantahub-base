@@ -1,4 +1,4 @@
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,9 +20,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -39,31 +40,27 @@ import (
 // @Failure 404 {object} utils.RError "App not found"
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /apps/{id} [get]
-func (app *App) handleGetApp(w rest.ResponseWriter, r *rest.Request) {
-	id := r.PathParam("id")
+func (app *App) handleGetApp(c *echo.Context) error {
+	id := c.Param("id")
 
 	var owner string
-	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
+	jwtPayload, ok := echoutil.Lookup(c, echoutil.KeyJWTPayload)
 	if ok {
 		owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"].(string)
 		if !ok {
-			utils.RestErrorWrapper(w, "Owner can't be defined", http.StatusInternalServerError)
-			return
+			return echoutil.RestErrorWrapper(c, "Owner can't be defined", http.StatusInternalServerError)
 		}
 	} else {
-		utils.RestErrorWrapper(w, "Owner can't be defined", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Owner can't be defined", http.StatusInternalServerError)
 	}
 
-	tpApp, httpCode, err := SearchApp(r.Context(), "", id, app.mongoClient.Database(utils.MongoDb))
+	tpApp, httpCode, err := SearchApp(c.Request().Context(), "", id, app.mongoClient.Database(utils.MongoDb))
 	if err != nil {
-		utils.RestErrorWrapper(w, err.Error(), httpCode)
-		return
+		return echoutil.RestErrorWrapper(c, err.Error(), httpCode)
 	}
 
 	if tpApp == nil {
-		utils.RestErrorWrapper(w, "App not found", http.StatusNotFound)
-		return
+		return echoutil.RestErrorWrapper(c, "App not found", http.StatusNotFound)
 	}
 
 	if tpApp.Owner != owner {
@@ -81,7 +78,7 @@ func (app *App) handleGetApp(w rest.ResponseWriter, r *rest.Request) {
 		tpApp.OwnerNick = ""
 	}
 
-	w.WriteJson(tpApp)
+	return echoutil.WriteJSON(c, http.StatusOK, tpApp)
 }
 
 // handleGetApps get an oauth clients
@@ -97,21 +94,19 @@ func (app *App) handleGetApp(w rest.ResponseWriter, r *rest.Request) {
 // @Failure 404 {object} utils.RError "App not found"
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /apps [get]
-func (app *App) handleGetApps(w rest.ResponseWriter, r *rest.Request) {
-	id := r.Request.URL.Query().Get("serviceID")
+func (app *App) handleGetApps(c *echo.Context) error {
+	id := c.Request().URL.Query().Get("serviceID")
 
 	owner := ""
 	var sessionOwner string
-	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
+	jwtPayload, ok := echoutil.Lookup(c, echoutil.KeyJWTPayload)
 	if ok {
 		sessionOwner, ok = jwtPayload.(jwtgo.MapClaims)["prn"].(string)
 		if !ok {
-			utils.RestErrorWrapper(w, "Owner can't be defined", http.StatusInternalServerError)
-			return
+			return echoutil.RestErrorWrapper(c, "Owner can't be defined", http.StatusInternalServerError)
 		}
 	} else {
-		utils.RestErrorWrapper(w, "Owner can't be defined", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Owner can't be defined", http.StatusInternalServerError)
 	}
 
 	if id != "" {
@@ -119,10 +114,9 @@ func (app *App) handleGetApps(w rest.ResponseWriter, r *rest.Request) {
 	} else {
 		owner = sessionOwner
 	}
-	apps, err := SearchApps(r.Context(), owner, id, app.mongoClient.Database(utils.MongoDb))
+	apps, err := SearchApps(c.Request().Context(), owner, id, app.mongoClient.Database(utils.MongoDb))
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error reading third party application "+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error reading third party application "+err.Error(), http.StatusInternalServerError)
 	}
 
 	for i, app := range apps {
@@ -142,7 +136,7 @@ func (app *App) handleGetApps(w rest.ResponseWriter, r *rest.Request) {
 		}
 	}
 
-	w.WriteJson(apps)
+	return echoutil.WriteJSON(c, http.StatusOK, apps)
 }
 
 // @Summary Get scopes for OAuth applications
@@ -156,29 +150,25 @@ func (app *App) handleGetApps(w rest.ResponseWriter, r *rest.Request) {
 // @Failure 404 {object} utils.RError "App not found"
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /apps/scopes [get]
-func (app *App) handleGetPhScopes(w rest.ResponseWriter, r *rest.Request) {
-	id := r.Request.URL.Query().Get("serviceID")
+func (app *App) handleGetPhScopes(c *echo.Context) error {
+	id := c.Request().URL.Query().Get("serviceID")
 
 	if id == "" {
-		scopes, err := SearchExposedScopes(r.Context(), app.mongoClient.Database(utils.MongoDb))
+		scopes, err := SearchExposedScopes(c.Request().Context(), app.mongoClient.Database(utils.MongoDb))
 		if err != nil {
-			utils.RestErrorWrapper(w, err.Error(), http.StatusInternalServerError)
-			return
+			return echoutil.RestErrorWrapper(c, err.Error(), http.StatusInternalServerError)
 		}
-		w.WriteJson(append(utils.PhScopeArray, scopes...))
-		return
+		return echoutil.WriteJSON(c, http.StatusOK, append(utils.PhScopeArray, scopes...))
 	}
 
-	tpApp, httpCode, err := SearchApp(r.Context(), "", id, app.mongoClient.Database(utils.MongoDb))
+	tpApp, httpCode, err := SearchApp(c.Request().Context(), "", id, app.mongoClient.Database(utils.MongoDb))
 	if err != nil {
-		utils.RestErrorWrapper(w, err.Error(), httpCode)
-		return
+		return echoutil.RestErrorWrapper(c, err.Error(), httpCode)
 	}
 
 	if tpApp == nil {
-		utils.RestErrorWrapper(w, "App not found", http.StatusNotFound)
-		return
+		return echoutil.RestErrorWrapper(c, "App not found", http.StatusNotFound)
 	}
 
-	w.WriteJson(tpApp.Scopes)
+	return echoutil.WriteJSON(c, http.StatusOK, tpApp.Scopes)
 }

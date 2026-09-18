@@ -1,4 +1,4 @@
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,9 +19,9 @@ package auth
 import (
 	"context"
 	"errors"
+	"net/http"
 	"strings"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	"gitlab.com/pantacor/pantahub-base/apps"
 	"gitlab.com/pantacor/pantahub-base/auth/authservices"
 	"gitlab.com/pantacor/pantahub-base/auth/redirecturi"
@@ -131,10 +131,10 @@ func validateSocialRedirectURI(candidate string, audit redirecturi.AuditContext)
 }
 
 // auditContext captures the request metadata attached to rejection events.
-func auditContext(r *rest.Request, flow string) redirecturi.AuditContext {
+func auditContext(r *http.Request, flow string) redirecturi.AuditContext {
 	return redirecturi.AuditContext{
 		Flow:       flow,
-		RemoteAddr: r.Request.RemoteAddr,
-		UserAgent:  r.Request.UserAgent(),
+		RemoteAddr: r.RemoteAddr,
+		UserAgent:  r.UserAgent(),
 	}
 }

@@ -1,3 +1,17 @@
+// Copyright (c) 2017-2026 Pantacor Ltd.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+
 package trails
 
 import (
@@ -8,21 +22,22 @@ import (
 	"testing"
 	"time"
 
-	jwt "gitlab.com/pantacor/pantahub-base/utils/jwtmiddleware"
 	"gitlab.com/pantacor/pantahub-base/auth"
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/subscriptions"
 	"gitlab.com/pantacor/pantahub-base/testutils"
 	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 	"gopkg.in/resty.v1"
 )
 
 var (
 	recorder        *httptest.ResponseRecorder
 	server          *httptest.Server
-	jwtMWA          *jwt.JWTMiddleware
-	jwtMWR          *jwt.JWTMiddleware
+	jwtMWA          *jwtauth.Config
+	jwtMWR          *jwtauth.Config
 	authURL         *url.URL
 	serverURL       *url.URL
 	devicesURL      *url.URL
@@ -51,14 +66,14 @@ func setUp(t *testing.T) {
 	mongoClient.Database(utils.MongoDb).Collection("pantahub_devices").Drop(nil)
 	mongoClient.Database(utils.MongoDb).Collection("pantahub_steps").Drop(nil)
 
-	jwtMWA = &jwt.JWTMiddleware{
+	jwtMWA = &jwtauth.Config{
 		Key:        []byte("secret key"),
 		Realm:      "pantahub services",
 		Timeout:    time.Minute * 60,
 		MaxRefresh: time.Hour * 24,
 	}
 
-	jwtMWR = &jwt.JWTMiddleware{
+	jwtMWR = &jwtauth.Config{
 		Key:   []byte("secret key"),
 		Realm: "pantahub services",
 	}
@@ -67,7 +82,9 @@ func setUp(t *testing.T) {
 
 	// auth app we need
 	authApp := auth.New(jwtMWA, mongoClient)
-	authServer := httptest.NewServer(authApp.API.MakeHandler())
+	authEcho := echoutil.NewServer("test")
+	authApp.Mount(authEcho)
+	authServer := httptest.NewServer(authEcho.E)
 	authURL, err = url.Parse(authServer.URL)
 	if err != nil {
 		t.Errorf("%s", "error parsing test server URL "+err.Error())
@@ -79,7 +96,9 @@ func setUp(t *testing.T) {
 	subService := subscriptions.NewService(mongoClient, utils.Prn("prn::subscriptions:"),
 		adminUsers, subscriptions.SubscriptionProperties)
 	devicesApp := devices.New(jwtMWR, subService, mongoClient)
-	devicesServer := httptest.NewServer(devicesApp.API.MakeHandler())
+	devicesEcho := echoutil.NewServer("test")
+	devicesApp.Mount(devicesEcho)
+	devicesServer := httptest.NewServer(devicesEcho.E)
 	devicesURL, err = url.Parse(devicesServer.URL)
 	if err != nil {
 		t.Errorf("%s", "error parsing test server URL "+err.Error())
@@ -88,7 +107,9 @@ func setUp(t *testing.T) {
 
 	// trails app we test
 	trailsApp := New(jwtMWR, mongoClient)
-	server = httptest.NewServer(trailsApp.API.MakeHandler())
+	srv := echoutil.NewServer("test")
+	trailsApp.Mount(srv)
+	server = httptest.NewServer(srv.E)
 	serverURL, err = url.Parse(server.URL)
 	if err != nil {
 		t.Errorf("%s", "error parsing test server URL "+err.Error())
@@ -105,7 +126,7 @@ func tearDown(t *testing.T) {
 
 func postState(t *testing.T) {
 	u := *serverURL
-	u.Path = ""
+	u.Path = "/trails/"
 
 	res, err := resty.R().SetAuthToken(deviceAuthToken).SetBody(map[string]string{"mystate": "mystate"}).Post(u.String())
 
@@ -126,7 +147,7 @@ func postState(t *testing.T) {
 func postStateHash(t *testing.T) {
 
 	s0 := *serverURL
-	s0.Path = device.ID.Hex() + "/steps/0"
+	s0.Path = "/trails/" + device.ID.Hex() + "/steps/0"
 
 	res, err := resty.R().SetAuthToken(userAuthToken).
 		Get(s0.String())
@@ -153,7 +174,7 @@ func postStateHash(t *testing.T) {
 
 func postStep(t *testing.T) {
 	u := *serverURL
-	u.Path = device.ID.Hex() + "/steps"
+	u.Path = "/trails/" + device.ID.Hex() + "/steps"
 
 	res, err := resty.R().SetAuthToken(userAuthToken).
 		SetBody("{\"rev\": 1, \"state\": {\"mystate\":         \"mystate\"}}").
@@ -182,7 +203,7 @@ func postStep(t *testing.T) {
 func postStepsHash(t *testing.T) {
 
 	s1 := *serverURL
-	s1.Path = device.ID.Hex() + "/steps/1"
+	s1.Path = "/trails/" + device.ID.Hex() + "/steps/1"
 
 	res, err := resty.R().SetAuthToken(userAuthToken).
 		Get(s1.String())

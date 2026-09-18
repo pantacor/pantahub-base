@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017-2023 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,11 +19,12 @@ package exports
 import (
 	"net/http"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/exports/exportservices"
 	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 )
 
 // handleGetExport Export a tar gz file with of a device
@@ -40,30 +41,27 @@ import (
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /exports/{owner}/{nick}/{rev}/{filename} [get]
-func (a *App) handleGetExport(w rest.ResponseWriter, r *rest.Request) {
-	owner := r.PathParam("owner")
-	nick := r.PathParam("nick")
-	rev := r.PathParam("rev")
-	filename := r.PathParam("filename")
-	frags := r.URL.Query().Get("parts")
-	meta := r.URL.Query().Get("meta") == "true"
+func (a *App) handleGetExport(c *echo.Context) error {
+	owner := c.Param("owner")
+	nick := c.Param("nick")
+	rev := c.Param("rev")
+	filename := c.Param("filename")
+	frags := c.QueryParams().Get("parts")
+	meta := c.QueryParams().Get("meta") == "true"
 
-	payload, ok := r.Env["JWT_PAYLOAD"]
+	payload, ok := echoutil.Lookup(c, echoutil.KeyJWTPayload)
 	if !ok {
-		utils.RestErrorWrapper(w, "You need to be logged in.", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in.", http.StatusForbidden)
 	}
 
 	authIDI, ok := payload.(jwtgo.MapClaims)["prn"]
 	if !ok {
-		utils.RestErrorWrapper(w, "You need to be logged in.", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in.", http.StatusForbidden)
 	}
 
 	authTypeI, ok := payload.(jwtgo.MapClaims)["type"]
 	if !ok {
-		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in", http.StatusForbidden)
 	}
 
 	ownerPtr, ok := payload.(jwtgo.MapClaims)["owner"]
@@ -73,39 +71,34 @@ func (a *App) handleGetExport(w rest.ResponseWriter, r *rest.Request) {
 
 	tokenOwner, ok := ownerPtr.(string)
 	if !ok {
-		utils.RestErrorWrapper(w, "Session has no owner info", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Session has no owner info", http.StatusBadRequest)
 	}
 
 	authType := authTypeI.(string)
 
 	exportservice := exportservices.CreateService(a.mongoClient, utils.MongoDb)
 
-	account, err := exportservice.GetUserAccountByNick(r.Context(), owner)
+	account, err := exportservice.GetUserAccountByNick(c.Request().Context(), owner)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error finding owner user account by nick:"+err.Error(), http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Error finding owner user account by nick:"+err.Error(), http.StatusForbidden)
 	}
 
-	device, rerr := exportservice.GetDevice(r.Context(), nick, account.Prn, tokenOwner)
+	device, rerr := exportservice.GetDevice(c.Request().Context(), nick, account.Prn, tokenOwner)
 	if rerr != nil {
-		utils.RestErrorWrite(w, rerr)
-		return
+		return echoutil.RestErrorWrite(c, rerr)
 	}
 
 	if device.Owner != tokenOwner && !device.IsPublic {
-		utils.RestErrorWrapper(w, "Resource not available", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Resource not available", http.StatusForbidden)
 	}
 
-	revision, state, modtime, rerr := exportservice.GetStepRev(r.Context(), device.ID.Hex(), rev, frags)
+	revision, state, modtime, rerr := exportservice.GetStepRev(c.Request().Context(), device.ID.Hex(), rev, frags)
 	if rerr != nil {
-		utils.RestErrorWrite(w, rerr)
-		return
+		return echoutil.RestErrorWrite(c, rerr)
 	}
 
 	objectDownloads, rerr := exportservice.GetTrailObjects(
-		r.Context(),
+		c.Request().Context(),
 		device.ID.Hex(),
 		revision,
 		account.Prn,
@@ -114,18 +107,17 @@ func (a *App) handleGetExport(w rest.ResponseWriter, r *rest.Request) {
 		frags,
 	)
 	if rerr != nil {
-		utils.RestErrorWrite(w, rerr)
-		return
+		return echoutil.RestErrorWrite(c, rerr)
 	}
 
 	// meta=true returns a cheap size estimate (no blob fetch, no tar generation)
 	// so clients can show the user the total before starting the download.
 	if meta {
-		w.WriteJson(buildExportMeta(revision, state, objectDownloads))
-		return
+		return echoutil.WriteJSON(c, http.StatusOK, buildExportMeta(revision, state, objectDownloads))
 	}
 
-	exportservice.WriteExportTar(w, filename, objectDownloads, state, modtime)
+	exportservice.WriteExportTar(c, filename, objectDownloads, state, modtime)
+	return nil
 }
 
 // ExportMeta is the cheap size estimate returned for meta=true requests.

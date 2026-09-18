@@ -1,4 +1,4 @@
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,14 +20,14 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwt "gitlab.com/pantacor/pantahub-base/utils/jwtmiddleware"
 	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/utils"
-	"gitlab.com/pantacor/pantahub-base/utils/tracer"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -76,15 +76,14 @@ type TPApp struct {
 
 // App thirdparty application manager
 type App struct {
-	API           *rest.Api
-	jwtMiddleware *jwt.JWTMiddleware
-	mongoClient   *mongo.Client
+	jwtConfig   *jwtauth.Config
+	mongoClient *mongo.Client
 }
 
 // New create a new thirparty apps manager api
-func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
+func New(jwtConfig *jwtauth.Config, mongoClient *mongo.Client) *App {
 	app := new(App)
-	app.jwtMiddleware = jwtMiddleware
+	app.jwtConfig = jwtConfig
 	app.mongoClient = mongoClient
 
 	err := app.setIndexes()
@@ -112,76 +111,59 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		}
 	}
 
-	app.setupAPI()
-
-	// Define router or service
-	apiRouter, _ := rest.MakeRouter(
-		rest.Get("/scopes", app.handleGetPhScopes),
-		rest.Post("/", app.handleCreateApp),
-		rest.Get("/", app.handleGetApps),
-		rest.Get("/#id", app.handleGetApp),
-		rest.Put("/#id", app.handleUpdateApp),
-		rest.Delete("/#id", app.handleDeleteApp),
-	)
-	app.API.Use(&tracer.OtelMiddleware{
-		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
-		Router:      apiRouter,
-	})
-	app.API.SetApp(apiRouter)
-
 	return app
 }
 
-func needsAuth(request *rest.Request) bool {
+func needsAuth(request *http.Request) bool {
 	return request.URL.Path != "/scopes"
 }
 
-func (app *App) setupAPI() {
-	app.API = rest.NewApi()
+// Mount registers apps on echo with its previous middleware stack.
+func (app *App) Mount(s *echoutil.Server) {
+	const prefix = "/apps"
 
-	// we dont use default stack because we dont want content type enforcement
-	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
-		"/apps:", log.Lshortfile)})
-	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "apps"})
-	app.API.Use(&rest.StatusMiddleware{})
-	app.API.Use(&metrics.Middleware{})
-	app.API.Use(rest.DefaultCommonStack...)
-	app.API.Use(&rest.CorsMiddleware{
-		RejectNonCorsRequests: false,
-		OriginValidator: func(origin string, request *rest.Request) bool {
-			return true
-		},
-		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{
-			"Accept",
-			"Content-Type",
-			"Content-Length",
-			"X-Custom-Header",
-			"Origin",
-			"Authorization",
-			"X-Trace-ID",
-			"Trace-Id",
-			"x-request-id",
-			"X-Request-ID",
-			"TraceID",
-			"ParentID",
-			"Uber-Trace-ID",
-			"uber-trace-id",
-			"traceparent",
-			"tracestate",
-		},
-		AccessControlAllowCredentials: true,
-		AccessControlMaxAge:           3600,
-	})
-	app.API.Use(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtMiddleware, Mongo: app.mongoClient})
-	app.API.Use(&rest.IfMiddleware{
-		Condition: needsAuth,
-		IfTrue:    app.jwtMiddleware,
-	})
-	app.API.Use(&rest.IfMiddleware{
-		Condition: needsAuth,
-		IfTrue:    &utils.AuthMiddleware{},
-	})
+	g := s.Mount(prefix,
+		echoutil.AccessLogJSON(log.New(os.Stdout, "/apps:", log.Lshortfile), prefix),
+		echoutil.AccessLogFluent(&utils.AccessLogFluentMiddleware{Prefix: "apps"}, prefix),
+		metrics.EchoMiddleware(prefix),
+		echoutil.Instrument(),
+		echoutil.Recover(),
+		echoutil.CORS(echoutil.CORSConfig{
+			RejectNonCorsRequests: false,
+			OriginValidator:       echoutil.AllowAllOrigins,
+			AllowedMethods:        []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+			AllowedHeaders: []string{
+				"Accept",
+				"Content-Type",
+				"Content-Length",
+				"X-Custom-Header",
+				"Origin",
+				"Authorization",
+				"X-Trace-ID",
+				"Trace-Id",
+				"x-request-id",
+				"X-Request-ID",
+				"TraceID",
+				"ParentID",
+				"Uber-Trace-ID",
+				"uber-trace-id",
+				"traceparent",
+				"tracestate",
+			},
+			AccessControlAllowCredentials: true,
+			AccessControlMaxAge:           3600,
+		}),
+		echoutil.BasicAuthToBearer(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtConfig, Mongo: app.mongoClient}),
+		echoutil.If(prefix, needsAuth, echoutil.JWT(app.jwtConfig)),
+		echoutil.If(prefix, needsAuth, echoutil.Auth()),
+	)
+
+	g.GET("/scopes", app.handleGetPhScopes)
+	g.POST("/", app.handleCreateApp)
+	g.GET("/", app.handleGetApps)
+	g.GET("/:id", app.handleGetApp)
+	g.PUT("/:id", app.handleUpdateApp)
+	g.DELETE("/:id", app.handleDeleteApp)
 }
 
 func (app *App) setIndexes() error {

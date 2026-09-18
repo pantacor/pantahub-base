@@ -1,4 +1,4 @@
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,8 +31,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"golang.org/x/oauth2"
 )
 
@@ -60,7 +61,7 @@ type ServiceType string
 type GetServiceConfigFunc func() *oauth2.Config
 
 // AuthorizeServiceFunc use service authorization method
-type AuthorizeServiceFunc func(redirectURI string, config *oauth2.Config, w rest.ResponseWriter, r *rest.Request)
+type AuthorizeServiceFunc func(redirectURI string, config *oauth2.Config, c *echo.Context) error
 
 // CallbackServiceFunc use service authorization method
 type CallbackServiceFunc func(ctx context.Context, config *oauth2.Config, code string) (*ResponsePayload, error)
@@ -111,19 +112,18 @@ var ServicesCallback = map[ServiceType]CallbackServiceFunc{
 type RedirectValidator func(redirectURI string) error
 
 // AuthorizeByService use service to autorize
-func AuthorizeByService(w rest.ResponseWriter, r *rest.Request, validate RedirectValidator) {
-	service := ServiceType(r.PathParam("service"))
+func AuthorizeByService(c *echo.Context, validate RedirectValidator) error {
+	service := ServiceType(c.Param("service"))
 	if service == "" {
 		// Authenticated connect flows start at /connected-providers and carry
 		// the selected service in the request body. The caller places it in the
 		// query only while invoking this shared authorizer.
-		service = ServiceType(r.Request.URL.Query().Get("service"))
+		service = ServiceType(c.Request().URL.Query().Get("service"))
 	}
-	redirectURI := r.Request.URL.Query().Get("redirect_uri")
+	redirectURI := c.Request().URL.Query().Get("redirect_uri")
 
 	if _, found := ServicesConfigs[service]; !found {
-		utils.RestError(w, nil, "We can't connect to that service", http.StatusForbidden)
-		return
+		return echoutil.RestError(c, nil, "We can't connect to that service", http.StatusForbidden)
 	}
 
 	// The callback returns a signed-in user token in the fragment, so the
@@ -131,17 +131,16 @@ func AuthorizeByService(w rest.ResponseWriter, r *rest.Request, validate Redirec
 	// go anywhere near the identity provider.
 	if redirectURI != "" {
 		if err := validate(redirectURI); err != nil {
-			utils.RestError(w, err, err.Error(), http.StatusBadRequest)
-			return
+			return echoutil.RestError(c, err, err.Error(), http.StatusBadRequest)
 		}
 	}
 
-	authorizeURL, err := AuthorizationURLByService(service, redirectURI, w)
+	authorizeURL, err := AuthorizationURLByService(service, redirectURI, c.Response())
 	if err != nil {
-		utils.RestError(w, err, err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestError(c, err, err.Error(), http.StatusInternalServerError)
 	}
-	http.Redirect(w, r.Request, authorizeURL, http.StatusTemporaryRedirect)
+	http.Redirect(c.Response(), c.Request(), authorizeURL, http.StatusTemporaryRedirect)
+	return nil
 }
 
 // AuthorizationURLByService creates a provider authorization URL and pins its
@@ -190,17 +189,17 @@ func AuthorizationURLByServiceWithConnect(service ServiceType, redirectURI, conn
 }
 
 // CbByService use service callback
-func CbByService(r *rest.Request) (*ResponsePayload, error) {
+func CbByService(c *echo.Context) (*ResponsePayload, error) {
 	var err error
-	service := ServiceType(r.PathParam("service"))
+	service := ServiceType(c.Param("service"))
 	getConfig, found := ServicesConfigs[service]
 	if !found {
 		payload := &ResponsePayload{RedirectTo: ""}
 		return payload, fmt.Errorf("we can't connect to service: %s", service)
 	}
 
-	code := r.FormValue("code")
-	payload, err := ServicesCallback[service](r.Context(), getConfig(), code)
+	code := c.Request().FormValue("code")
+	payload, err := ServicesCallback[service](c.Request().Context(), getConfig(), code)
 	if err != nil {
 		return payload, fmt.Errorf("%s error -- %s", service, err)
 	}
@@ -210,7 +209,7 @@ func CbByService(r *rest.Request) (*ResponsePayload, error) {
 	// with, and it does not depend on a cross-site cookie surviving the provider
 	// redirect. The provider's authorization code is single-use, which prevents a
 	// completed callback from being replayed.
-	returnedState := r.FormValue("state")
+	returnedState := c.Request().FormValue("state")
 	claims, err := decodeState(returnedState)
 	if err != nil {
 		payload := &ResponsePayload{RedirectTo: ""}

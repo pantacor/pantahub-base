@@ -1,5 +1,5 @@
 //
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,11 +21,9 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
-
-	"github.com/ant0ine/go-json-rest/rest"
 )
 
-func restRequest(t *testing.T, target string, headers map[string]string) *rest.Request {
+func restRequest(t *testing.T, target string, headers map[string]string) *http.Request {
 	t.Helper()
 
 	req := httptest.NewRequest(http.MethodGet, target, nil)
@@ -33,7 +31,7 @@ func restRequest(t *testing.T, target string, headers map[string]string) *rest.R
 		req.Header.Set(k, v)
 	}
 
-	return &rest.Request{Request: req}
+	return req
 }
 
 // The previous implementation asked r.URL.Scheme, which net/http leaves empty

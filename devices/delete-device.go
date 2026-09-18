@@ -1,5 +1,5 @@
 //
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,9 +22,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -44,69 +45,60 @@ import (
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /devices/{id} [delete]
-func (a *App) handleDeleteDevice(w rest.ResponseWriter, r *rest.Request) {
-	delID := r.PathParam("id")
+func (a *App) handleDeleteDevice(c *echo.Context) error {
+	delID := c.Param("id")
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	owner, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in as a USER", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in as a USER", http.StatusForbidden)
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
 	if collection == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
 	device := Device{}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	deviceObjectID, err := primitive.ObjectIDFromHex(delID)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 	}
 	err = collection.FindOne(ctx, bson.M{
 		"_id":     deviceObjectID,
 		"garbage": bson.M{"$ne": true},
 	}).Decode(&device)
 	if err != nil && mongoutils.IsNotFound(err) {
-		utils.RestErrorWrapper(w, "Device not found", http.StatusNotFound)
-		return
+		return echoutil.RestErrorWrapper(c, "Device not found", http.StatusNotFound)
 	}
 	if err != nil {
 		if err != mongo.ErrNoDocuments {
 			log.Println("Error deleting device: " + err.Error())
-			utils.RestErrorWrapper(w, "Device not found", http.StatusInternalServerError)
-			return
+			return echoutil.RestErrorWrapper(c, "Device not found", http.StatusInternalServerError)
 		}
 
 		device.ID = deviceObjectID
-		w.WriteJson(device)
-		return
+		return echoutil.WriteJSON(c, http.StatusOK, device)
 	}
 
 	// Any logged-in caller may delete an unclaimed device (no owner yet);
 	// pantahub-gc would sweep it anyway. Owned devices need their owner.
 	if device.Owner != "" && device.Owner != owner {
-		utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "No Access", http.StatusForbidden)
 	}
 
 	result, res, err := MarkDeviceAsGarbage(delID)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error calling GC API for Marking Device Garbage: "+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error calling GC API for Marking Device Garbage: "+err.Error(), http.StatusInternalServerError)
 	}
 
 	if res.StatusCode() != 200 {
 		log.Printf("GC API error marking device %s garbage: status %d", delID, res.StatusCode())
-		utils.RestErrorWrapper(w, "Error calling GC API for Marking Device Garbage", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error calling GC API for Marking Device Garbage", http.StatusInternalServerError)
 	}
 	if result.Status == 1 {
 		device.Garbage = true
@@ -114,5 +106,5 @@ func (a *App) handleDeleteDevice(w rest.ResponseWriter, r *rest.Request) {
 
 	device.Secret = ""
 	device.Challenge = ""
-	w.WriteJson(device)
+	return echoutil.WriteJSON(c, http.StatusOK, device)
 }

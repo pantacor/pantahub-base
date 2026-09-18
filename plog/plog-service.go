@@ -1,5 +1,5 @@
 //
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,22 +32,21 @@ import (
 	"time"
 
 	jwtgo "github.com/golang-jwt/jwt/v5"
-	jwt "gitlab.com/pantacor/pantahub-base/utils/jwtmiddleware"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/mgo.v2/bson"
 
-	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
-	"gitlab.com/pantacor/pantahub-base/utils/tracer"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 )
 
 // App plog rest application
 type App struct {
-	jwtMiddleware *jwt.JWTMiddleware
-	API           *rest.Api
-	mongoClient   *mongo.Client
+	jwtConfig   *jwtauth.Config
+	mongoClient *mongo.Client
 }
 
 // Post plog post payload
@@ -73,106 +72,81 @@ type PvrRemote struct {
 // ## GET /trails/summary
 //
 //	get summary of all trails by the calling owner.
-func (a *App) handleGetPlogPosts(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetPlogPosts(c *echo.Context) error {
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	owner, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in", http.StatusForbidden)
 	}
 
 	collPlogPosts := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_plogposts")
 
 	if collPlogPosts == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+	authType, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["type"]
 
 	if authType != "USER" && authType != "SESSION" {
-		utils.RestErrorWrapper(w, "Need to be logged in as USER/SESSION user to get trail summary", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Need to be logged in as USER/SESSION user to get trail summary", http.StatusForbidden)
 	}
 
 	plogPosts := make([]Post, 0)
 	findOptions := options.Find()
 	findOptions.SetNoCursorTimeout(true)
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	cur, err := collPlogPosts.Find(ctx, bson.M{
 		"owner": owner,
 	}, findOptions)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error on fetching plogposts:"+err.Error(), http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Error on fetching plogposts:"+err.Error(), http.StatusForbidden)
 	}
 	defer cur.Close(ctx)
 	for cur.Next(ctx) {
 		result := Post{}
 		err := cur.Decode(&result)
 		if err != nil {
-			utils.RestErrorWrapper(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
-			return
+			return echoutil.RestErrorWrapper(c, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
 		}
 		plogPosts = append(plogPosts, result)
 	}
 
-	w.WriteJson(plogPosts)
+	return echoutil.WriteJSON(c, http.StatusOK, plogPosts)
 }
 
 // New creates a new plog rest application
-func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
+func New(jwtConfig *jwtauth.Config, mongoClient *mongo.Client) *App {
 
 	app := new(App)
-	app.jwtMiddleware = jwtMiddleware
+	app.jwtConfig = jwtConfig
 	app.mongoClient = mongoClient
 
-	app.API = rest.NewApi()
-
-	// we dont use default stack because we dont want content type enforcement
-	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
-		"/plog:", log.Lshortfile)})
-	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "plog"})
-	app.API.Use(rest.DefaultCommonStack...)
-
-	// we allow calls from other domains to allow webapps; XXX: review
-	app.API.Use(&rest.CorsMiddleware{
-		RejectNonCorsRequests: false,
-		OriginValidator: func(origin string, request *rest.Request) bool {
-			return true
-		},
-		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{
-			"Accept", "Content-Type", "X-Custom-Header", "Origin", "Authorization"},
-		AccessControlAllowCredentials: true,
-		AccessControlMaxAge:           3600,
-	})
-
-	app.API.Use(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtMiddleware, Mongo: app.mongoClient})
-	// no authentication needed for /login
-	app.API.Use(&rest.IfMiddleware{
-		Condition: func(request *rest.Request) bool {
-			return true
-		},
-		IfTrue: app.jwtMiddleware,
-	})
-
-	// /auth_status endpoints
-	// XXX: this is all needs to be done so that paths that do not trail with /
-	//      get a MOVED PERMANTENTLY error with the redir path with / like the main
-	//      API routers (bad rest.MakeRouter I suspect)
-	apiRouter, _ := rest.MakeRouter(
-		//rest.Get("/", app.handle_getploginfo),
-		rest.Get("/posts", app.handleGetPlogPosts),
-	//	rest.Post("/posts", app.handlePostPlogPosts),
-	)
-	app.API.Use(&tracer.OtelMiddleware{
-		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
-		Router:      apiRouter,
-	})
-	app.API.SetApp(apiRouter)
-
 	return app
+}
+
+// Mount registers plog on the echo server.
+func (app *App) Mount(s *echoutil.Server) {
+	const prefix = "/plog"
+
+	g := s.Mount(prefix,
+		echoutil.AccessLogJSON(log.New(os.Stdout, "/plog:", log.Lshortfile), prefix),
+		echoutil.AccessLogFluent(&utils.AccessLogFluentMiddleware{Prefix: "plog"}, prefix),
+		echoutil.Instrument(),
+		echoutil.Recover(),
+		echoutil.CORS(echoutil.CORSConfig{
+			RejectNonCorsRequests: false,
+			OriginValidator:       echoutil.AllowAllOrigins,
+			AllowedMethods:        []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+			AllowedHeaders: []string{
+				"Accept", "Content-Type", "X-Custom-Header", "Origin", "Authorization"},
+			AccessControlAllowCredentials: true,
+			AccessControlMaxAge:           3600,
+		}),
+		echoutil.BasicAuthToBearer(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtConfig, Mongo: app.mongoClient}),
+		echoutil.JWT(app.jwtConfig),
+	)
+
+	g.GET("/posts", app.handleGetPlogPosts)
 }

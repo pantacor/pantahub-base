@@ -1,4 +1,4 @@
-// Copyright 2020 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 
 package utils

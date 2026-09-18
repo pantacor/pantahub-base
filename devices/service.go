@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017-2025 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,14 +24,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwt "gitlab.com/pantacor/pantahub-base/utils/jwtmiddleware"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/subscriptions"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-base/utils/caclient"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 	"gitlab.com/pantacor/pantahub-base/utils/models"
-	"gitlab.com/pantacor/pantahub-base/utils/tracer"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -47,10 +47,9 @@ const DeviceNickRule = `(?m)^[a-zA-Z0-9_\-+%]+$`
 
 // App Web app structure
 type App struct {
-	jwtMiddleware *jwt.JWTMiddleware
-	API           *rest.Api
-	mongoClient   *mongo.Client
-	subService    subscriptions.SubscriptionService
+	jwtConfig   *jwtauth.Config
+	mongoClient *mongo.Client
+	subService  subscriptions.SubscriptionService
 }
 
 // Build factory a new Device App only with mongoClient
@@ -101,9 +100,9 @@ type autoTokenInfo struct {
 }
 
 // New create devices web app
-func New(jwtMiddleware *jwt.JWTMiddleware, subService subscriptions.SubscriptionService, mongoClient *mongo.Client) *App {
+func New(jwtConfig *jwtauth.Config, subService subscriptions.SubscriptionService, mongoClient *mongo.Client) *App {
 	app := new(App)
-	app.jwtMiddleware = jwtMiddleware
+	app.jwtConfig = jwtConfig
 	app.mongoClient = mongoClient
 	app.subService = subService
 
@@ -133,78 +132,64 @@ func New(jwtMiddleware *jwt.JWTMiddleware, subService subscriptions.Subscription
 	// background; devices that log in meanwhile upgrade themselves on the way
 	go RunSecretMigration(context.Background(), mongoClient.Database(utils.MongoDb).Collection("pantahub_devices"))
 
-	app.API = rest.NewApi()
-	// we dont use default stack because we dont want content type enforcement
-	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
-		"/devices:", log.Lshortfile)})
-	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "devices"})
-	app.API.Use(&rest.StatusMiddleware{})
-	app.API.Use(&metrics.Middleware{})
+	return app
+}
 
-	app.API.Use(rest.DefaultCommonStack...)
-	app.API.Use(&rest.CorsMiddleware{
-		RejectNonCorsRequests: false,
-		OriginValidator: func(origin string, request *rest.Request) bool {
-			return true
-		},
-		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{
-			"Accept",
-			"Content-Type",
-			"Content-Length",
-			"X-Custom-Header",
-			"Origin",
-			"Authorization",
-			"X-Trace-ID",
-			"Trace-Id",
-			"x-request-id",
-			"X-Request-ID",
-			"TraceID",
-			"ParentID",
-			"Uber-Trace-ID",
-			"uber-trace-id",
-			"traceparent",
-			"tracestate",
-			"Ssl-Client-Verify",
-			"Ssl-Client-Cert",
-			"ssl-client-verify",
-			"ssl-client-cert",
-		},
-		AccessControlAllowCredentials: true,
-		AccessControlMaxAge:           3600,
-	})
+// needsAuth mirrors the go-json-rest condition: bearer calls always
+// authenticate; anonymous POST / and POST /register (device registration)
+// pass through.
+func needsAuth(r *http.Request) bool {
+	auth := r.Header.Get("Authorization")
+	if auth != "" && strings.HasPrefix(strings.ToLower(strings.TrimSpace(auth)), "bearer ") {
+		return true
+	}
+	return !((r.Method == "POST" && r.URL.Path == "/") ||
+		(r.Method == "POST" && r.URL.Path == "/register"))
+}
 
-	app.API.Use(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtMiddleware, Mongo: app.mongoClient})
-	app.API.Use(&rest.IfMiddleware{
-		Condition: func(request *rest.Request) bool {
-			// if call is coming with authorization attempt, ensure JWT middleware
-			// is used... otherwise let through anonymous POST for registration
-			auth := request.Header.Get("Authorization")
-			if auth != "" && strings.HasPrefix(strings.ToLower(strings.TrimSpace(auth)), "bearer ") {
-				return true
-			}
+// Mount registers devices on echo with its previous middleware stack.
+func (app *App) Mount(s *echoutil.Server) {
+	const prefix = "/devices"
 
-			// post new device means to register... allow this unauthenticated
-			return !((request.Method == "POST" && request.URL.Path == "/") ||
-				(request.Method == "POST" && request.URL.Path == "/register"))
-		},
-		IfTrue: app.jwtMiddleware,
-	})
-	app.API.Use(&rest.IfMiddleware{
-		Condition: func(request *rest.Request) bool {
-			// if call is coming with authorization attempt, ensure JWT middleware
-			// is used... otherwise let through anonymous POST for registration
-			auth := request.Header.Get("Authorization")
-			if auth != "" && strings.HasPrefix(strings.ToLower(strings.TrimSpace(auth)), "bearer ") {
-				return true
-			}
-
-			// post new device means to register... allow this unauthenticated
-			return !((request.Method == "POST" && request.URL.Path == "/") ||
-				(request.Method == "POST" && request.URL.Path == "/register"))
-		},
-		IfTrue: &utils.AuthMiddleware{},
-	})
+	g := s.Mount(prefix,
+		echoutil.AccessLogJSON(log.New(os.Stdout, "/devices:", log.Lshortfile), prefix),
+		echoutil.AccessLogFluent(&utils.AccessLogFluentMiddleware{Prefix: "devices"}, prefix),
+		metrics.EchoMiddleware(prefix),
+		echoutil.Instrument(),
+		echoutil.Recover(),
+		echoutil.CORS(echoutil.CORSConfig{
+			RejectNonCorsRequests: false,
+			OriginValidator:       echoutil.AllowAllOrigins,
+			AllowedMethods:        []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+			AllowedHeaders: []string{
+				"Accept",
+				"Content-Type",
+				"Content-Length",
+				"X-Custom-Header",
+				"Origin",
+				"Authorization",
+				"X-Trace-ID",
+				"Trace-Id",
+				"x-request-id",
+				"X-Request-ID",
+				"TraceID",
+				"ParentID",
+				"Uber-Trace-ID",
+				"uber-trace-id",
+				"traceparent",
+				"tracestate",
+				"Ssl-Client-Verify",
+				"Ssl-Client-Cert",
+				"ssl-client-verify",
+				"ssl-client-cert",
+			},
+			AccessControlAllowCredentials: true,
+			AccessControlMaxAge:           3600,
+		}),
+		echoutil.BasicAuthToBearer(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtConfig, Mongo: app.mongoClient}),
+		echoutil.If(prefix, needsAuth, echoutil.JWT(app.jwtConfig)),
+		echoutil.If(prefix, needsAuth, echoutil.Auth()),
+	)
 
 	writeDevicesScopes := []utils.Scope{
 		utils.Scopes.API,
@@ -229,52 +214,41 @@ func New(jwtMiddleware *jwt.JWTMiddleware, subService subscriptions.Subscription
 		utils.Scopes.ValidateDevices,
 	}
 
-	// /auth_status endpoints
-	apiRouter, _ := rest.MakeRouter(
-		// TPM auto enroll register
-		rest.Post("/register", app.handleRegister),
+	// TPM auto enroll register
+	g.POST("/register", app.handleRegister)
 
-		// Device Ownership validation
-		rest.Post("/#id/ownership/validate", utils.ScopeFilter(validateDeviceScopes, app.handleValidateOwnership)),
+	// Device Ownership validation
+	g.POST("/:id/ownership/validate", echoutil.ScopeFilter(validateDeviceScopes, app.handleValidateOwnership))
 
-		// token api
-		rest.Post("/tokens", utils.ScopeFilter(updateDevicesScopes, app.handlePostTokens)),
-		rest.Delete("/tokens/#id", utils.ScopeFilter(updateDevicesScopes, app.handleDisableTokens)),
-		rest.Patch("/tokens/#id", utils.ScopeFilter(updateDevicesScopes, app.handlePatchTokens)),
-		rest.Get("/tokens/#id", utils.ScopeFilter(readDevicesScopes, app.handleGetToken)),
-		rest.Get("/tokens", utils.ScopeFilter(readDevicesScopes, app.handleGetTokens)),
+	// token api
+	g.POST("/tokens", echoutil.ScopeFilter(updateDevicesScopes, app.handlePostTokens))
+	g.DELETE("/tokens/:id", echoutil.ScopeFilter(updateDevicesScopes, app.handleDisableTokens))
+	g.PATCH("/tokens/:id", echoutil.ScopeFilter(updateDevicesScopes, app.handlePatchTokens))
+	g.GET("/tokens/:id", echoutil.ScopeFilter(readDevicesScopes, app.handleGetToken))
+	g.GET("/tokens", echoutil.ScopeFilter(readDevicesScopes, app.handleGetTokens))
 
-		// default api
-		rest.Get("/auth_status", utils.ScopeFilter(readDevicesScopes, handleAuth)),
-		rest.Get("/", utils.ScopeFilter(readDevicesScopes, app.handleGetDevices)),
-		rest.Post("/", utils.ScopeFilterOptionalAuth(writeDevicesScopes,
-			func(writer rest.ResponseWriter, request *rest.Request) {
-				userAgent := request.Header.Get("User-Agent")
-				if userAgent == "" {
-					utils.RestErrorWrapperUser(writer, "No Access (DOS) - no UserAgent", "Incompatible Client; upgrade pantavisor", http.StatusForbidden)
-					return
-				}
-				app.handlePostDevice(writer, request)
-			})),
-		rest.Get("/#id", utils.ScopeFilter(readDevicesScopes, app.handleGetDevice)),
-		rest.Put("/#id", utils.ScopeFilter(writeDevicesScopes, app.handlePutDevice)),
-		rest.Patch("/#id", utils.ScopeFilter(writeDevicesScopes, app.handlePatchDevice)),
-		rest.Put("/#id/public", utils.ScopeFilter(writeDevicesScopes, app.handlePutPublic)),
-		rest.Delete("/#id/public", utils.ScopeFilter(writeDevicesScopes, app.handleDeletePublic)),
-		rest.Get("/#id/user-meta", utils.ScopeFilter(readDevicesScopes, app.handleGetUserData)),
-		rest.Put("/#id/user-meta", utils.ScopeFilter(writeDevicesScopes, app.handlePutUserData)),
-		rest.Patch("/#id/user-meta", utils.ScopeFilter(writeDevicesScopes, app.handlePatchUserData)),
-		rest.Put("/#id/device-meta", utils.ScopeFilter(writeDevicesScopes, app.handlePutDeviceData)),
-		rest.Patch("/#id/device-meta", utils.ScopeFilter(writeDevicesScopes, app.handlePatchDeviceData)),
-		rest.Delete("/#id", utils.ScopeFilter(writeDevicesScopes, app.handleDeleteDevice)),
-		// lookup by nick-path (np)
-		rest.Get("/np/#usernick/#devicenick", utils.ScopeFilter(readDevicesScopes, app.handleGetUserDevice)),
-	)
-	app.API.Use(&tracer.OtelMiddleware{
-		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
-		Router:      apiRouter,
-	})
-	app.API.SetApp(apiRouter)
-
-	return app
+	// default api
+	g.GET("/auth_status", echoutil.ScopeFilter(readDevicesScopes, handleAuth))
+	g.GET("/", echoutil.ScopeFilter(readDevicesScopes, app.handleGetDevices))
+	g.POST("/", echoutil.ScopeFilterOptionalAuth(writeDevicesScopes,
+		func(c *echo.Context) error {
+			userAgent := c.Request().Header.Get("User-Agent")
+			if userAgent == "" {
+				return echoutil.RestErrorWrapperUser(c, "No Access (DOS) - no UserAgent", "Incompatible Client; upgrade pantavisor", http.StatusForbidden)
+			}
+			return app.handlePostDevice(c)
+		}))
+	g.GET("/:id", echoutil.ScopeFilter(readDevicesScopes, app.handleGetDevice))
+	g.PUT("/:id", echoutil.ScopeFilter(writeDevicesScopes, app.handlePutDevice))
+	g.PATCH("/:id", echoutil.ScopeFilter(writeDevicesScopes, app.handlePatchDevice))
+	g.PUT("/:id/public", echoutil.ScopeFilter(writeDevicesScopes, app.handlePutPublic))
+	g.DELETE("/:id/public", echoutil.ScopeFilter(writeDevicesScopes, app.handleDeletePublic))
+	g.GET("/:id/user-meta", echoutil.ScopeFilter(readDevicesScopes, app.handleGetUserData))
+	g.PUT("/:id/user-meta", echoutil.ScopeFilter(writeDevicesScopes, app.handlePutUserData))
+	g.PATCH("/:id/user-meta", echoutil.ScopeFilter(writeDevicesScopes, app.handlePatchUserData))
+	g.PUT("/:id/device-meta", echoutil.ScopeFilter(writeDevicesScopes, app.handlePutDeviceData))
+	g.PATCH("/:id/device-meta", echoutil.ScopeFilter(writeDevicesScopes, app.handlePatchDeviceData))
+	g.DELETE("/:id", echoutil.ScopeFilter(writeDevicesScopes, app.handleDeleteDevice))
+	// lookup by nick-path (np)
+	g.GET("/np/:usernick/:devicenick", echoutil.ScopeFilter(readDevicesScopes, app.handleGetUserDevice))
 }

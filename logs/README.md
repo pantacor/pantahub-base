@@ -143,7 +143,6 @@ HTTP/1.1 200 OK
 Content-Length: 1999
 Content-Type: application/json; charset=utf-8
 Date: Sat, 03 Jun 2017 23:44:46 GMT
-X-Powered-By: go-json-rest
 
 {
     "count": 8,
@@ -189,7 +188,6 @@ HTTP/1.1 200 OK
 Content-Length: 1999
 Content-Type: application/json; charset=utf-8
 Date: Sat, 03 Jun 2017 23:44:46 GMT
-X-Powered-By: go-json-rest
 
 {
     "count": 1,
@@ -271,7 +269,6 @@ Date: Mon, 15 Oct 2018 09:10:50 GMT
 Server: nginx/1.13.5
 Strict-Transport-Security: max-age=15724800; includeSubDomains;
 Transfer-Encoding: chunked
-X-Powered-By: go-json-rest
 X-Runtime: 0.719266
 
 {

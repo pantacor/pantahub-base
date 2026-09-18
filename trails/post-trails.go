@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017-2023 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,10 +25,11 @@ import (
 
 	"context"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -50,35 +51,31 @@ type state map[string]interface{}
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /trails [post]
-func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
-	rContext := context.WithoutCancel(r.Context())
+func (a *App) handlePostTrail(c *echo.Context) error {
+	rContext := context.WithoutCancel(c.Request().Context())
 	initialState := map[string]interface{}{}
 
-	if err := r.DecodeJsonPayload(&initialState); err != nil {
-		utils.RestErrorWrapper(w, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
-		return
+	if err := echoutil.DecodeJsonPayload(c, &initialState); err != nil {
+		return echoutil.RestErrorWrapper(c, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
 	}
 
-	device, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	device, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in", http.StatusForbidden)
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+	authType, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["type"]
 
 	if authType != "DEVICE" {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in as a DEVICE to post new trails", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in as a DEVICE to post new trails", http.StatusForbidden)
 	}
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["owner"]
+	owner, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["owner"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "Device needs an owner", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Device needs an owner", http.StatusForbidden)
 	}
 	deviceID := prnGetID(device.(string))
 
@@ -86,8 +83,7 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 	newTrail := trailmodels.Trail{}
 	deviceObjectID, err := primitive.ObjectIDFromHex(deviceID)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 	}
 	newTrail.ID = deviceObjectID
 	newTrail.Owner = owner.(string)
@@ -96,7 +92,7 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 	newTrail.LastTouched = newTrail.LastInSync
 
 	autoLink := true
-	autolinkValue, ok := r.URL.Query()["autolink"]
+	autolinkValue, ok := c.Request().URL.Query()["autolink"]
 	if ok && autolinkValue[0] == "no" {
 		autoLink = false
 	}
@@ -105,8 +101,7 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 	defer cancel()
 	objectList, err := ProcessObjectsInState(ctx, newTrail.Owner, initialState, autoLink, a)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error processing trail objects in factory-state:"+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error processing trail objects in factory-state:"+err.Error(), http.StatusInternalServerError)
 	}
 	newTrail.UsedObjects = objectList
 	newTrail.FactoryState = utils.BsonQuoteMap(&initialState)
@@ -117,8 +112,7 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 	newStep.Rev = 0
 	stateSha, err := utils.StateSha(&initialState)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error calculating state sha"+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error calculating state sha"+err.Error(), http.StatusInternalServerError)
 	}
 	newStep.StateSha = stateSha
 	newStep.Owner = newTrail.Owner
@@ -145,24 +139,21 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 	defer cancel()
 	isDevicePublic, err := a.IsDevicePublic(ctx, newStep.TrailID)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error checking device is public or not:"+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error checking device is public or not:"+err.Error(), http.StatusInternalServerError)
 	}
 	newStep.IsPublic = isDevicePublic
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_trails")
 
 	if collection == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
 	ctx, cancel = context.WithTimeout(rContext, 10*time.Second)
 	defer cancel()
 	objectList, err = ProcessObjectsInState(ctx, newStep.Owner, initialState, autoLink, a)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error processing step objects in state: "+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error processing step objects in state: "+err.Error(), http.StatusInternalServerError)
 	}
 	newStep.UsedObjects = objectList
 	newStep.State = utils.BsonQuoteMap(&initialState)
@@ -175,15 +166,13 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 		newTrail,
 	)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error inserting trail into database "+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error inserting trail into database "+err.Error(), http.StatusInternalServerError)
 	}
 
 	collection = a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
 	if collection == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 	ctx, cancel = context.WithTimeout(rContext, 10*time.Second)
 	defer cancel()
@@ -193,10 +182,9 @@ func (a *App) handlePostTrail(w rest.ResponseWriter, r *rest.Request) {
 	)
 
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error inserting step into database "+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error inserting step into database "+err.Error(), http.StatusInternalServerError)
 	}
 
 	newTrail.FactoryState = utils.BsonUnquoteMap(&newTrail.FactoryState)
-	w.WriteJson(newTrail)
+	return echoutil.WriteJSON(c, http.StatusOK, newTrail)
 }

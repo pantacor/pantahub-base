@@ -1,5 +1,5 @@
 //
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,10 +24,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/golang-jwt/jwt/v5"
-	jwt "gitlab.com/pantacor/pantahub-base/utils/jwtmiddleware"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 )
 
 // stubBackend returns a fixed page, standing in for Elasticsearch.
@@ -47,47 +48,6 @@ func (s *stubBackend) postLogs(context.Context, []Entry, bool) error { return ni
 func (s *stubBackend) register() error                               { return nil }
 func (s *stubBackend) unregister(bool) error                         { return nil }
 
-// testResponseWriter is a minimal rest.ResponseWriter over httptest.Recorder;
-// the library exposes no constructor for one.
-type testResponseWriter struct {
-	recorder *httptest.ResponseRecorder
-	wroteHdr bool
-}
-
-func (w *testResponseWriter) Header() http.Header { return w.recorder.Header() }
-
-func (w *testResponseWriter) EncodeJson(v interface{}) ([]byte, error) {
-	return json.Marshal(v)
-}
-
-func (w *testResponseWriter) WriteJson(v interface{}) error {
-	encoded, err := w.EncodeJson(v)
-	if err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	_, err = w.Write(encoded)
-	return err
-}
-
-func (w *testResponseWriter) Write(b []byte) (int, error) {
-	if !w.wroteHdr {
-		w.WriteHeader(http.StatusOK)
-	}
-	return w.recorder.Write(b)
-}
-
-func (w *testResponseWriter) WriteHeader(code int) {
-	w.wroteHdr = true
-	w.recorder.WriteHeader(code)
-}
-
-func (w *testResponseWriter) Count() uint64 { return uint64(w.recorder.Body.Len()) }
-
-func newTestWriter(recorder *httptest.ResponseRecorder) *testResponseWriter {
-	return &testResponseWriter{recorder: recorder}
-}
-
 // The error paths log through fluentd, which is not running in a unit test;
 // an explicitly empty port makes utils' logger a no-op (GetEnv uses LookupEnv,
 // so an empty value wins over the built-in default).
@@ -99,26 +59,25 @@ func withoutFluent(t *testing.T) {
 func testApp(backend Backend) *App {
 	return &App{
 		backend: backend,
-		jwtMiddleware: &jwt.JWTMiddleware{
+		jwtConfig: &jwtauth.Config{
 			Key:              []byte("test-signing-key"),
 			SigningAlgorithm: "HS256",
 		},
 	}
 }
 
-func getLogsRequest(t *testing.T, target string) *rest.Request {
+func getLogsRequest(t *testing.T, target string) (*echo.Context, *httptest.ResponseRecorder) {
 	t.Helper()
 
 	req := httptest.NewRequest(http.MethodGet, target, nil)
-	return &rest.Request{
-		Request: req,
-		Env: map[string]interface{}{
-			"JWT_PAYLOAD": jwtgo.MapClaims{
-				"type": "USER",
-				"prn":  "prn:::accounts:/testowner",
-			},
-		},
-	}
+	e := echo.New()
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set(echoutil.KeyJWTPayload, jwtgo.MapClaims{
+		"type": "USER",
+		"prn":  "prn:::accounts:/testowner",
+	})
+	return c, rec
 }
 
 // A caller that asks for a cursor must always be handed one back, including
@@ -141,9 +100,8 @@ func TestHandleGetLogsAlwaysReturnsCursorWhenAsked(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			app := testApp(&stubBackend{entries: tc.entries, nextCursor: tc.next})
 
-			recorder := httptest.NewRecorder()
-			writer := newTestWriter(recorder)
-			app.handleGetLogs(writer, getLogsRequest(t, "/logs/?cursor=true&page=50"))
+			c, recorder := getLogsRequest(t, "/logs/?cursor=true&page=50")
+			_ = app.handleGetLogs(c)
 
 			if recorder.Code != http.StatusOK {
 				t.Fatalf("expected 200, got %d: %s", recorder.Code, recorder.Body.String())
@@ -165,9 +123,8 @@ func TestHandleGetLogsAlwaysReturnsCursorWhenAsked(t *testing.T) {
 func TestHandleGetLogsOmitsCursorWhenNotAsked(t *testing.T) {
 	app := testApp(&stubBackend{entries: []*Entry{{LogText: "hello"}}})
 
-	recorder := httptest.NewRecorder()
-	writer := newTestWriter(recorder)
-	app.handleGetLogs(writer, getLogsRequest(t, "/logs/?page=50"))
+	c, recorder := getLogsRequest(t, "/logs/?page=50")
+	_ = app.handleGetLogs(c)
 
 	var pager Pager
 	if err := json.Unmarshal(recorder.Body.Bytes(), &pager); err != nil {
@@ -185,9 +142,8 @@ func TestHandleGetLogsCursorRejectsEmptyCursorAsBadRequest(t *testing.T) {
 
 	app := testApp(&stubBackend{})
 
-	recorder := httptest.NewRecorder()
-	writer := newTestWriter(recorder)
-	app.handleGetLogsCursor(writer, getLogsRequest(t, "/logs/cursor"))
+	c, recorder := getLogsRequest(t, "/logs/cursor")
+	_ = app.handleGetLogsCursor(c)
 
 	if recorder.Code != http.StatusBadRequest {
 		t.Errorf("expected 400 for a missing cursor, got %d (403 reads as expired auth to clients)", recorder.Code)

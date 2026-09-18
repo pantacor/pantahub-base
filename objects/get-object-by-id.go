@@ -1,4 +1,4 @@
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,8 +22,9 @@ import (
 
 	jwtgo "github.com/golang-jwt/jwt/v5"
 
-	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -40,45 +41,41 @@ import (
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /objects/{id} [get]
-func (a *App) handleGetObject(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetObject(c *echo.Context) error {
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["owner"]
+	owner, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["owner"]
 	if !ok {
-		owner, ok = r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+		owner, ok = c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"]
 		// XXX: find right error
 		if !ok {
-			utils.RestErrorWrapper(w, "You need to be logged in as USER or DEVICE with owner", http.StatusForbidden)
-			return
+			return echoutil.RestErrorWrapper(c, "You need to be logged in as USER or DEVICE with owner", http.StatusForbidden)
 		}
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 
 	if collection == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
 	ownerStr, ok := owner.(string)
 
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "Invalid Access", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Invalid Access", http.StatusForbidden)
 	}
 
-	objID := r.PathParam("id")
+	objID := c.Param("id")
 	sha, err := utils.DecodeSha256HexString(objID)
 
 	if err != nil {
-		utils.RestErrorWrapper(w, "Get New Object :id must be a valid sha256", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Get New Object :id must be a valid sha256", http.StatusBadRequest)
 	}
 
 	storageID := MakeStorageID(ownerStr, sha)
 
 	var filesObj Object
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	err = collection.FindOne(ctx, bson.M{
 		"_id":     storageID,
@@ -86,25 +83,23 @@ func (a *App) handleGetObject(w rest.ResponseWriter, r *rest.Request) {
 	}).Decode(&filesObj)
 
 	if err != nil {
-		utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "No Access", http.StatusForbidden)
 	}
 
 	// XXX: fixme; needs delegation of authorization for device accessing its resources
 	// could be subscriptions, but also something else
 	if filesObj.Owner != owner {
-		utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "No Access", http.StatusForbidden)
 	}
 
 	issuerURL := utils.GetAPIEndpoint("/objects")
 	filesObjWithAccess := MakeObjAccessible(issuerURL, ownerStr, filesObj, storageID)
 
 	if filesObj.LinkedObject != "" {
-		w.Header().Add(HttpHeaderPantahubObjectType, ObjectTypeLink)
+		c.Response().Header().Add(HttpHeaderPantahubObjectType, ObjectTypeLink)
 	} else {
-		w.Header().Add(HttpHeaderPantahubObjectType, ObjectTypeObject)
+		c.Response().Header().Add(HttpHeaderPantahubObjectType, ObjectTypeObject)
 	}
 
-	w.WriteJson(filesObjWithAccess)
+	return echoutil.WriteJSON(c, http.StatusOK, filesObjWithAccess)
 }

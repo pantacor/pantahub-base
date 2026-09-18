@@ -1,0 +1,86 @@
+{
+  "TestRoutingEdgeCasesMatchGoJSONRest/OPTIONS_without_a_route|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}",
+    "Allow": ""
+  },
+  "TestRoutingEdgeCasesMatchGoJSONRest/encoded_slash_in_param_passes_through|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"abc%2Fextra\"",
+    "Allow": ""
+  },
+  "TestRoutingEdgeCasesMatchGoJSONRest/encoded_traversal_in_param_passes_through|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"..%2F..%2Fsecret\"",
+    "Allow": ""
+  },
+  "TestRoutingEdgeCasesMatchGoJSONRest/handler_panic|gjr": {
+    "Status": 500,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Internal Server Error\"}",
+    "Allow": ""
+  },
+  "TestRoutingEdgeCasesMatchGoJSONRest/known_param_path,_wrong_method|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}",
+    "Allow": ""
+  },
+  "TestRoutingEdgeCasesMatchGoJSONRest/known_path,_wrong_method|gjr": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Method not allowed\"}",
+    "Allow": ""
+  },
+  "TestRoutingEdgeCasesMatchGoJSONRest/match|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "[\"a\"]",
+    "Allow": ""
+  },
+  "TestRoutingEdgeCasesMatchGoJSONRest/param_swallowing_several_segments|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}",
+    "Allow": ""
+  },
+  "TestRoutingEdgeCasesMatchGoJSONRest/param_with_trailing_slash|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}",
+    "Allow": ""
+  },
+  "TestRoutingEdgeCasesMatchGoJSONRest/path_parameter|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"abc123\"",
+    "Allow": ""
+  },
+  "TestRoutingEdgeCasesMatchGoJSONRest/second_method_on_same_path|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"created\"",
+    "Allow": ""
+  },
+  "TestRoutingEdgeCasesMatchGoJSONRest/trailing_slash_is_a_different_path|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}",
+    "Allow": ""
+  },
+  "TestRoutingEdgeCasesMatchGoJSONRest/unknown_nested_path|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}",
+    "Allow": ""
+  },
+  "TestRoutingEdgeCasesMatchGoJSONRest/unknown_path|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}",
+    "Allow": ""
+  }
+}

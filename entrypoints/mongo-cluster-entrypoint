@@ -14,12 +14,12 @@ chmod 600 /keys/mongokey.yaml
     sleep 2
   done
 
+  # Single-node replica set: change streams (Kafka Connect, watch()) need a replica set, but one
+  # member is enough locally and uses a third of the disk (three members = three full copies).
   replicaSet="{
     \"_id\": \"${MONGO_RS}\",
     \"members\": [
-      { \"_id\": 0, \"host\": \"mongo:27017\" },
-      { \"_id\": 1, \"host\": \"mongo2:30002\" },
-      { \"_id\": 2, \"host\": \"mongo3:30003\" }
+      { \"_id\": 0, \"host\": \"mongo:27017\" }
     ]
   }"
 
@@ -77,4 +77,6 @@ chmod 600 /keys/mongokey.yaml
 ) &
 
 # Execute mongod as main process
-exec mongod --keyFile /keys/mongokey.yaml --transitionToAuth --port ${MONGO_PORT} --replSet ${MONGO_RS} --bind_ip_all --oplogSize ${MONGO_OPLOG_SIZE_MB:-990} "$@"
+# mirrorReads samplingRate 0: with a single member there is no secondary to mirror reads to, and
+# MirrorMaestro otherwise retries removed hosts once a second forever.
+exec mongod --keyFile /keys/mongokey.yaml --transitionToAuth --port ${MONGO_PORT} --replSet ${MONGO_RS} --bind_ip_all --oplogSize ${MONGO_OPLOG_SIZE_MB:-990} --setParameter mirrorReads='{samplingRate: 0.0}' "$@"

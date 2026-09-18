@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017-2023 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,10 +25,11 @@ import (
 
 	"context"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -47,33 +48,30 @@ import (
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /trails/{id}/steps/{rev}/meta [put]
-func (a *App) handlePutStepMeta(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePutStepMeta(c *echo.Context) error {
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	owner, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in", http.StatusForbidden)
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+	authType, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["type"]
 
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 	if coll == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
 	step := trailmodels.Step{}
-	trailID := r.PathParam("id")
-	rev := r.PathParam("rev")
+	trailID := c.Param("id")
+	rev := c.Param("rev")
 
 	if authType != "USER" && authType != "SESSION" {
-		utils.RestErrorWrapper(w, "Need to be logged in as USER/SESSION user to put step meta", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Need to be logged in as USER/SESSION user to put step meta", http.StatusForbidden)
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	err := coll.FindOne(ctx, bson.M{
 		"_id":     trailID + "-" + rev,
@@ -81,34 +79,30 @@ func (a *App) handlePutStepMeta(w rest.ResponseWriter, r *rest.Request) {
 	}).Decode(&step)
 
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error with accessing data: "+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with accessing data: "+err.Error(), http.StatusInternalServerError)
 	}
 
 	if step.Owner != owner {
-		utils.RestErrorWrapper(w, "No write access to step meta", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "No write access to step meta", http.StatusForbidden)
 	}
 
 	metaMap := map[string]interface{}{}
-	err = r.DecodeJsonPayload(&metaMap)
+	err = echoutil.DecodeJsonPayload(c, &metaMap)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error with request: "+err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with request: "+err.Error(), http.StatusBadRequest)
 	}
 
 	step.Meta = utils.BsonQuoteMap(&metaMap)
 
 	step.TimeModified = time.Now()
 
-	isDevicePublic, err := a.IsDevicePublic(r.Context(), step.TrailID)
+	isDevicePublic, err := a.IsDevicePublic(c.Request().Context(), step.TrailID)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error checking device is public or not:"+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error checking device is public or not:"+err.Error(), http.StatusInternalServerError)
 	}
 	step.IsPublic = isDevicePublic
 
-	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel = context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	updateResult, err := coll.UpdateOne(
 		ctx,
@@ -120,15 +114,13 @@ func (a *App) handlePutStepMeta(w rest.ResponseWriter, r *rest.Request) {
 		bson.M{"$set": step},
 	)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error updating step meta: "+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error updating step meta: "+err.Error(), http.StatusInternalServerError)
 	}
 
 	if updateResult.MatchedCount == 0 {
-		utils.RestErrorWrapper(w, "Error updating step meta: not found", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Error updating step meta: not found", http.StatusBadRequest)
 	}
 
 	step.Meta = utils.BsonUnquoteMap(&step.Meta)
-	w.WriteJson(step.Meta)
+	return echoutil.WriteJSON(c, http.StatusOK, step.Meta)
 }

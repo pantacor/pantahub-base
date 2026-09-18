@@ -1,4 +1,4 @@
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,11 +18,9 @@ package utils
 
 import (
 	"fmt"
-	"net/http"
 	"reflect"
 	"strings"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/gosimple/slug"
 )
 
@@ -232,76 +230,17 @@ func InitScopes() {
 	}
 }
 
-type ScopeFilterMiddleware struct {
-	filterTypes []Scope
-}
-
-func (m *ScopeFilterMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFunc {
-	return ScopeFilter(m.filterTypes, handler)
-}
-
-func InitScopeFilterMiddleware(filterTypes []Scope) *ScopeFilterMiddleware {
-	return &ScopeFilterMiddleware{
-		filterTypes,
-	}
-}
-
-// ScopeFilter :  Scope Filter for end points
-func ScopeFilter(filterScopes []Scope, handler rest.HandlerFunc) rest.HandlerFunc {
-	parsedFilterScopes := MarshalScopes(filterScopes)
-
-	return func(w rest.ResponseWriter, r *rest.Request) {
-		authInfo := GetAuthInfo(r)
-		if authInfo == nil {
-			RestErrorWrapper(w, "Authentication Required", http.StatusUnauthorized)
-			return
-		}
-		if len(parsedFilterScopes) > 0 {
-			if !MatchScope(parsedFilterScopes, authInfo.Scopes) {
-				phAuth := GetEnv(EnvPantahubAuth)
-				w.Header().Set("WWW-Authenticate", `Bearer Realm="pantahub services",
-								ph-aeps="`+phAuth+`",
-								scope="`+strings.Join(parsedFilterScopes, " ")+`",
+// ScopeChallenge is the WWW-Authenticate value for insufficient scopes; shared
+// with utils/echoutil so both frameworks send the same bytes.
+func ScopeChallenge(parsedFilterScopes []string) string {
+	phAuth := GetEnv(EnvPantahubAuth)
+	return `Bearer Realm="pantahub services",
+								ph-aeps="` + phAuth + `",
+								scope="` + strings.Join(parsedFilterScopes, " ") + `",
 								error="insufficient_scope",
 								error_description="The request requires higher privileges than provided by the
 				     access token"
-								`)
-				RestErrorWrapper(w, "InSufficient Scopes", http.StatusForbidden)
-				return
-			}
-		}
-		handler(w, r)
-	}
-}
-
-// ScopeFilterOptionalAuth behaves like ScopeFilter for authenticated callers
-// (the scope requirement is enforced) but lets UNAUTHENTICATED requests through.
-// It is only for endpoints that intentionally allow anonymous access, such as
-// device self-registration (POST /devices/): a device registers itself with no
-// credentials, is created unclaimed, and is later claimed by its owner (or
-// garbage-collected if never claimed); with an auto-join token it is claimed on
-// registration. Do NOT use this for endpoints that must require authentication.
-func ScopeFilterOptionalAuth(filterScopes []Scope, handler rest.HandlerFunc) rest.HandlerFunc {
-	parsedFilterScopes := MarshalScopes(filterScopes)
-
-	return func(w rest.ResponseWriter, r *rest.Request) {
-		authInfo := GetAuthInfo(r)
-		if authInfo != nil && len(parsedFilterScopes) > 0 {
-			if !MatchScope(parsedFilterScopes, authInfo.Scopes) {
-				phAuth := GetEnv(EnvPantahubAuth)
-				w.Header().Set("WWW-Authenticate", `Bearer Realm="pantahub services",
-								ph-aeps="`+phAuth+`",
-								scope="`+strings.Join(parsedFilterScopes, " ")+`",
-								error="insufficient_scope",
-								error_description="The request requires higher privileges than provided by the
-				     access token"
-								`)
-				RestErrorWrapper(w, "InSufficient Scopes", http.StatusForbidden)
-				return
-			}
-		}
-		handler(w, r)
-	}
+								`
 }
 
 // MatchScope serch one scope in all the available scopes

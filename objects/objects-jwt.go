@@ -1,5 +1,5 @@
 //
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -119,18 +119,8 @@ func (o *ObjectAccessToken) Sign() (string, error) {
 	return o.SignedString(utils.GetObjectTokenSecret())
 }
 
-// StorageID returns the single audience carried by an object access token,
-// which the file servers use as the on-disk / in-bucket object name.
-//
-// dgrijalva/jwt-go v3 modelled Audience as a plain string and callers used it
-// directly. golang-jwt/v5 models it as ClaimStrings, so this accessor restores
-// the v3 shape at the points where it is consumed.
-//
-// NewObjectAccessToken always mints exactly one audience, so any other count is
-// a malformed or hand-crafted token. It returns ok=false rather than an empty
-// string on its own, because an empty storage id would make path.Join resolve
-// to the containing directory instead of an object -- callers must reject it,
-// not paper over it.
+// StorageID returns the token's single audience (the storage id). ok is false
+// otherwise: an empty id would make path.Join resolve to the directory.
 func (c ObjectAccessClaims) StorageID() (string, bool) {
 	if len(c.Audience) != 1 || c.Audience[0] == "" {
 		return "", false

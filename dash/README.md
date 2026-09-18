@@ -27,7 +27,6 @@ HTTP/1.1 200 OK
 Content-Length: 1239
 Content-Type: application/json; charset=utf-8
 Date: Wed, 12 Jul 2017 15:35:08 GMT
-X-Powered-By: go-json-rest
 
 {
     "nick": "user1",

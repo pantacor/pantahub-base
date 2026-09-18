@@ -56,7 +56,6 @@ Content-Length: 256
 Content-Type: application/json; charset=utf-8
 Date: Fri, 19 Aug 2016 12:11:03 GMT
 X-Auth-Accesstoken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhYnJuIjoiYWJybjphYmNpZS54eXo6YXV0aDovdXNlcjEiLCJleHAiOjE0NzE2MTIyNjMsImlkIjoidXNlcjEiLCJvcmlnX2lhdCI6MTQ3MTYwODY2Mywicm9sZXMiOiJ1c2VyIiwidHlwZSI6IlVTRVIifQ.Fdwmbphn_OA7nBe9jWvWbfCbuiKcBtD0rQqEoZFBIRk
-X-Powered-By: go-json-rest
 
 {
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhYnJuIjoiYWJybjphYmNpZS54eXo6YXV0aDovdXNlcjEiLCJleHAiOjE0NzE2MTIyNjMsImlkIjoidXNlcjEiLCJvcmlnX2lhdCI6MTQ3MTYwODY2Mywicm9sZXMiOiJ1c2VyIiwidHlwZSI6IlVTRVIifQ.Fdwmbphn_OA7nBe9jWvWbfCbuiKcBtD0rQqEoZFBIRk"
@@ -98,7 +97,6 @@ Content-Length: 256
 Content-Type: application/json; charset=utf-8
 Date: Wed, 28 Sep 2016 11:22:57 GMT
 X-Auth-Accesstoken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhYnJuIjoiYWJybjphYmNpZS54eXo6YXV0aDovdXNlcjEiLCJleHAiOjE0NzUwNjUzNzcsImlkIjoidXNlcjEiLCJvcmlnX2lhdCI6MTQ3NTA2MTI5Mywicm9sZXMiOiJ1c2VyIiwidHlwZSI6IlVTRVIifQ.R2Em_nvxzYq--EBAEXW3WKTo558PN_VwmAc4TVJ_-ek
-X-Powered-By: go-json-rest
 
 {
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhYnJuIjoiYWJybjphYmNpZS54eXo6YXV0aDovdXNlcjEiLCJleHAiOjE0NzUwNjUzNzcsImlkIjoidXNlcjEiLCJvcmlnX2lhdCI6MTQ3NTA2MTI5Mywicm9sZXMiOiJ1c2VyIiwidHlwZSI6IlVTRVIifQ.R2Em_nvxzYq--EBAEXW3WKTo558PN_VwmAc4TVJ_-ek"
@@ -119,7 +117,6 @@ Content-Length: 376
 Content-Type: application/json; charset=utf-8
 Date: Wed, 28 Sep 2016 16:04:07 GMT
 X-Auth-Accesstoken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhYnJuIjoiYWJybjo6OmRldmljZXM6LzU3ZWJhYWRkYzA5NGY2MTg4ZDAwMDAwMiIsImV4cCI6MTQ3NTA4MjI0NywiaWQiOiJhYnJuOjo6ZGV2aWNlczovNTdlYmFhZGRjMDk0ZjYxODhkMDAwMDAyIiwib3JpZ19pYXQiOjE0NzUwNzg2NDcsIm93bmVyIjoiYWJybjphYmNpZS54eXo6YXV0aDovdXNlcjEiLCJyb2xlcyI6ImRldmljZSIsInR5cGUiOiJERVZJQ0UifQ.7_lwQB2mk-ZvuLrNzbk1Wg_UxGe5QQp9Nr9YbhEPq8w
-X-Powered-By: go-json-rest
 
 {
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhYnJuIjoiYWJybjo6OmRldmljZXM6LzU3ZWJhYWRkYzA5NGY2MTg4ZDAwMDAwMiIsImV4cCI6MTQ3NTA4MjI0NywiaWQiOiJhYnJuOjo6ZGV2aWNlczovNTdlYmFhZGRjMDk0ZjYxODhkMDAwMDAyIiwib3JpZ19pYXQiOjE0NzUwNzg2NDcsIm93bmVyIjoiYWJybjphYmNpZS54eXo6YXV0aDovdXNlcjEiLCJyb2xlcyI6ImRldmljZSIsInR5cGUiOiJERVZJQ0UifQ.7_lwQB2mk-ZvuLrNzbk1Wg_UxGe5QQp9Nr9YbhEPq8w"
@@ -166,7 +163,6 @@ HTTP/1.1 200 OK
 Content-Length: 243
 Content-Type: application/json; charset=utf-8
 Date: Wed, 20 Feb 2019 23:39:45 GMT
-X-Powered-By: go-json-rest
 X-Runtime: 0.000000
 
 {
@@ -196,7 +192,6 @@ HTTP/1.1 200 OK
 Content-Type: application/json; charset=utf-8
 Date: Mon, 18 Mar 2019 09:49:08 GMT
 Transfer-Encoding: chunked
-X-Powered-By: go-json-rest
 X-Runtime: 0.006500
 
 [
@@ -223,7 +218,6 @@ HTTP/1.1 200 OK
 Content-Length: 469
 Content-Type: application/json; charset=utf-8
 Date: Mon, 18 Mar 2019 09:53:08 GMT
-X-Powered-By: go-json-rest
 X-Runtime: 0.000183
 
 {
@@ -251,7 +245,6 @@ HTTP/1.1 200 OK
 Content-Length: 279
 Content-Type: application/json; charset=utf-8
 Date: Wed, 06 Mar 2019 13:38:42 GMT
-X-Powered-By: go-json-rest
 X-Runtime: 0.000193
 
 {

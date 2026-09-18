@@ -1,4 +1,4 @@
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,11 +33,11 @@ import (
 	"time"
 
 	jwtgo "github.com/golang-jwt/jwt/v5"
-	jwt "gitlab.com/pantacor/pantahub-base/utils/jwtmiddleware"
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
 	"gitlab.com/pantacor/pantahub-base/auth/storage"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -298,7 +298,7 @@ func PendingTokenTimeout() time.Duration {
 // between the successful password step and the second factor. Signed with
 // the same key as session tokens but structurally unusable as one (see
 // MFAPendingClaims).
-func CreateMFAPendingToken(jwtMiddleware *jwt.JWTMiddleware, username, prn, scope string, amr, methods []string) (string, error) {
+func CreateMFAPendingToken(jwtConfig *jwtauth.Config, username, prn, scope string, amr, methods []string) (string, error) {
 	jti := make([]byte, 16)
 	if _, err := rand.Read(jti); err != nil {
 		return "", err
@@ -319,24 +319,24 @@ func CreateMFAPendingToken(jwtMiddleware *jwt.JWTMiddleware, username, prn, scop
 		},
 	}
 
-	token := jwtgo.NewWithClaims(jwtgo.GetSigningMethod(jwtMiddleware.SigningAlgorithm), claims)
-	return token.SignedString(jwtMiddleware.Key)
+	token := jwtgo.NewWithClaims(jwtgo.GetSigningMethod(jwtConfig.SigningAlgorithm), claims)
+	return token.SignedString(jwtConfig.Key)
 }
 
 // ParseMFAPendingToken validates signature, expiry and purpose of an
 // MFA-pending token. jti single-use enforcement is the caller's job (via
 // MFARepo.ConsumeJTI on success).
-func ParseMFAPendingToken(jwtMiddleware *jwt.JWTMiddleware, tokenString string) (*MFAPendingClaims, error) {
+func ParseMFAPendingToken(jwtConfig *jwtauth.Config, tokenString string) (*MFAPendingClaims, error) {
 	claims := &MFAPendingClaims{}
 
 	token, err := jwtgo.ParseWithClaims(tokenString, claims, func(t *jwtgo.Token) (interface{}, error) {
-		if t.Method.Alg() != jwtMiddleware.SigningAlgorithm {
+		if t.Method.Alg() != jwtConfig.SigningAlgorithm {
 			return nil, fmt.Errorf("unexpected signing method: %s", t.Method.Alg())
 		}
-		if strings.HasPrefix(jwtMiddleware.SigningAlgorithm, "HS") {
-			return jwtMiddleware.Key, nil
+		if strings.HasPrefix(jwtConfig.SigningAlgorithm, "HS") {
+			return jwtConfig.Key, nil
 		}
-		return jwtMiddleware.Pub, nil
+		return jwtConfig.Pub, nil
 	})
 	if err != nil || !token.Valid {
 		return nil, ErrInvalidPendingToken
@@ -354,7 +354,7 @@ func ParseMFAPendingToken(jwtMiddleware *jwt.JWTMiddleware, tokenString string) 
 // is valid (for the same TTL) for the handful of management calls a user
 // makes in one sitting, mirroring GitHub's "sudo mode". Structurally unusable
 // as a session for the same reason as the pending token (no prn/type claims).
-func CreateSudoToken(jwtMiddleware *jwt.JWTMiddleware, prn, factor string) (string, error) {
+func CreateSudoToken(jwtConfig *jwtauth.Config, prn, factor string) (string, error) {
 	now := time.Now()
 	claims := &MFAPendingClaims{
 		TokenUse: MFASudoTokenUse,
@@ -365,23 +365,23 @@ func CreateSudoToken(jwtMiddleware *jwt.JWTMiddleware, prn, factor string) (stri
 			ExpiresAt: jwtgo.NewNumericDate(now.Add(PendingTokenTimeout())),
 		},
 	}
-	token := jwtgo.NewWithClaims(jwtgo.GetSigningMethod(jwtMiddleware.SigningAlgorithm), claims)
-	return token.SignedString(jwtMiddleware.Key)
+	token := jwtgo.NewWithClaims(jwtgo.GetSigningMethod(jwtConfig.SigningAlgorithm), claims)
+	return token.SignedString(jwtConfig.Key)
 }
 
 // ParseSudoToken validates signature, expiry and purpose of a sudo token and
 // returns the account PRN it authorizes.
-func ParseSudoToken(jwtMiddleware *jwt.JWTMiddleware, tokenString string) (*MFAPendingClaims, error) {
+func ParseSudoToken(jwtConfig *jwtauth.Config, tokenString string) (*MFAPendingClaims, error) {
 	claims := &MFAPendingClaims{}
 
 	token, err := jwtgo.ParseWithClaims(tokenString, claims, func(t *jwtgo.Token) (interface{}, error) {
-		if t.Method.Alg() != jwtMiddleware.SigningAlgorithm {
+		if t.Method.Alg() != jwtConfig.SigningAlgorithm {
 			return nil, fmt.Errorf("unexpected signing method: %s", t.Method.Alg())
 		}
-		if strings.HasPrefix(jwtMiddleware.SigningAlgorithm, "HS") {
-			return jwtMiddleware.Key, nil
+		if strings.HasPrefix(jwtConfig.SigningAlgorithm, "HS") {
+			return jwtConfig.Key, nil
 		}
-		return jwtMiddleware.Pub, nil
+		return jwtConfig.Pub, nil
 	})
 	if err != nil || !token.Valid {
 		return nil, ErrInvalidPendingToken

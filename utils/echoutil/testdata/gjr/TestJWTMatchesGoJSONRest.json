@@ -1,0 +1,83 @@
+{
+  "TestJWTMatchesGoJSONRest/empty_bearer|gjr": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "WWWAuth": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Reached": false,
+    "RemoteUser": null,
+    "Nick": null
+  },
+  "TestJWTMatchesGoJSONRest/expired|gjr": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "WWWAuth": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Reached": false,
+    "RemoteUser": null,
+    "Nick": null
+  },
+  "TestJWTMatchesGoJSONRest/garbage_token|gjr": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "WWWAuth": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Reached": false,
+    "RemoteUser": null,
+    "Nick": null
+  },
+  "TestJWTMatchesGoJSONRest/lowercase_bearer|gjr": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "WWWAuth": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Reached": false,
+    "RemoteUser": null,
+    "Nick": null
+  },
+  "TestJWTMatchesGoJSONRest/no_header|gjr": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "WWWAuth": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Reached": false,
+    "RemoteUser": null,
+    "Nick": null
+  },
+  "TestJWTMatchesGoJSONRest/scheme_only|gjr": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "WWWAuth": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Reached": false,
+    "RemoteUser": null,
+    "Nick": null
+  },
+  "TestJWTMatchesGoJSONRest/valid|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"ok\":\"yes\"}",
+    "WWWAuth": "",
+    "Reached": true,
+    "RemoteUser": "user1",
+    "Nick": "user1nick"
+  },
+  "TestJWTMatchesGoJSONRest/wrong_scheme|gjr": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "WWWAuth": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Reached": false,
+    "RemoteUser": null,
+    "Nick": null
+  },
+  "TestJWTMatchesGoJSONRest/wrong_signing_key|gjr": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "WWWAuth": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Reached": false,
+    "RemoteUser": null,
+    "Nick": null
+  }
+}

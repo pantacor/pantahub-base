@@ -1,5 +1,5 @@
 //
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,28 +18,20 @@ package metrics
 
 import (
 	"log"
-	"net/http"
 	"os"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwt "gitlab.com/pantacor/pantahub-base/utils/jwtmiddleware"
+	"github.com/labstack/echo/v5"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gitlab.com/pantacor/pantahub-base/utils"
-	"gitlab.com/pantacor/pantahub-base/utils/tracer"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // App metrics rest application
 type App struct {
-	jwtMiddleware *jwt.JWTMiddleware
-	API           *rest.Api
-	mongoClient   *mongo.Client
-}
-
-// RestRequestResponseAdapter rest responder adapter
-type RestRequestResponseAdapter struct {
-	Request  *rest.Request
-	Response rest.ResponseWriter
+	jwtConfig   *jwtauth.Config
+	mongoClient *mongo.Client
 }
 
 // handleGetMetrics Get API metrics
@@ -53,54 +45,39 @@ type RestRequestResponseAdapter struct {
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /metrics [get]
-func (a *App) handleGetMetrics(w rest.ResponseWriter, r *rest.Request) {
-	var httpResp http.ResponseWriter = w
-
-	handler := promhttp.Handler()
-	handler.ServeHTTP(httpResp, r.Request)
+func (a *App) handleGetMetrics(c *echo.Context) error {
+	promhttp.Handler().ServeHTTP(c.Response(), c.Request())
+	return nil
 }
 
 // New create a new metrics rest application
-func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
-	app := new(App)
-	app.jwtMiddleware = jwtMiddleware
-	app.mongoClient = mongoClient
+func New(jwtConfig *jwtauth.Config, mongoClient *mongo.Client) *App {
+	return &App{jwtConfig: jwtConfig, mongoClient: mongoClient}
+}
 
-	app.API = rest.NewApi()
-	// we dont use default stack because we dont want content type enforcement
-	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
-		"/metrics:", log.Lshortfile)})
-	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "metrics"})
+// Mount registers metrics on echo.
+func (app *App) Mount(s *echoutil.Server) {
+	const prefix = "/metrics"
 
-	app.API.Use(rest.DefaultCommonStack...)
-	app.API.Use(&rest.CorsMiddleware{
-		RejectNonCorsRequests: false,
-		OriginValidator: func(origin string, request *rest.Request) bool {
-			return true
-		},
-		AllowedMethods: []string{"GET", "OPTIONS"},
-		AllowedHeaders: []string{
-			"Accept", "Content-Type", "X-Custom-Header", "Origin", "Authorization"},
-		AccessControlAllowCredentials: true,
-		AccessControlMaxAge:           3600,
-	})
-
-	app.API.Use(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtMiddleware, Mongo: app.mongoClient})
-	app.API.Use(app.jwtMiddleware)
-
-	// /auth_status endpoints
-	apiRouter, _ := rest.MakeRouter(
-		// default api
-		rest.Get("/", utils.ScopeFilter(
-			[]utils.Scope{utils.Scopes.API, utils.Scopes.Metrics, utils.Scopes.ReadMetrics},
-			app.handleGetMetrics),
-		),
+	g := s.Mount(prefix,
+		echoutil.AccessLogJSON(log.New(os.Stdout, "/metrics:", log.Lshortfile), prefix),
+		echoutil.AccessLogFluent(&utils.AccessLogFluentMiddleware{Prefix: "metrics"}, prefix),
+		echoutil.Instrument(),
+		echoutil.Recover(),
+		echoutil.CORS(echoutil.CORSConfig{
+			RejectNonCorsRequests: false,
+			OriginValidator:       echoutil.AllowAllOrigins,
+			AllowedMethods:        []string{"GET", "OPTIONS"},
+			AllowedHeaders: []string{
+				"Accept", "Content-Type", "X-Custom-Header", "Origin", "Authorization"},
+			AccessControlAllowCredentials: true,
+			AccessControlMaxAge:           3600,
+		}),
+		echoutil.BasicAuthToBearer(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtConfig, Mongo: app.mongoClient}),
+		echoutil.JWT(app.jwtConfig),
 	)
-	app.API.Use(&tracer.OtelMiddleware{
-		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
-		Router:      apiRouter,
-	})
-	app.API.SetApp(apiRouter)
 
-	return app
+	g.GET("/", echoutil.ScopeFilter(
+		[]utils.Scope{utils.Scopes.API, utils.Scopes.Metrics, utils.Scopes.ReadMetrics},
+		app.handleGetMetrics))
 }

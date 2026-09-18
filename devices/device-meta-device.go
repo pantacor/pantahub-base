@@ -1,5 +1,5 @@
 //
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,10 +24,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-base/utils/decoder"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -48,55 +49,48 @@ type metaDataPayload map[string]interface{}
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /devices/{id}/device-meta [put]
-func (a *App) handlePutDeviceData(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePutDeviceData(c *echo.Context) error {
 
-	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
+	jwtPayload, ok := echoutil.Lookup(c, echoutil.KeyJWTPayload)
 	if !ok {
-		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Missing JWT_PAYLOAD", http.StatusBadRequest)
 	}
 
 	var owner interface{}
 	owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
 	if !ok {
-		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
 	}
 
 	var authType interface{}
 	authType, ok = jwtPayload.(jwtgo.MapClaims)["type"]
 	if !ok {
-		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
 	}
 
 	if authType != "DEVICE" {
-		utils.RestErrorWrapper(w, "Device data can only be updated by Device", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Device data can only be updated by Device", http.StatusBadRequest)
 	}
 
-	deviceID := r.PathParam("id")
+	deviceID := c.Param("id")
 	deviceObjectID, err := primitive.ObjectIDFromHex(deviceID)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 	}
 
 	data := map[string]interface{}{}
-	err = decoder.DecodeJsonPayload(r, &data)
+	err = decoder.DecodeJsonBody(c.Request().Body, &data)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error parsing data: "+err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Error parsing data: "+err.Error(), http.StatusBadRequest)
 	}
 	data = utils.BsonQuoteMap(&data)
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
 	// For PUT, we replace the whole metadata object.
@@ -115,15 +109,13 @@ func (a *App) handlePutDeviceData(w rest.ResponseWriter, r *rest.Request) {
 		}},
 	)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error updating device metadata: "+err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Error updating device metadata: "+err.Error(), http.StatusBadRequest)
 	}
 	if updateResult.MatchedCount == 0 {
-		utils.RestErrorWrapper(w, "Error updating device metadata: not found", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Error updating device metadata: not found", http.StatusBadRequest)
 	}
 
-	w.WriteJson(map[string]string{"status": "ok"})
+	return echoutil.WriteJSON(c, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 var parsingErrorKey = "hub_parsing"
@@ -142,64 +134,55 @@ var parsingErrorKey = "hub_parsing"
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /devices/{id}/device-meta [patch]
-func (a *App) handlePatchDeviceData(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePatchDeviceData(c *echo.Context) error {
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
-	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
+	jwtPayload, ok := echoutil.Lookup(c, echoutil.KeyJWTPayload)
 	if !ok {
-		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Missing JWT_PAYLOAD", http.StatusBadRequest)
 	}
 
 	var authType interface{}
 	authType, ok = jwtPayload.(jwtgo.MapClaims)["type"]
 	if !ok {
-		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
 	}
 
 	if authType != "DEVICE" {
-		utils.RestErrorWrapper(w, "Device data can only be updated by Device", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Device data can only be updated by Device", http.StatusBadRequest)
 	}
 
 	var caller interface{}
 	caller, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
 	if !ok {
-		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
 	}
 
 	callerStr, ok := caller.(string)
 	if !ok {
-		utils.RestErrorWrapper(w, "Owner state not set.", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Owner state not set.", http.StatusInternalServerError)
 	}
 
-	deviceID := r.PathParam("id")
+	deviceID := c.Param("id")
 	if deviceID == "" || !strings.HasSuffix(callerStr, "/"+deviceID) {
-		utils.RestErrorWrapper(w, "Calling Device "+callerStr+"and Device ID "+deviceID+" in url mismatch.", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Calling Device "+callerStr+"and Device ID "+deviceID+" in url mismatch.", http.StatusBadRequest)
 	}
 
 	data := map[string]interface{}{}
-	content, err := io.ReadAll(r.Body)
-	_ = r.Body.Close()
+	content, err := io.ReadAll(c.Request().Body)
+	_ = c.Request().Body.Close()
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error reading request device-meta body: "+err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Error reading request device-meta body: "+err.Error(), http.StatusBadRequest)
 	}
 	if len(content) == 0 {
-		utils.RestErrorWrapper(w, "Request device-meta body is empty", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Request device-meta body is empty", http.StatusBadRequest)
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
 	err = json.Unmarshal(content, &data)
@@ -220,12 +203,10 @@ func (a *App) handlePatchDeviceData(w rest.ResponseWriter, r *rest.Request) {
 			}},
 		)
 		if err != nil {
-			utils.RestErrorWrapper(w, "Error updating device-meta (parsing error log): "+err.Error(), http.StatusBadRequest)
-			return
+			return echoutil.RestErrorWrapper(c, "Error updating device-meta (parsing error log): "+err.Error(), http.StatusBadRequest)
 		}
 		if updateResult.MatchedCount == 0 {
-			utils.RestErrorWrapper(w, "Error updating device-meta (parsing error log): not found", http.StatusBadRequest)
-			return
+			return echoutil.RestErrorWrapper(c, "Error updating device-meta (parsing error log): not found", http.StatusBadRequest)
 		}
 	} else {
 		// 1. Quote the BSON keys first to handle dots in key names (e.g. "lo.ipv4")
@@ -257,14 +238,12 @@ func (a *App) handlePatchDeviceData(w rest.ResponseWriter, r *rest.Request) {
 			updateDoc,
 		)
 		if err != nil {
-			utils.RestErrorWrapper(w, "Error updating device-meta: "+err.Error(), http.StatusBadRequest)
-			return
+			return echoutil.RestErrorWrapper(c, "Error updating device-meta: "+err.Error(), http.StatusBadRequest)
 		}
 		if updateResult.MatchedCount == 0 {
-			utils.RestErrorWrapper(w, "Error updating device-meta: not found", http.StatusBadRequest)
-			return
+			return echoutil.RestErrorWrapper(c, "Error updating device-meta: not found", http.StatusBadRequest)
 		}
 	}
 
-	w.WriteJson(map[string]string{"status": "ok"})
+	return echoutil.WriteJSON(c, http.StatusOK, map[string]string{"status": "ok"})
 }

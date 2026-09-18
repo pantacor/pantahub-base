@@ -1,0 +1,215 @@
+{
+  "TestCanonicalJSONMatchesGoJSONRest/302_redirect|gjr": {
+    "Result": {
+      "Status": 302,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": ""
+    },
+    "Header": {
+      "Content-Type": [
+        "application/json; charset=utf-8"
+      ],
+      "Location": [
+        "https://example.com/x"
+      ],
+      "Phjsonformat": [
+        "gibson042-canonicaljson"
+      ],
+      "X-Powered-By": [
+        "go-json-rest"
+      ],
+      "X-Runtime": [
+        "0.000010"
+      ]
+    }
+  },
+  "TestCanonicalJSONMatchesGoJSONRest/409_without_body|gjr": {
+    "Result": {
+      "Status": 409,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": ""
+    },
+    "Header": {
+      "Content-Type": [
+        "application/json; charset=utf-8"
+      ],
+      "Phjsonformat": [
+        "gibson042-canonicaljson"
+      ],
+      "X-Pantahub-Object-Type": [
+        "object"
+      ],
+      "X-Powered-By": [
+        "go-json-rest"
+      ],
+      "X-Runtime": [
+        "0.000019"
+      ]
+    }
+  },
+  "TestCanonicalJSONMatchesGoJSONRest/cors_preflight|gjr": {
+    "Result": {
+      "Status": 200,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": ""
+    },
+    "Header": {
+      "Access-Control-Allow-Credentials": [
+        "true"
+      ],
+      "Access-Control-Allow-Headers": [
+        "Authorization,Content-Type"
+      ],
+      "Access-Control-Allow-Methods": [
+        "GET,POST"
+      ],
+      "Access-Control-Allow-Origin": [
+        "https://ui.example.com"
+      ],
+      "Access-Control-Max-Age": [
+        "3600"
+      ],
+      "Content-Type": [
+        "application/json; charset=utf-8"
+      ],
+      "Phjsonformat": [
+        "gibson042-canonicaljson"
+      ],
+      "X-Powered-By": [
+        "go-json-rest"
+      ],
+      "X-Runtime": [
+        "0.000009"
+      ]
+    }
+  },
+  "TestCanonicalJSONMatchesGoJSONRest/json|gjr": {
+    "Result": {
+      "Status": 200,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "{\"a\":\"é\u003c\u0026\u003e\",\"m\":[3,\"x\",null],\"n\":1.0E-6,\"z\":1500000000000000000000}"
+    },
+    "Header": {
+      "Content-Type": [
+        "application/json; charset=utf-8"
+      ],
+      "Phjsonformat": [
+        "gibson042-canonicaljson"
+      ],
+      "X-Powered-By": [
+        "go-json-rest"
+      ],
+      "X-Runtime": [
+        "0.000030"
+      ]
+    }
+  },
+  "TestCanonicalJSONMatchesGoJSONRest/panic_500|gjr": {
+    "Result": {
+      "Status": 500,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "{\"Error\":\"Internal Server Error\"}"
+    },
+    "Header": {
+      "Content-Type": [
+        "application/json; charset=utf-8"
+      ],
+      "Phjsonformat": [
+        "gibson042-canonicaljson"
+      ],
+      "X-Powered-By": [
+        "go-json-rest"
+      ],
+      "X-Runtime": [
+        "0.000097"
+      ]
+    }
+  },
+  "TestCanonicalJSONMatchesGoJSONRest/rest_error|gjr": {
+    "Result": {
+      "Status": 400,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "{\"code\":400,\"error\":\"REST-ERR-ID-N\"}"
+    },
+    "Header": {
+      "Content-Type": [
+        "application/json; charset=utf-8"
+      ],
+      "Phjsonformat": [
+        "gibson042-canonicaljson"
+      ],
+      "X-Powered-By": [
+        "go-json-rest"
+      ],
+      "X-Runtime": [
+        "0.000016"
+      ]
+    }
+  },
+  "TestCanonicalJSONMatchesGoJSONRest/unauthenticated_401|gjr": {
+    "Result": {
+      "Status": 401,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "{\"Error\":\"Not Authorized\"}"
+    },
+    "Header": {
+      "Content-Type": [
+        "application/json; charset=utf-8"
+      ],
+      "Phjsonformat": [
+        "gibson042-canonicaljson"
+      ],
+      "Www-Authenticate": [
+        "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\""
+      ],
+      "X-Powered-By": [
+        "go-json-rest"
+      ],
+      "X-Runtime": [
+        "0.000008"
+      ]
+    }
+  },
+  "TestCanonicalJSONMatchesGoJSONRest/unknown_route_404|gjr": {
+    "Result": {
+      "Status": 404,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "{\"Error\":\"Resource not found\"}"
+    },
+    "Header": {
+      "Content-Type": [
+        "application/json; charset=utf-8"
+      ],
+      "Phjsonformat": [
+        "gibson042-canonicaljson"
+      ],
+      "X-Powered-By": [
+        "go-json-rest"
+      ],
+      "X-Runtime": [
+        "0.000011"
+      ]
+    }
+  },
+  "TestCanonicalJSONMatchesGoJSONRest/wrong_method_405|gjr": {
+    "Result": {
+      "Status": 405,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "{\"Error\":\"Method not allowed\"}"
+    },
+    "Header": {
+      "Content-Type": [
+        "application/json; charset=utf-8"
+      ],
+      "Phjsonformat": [
+        "gibson042-canonicaljson"
+      ],
+      "X-Powered-By": [
+        "go-json-rest"
+      ],
+      "X-Runtime": [
+        "0.000013"
+      ]
+    }
+  }
+}

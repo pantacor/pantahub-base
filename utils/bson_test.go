@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Tests for BsonQuoteMap / BsonUnquoteMap. The invariants we care about:
 //

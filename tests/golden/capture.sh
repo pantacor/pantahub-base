@@ -1,23 +1,12 @@
 #!/usr/bin/env bash
 #
-# Golden-response capture for the go-json-rest -> echo migration.
+# Golden-response capture for the go-json-rest -> echo migration: records the
+# HTTP contract (status, contract headers, normalised bodies) of a running API.
+# Capture a baseline on the old build, a candidate on the new one, then diff.
+# Auth uses `pvr curl`, so no credentials are stored.
 #
-# Records the observable HTTP contract of a running Hub API: status line, the
-# headers that clients actually depend on, and the response body. Run it once
-# against the CURRENT (go-json-rest) implementation to produce a baseline, then
-# again against the echo build and diff the two trees. Any difference is a
-# regression unless it is explicitly listed as an intended change.
-#
-# Auth comes from `pvr curl`, which injects pvr's bearer token, so no credential
-# is ever written to disk or passed on a command line here.
-#
-# Usage:
-#   tests/golden/capture.sh baseline            # capture to tests/golden/baseline/
-#   tests/golden/capture.sh candidate           # capture to tests/golden/candidate/
-#   tests/golden/capture.sh diff                # compare the two
-#   API=https://api.stage.pantahub.com tests/golden/capture.sh baseline
-#
-# Exit status for `diff`: 0 identical, 1 differences found.
+# Usage: API=https://api.stage.pantahub.com tests/golden/capture.sh baseline|candidate|diff
+# diff exits 0 when identical, 1 on differences.
 
 set -uo pipefail
 
@@ -26,37 +15,99 @@ UA="${UA:-pantahub-golden/0.1}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODE="${1:-}"
 
-# Headers whose values form part of the client contract. Everything else (Date,
-# Content-Length, trace ids, ...) varies per request and is deliberately ignored.
-CONTRACT_HEADERS='^(www-authenticate|phjsonformat|content-type|location|allow|x-powered-by):'
+# Contract headers; volatile ones are ignored. x-powered-by dropped on echo
+# (owner decision), so not pinned.
+CONTRACT_HEADERS='^(www-authenticate|phjsonformat|content-type|location|allow):'
 
-# --- route table -------------------------------------------------------------
-# Authenticated GETs. Extend as coverage grows; every route added here becomes
-# part of the enforced contract.
+# Authenticated GETs (via pvr curl).
 AUTHED_PATHS=(
   /devices/ /trails/ /apps/ /objects/ /logs/ /dash/
   /profiles/ /subscriptions/ /tokens/ /exports/ /metrics/
+  # dash (first service moved to echo)
+  /dash/auth_status /dash/does-not-exist
+  # plog
+  /plog/posts /plog/does-not-exist
+  # changes (no page[size] answers an empty 200: pre-existing bug, pinned)
+  "/changes/devices?page%5Bsize%5D=5" /changes/devices /changes/does-not-exist
+  # tokens, profiles
+  /tokens/does-not-exist /profiles/config/meta /profiles/miele-devices
+  # metrics
+  /metrics/does-not-exist
+  # subscriptions (URLClean: trailing "/" dropped before routing)
+  /subscriptions/does-not-exist/
+  # exports
+  /exports/does-not-exist /exports/nobody-probe/nodevice/0/probe.tar
+  # logs
+  "/logs/?page=5" /logs/cursor /logs/does-not-exist
+  # apps
+  /apps/scopes /apps/does-not-exist
+  # objects (pvr clone/push)
+  /objects/auth_status /objects/does-not-exist /objects/does-not-exist/blob /objects/a/b/c
+  # trails (canonical JSON, URLClean)
+  /trails/summary /trails/does-not-exist/steps/ /trails/a/b/c/d/e/f/g/h
+  # devices (overlapping routes; 404 vs 405)
+  /devices/tokens /devices/auth_status /devices/np/nobody-probe/nodevice /devices/tokens/ownership/validate
+  /devices/tokens/t1/public /devices/a/b/c/d
 )
 
-# Paths probed WITHOUT credentials. These capture the 401 contract, which is the
-# highest-risk part of the migration: pvr keys its on-disk credential store by
-# the exact `WWW-Authenticate` string (ph-aeps + " realm=" + realm), so a change
-# in these bytes logs out every pvr client and device in the fleet.
+# No credentials: pins the 401 WWW-Authenticate contract pvr depends on.
 UNAUTH_PATHS=(
   /auth/login /devices/ /trails/ /objects/ /apps/ /logs/ /profiles/
   /subscriptions/ /tokens/ /metrics/ /healthz/ /exports/
+  # Auth runs before routing: unknown route without credentials is 401.
+  /dash/ /dash/does-not-exist /devices/does-not-exist
+  /plog/posts /plog/does-not-exist
+  /changes/devices /tokens/does-not-exist /profiles/config/meta
+  /metrics/does-not-exist /healthz/does-not-exist
+  /subscriptions/does-not-exist
+  /exports/does-not-exist /exports/nobody-probe/nodevice/0/probe.tar
+  /logs/cursor /apps/does-not-exist
+  # /apps/scopes is the one apps route without auth
+  /apps/scopes
+  /objects/auth_status /objects/does-not-exist/blob
+  /webhooks/ /webhooks/event-types /webhooks/a/b/c/d
+  /trails/summary /trails/does-not-exist/steps/
+  /devices/tokens /devices/np/nobody-probe/nodevice /devices/register
 )
 
-# Trailing-slash pairs. Today the no-slash form is a 307 from http.ServeMux (not
-# from the framework); mounting echo at "/" instead of per-prefix would silently
-# remove these redirects.
+# "METHOD|path|Authorization". callbacks/cron (saadmin Basic auth) probed without
+# the secret: missing/wrong -> 401 + challenge, malformed -> 400. No handler runs.
+RAW_PROBES=(
+  "PUT|/callbacks/devices/probe00000000000000000000|"
+  "PUT|/callbacks/devices/probe00000000000000000000|__WRONG_BASIC__"
+  "PUT|/callbacks/devices/probe00000000000000000000|Basic !!!not-base64"
+  "GET|/callbacks/devices/probe00000000000000000000|"
+  "PUT|/callbacks/does-not-exist|"
+  "PUT|/cron/public/devices|"
+  "PUT|/cron/public/devices|__WRONG_BASIC__"
+  "PUT|/cron/public/devices|Basic !!!not-base64"
+  "GET|/cron/public/steps|"
+  "GET|/healthz/|__WRONG_BASIC__"
+  "GET|/healthz/|Basic !!!not-base64"
+  "POST|/healthz/|"
+  "PUT|/subscriptions/admin/subscription/|"
+  "GET|/subscriptions/admin/subscription|"
+)
+WRONG_BASIC='Basic c2FhZG1pbjpkZWZpbml0ZWx5LW5vdC10aGUtc2VjcmV0'
+
+# CORS preflights "path|method|headers"; config differs per service.
+PREFLIGHTS=(
+  "/dash/|GET|authorization,content-type"
+  "/dash/|GET|x-not-allowed-header"
+  "/dash/|DELETE|authorization"
+  "/devices/|GET|authorization,content-type"
+  "/trails/|GET|authorization,content-type"
+  "/trails/|PATCH|authorization"
+  "/objects/|GET|authorization"
+  "/apps/|GET|authorization"
+)
+
+# No-slash form is a 307 from http.ServeMux.
 SLASH_PATHS=(
   /devices /trails /apps /objects /logs /profiles /subscriptions /tokens
 )
 
-# Path-parameter routes. go-json-rest spells these `#id`, echo spells them `:id`;
-# the rewrite is meant to be semantically identical, and this is what proves it.
-# {DEV} is substituted with an id discovered at capture time (see discover_ids).
+# Path-parameter routes; {DEV} is discovered at capture time.
 PARAM_PATHS=(
   "/devices/{DEV}"
   "/devices/{DEV}/user-meta"
@@ -64,19 +115,11 @@ PARAM_PATHS=(
   "/trails/{DEV}/steps"
   "/trails/{DEV}/summary"
   "/trails/{DEV}/steps/0"
-  # A revision that does not exist. This now answers 404; it answered 500 until
-  # the ErrNoDocuments fix, because trails/get-trails-rev.go mapped every FindOne
-  # error to 500 "No access", so every device poll for a not-yet-created revision
-  # minted an incident id and a fluentd forward (~780 per three minutes on
-  # stage). That status change was deliberate and owner-approved -- the baseline
-  # must be re-captured across it. Any FURTHER change here is a regression.
+  # Missing revision: 404 since the ErrNoDocuments fix (was 500).
   "/trails/{DEV}/steps/999999"
 )
 
-# Malformed identifiers. These pin the CURRENT error behaviour, which is not
-# uniform: /devices/<bad> answers 400 while /trails/<bad> answers 500. The 500 is
-# very likely a latent bug, but it is the contract as shipped -- if the port
-# changes it, that must be a deliberate, announced fix rather than a side effect.
+# Malformed ids pin current behaviour (/devices 400, /trails 500).
 BAD_ID='nonexistent0000000000000000'
 BADPARAM_PATHS=(
   "/devices/$BAD_ID"
@@ -86,47 +129,30 @@ BADPARAM_PATHS=(
 
 slug() { echo "$1" | sed 's#^/##; s#/$##; s#/#_#g; s#[^A-Za-z0-9_.-]#-#g; s#^$#root#'; }
 
-# Endpoints whose bodies are inherently live (log streams, last-seen clocks).
-# For these we pin status + contract headers only; diffing the body would produce
-# a regression report on every run and train everyone to ignore it.
-BODY_SKIP='^/(logs|devices|dash)/$'
+# Live-data endpoints: status and headers only.
+BODY_SKIP='^/(logs|devices|dash)/(\?.*)?$'
 
-# Normalise a body so that unstable values (ids, timestamps, incident ids) do not
-# swamp the diff. Structure and key names are what we are pinning.
-#
-# REST-ERR-ID-<nanos> is minted per request by utils/resterror.go, so it must be
-# masked -- but its PRESENCE is part of the contract and is asserted separately.
+# Mask volatile values so diffs show contract changes only.
 normalise_body() {
   local f="$1"
   if command -v jq >/dev/null 2>&1 && jq -e . >/dev/null 2>&1 < "$f"; then
-    # device-meta is telemetry the DEVICE reports (freeram, load averages, disk
-    # free, uptime). It changes every second and is not part of the API contract
-    # we are pinning -- the contract is that the key exists and is an object. Its
-    # contents would otherwise make every diff fail.
+    # Device telemetry and live fleet state change between captures.
     jq -S 'walk(if type == "object" then
                   with_entries(.value =
                     if (.key | test("^(device-meta|sysinfo|storage)$"; "i"))
                     then "<VOLATILE-SUBTREE>"
-                    # Live fleet state: the Fleet service drives deployments on
-                    # these devices continuously, so user-meta fleet.* values and
-                    # the trail summary progress fields change between two
-                    # captures seconds apart. Key NAMES stay under contract; the
-                    # values are simulation state, not API behaviour.
                     elif (.key | test("^(fleet\\.|progress-revision$|progress-time$|revision$|state-sha$|step-time$|trail-touched-time$)"; "i"))
                     then "<VAR>"
-                    elif (.key | test("^(id|_id|timestamp|time-?modified|time-?created|last-?seen|rev|garbage|exp|iat|tsec|tnano|dev|device|trail-touched|status-changed|meta-modified|last-?touched|last-?insync)$"; "i"))
+                    elif (.key | test("^(id|_id|timestamp|time-?modified|time-?created|last-?seen|rev|garbage|exp|iat|tsec|tnano|dev|device|trail-touched|status-changed|meta-modified|last-?touched|last-?insync|orig_iat|jti)$"; "i"))
                     then "<VAR>" else .value end)
                 else . end)' < "$f" 2>/dev/null \
-      | sed -E 's/REST-ERR-ID-[0-9]+/REST-ERR-ID-<VAR>/g'
+      | sed -E 's/REST-ERR-ID-[0-9]+/REST-ERR-ID-<VAR>/g; s/page\[(before|after)\]=[^"&]*/page[\1]=<VAR>/g'
   else
-    sed -E 's/REST-ERR-ID-[0-9]+/REST-ERR-ID-<VAR>/g' < "$f"
+    sed -E 's/REST-ERR-ID-[0-9]+/REST-ERR-ID-<VAR>/g; s/page\[(before|after)\]=[^"&]*/page[\1]=<VAR>/g' < "$f"
   fi
 }
 
-# Record which error SHAPE an endpoint uses. The repo emits two incompatible
-# shapes today -- {"Error":...} from go-json-rest and {"code","error",...} with a
-# minted incident id from utils/resterror.go -- and echo's default handler would
-# replace both with {"message":...}. Which shape each route uses is contract.
+# Record which error shape a route uses: {"Error"} or {"code","error"}.
 error_shape() {
   local f="$1"
   if   grep -q '"Error"'   "$f" 2>/dev/null; then echo 'gjr:{"Error":...}'
@@ -135,12 +161,7 @@ error_shape() {
   else echo 'empty'; fi
 }
 
-# Resolve the concrete ids the parameterised routes are probed with.
-#
-# The baseline run discovers a device id from /devices/ and records it. The
-# candidate run REUSES the id the baseline recorded, so both captures address the
-# same resource -- otherwise the bodies would differ for a reason that has
-# nothing to do with the migration.
+# Baseline discovers ids; candidate reuses them so both hit the same resource.
 discover_ids() {
   local outdir="$1" idfile="$HERE/baseline/IDS"
   if [ "$outdir" != "$HERE/baseline" ] && [ -f "$idfile" ]; then
@@ -160,18 +181,8 @@ discover_ids() {
   mkdir -p "$outdir"; echo "DEV='$DEV'" > "$outdir/IDS"
 }
 
-# Fetch a URL into <base>.hdr.raw / <base>.body.raw, retrying ONCE on a 5xx.
-#
-# Stage's Elasticsearch occasionally times out (observed:
-# "pv-elastic-sticky:9200 ... Client.Timeout exceeded while awaiting headers"),
-# which made /logs/ answer 500 in one capture and 200 in the next -- a diff that
-# looks like a contract regression but is infrastructure noise, and the fastest
-# way to teach everyone to ignore this tool's output.
-#
-# The retry is deliberately ONE attempt and it does NOT suppress the result: if
-# the endpoint is genuinely broken, the second try fails too and the 5xx is
-# recorded and diffed as it should be. A retry is reported on stderr so a
-# flapping endpoint stays visible rather than silently smoothed over.
+# Fetch into <base>.hdr.raw/.body.raw, retrying once on 5xx (stage Elasticsearch
+# timeouts). Retries are logged; noretry for probes whose contract is a 5xx.
 fetch() {
   local base="$1" url="$2" authed="$3" noretry="${4:-}" attempt status
   for attempt in 1 2; do
@@ -183,9 +194,6 @@ fetch() {
     status="$(head -1 "$base.hdr.raw" 2>/dev/null | tr -d '\r')"
     case "$status" in
       *" 5"*)
-        # Routes whose pinned contract IS a 5xx (the malformed-id probes) pass
-        # noretry: retrying them would waste a request and, worse, label a
-        # deterministic status "transient" in the output.
         [ -n "$noretry" ] && break
         [ "$attempt" = 1 ] && { echo "  retrying after transient $status on $url" >&2; sleep 2; continue; } ;;
     esac
@@ -237,6 +245,46 @@ capture() {
     local s; s="$(slug "$p")"
     fetch "$outdir/param/$s" "$API$p" auth noretry
     finalise "$outdir/param/$s" "$p"
+  done
+
+  echo "== raw method/Authorization probes =="
+  mkdir -p "$outdir/raw"
+  for spec in "${RAW_PROBES[@]}"; do
+    local m p authz s
+    IFS='|' read -r m p authz <<< "$spec"
+    [ "$authz" = "__WRONG_BASIC__" ] && authz="$WRONG_BASIC"
+    case "$authz" in
+      "")      s="$(slug "$p")_${m}_noauth" ;;
+      "$WRONG_BASIC") s="$(slug "$p")_${m}_wrongbasic" ;;
+      *)       s="$(slug "$p")_${m}_malformed" ;;
+    esac
+    if [ -n "$authz" ]; then
+      curl -s -X "$m" -D "$outdir/raw/$s.hdr.raw" -o "$outdir/raw/$s.body.raw" \
+        -A "$UA" --max-time 20 -H "Authorization: $authz" "$API$p" >/dev/null 2>&1
+    else
+      curl -s -X "$m" -D "$outdir/raw/$s.hdr.raw" -o "$outdir/raw/$s.body.raw" \
+        -A "$UA" --max-time 20 "$API$p" >/dev/null 2>&1
+    fi
+    finalise "$outdir/raw/$s" "$m $p ${s##*_}"
+  done
+
+  echo "== CORS preflights =="
+  mkdir -p "$outdir/cors"
+  for spec in "${PREFLIGHTS[@]}"; do
+    local p m hdrs s
+    IFS='|' read -r p m hdrs <<< "$spec"
+    s="$(slug "$p")_${m}_$(echo "$hdrs" | tr -c 'A-Za-z0-9' '_')"
+    curl -s -o /dev/null -D "$outdir/cors/$s.raw" -X OPTIONS -A "$UA" --max-time 20 \
+      -H "Origin: https://hub.stage.pantahub.com" \
+      -H "Access-Control-Request-Method: $m" \
+      -H "Access-Control-Request-Headers: $hdrs" "$API$p" >/dev/null 2>&1
+    {
+      head -1 "$outdir/cors/$s.raw" | tr -d '\r'
+      grep -iE '^(access-control-|content-type:)' "$outdir/cors/$s.raw" | tr -d '\r' \
+        | sed 's/^\([A-Za-z-]*\):/\L\1:/' | sort
+    } > "$outdir/cors/$s.hdr"
+    rm -f "$outdir/cors/$s.raw"
+    printf '%-40s %s\n' "$p $m [$hdrs]" "$(head -1 "$outdir/cors/$s.hdr")"
   done
 
   echo "== trailing-slash pairs =="

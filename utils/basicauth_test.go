@@ -1,5 +1,5 @@
 //
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,202 +19,89 @@ package utils
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwt "gitlab.com/pantacor/pantahub-base/utils/jwtmiddleware"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func TestBasicAuthToBearerMiddleware_NoAuth(t *testing.T) {
-	mw := &BasicAuthToBearerMiddleware{}
-	handlerCalled := false
-	handler := func(w rest.ResponseWriter, r *rest.Request) {
-		handlerCalled = true
+func basicRequest(authz string) *http.Request {
+	r := httptest.NewRequest("GET", "/", nil)
+	if authz != "" {
+		r.Header.Set("Authorization", authz)
 	}
+	return r
+}
 
-	r := buildRestRequest(t, "")
-	mw.MiddlewareFunc(handler)(r.responseWriter, r.req)
-	if !handlerCalled {
-		t.Error("handler should have been called")
-	}
-	if r.req.Header.Get("Authorization") != "" {
-		t.Error("Authorization header should remain empty")
+func withFactory(t *testing.T, f func(ctx context.Context, username, password string, jwtConfig *jwtauth.Config, mongoClient *mongo.Client, ttl time.Duration) (string, *RError)) {
+	t.Helper()
+	orig := BasicAuthTokenFactory
+	BasicAuthTokenFactory = f
+	t.Cleanup(func() { BasicAuthTokenFactory = orig })
+}
+
+func TestTranslate_NoAuth(t *testing.T) {
+	r := basicRequest("")
+	res, user := (&BasicAuthToBearerMiddleware{}).Translate(r)
+	if res != BasicAuthPassThrough || user != "" || r.Header.Get("Authorization") != "" {
+		t.Errorf("got %v %q %q", res, user, r.Header.Get("Authorization"))
 	}
 }
 
-func TestBasicAuthToBearerMiddleware_BearerPassThrough(t *testing.T) {
-	mw := &BasicAuthToBearerMiddleware{}
-	handlerCalled := false
-	handler := func(w rest.ResponseWriter, r *rest.Request) {
-		handlerCalled = true
-	}
-
-	r := buildRestRequest(t, "Bearer some-token")
-	mw.MiddlewareFunc(handler)(r.responseWriter, r.req)
-	if !handlerCalled {
-		t.Error("handler should have been called")
-	}
-	if r.req.Header.Get("Authorization") != "Bearer some-token" {
-		t.Error("Authorization header should remain unchanged")
+func TestTranslate_BearerPassThrough(t *testing.T) {
+	r := basicRequest("Bearer some-token")
+	res, _ := (&BasicAuthToBearerMiddleware{}).Translate(r)
+	if res != BasicAuthPassThrough || r.Header.Get("Authorization") != "Bearer some-token" {
+		t.Errorf("got %v, header %q", res, r.Header.Get("Authorization"))
 	}
 }
 
-func TestBasicAuthToBearerMiddleware_MalformedBasic(t *testing.T) {
-	mw := &BasicAuthToBearerMiddleware{}
-	handlerCalled := false
-	handler := func(w rest.ResponseWriter, r *rest.Request) {
-		handlerCalled = true
-	}
-
-	r := buildRestRequest(t, "Basic ")
-	mw.MiddlewareFunc(handler)(r.responseWriter, r.req)
-	if !handlerCalled {
-		t.Error("handler should have been called for malformed Basic")
+func TestTranslate_MalformedBasic(t *testing.T) {
+	withFactory(t, func(context.Context, string, string, *jwtauth.Config, *mongo.Client, time.Duration) (string, *RError) {
+		t.Fatal("factory must not be called for malformed Basic")
+		return "", nil
+	})
+	for _, h := range []string{"Basic ", "Basic !!!", "Basic " + base64.StdEncoding.EncodeToString([]byte(":secret"))} {
+		if res, _ := (&BasicAuthToBearerMiddleware{}).Translate(basicRequest(h)); res != BasicAuthPassThrough {
+			t.Errorf("%q: got %v, want pass-through", h, res)
+		}
 	}
 }
 
-func TestBasicAuthToBearerMiddleware_ValidBasic(t *testing.T) {
-	originalFactory := BasicAuthTokenFactory
-	defer func() { BasicAuthTokenFactory = originalFactory }()
-
-	BasicAuthTokenFactory = func(ctx context.Context, username, password string, jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client, ttl time.Duration) (string, *RError) {
+func TestTranslate_ValidBasic(t *testing.T) {
+	withFactory(t, func(ctx context.Context, username, password string, jwtConfig *jwtauth.Config, mongoClient *mongo.Client, ttl time.Duration) (string, *RError) {
 		if username == "alice" && password == "secret" {
 			return "mock-jwt", nil
 		}
 		return "", &RError{Code: http.StatusUnauthorized}
+	})
+	r := basicRequest("Basic " + base64.StdEncoding.EncodeToString([]byte("alice:secret")))
+	res, user := (&BasicAuthToBearerMiddleware{}).Translate(r)
+	if res != BasicAuthRewritten || user != "alice" {
+		t.Fatalf("got %v %q", res, user)
 	}
-
-	mw := &BasicAuthToBearerMiddleware{}
-	handlerCalled := false
-	var gotAuth string
-	handler := func(w rest.ResponseWriter, r *rest.Request) {
-		handlerCalled = true
-		gotAuth = r.Header.Get("Authorization")
-	}
-
-	creds := base64.StdEncoding.EncodeToString([]byte("alice:secret"))
-	r := buildRestRequest(t, "Basic "+creds)
-	mw.MiddlewareFunc(handler)(r.responseWriter, r.req)
-
-	if !handlerCalled {
-		t.Fatal("handler should have been called")
-	}
-	if gotAuth != "Bearer mock-jwt" {
-		t.Errorf("Authorization header = %q, want \"Bearer mock-jwt\"", gotAuth)
-	}
-	if r.req.Env["PH_BASIC_AUTH_USER"] != "alice" {
-		t.Errorf("PH_BASIC_AUTH_USER = %v, want \"alice\"", r.req.Env["PH_BASIC_AUTH_USER"])
+	if got := r.Header.Get("Authorization"); got != "Bearer mock-jwt" {
+		t.Errorf("Authorization = %q, want \"Bearer mock-jwt\"", got)
 	}
 }
 
-func TestBasicAuthToBearerMiddleware_InvalidBasic(t *testing.T) {
-	oldPort := os.Getenv(EnvFluentPort)
-	os.Setenv(EnvFluentPort, "")
-	defer os.Setenv(EnvFluentPort, oldPort)
-	originalFactory := BasicAuthTokenFactory
-	defer func() { BasicAuthTokenFactory = originalFactory }()
-
-	BasicAuthTokenFactory = func(ctx context.Context, username, password string, jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client, ttl time.Duration) (string, *RError) {
+func TestTranslate_InvalidBasic(t *testing.T) {
+	withFactory(t, func(context.Context, string, string, *jwtauth.Config, *mongo.Client, time.Duration) (string, *RError) {
 		return "", &RError{Code: http.StatusUnauthorized}
-	}
-
-	mw := &BasicAuthToBearerMiddleware{}
-	handlerCalled := false
-	handler := func(w rest.ResponseWriter, r *rest.Request) {
-		handlerCalled = true
-	}
-
-	creds := base64.StdEncoding.EncodeToString([]byte("bob:wrong"))
-	r := buildRestRequest(t, "Basic "+creds)
-	mw.MiddlewareFunc(handler)(r.responseWriter, r.req)
-
-	if handlerCalled {
-		t.Error("handler should NOT have been called")
-	}
-	rec := r.responseWriter.(*testResponseWriter).ResponseRecorder
-	if rec.Code != http.StatusUnauthorized {
-		t.Errorf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
-	}
-	wwwAuth := rec.Header().Get("WWW-Authenticate")
-	if wwwAuth == "" {
-		t.Error("WWW-Authenticate header should be set")
+	})
+	r := basicRequest("Basic " + base64.StdEncoding.EncodeToString([]byte("bob:wrong")))
+	if res, _ := (&BasicAuthToBearerMiddleware{}).Translate(r); res != BasicAuthRejected {
+		t.Errorf("got %v, want rejected", res)
 	}
 }
 
-func TestBasicAuthToBearerMiddleware_FactoryNil(t *testing.T) {
-	BasicAuthTokenFactory = nil
-	mw := &BasicAuthToBearerMiddleware{}
-	handlerCalled := false
-	handler := func(w rest.ResponseWriter, r *rest.Request) {
-		handlerCalled = true
+func TestTranslate_FactoryNil(t *testing.T) {
+	withFactory(t, nil)
+	r := basicRequest("Basic " + base64.StdEncoding.EncodeToString([]byte("alice:secret")))
+	if res, _ := (&BasicAuthToBearerMiddleware{}).Translate(r); res != BasicAuthPassThrough {
+		t.Errorf("got %v, want pass-through", res)
 	}
-
-	creds := base64.StdEncoding.EncodeToString([]byte("alice:secret"))
-	r := buildRestRequest(t, "Basic "+creds)
-	mw.MiddlewareFunc(handler)(r.responseWriter, r.req)
-	if !handlerCalled {
-		t.Error("handler should have been called when factory is nil")
-	}
-}
-
-// testRequest wraps a *rest.Request so we can build it easily.
-type testRequest struct {
-	req            *rest.Request
-	responseWriter rest.ResponseWriter
-}
-
-func buildRestRequest(t *testing.T, authz string) *testRequest {
-	t.Helper()
-	httpReq := httptest.NewRequest("GET", "/", nil)
-	if authz != "" {
-		httpReq.Header.Set("Authorization", authz)
-	}
-	req := &rest.Request{Request: httpReq, Env: map[string]interface{}{}}
-	recorder := httptest.NewRecorder()
-	rw := &testResponseWriter{recorder, false}
-	return &testRequest{req: req, responseWriter: rw}
-}
-
-// testResponseWriter implements rest.ResponseWriter for tests.
-type testResponseWriter struct {
-	*httptest.ResponseRecorder
-	wroteHeader bool
-}
-
-func (w *testResponseWriter) WriteJson(v interface{}) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	_, err = w.Write(b)
-	return err
-}
-
-func (w *testResponseWriter) EncodeJson(v interface{}) ([]byte, error) {
-	return json.Marshal(v)
-}
-
-func (w *testResponseWriter) WriteHeader(code int) {
-	if !w.wroteHeader {
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.ResponseRecorder.WriteHeader(code)
-		w.wroteHeader = true
-	}
-}
-
-func (w *testResponseWriter) Write(b []byte) (int, error) {
-	if !w.wroteHeader {
-		w.WriteHeader(http.StatusOK)
-	}
-	return w.ResponseRecorder.Write(b)
-}
-
-func (w *testResponseWriter) Count() uint64 {
-	return 0
 }

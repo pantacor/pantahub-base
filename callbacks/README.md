@@ -21,7 +21,6 @@ HTTP/1.1 200 OK
 Content-Length: 331
 Content-Type: application/json; charset=utf-8
 Date: Wed, 23 Apr 2020 21:13:08 GMT
-X-Powered-By: go-json-rest
 
 {
     "device_id": 5e9ef0cefb1395295dc24173,
@@ -40,7 +39,6 @@ HTTP/1.1 200 OK
 Content-Length: 331
 Content-Type: application/json; charset=utf-8
 Date: Wed, 23 Apr 2020 21:13:08 GMT
-X-Powered-By: go-json-rest
 
 {
     "device_id": 5e9ef0cefb1395295dc24173,
@@ -61,7 +59,6 @@ HTTP/1.1 200 OK
 Content-Length: 331
 Content-Type: application/json; charset=utf-8
 Date: Wed, 23 Apr 2020 21:13:08 GMT
-X-Powered-By: go-json-rest
 
 {
     "step_id": "5e9ef0cefb1395295dc24173-1",
@@ -87,7 +84,6 @@ HTTP/1.1 200 OK
 Content-Length: 331
 Content-Type: application/json; charset=utf-8
 Date: Wed, 23 Apr 2020 21:13:08 GMT
-X-Powered-By: go-json-rest
 
 {
     "step_id": "5e9ef0cefb1395295dc24173-1",

@@ -1,4 +1,4 @@
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,8 +24,9 @@ import (
 	jwtgo "github.com/golang-jwt/jwt/v5"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -42,34 +43,30 @@ import (
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /objects [get]
-func (a *App) handleGetObjects(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetObjects(c *echo.Context) error {
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	owner, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in as a USER", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in as a USER", http.StatusForbidden)
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 
 	if collection == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
-	filter := r.URL.Query().Get("filter")
+	filter := c.Request().URL.Query().Get("filter")
 	m := map[string]interface{}{}
 
 	if filter != "" {
 		err := json.Unmarshal([]byte(filter), &m)
 		if err != nil {
-			utils.RestErrorWrapper(w, "Error parsing filter json "+err.Error(), http.StatusBadRequest)
-			return
+			return echoutil.RestErrorWrapper(c, "Error parsing filter json "+err.Error(), http.StatusBadRequest)
 		}
 		if err := mongoutils.ValidateClientFilter(m); err != nil {
-			utils.RestErrorWrapper(w, "Illegal filter: "+err.Error(), http.StatusBadRequest)
-			return
+			return echoutil.RestErrorWrapper(c, "Illegal filter: "+err.Error(), http.StatusBadRequest)
 		}
 	}
 	m["owner"] = owner
@@ -78,26 +75,24 @@ func (a *App) handleGetObjects(w rest.ResponseWriter, r *rest.Request) {
 	newObjects := make([]Object, 0)
 	findOptions := options.Find()
 	findOptions.SetNoCursorTimeout(true)
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	cur, err := collection.Find(ctx, bson.M{
 		"owner":   owner,
 		"garbage": bson.M{"$ne": true},
 	}, findOptions)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error on fetching objects:"+err.Error(), http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Error on fetching objects:"+err.Error(), http.StatusForbidden)
 	}
 	defer cur.Close(ctx)
 	for cur.Next(ctx) {
 		result := Object{}
 		err := cur.Decode(&result)
 		if err != nil {
-			utils.RestErrorWrapper(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
-			return
+			return echoutil.RestErrorWrapper(c, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
 		}
 		newObjects = append(newObjects, result)
 	}
 
-	w.WriteJson(newObjects)
+	return echoutil.WriteJSON(c, http.StatusOK, newObjects)
 }

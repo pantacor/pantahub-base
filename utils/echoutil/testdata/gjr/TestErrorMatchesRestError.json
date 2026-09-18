@@ -1,0 +1,7 @@
+{
+  "TestErrorMatchesRestError|gjr": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  }
+}

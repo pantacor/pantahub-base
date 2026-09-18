@@ -1,5 +1,5 @@
 //
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,9 +23,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"gopkg.in/mgo.v2/bson"
@@ -50,25 +51,23 @@ type challengePayload struct {
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /devices/{id} [put]
-func (a *App) handlePutDevice(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePutDevice(c *echo.Context) error {
 
 	newDevice := Device{}
 
-	putID := r.PathParam("id")
+	putID := c.Param("id")
 
-	authID, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	authID, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in.", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in.", http.StatusForbidden)
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+	authType, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["type"]
 
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in with a known authentication type.", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in with a known authentication type.", http.StatusForbidden)
 	}
 
 	callerIsUser := false
@@ -83,74 +82,63 @@ func (a *App) handlePutDevice(w rest.ResponseWriter, r *rest.Request) {
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
 	if collection == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	deviceObjectID, err := primitive.ObjectIDFromHex(putID)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 	}
 	err = collection.FindOne(ctx,
 		bson.M{"_id": deviceObjectID}).
 		Decode(&newDevice)
 
 	if err != nil && mongoutils.IsNotFound(err) {
-		utils.RestErrorWrapper(w, "Device not found", http.StatusNotFound)
-		return
+		return echoutil.RestErrorWrapper(c, "Device not found", http.StatusNotFound)
 	}
 
 	if err != nil {
-		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Not Accessible Resource Id", http.StatusForbidden)
 	}
 
 	prn := newDevice.Prn
 	timeCreated := newDevice.TimeCreated
 	owner := newDevice.Owner
 	challenge := newDevice.Challenge
-	challengeVal := r.FormValue("challenge")
+	challengeVal := c.Request().FormValue("challenge")
 	isPublic := newDevice.IsPublic
 	userMeta := utils.BsonUnquoteMap(&newDevice.UserMeta)
 	deviceMeta := utils.BsonUnquoteMap(&newDevice.DeviceMeta)
 
 	if callerIsDevice && newDevice.Prn != authID {
-		utils.RestErrorWrapper(w, "Not Device Accessible Resource Id", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Not Device Accessible Resource Id", http.StatusForbidden)
 	}
 
 	if callerIsUser && newDevice.Owner != "" && newDevice.Owner != authID {
-		utils.RestErrorWrapper(w, "Not User Accessible Resource Id", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Not User Accessible Resource Id", http.StatusForbidden)
 	}
 
 	// Pantavisor registers and pvr claims with a body-less request, so an
 	// empty payload is the same as "{}"; only malformed JSON is rejected.
-	if err := r.DecodeJsonPayload(&newDevice); err != nil && err != rest.ErrJsonPayloadEmpty {
-		utils.RestErrorWrapper(w, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
-		return
+	if err := echoutil.DecodeJsonPayload(c, &newDevice); err != nil && err != echoutil.ErrJsonPayloadEmpty {
+		return echoutil.RestErrorWrapper(c, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
 	}
 
 	if newDevice.ID.Hex() != putID {
-		utils.RestErrorWrapper(w, "Cannot change device Id in PUT", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Cannot change device Id in PUT", http.StatusForbidden)
 	}
 
 	if newDevice.Prn != prn {
-		utils.RestErrorWrapper(w, "Cannot change device prn in PUT", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Cannot change device prn in PUT", http.StatusForbidden)
 	}
 
 	if newDevice.Owner != owner {
-		utils.RestErrorWrapper(w, "Cannot change device owner in PUT", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Cannot change device owner in PUT", http.StatusForbidden)
 	}
 
 	if newDevice.TimeCreated != timeCreated {
-		utils.RestErrorWrapper(w, "Cannot change device timeCreated in PUT", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Cannot change device timeCreated in PUT", http.StatusForbidden)
 	}
 
 	// The secret is generated once at registration and can never be changed
@@ -159,8 +147,7 @@ func (a *App) handlePutDevice(w rest.ResponseWriter, r *rest.Request) {
 	newDevice.Secret = ""
 
 	if callerIsDevice && newDevice.IsPublic != isPublic {
-		utils.RestErrorWrapper(w, "Device cannot change its own 'public' state", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Device cannot change its own 'public' state", http.StatusForbidden)
 	}
 
 	// if device puts info, always reset the user part of the data and vv.
@@ -175,16 +162,14 @@ func (a *App) handlePutDevice(w rest.ResponseWriter, r *rest.Request) {
 		if challenge == challengeVal {
 			// Check device quota before claiming device if it's currently unowned
 			if owner == "" {
-				quotaResult, err := CheckDeviceQuota(r.Context(), authID.(string), a.mongoClient, a.subService)
+				quotaResult, err := CheckDeviceQuota(c.Request().Context(), authID.(string), a.mongoClient, a.subService)
 				if err != nil {
-					utils.RestErrorWrapper(w, "Error checking device quota: "+err.Error(), http.StatusInternalServerError)
-					return
+					return echoutil.RestErrorWrapper(c, "Error checking device quota: "+err.Error(), http.StatusInternalServerError)
 				}
 				if quotaResult.Exceeded {
-					utils.RestErrorWrapperUser(w, "device quota exceeded",
+					return echoutil.RestErrorWrapperUser(c, "device quota exceeded",
 						"Device quota exceeded; delete some devices or request a quota bump from team@pantahub.com",
 						http.StatusForbidden)
-					return
 				}
 			}
 
@@ -195,23 +180,20 @@ func (a *App) handlePutDevice(w rest.ResponseWriter, r *rest.Request) {
 				newDevice.Nick = GenerateDeviceNick()
 			}
 		} else {
-			utils.RestErrorWrapper(w, "No Access to Device", http.StatusForbidden)
-			return
+			return echoutil.RestErrorWrapper(c, "No Access to Device", http.StatusForbidden)
 		}
 	}
 
 	isValidNick, err := regexp.MatchString(DeviceNickRule, newDevice.Nick)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error Validating Device nick "+err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Error Validating Device nick "+err.Error(), http.StatusBadRequest)
 	}
 	if !isValidNick {
-		utils.RestErrorWrapper(w, "Invalid Device Nick(Only allowed characters:[A-Za-z0-9-_+%])", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Invalid Device Nick(Only allowed characters:[A-Za-z0-9-_+%])", http.StatusBadRequest)
 	}
 
 	newDevice.TimeModified = time.Now()
-	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel = context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
 	// Build update document to avoid overwriting sensitive fields accidentally
@@ -245,13 +227,12 @@ func (a *App) handlePutDevice(w rest.ResponseWriter, r *rest.Request) {
 		updateDoc,
 	)
 	if err != nil {
-		utils.RestErrorWrapper(w, "error updating device: "+err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "error updating device: "+err.Error(), http.StatusBadRequest)
 	}
 
 	// unquote back to original format
 	newDevice.UserMeta = utils.BsonUnquoteMap(&newDevice.UserMeta)
 	newDevice.DeviceMeta = utils.BsonUnquoteMap(&newDevice.DeviceMeta)
 
-	w.WriteJson(newDevice)
+	return echoutil.WriteJSON(c, http.StatusOK, newDevice)
 }

@@ -1,0 +1,2766 @@
+{
+  "DELETE /connected-providers token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "DELETE /connected-providers token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "DELETE /connected-providers token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "DELETE /connected-providers token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "DELETE /connected-providers token=user": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "DELETE /connected-providers token=user body={}": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "DELETE /login/mfa/totp token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "DELETE /login/mfa/totp token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "DELETE /login/mfa/totp token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "DELETE /login/mfa/totp token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "DELETE /login/mfa/totp token=user": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "DELETE /login/mfa/totp token=user body={}": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "DELETE /mfa/totp token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "DELETE /mfa/totp token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "DELETE /mfa/totp token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "DELETE /mfa/totp token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "DELETE /mfa/totp token=user": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Password verification failed\",\"code\":401}"
+  },
+  "DELETE /mfa/totp token=user body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Password verification failed\",\"code\":401}"
+  },
+  "DELETE /mfa/webauthn/credentials/c1 token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "DELETE /mfa/webauthn/credentials/c1 token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "DELETE /mfa/webauthn/credentials/c1 token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "DELETE /mfa/webauthn/credentials/c1 token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "DELETE /mfa/webauthn/credentials/c1 token=user": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Password verification failed\",\"code\":401}"
+  },
+  "DELETE /mfa/webauthn/credentials/c1 token=user body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Password verification failed\",\"code\":401}"
+  },
+  "GET / token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET / token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET / token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET / token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET / token=user": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"type\":\"USER\",\"email\":\"no-reply-user1@accounts.pantahub.com\",\"nick\":\"user1\",\"prn\":\"prn:pantahub.com:auth:/user1\",\"password\":\"user1\",\"time-created\":\"\u003cv\u003e\",\"time-modified\":\"\u003cv\u003e\"}"
+  },
+  "GET / token=user body={}": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"type\":\"USER\",\"email\":\"no-reply-user1@accounts.pantahub.com\",\"nick\":\"user1\",\"prn\":\"prn:pantahub.com:auth:/user1\",\"password\":\"user1\",\"time-created\":\"\u003cv\u003e\",\"time-modified\":\"\u003cv\u003e\"}"
+  },
+  "GET /accounts token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /accounts token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /accounts token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /accounts token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /accounts token=user": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "[]"
+  },
+  "GET /accounts token=user body={}": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "[]"
+  },
+  "GET /auth_status token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /auth_status token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /auth_status token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /auth_status token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /auth_status token=user": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"exp\":\u003cunix\u003e,\"id\":\"user1\",\"nick\":\"user1\",\"orig_iat\":\u003cunix\u003e,\"prn\":\"prn:pantahub.com:auth:/user1\",\"roles\":\"user\",\"scopes\":\"prn:pantahub.com:apis:/base/all\",\"type\":\"USER\"}"
+  },
+  "GET /auth_status token=user body={}": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"exp\":\u003cunix\u003e,\"id\":\"user1\",\"nick\":\"user1\",\"orig_iat\":\u003cunix\u003e,\"prn\":\"prn:pantahub.com:auth:/user1\",\"roles\":\"user\",\"scopes\":\"prn:pantahub.com:apis:/base/all\",\"type\":\"USER\"}"
+  },
+  "GET /connected-providers token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /connected-providers token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /connected-providers token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /connected-providers token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /connected-providers token=user": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":404}"
+  },
+  "GET /connected-providers token=user body={}": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":404}"
+  },
+  "GET /login token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /login token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /login token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /login token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /login token=user": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"token\":\"\u003cjwt exp=+120h0m0s id=\"user1\" nick=\"user1\" orig_iat=* prn=\"prn:pantahub.com:auth:/user1\" roles=\"user\" scopes=\"prn:pantahub.com:apis:/base/all\" type=\"USER\"\u003e\"}"
+  },
+  "GET /login token=user body={}": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"token\":\"\u003cjwt exp=+120h0m0s id=\"user1\" nick=\"user1\" orig_iat=* prn=\"prn:pantahub.com:auth:/user1\" roles=\"user\" scopes=\"prn:pantahub.com:apis:/base/all\" type=\"USER\"\u003e\"}"
+  },
+  "GET /login/ token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /login/ token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /login/ token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /login/ token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /login/ token=user": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "GET /login/ token=user body={}": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "GET /login/webauthn/x token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /login/webauthn/x token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /login/webauthn/x token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /login/webauthn/x token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /login/webauthn/x token=user": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "GET /login/webauthn/x token=user body={}": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "GET /mfa token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /mfa token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /mfa token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /mfa token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /mfa token=user": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"mfa_enabled\":false,\"password_set\":true,\"social_connected\":false,\"totp\":{\"enabled\":false,\"pending\":false},\"webauthn\":[],\"recovery_codes_remaining\":0}"
+  },
+  "GET /mfa token=user body={}": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"mfa_enabled\":false,\"password_set\":true,\"social_connected\":false,\"totp\":{\"enabled\":false,\"pending\":false},\"webauthn\":[],\"recovery_codes_remaining\":0}"
+  },
+  "GET /mfa/totp token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /mfa/totp token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /mfa/totp token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /mfa/totp token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /mfa/totp token=user": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "GET /mfa/totp token=user body={}": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "GET /nope token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /nope token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /nope token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /nope token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /nope token=user": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "GET /nope token=user body={}": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "GET /oauth/authorize token=bad": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Missing required PKCE parameters\",\"code\":400}"
+  },
+  "GET /oauth/authorize token=bad body={}": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Missing required PKCE parameters\",\"code\":400}"
+  },
+  "GET /oauth/authorize token=none": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Missing required PKCE parameters\",\"code\":400}"
+  },
+  "GET /oauth/authorize token=none body={}": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Missing required PKCE parameters\",\"code\":400}"
+  },
+  "GET /oauth/authorize token=user": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Missing required PKCE parameters\",\"code\":400}"
+  },
+  "GET /oauth/authorize token=user body={}": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Missing required PKCE parameters\",\"code\":400}"
+  },
+  "GET /oauth/authorizex token=bad": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "GET /oauth/authorizex token=bad body={}": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "GET /oauth/authorizex token=none": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "GET /oauth/authorizex token=none body={}": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "GET /oauth/authorizex token=user": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "GET /oauth/authorizex token=user body={}": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "GET /oauth/callback/github token=bad": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":403}"
+  },
+  "GET /oauth/callback/github token=bad body={}": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":403}"
+  },
+  "GET /oauth/callback/github token=none": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":403}"
+  },
+  "GET /oauth/callback/github token=none body={}": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":403}"
+  },
+  "GET /oauth/callback/github token=user": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":403}"
+  },
+  "GET /oauth/callback/github token=user body={}": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":403}"
+  },
+  "GET /oauth/login token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /oauth/login token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /oauth/login token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /oauth/login token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "GET /oauth/login token=user": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "GET /oauth/login token=user body={}": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "GET /oauth/login/a/b token=bad": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "GET /oauth/login/a/b token=bad body={}": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "GET /oauth/login/a/b token=none": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "GET /oauth/login/a/b token=none body={}": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "GET /oauth/login/a/b token=user": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "GET /oauth/login/a/b token=user body={}": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "GET /oauth/login/github token=bad": {
+    "Status": 307,
+    "ContentType": "text/html; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "https://github.com/login/oauth/authorize?client_id=CHANGE+THIS\u0026redirect_uri=http%3A%2F%2Flocalhost%3A12365%2Fauth%2Foauth%2Fcallback%2Fgithub\u0026response_type=code\u0026scope=user\u0026\u003cv\u003e",
+    "Cookies": [
+      "oauthstate"
+    ],
+    "Body": "\u003ca href=\"https://github.com/login/oauth/authorize?client_id=CHANGE+THIS\u0026amp;redirect_uri=http%3A%2F%2Flocalhost%3A12365%2Fauth%2Foauth%2Fcallback%2Fgithub\u0026amp;response_type=code\u0026amp;scope=user\u0026amp;\u003cv\u003e\"\u003eTemporary Redirect\u003c/a\u003e.\n\n"
+  },
+  "GET /oauth/login/github token=bad body={}": {
+    "Status": 307,
+    "ContentType": "text/html; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "https://github.com/login/oauth/authorize?client_id=CHANGE+THIS\u0026redirect_uri=http%3A%2F%2Flocalhost%3A12365%2Fauth%2Foauth%2Fcallback%2Fgithub\u0026response_type=code\u0026scope=user\u0026\u003cv\u003e",
+    "Cookies": [
+      "oauthstate"
+    ],
+    "Body": "\u003ca href=\"https://github.com/login/oauth/authorize?client_id=CHANGE+THIS\u0026amp;redirect_uri=http%3A%2F%2Flocalhost%3A12365%2Fauth%2Foauth%2Fcallback%2Fgithub\u0026amp;response_type=code\u0026amp;scope=user\u0026amp;\u003cv\u003e\"\u003eTemporary Redirect\u003c/a\u003e.\n\n"
+  },
+  "GET /oauth/login/github token=none": {
+    "Status": 307,
+    "ContentType": "text/html; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "https://github.com/login/oauth/authorize?client_id=CHANGE+THIS\u0026redirect_uri=http%3A%2F%2Flocalhost%3A12365%2Fauth%2Foauth%2Fcallback%2Fgithub\u0026response_type=code\u0026scope=user\u0026\u003cv\u003e",
+    "Cookies": [
+      "oauthstate"
+    ],
+    "Body": "\u003ca href=\"https://github.com/login/oauth/authorize?client_id=CHANGE+THIS\u0026amp;redirect_uri=http%3A%2F%2Flocalhost%3A12365%2Fauth%2Foauth%2Fcallback%2Fgithub\u0026amp;response_type=code\u0026amp;scope=user\u0026amp;\u003cv\u003e\"\u003eTemporary Redirect\u003c/a\u003e.\n\n"
+  },
+  "GET /oauth/login/github token=none body={}": {
+    "Status": 307,
+    "ContentType": "text/html; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "https://github.com/login/oauth/authorize?client_id=CHANGE+THIS\u0026redirect_uri=http%3A%2F%2Flocalhost%3A12365%2Fauth%2Foauth%2Fcallback%2Fgithub\u0026response_type=code\u0026scope=user\u0026\u003cv\u003e",
+    "Cookies": [
+      "oauthstate"
+    ],
+    "Body": "\u003ca href=\"https://github.com/login/oauth/authorize?client_id=CHANGE+THIS\u0026amp;redirect_uri=http%3A%2F%2Flocalhost%3A12365%2Fauth%2Foauth%2Fcallback%2Fgithub\u0026amp;response_type=code\u0026amp;scope=user\u0026amp;\u003cv\u003e\"\u003eTemporary Redirect\u003c/a\u003e.\n\n"
+  },
+  "GET /oauth/login/github token=user": {
+    "Status": 307,
+    "ContentType": "text/html; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "https://github.com/login/oauth/authorize?client_id=CHANGE+THIS\u0026redirect_uri=http%3A%2F%2Flocalhost%3A12365%2Fauth%2Foauth%2Fcallback%2Fgithub\u0026response_type=code\u0026scope=user\u0026\u003cv\u003e",
+    "Cookies": [
+      "oauthstate"
+    ],
+    "Body": "\u003ca href=\"https://github.com/login/oauth/authorize?client_id=CHANGE+THIS\u0026amp;redirect_uri=http%3A%2F%2Flocalhost%3A12365%2Fauth%2Foauth%2Fcallback%2Fgithub\u0026amp;response_type=code\u0026amp;scope=user\u0026amp;\u003cv\u003e\"\u003eTemporary Redirect\u003c/a\u003e.\n\n"
+  },
+  "GET /oauth/login/github token=user body={}": {
+    "Status": 307,
+    "ContentType": "text/html; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "https://github.com/login/oauth/authorize?client_id=CHANGE+THIS\u0026redirect_uri=http%3A%2F%2Flocalhost%3A12365%2Fauth%2Foauth%2Fcallback%2Fgithub\u0026response_type=code\u0026scope=user\u0026\u003cv\u003e",
+    "Cookies": [
+      "oauthstate"
+    ],
+    "Body": "\u003ca href=\"https://github.com/login/oauth/authorize?client_id=CHANGE+THIS\u0026amp;redirect_uri=http%3A%2F%2Flocalhost%3A12365%2Fauth%2Foauth%2Fcallback%2Fgithub\u0026amp;response_type=code\u0026amp;scope=user\u0026amp;\u003cv\u003e\"\u003eTemporary Redirect\u003c/a\u003e.\n\n"
+  },
+  "GET /verify token=bad": {
+    "Status": 500,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":500}"
+  },
+  "GET /verify token=bad body={}": {
+    "Status": 500,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":500}"
+  },
+  "GET /verify token=none": {
+    "Status": 500,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":500}"
+  },
+  "GET /verify token=none body={}": {
+    "Status": 500,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":500}"
+  },
+  "GET /verify token=user": {
+    "Status": 500,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":500}"
+  },
+  "GET /verify token=user body={}": {
+    "Status": 500,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":500}"
+  },
+  "PATCH /mfa/webauthn/credentials/c1 token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "PATCH /mfa/webauthn/credentials/c1 token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "PATCH /mfa/webauthn/credentials/c1 token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "PATCH /mfa/webauthn/credentials/c1 token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "PATCH /mfa/webauthn/credentials/c1 token=user": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "PATCH /mfa/webauthn/credentials/c1 token=user body={}": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /accounts token=bad": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /accounts token=bad body={}": {
+    "Status": 412,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":412}"
+  },
+  "POST /accounts token=none": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /accounts token=none body={}": {
+    "Status": 412,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":412}"
+  },
+  "POST /accounts token=user": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /accounts token=user body={}": {
+    "Status": 412,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":412}"
+  },
+  "POST /accounts/ token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /accounts/ token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /accounts/ token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /accounts/ token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /accounts/ token=user": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "POST /accounts/ token=user body={}": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "POST /authorize token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /authorize token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /authorize token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /authorize token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /authorize token=user": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /authorize token=user body={}": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /code token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /code token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /code token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /code token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /code token=user": {
+    "Status": 500,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":500}"
+  },
+  "POST /code token=user body={}": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /connected-providers token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /connected-providers token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /connected-providers token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /connected-providers token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /connected-providers token=user": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":401}"
+  },
+  "POST /connected-providers token=user body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":401}"
+  },
+  "POST /login token=bad": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /login token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":401}"
+  },
+  "POST /login token=none": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /login token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":401}"
+  },
+  "POST /login token=user": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /login token=user body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":401}"
+  },
+  "POST /login/mfa/recovery token=bad": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /login/mfa/recovery token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Authentication Failed\",\"code\":401}"
+  },
+  "POST /login/mfa/recovery token=none": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /login/mfa/recovery token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Authentication Failed\",\"code\":401}"
+  },
+  "POST /login/mfa/recovery token=user": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /login/mfa/recovery token=user body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Authentication Failed\",\"code\":401}"
+  },
+  "POST /login/mfa/totp token=bad": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /login/mfa/totp token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Authentication Failed\",\"code\":401}"
+  },
+  "POST /login/mfa/totp token=none": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /login/mfa/totp token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Authentication Failed\",\"code\":401}"
+  },
+  "POST /login/mfa/totp token=user": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /login/mfa/totp token=user body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Authentication Failed\",\"code\":401}"
+  },
+  "POST /login/mfa/webauthn token=bad": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /login/mfa/webauthn token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Authentication Failed\",\"code\":401}"
+  },
+  "POST /login/mfa/webauthn token=none": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /login/mfa/webauthn token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Authentication Failed\",\"code\":401}"
+  },
+  "POST /login/mfa/webauthn token=user": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /login/mfa/webauthn token=user body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Authentication Failed\",\"code\":401}"
+  },
+  "POST /login/mfa/webauthn/finish token=bad": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /login/mfa/webauthn/finish token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Authentication Failed\",\"code\":401}"
+  },
+  "POST /login/mfa/webauthn/finish token=none": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /login/mfa/webauthn/finish token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Authentication Failed\",\"code\":401}"
+  },
+  "POST /login/mfa/webauthn/finish token=user": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /login/mfa/webauthn/finish token=user body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Authentication Failed\",\"code\":401}"
+  },
+  "POST /login/webauthn/begin token=bad": {
+    "Status": 501,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"WebAuthn is not configured on this server\",\"code\":501}"
+  },
+  "POST /login/webauthn/begin token=bad body={}": {
+    "Status": 501,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"WebAuthn is not configured on this server\",\"code\":501}"
+  },
+  "POST /login/webauthn/begin token=none": {
+    "Status": 501,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"WebAuthn is not configured on this server\",\"code\":501}"
+  },
+  "POST /login/webauthn/begin token=none body={}": {
+    "Status": 501,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"WebAuthn is not configured on this server\",\"code\":501}"
+  },
+  "POST /login/webauthn/begin token=user": {
+    "Status": 501,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"WebAuthn is not configured on this server\",\"code\":501}"
+  },
+  "POST /login/webauthn/begin token=user body={}": {
+    "Status": 501,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"WebAuthn is not configured on this server\",\"code\":501}"
+  },
+  "POST /login/webauthn/finish token=bad": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /login/webauthn/finish token=bad body={}": {
+    "Status": 501,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"WebAuthn is not configured on this server\",\"code\":501}"
+  },
+  "POST /login/webauthn/finish token=none": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /login/webauthn/finish token=none body={}": {
+    "Status": 501,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"WebAuthn is not configured on this server\",\"code\":501}"
+  },
+  "POST /login/webauthn/finish token=user": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /login/webauthn/finish token=user body={}": {
+    "Status": 501,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"WebAuthn is not configured on this server\",\"code\":501}"
+  },
+  "POST /mfa/reauth/recovery token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/reauth/recovery token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/reauth/recovery token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/reauth/recovery token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/reauth/recovery token=user": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /mfa/reauth/recovery token=user body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Authentication Failed\",\"code\":401}"
+  },
+  "POST /mfa/reauth/totp token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/reauth/totp token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/reauth/totp token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/reauth/totp token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/reauth/totp token=user": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /mfa/reauth/totp token=user body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Authentication Failed\",\"code\":401}"
+  },
+  "POST /mfa/reauth/webauthn token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/reauth/webauthn token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/reauth/webauthn token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/reauth/webauthn token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/reauth/webauthn token=user": {
+    "Status": 501,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"WebAuthn is not configured on this server\",\"code\":501}"
+  },
+  "POST /mfa/reauth/webauthn token=user body={}": {
+    "Status": 501,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"WebAuthn is not configured on this server\",\"code\":501}"
+  },
+  "POST /mfa/reauth/webauthn/finish token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/reauth/webauthn/finish token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/reauth/webauthn/finish token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/reauth/webauthn/finish token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/reauth/webauthn/finish token=user": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /mfa/reauth/webauthn/finish token=user body={}": {
+    "Status": 501,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"WebAuthn is not configured on this server\",\"code\":501}"
+  },
+  "POST /mfa/recovery/regenerate token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/recovery/regenerate token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/recovery/regenerate token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/recovery/regenerate token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/recovery/regenerate token=user": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Password verification failed\",\"code\":401}"
+  },
+  "POST /mfa/recovery/regenerate token=user body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Password verification failed\",\"code\":401}"
+  },
+  "POST /mfa/totp token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/totp token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/totp token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/totp token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/totp token=user": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /mfa/totp token=user body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Password verification failed\",\"code\":401}"
+  },
+  "POST /mfa/totp/confirm token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/totp/confirm token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/totp/confirm token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/totp/confirm token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/totp/confirm token=user": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /mfa/totp/confirm token=user body={}": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"No pending authenticator enrollment\",\"code\":400}"
+  },
+  "POST /mfa/webauthn/register token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/webauthn/register token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/webauthn/register token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/webauthn/register token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/webauthn/register token=user": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /mfa/webauthn/register token=user body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Password verification failed\",\"code\":401}"
+  },
+  "POST /mfa/webauthn/register/finish token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/webauthn/register/finish token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/webauthn/register/finish token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/webauthn/register/finish token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /mfa/webauthn/register/finish token=user": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /mfa/webauthn/register/finish token=user body={}": {
+    "Status": 501,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"WebAuthn is not configured on this server\",\"code\":501}"
+  },
+  "POST /oauth/authorize token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /oauth/authorize token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /oauth/authorize token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /oauth/authorize token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /oauth/authorize token=user": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /oauth/authorize token=user body={}": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Missing authorization information (cookies/session_id)\",\"code\":400}"
+  },
+  "POST /oauth/pkce/init token=bad": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Invalid request payload\",\"code\":400}"
+  },
+  "POST /oauth/pkce/init token=bad body={}": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Missing required PKCE parameters\",\"code\":400}"
+  },
+  "POST /oauth/pkce/init token=none": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Invalid request payload\",\"code\":400}"
+  },
+  "POST /oauth/pkce/init token=none body={}": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Missing required PKCE parameters\",\"code\":400}"
+  },
+  "POST /oauth/pkce/init token=user": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Invalid request payload\",\"code\":400}"
+  },
+  "POST /oauth/pkce/init token=user body={}": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Missing required PKCE parameters\",\"code\":400}"
+  },
+  "POST /oauth/token token=bad": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Invalid request payload\",\"code\":400}"
+  },
+  "POST /oauth/token token=bad body={}": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"The grant type is not supported\",\"code\":400}"
+  },
+  "POST /oauth/token token=none": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Invalid request payload\",\"code\":400}"
+  },
+  "POST /oauth/token token=none body={}": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"The grant type is not supported\",\"code\":400}"
+  },
+  "POST /oauth/token token=user": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"Invalid request payload\",\"code\":400}"
+  },
+  "POST /oauth/token token=user body={}": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"msg\":\"The grant type is not supported\",\"code\":400}"
+  },
+  "POST /oauth/tokenx token=bad": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "POST /oauth/tokenx token=bad body={}": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "POST /oauth/tokenx token=none": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "POST /oauth/tokenx token=none body={}": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "POST /oauth/tokenx token=user": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "POST /oauth/tokenx token=user body={}": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Resource not found\"}"
+  },
+  "POST /password token=bad": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /password token=bad body={}": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /password token=none": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /password token=none body={}": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /password token=user": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /password token=user body={}": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /recover token=bad": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /recover token=bad body={}": {
+    "Status": 412,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":412}"
+  },
+  "POST /recover token=none": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /recover token=none body={}": {
+    "Status": 412,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":412}"
+  },
+  "POST /recover token=user": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /recover token=user body={}": {
+    "Status": 412,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":412}"
+  },
+  "POST /sessions token=bad": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"token\":\"\u003cjwt exp=+1h0m0s id=\"__SESSION__\u003cv\u003e\" nick=\"__SESSION__\u003cv\u003e\" orig_iat=* prn=\"prn:::sessions:/\u003cv\u003e\" roles=\"session\" scopes=\"prn:pantahub.com:apis:/base/all\" type=\"SESSION\"\u003e\"}"
+  },
+  "POST /sessions token=bad body={}": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"token\":\"\u003cjwt exp=+1h0m0s id=\"__SESSION__\u003cv\u003e\" nick=\"__SESSION__\u003cv\u003e\" orig_iat=* prn=\"prn:::sessions:/\u003cv\u003e\" roles=\"session\" scopes=\"prn:pantahub.com:apis:/base/all\" type=\"SESSION\"\u003e\"}"
+  },
+  "POST /sessions token=none": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"token\":\"\u003cjwt exp=+1h0m0s id=\"__SESSION__\u003cv\u003e\" nick=\"__SESSION__\u003cv\u003e\" orig_iat=* prn=\"prn:::sessions:/\u003cv\u003e\" roles=\"session\" scopes=\"prn:pantahub.com:apis:/base/all\" type=\"SESSION\"\u003e\"}"
+  },
+  "POST /sessions token=none body={}": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"token\":\"\u003cjwt exp=+1h0m0s id=\"__SESSION__\u003cv\u003e\" nick=\"__SESSION__\u003cv\u003e\" orig_iat=* prn=\"prn:::sessions:/\u003cv\u003e\" roles=\"session\" scopes=\"prn:pantahub.com:apis:/base/all\" type=\"SESSION\"\u003e\"}"
+  },
+  "POST /sessions token=user": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"token\":\"\u003cjwt exp=+1h0m0s id=\"__SESSION__\u003cv\u003e\" nick=\"__SESSION__\u003cv\u003e\" orig_iat=* prn=\"prn:::sessions:/\u003cv\u003e\" roles=\"session\" scopes=\"prn:pantahub.com:apis:/base/all\" type=\"SESSION\"\u003e\"}"
+  },
+  "POST /sessions token=user body={}": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"token\":\"\u003cjwt exp=+1h0m0s id=\"__SESSION__\u003cv\u003e\" nick=\"__SESSION__\u003cv\u003e\" orig_iat=* prn=\"prn:::sessions:/\u003cv\u003e\" roles=\"session\" scopes=\"prn:pantahub.com:apis:/base/all\" type=\"SESSION\"\u003e\"}"
+  },
+  "POST /signature/verify token=bad": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /signature/verify token=bad body={}": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Token not found or you are not the owner: the provided hex string is not a valid ObjectID\"}"
+  },
+  "POST /signature/verify token=none": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /signature/verify token=none body={}": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Token not found or you are not the owner: the provided hex string is not a valid ObjectID\"}"
+  },
+  "POST /signature/verify token=user": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /signature/verify token=user body={}": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Token not found or you are not the owner: the provided hex string is not a valid ObjectID\"}"
+  },
+  "POST /token token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /token token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /token token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /token token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /token token=user": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /token token=user body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":401}"
+  },
+  "POST /token/refresh token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /token/refresh token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /token/refresh token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /token/refresh token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "POST /token/refresh token=user": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /token/refresh token=user body={}": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "POST /x509/login token=bad": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":403}"
+  },
+  "POST /x509/login token=bad body={}": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":403}"
+  },
+  "POST /x509/login token=none": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":403}"
+  },
+  "POST /x509/login token=none body={}": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":403}"
+  },
+  "POST /x509/login token=user": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":403}"
+  },
+  "POST /x509/login token=user body={}": {
+    "Status": 403,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":403}"
+  },
+  "PUT /login token=bad": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "PUT /login token=bad body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "PUT /login token=none": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "PUT /login token=none body={}": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "PUT /login token=user": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "PUT /login token=user body={}": {
+    "Status": 405,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Method not allowed\"}"
+  },
+  "flow auth_status": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"exp\":\u003cunix\u003e,\"id\":\"user1\",\"nick\":\"user1\",\"orig_iat\":\u003cunix\u003e,\"prn\":\"prn:pantahub.com:auth:/user1\",\"roles\":\"user\",\"scopes\":\"prn:pantahub.com:apis:/base/all\",\"type\":\"USER\"}"
+  },
+  "flow login anon": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"token\":\"\u003cjwt exp=+5m0s id=\"prn:pantahub.com:auth:/anon\" nick=\"anonymous\" orig_iat=* prn=\"prn:pantahub.com:auth:/anon\" roles=\"user\" scopes=\"prn:pantahub.com:apis:/base/all\" type=\"USER\"\u003e\"}"
+  },
+  "flow login bad password": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":401}"
+  },
+  "flow login empty creds": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":401}"
+  },
+  "flow login no body": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":400}"
+  },
+  "flow login user1": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"token\":\"\u003cjwt exp=+1h0m0s id=\"user1\" nick=\"user1\" orig_iat=* prn=\"prn:pantahub.com:auth:/user1\" roles=\"user\" scopes=\"prn:pantahub.com:apis:/base/all\" type=\"USER\"\u003e\"}"
+  },
+  "flow preflight login": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": ""
+  },
+  "flow profile": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"type\":\"USER\",\"email\":\"no-reply-user1@accounts.pantahub.com\",\"nick\":\"user1\",\"prn\":\"prn:pantahub.com:auth:/user1\",\"password\":\"user1\",\"time-created\":\"\u003cv\u003e\",\"time-modified\":\"\u003cv\u003e\"}"
+  },
+  "flow refresh basic": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "flow refresh garbage token": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "flow refresh token without orig_iat": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Token is not refreshable\"}"
+  },
+  "flow refresh with token": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"token\":\"\u003cjwt exp=+120h0m0s id=\"user1\" nick=\"user1\" orig_iat=* prn=\"prn:pantahub.com:auth:/user1\" roles=\"user\" scopes=\"prn:pantahub.com:apis:/base/all\" type=\"USER\"\u003e\"}"
+  },
+  "flow refresh without token": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"Error\":\"Not Authorized\"}"
+  },
+  "flow token": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "WWWAuthenticate": "",
+    "Location": "",
+    "Cookies": null,
+    "Body": "{\"error\":\"\u003cv\u003e\",\"code\":401}"
+  }
+}

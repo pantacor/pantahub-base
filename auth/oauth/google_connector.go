@@ -1,4 +1,4 @@
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import (
 	"net/http"
 	"regexp"
 
-	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/labstack/echo/v5"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
@@ -71,12 +71,13 @@ func GetGoogleConfig() *oauth2.Config {
 }
 
 // GoogleAuthorize use google to authorize user
-func GoogleAuthorize(redirectURI string, config *oauth2.Config, w rest.ResponseWriter, r *rest.Request) {
+func GoogleAuthorize(redirectURI string, config *oauth2.Config, c *echo.Context) error {
 	// Create oauthState cookie
-	oauthState := generateStateOauthCookie(redirectURI, w)
+	oauthState := generateStateOauthCookie(redirectURI, c.Response())
 
 	u := config.AuthCodeURL(oauthState)
-	http.Redirect(w, r.Request, u, http.StatusTemporaryRedirect)
+	http.Redirect(c.Response(), c.Request(), u, http.StatusTemporaryRedirect)
+	return nil
 }
 
 // GoogleCb use code to retrive service user data

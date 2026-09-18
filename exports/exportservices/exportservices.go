@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017-2023 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,13 +31,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/accounts/accountsdata"
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/trails/trailservices"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"gitlab.com/pantacor/pvr/libpvr"
 	"gitlab.com/pantacor/pvr/utils/pvjson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -50,7 +51,7 @@ type ExportService interface {
 	GetTrailObjects(ctx context.Context, deviceID, rev, owner, authType string, isPublic bool, frags string) (owa []objects.ObjectWithAccess, rerr *utils.RError)
 	GetStepRev(ctx context.Context, trailID, rev, frags string) (r string, state []byte, modtime *time.Time, rerr *utils.RError)
 	WriteExportTar(
-		w rest.ResponseWriter,
+		c *echo.Context,
 		filename string,
 		objectDownloads []objects.ObjectWithAccess,
 		state []byte,
@@ -186,12 +187,13 @@ func (s *EService) GetDevice(ctx context.Context, nick, owner, tokenOwner string
 }
 
 func (s *EService) WriteExportTar(
-	w rest.ResponseWriter,
+	c *echo.Context,
 	filename string,
 	objectDownloads []objects.ObjectWithAccess,
 	state []byte,
 	modtime *time.Time,
 ) {
+	w := c.Response()
 	var fileWriter io.Writer = w
 
 	w.Header().Add("Content-disposition", "attachment; filename="+filename)
@@ -210,7 +212,7 @@ func (s *EService) WriteExportTar(
 	defer tw.Close()
 
 	if err := addToTarFileFromBytes(tw, "json", state, modtime); err != nil {
-		handleTarWriteError(w, "json", err)
+		handleTarWriteError(c, "json", err)
 		return
 	}
 
@@ -219,12 +221,12 @@ func (s *EService) WriteExportTar(
 	for _, object := range objectDownloads {
 		resp, err := http.Get(object.SignedGetURL)
 		if err != nil {
-			handleTarWriteError(w, "objects/"+object.ID, err)
+			handleTarWriteError(c, "objects/"+object.ID, err)
 			return
 		}
 
 		if err := addToTarFromResponse(tw, "objects/"+object.ID, resp, &object.TimeModified); err != nil {
-			handleTarWriteError(w, "objects/"+object.ID, err)
+			handleTarWriteError(c, "objects/"+object.ID, err)
 			return
 		}
 	}
@@ -244,12 +246,12 @@ func isClientDisconnect(err error) bool {
 // and only special-cases a cancelled download: a client disconnect surfaces as
 // a broken pipe, and calling RestErrorWrapper on that already-broken connection
 // would panic with "superfluous WriteHeader", so we just log it instead.
-func handleTarWriteError(w rest.ResponseWriter, entry string, err error) {
+func handleTarWriteError(c *echo.Context, entry string, err error) {
 	if isClientDisconnect(err) {
 		log.Printf("export: download cancelled by client while writing %q: %v", entry, err)
 		return
 	}
-	utils.RestErrorWrapper(w, err.Error(), http.StatusInternalServerError)
+	_ = echoutil.RestErrorWrapper(c, err.Error(), http.StatusInternalServerError)
 }
 
 func addToTarFileFromBytes(writer *tar.Writer, archivePath string, content []byte, modtime *time.Time) error {

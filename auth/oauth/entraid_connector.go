@@ -1,4 +1,4 @@
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"golang.org/x/oauth2"
@@ -75,12 +75,13 @@ func GetEntraidConfig() *oauth2.Config {
 }
 
 // EntraidAuthorize use google to authorize user
-func EntraidAuthorize(redirectURI string, config *oauth2.Config, w rest.ResponseWriter, r *rest.Request) {
+func EntraidAuthorize(redirectURI string, config *oauth2.Config, c *echo.Context) error {
 	// Create oauthState cookie
-	oauthState := generateStateOauthCookie(redirectURI, w)
+	oauthState := generateStateOauthCookie(redirectURI, c.Response())
 
 	u := config.AuthCodeURL(oauthState)
-	http.Redirect(w, r.Request, u, http.StatusTemporaryRedirect)
+	http.Redirect(c.Response(), c.Request(), u, http.StatusTemporaryRedirect)
+	return nil
 }
 
 // EntraidCb use code to retrive service user data

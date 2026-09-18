@@ -1,4 +1,4 @@
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -45,29 +45,28 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwt "gitlab.com/pantacor/pantahub-base/utils/jwtmiddleware"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/utils"
-	"gitlab.com/pantacor/pantahub-base/utils/tracer"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 )
 
-// App is the rest.Api wrapper for the webhooks proxy module.
+// App is the webhooks proxy module.
 type App struct {
-	jwtMiddleware *jwt.JWTMiddleware
-	API           *rest.Api
-	backend       *url.URL
-	proxy         *httputil.ReverseProxy
-	proxySecrets  [][]byte
+	jwtConfig    *jwtauth.Config
+	backend      *url.URL
+	proxy        *httputil.ReverseProxy
+	proxySecrets [][]byte
 }
 
 // New constructs the webhooks proxy app. The backend URL is read from
 // PANTAHUB_WEBHOOKS_BACKEND (default http://localhost:12380). Requests
-// are forwarded with /webhooks already stripped by the parent mux, so
-// the upstream sees the path the underlying service expects.
-func New(jwtMiddleware *jwt.JWTMiddleware) *App {
+// are forwarded with their full /webhooks/... path, which is the path the
+// upstream's router expects.
+func New(jwtConfig *jwtauth.Config) *App {
 	app := new(App)
-	app.jwtMiddleware = jwtMiddleware
+	app.jwtConfig = jwtConfig
 
 	backendStr := os.Getenv("PANTAHUB_WEBHOOKS_BACKEND")
 	if backendStr == "" {
@@ -94,13 +93,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware) *App {
 		Director: func(req *http.Request) {
 			req.URL.Scheme = u.Scheme
 			req.URL.Host = u.Host
-			// The original request arrives at /webhooks/<rest>. The parent
-			// mux has already stripped /webhooks, so req.URL.Path is /<rest>;
-			// the upstream's own router expects /webhooks/<rest>, so we
-			// re-prefix here. This mirrors the path layout used when the
-			// upstream is hit directly via the optional hooks.pantacor.com
-			// ingress.
-			req.URL.Path = "/webhooks" + req.URL.Path
+			// req.URL.Path is already /webhooks/<rest>, the layout the
+			// upstream also serves via the optional hooks.pantacor.com ingress.
 			req.URL.RawPath = ""
 			req.Host = u.Host
 		},
@@ -115,135 +109,106 @@ func New(jwtMiddleware *jwt.JWTMiddleware) *App {
 		},
 	}
 
-	app.API = rest.NewApi()
-	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
-		"/webhooks:", log.Lshortfile)})
-	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "webhooks"})
-	app.API.Use(&rest.StatusMiddleware{})
-	app.API.Use(&metrics.Middleware{})
-	app.API.Use(rest.DefaultCommonStack...)
-	app.API.Use(&rest.CorsMiddleware{
-		RejectNonCorsRequests: false,
-		OriginValidator: func(origin string, request *rest.Request) bool {
-			return true
-		},
-		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{
-			"Accept", "Content-Type", "Content-Length",
-			"Origin", "Authorization",
-			"X-Trace-ID", "Trace-Id", "x-request-id", "X-Request-ID",
-			"TraceID", "ParentID",
-			"Uber-Trace-ID", "uber-trace-id", "traceparent", "tracestate",
-		},
-		AccessControlAllowCredentials: true,
-		AccessControlMaxAge:           3600,
-	})
+	return app
+}
 
-	// /webhooks/event-types is public (no auth) — every other route requires a JWT.
-	app.API.Use(&rest.IfMiddleware{
-		Condition: func(r *rest.Request) bool {
-			return !strings.HasPrefix(r.URL.Path, "/event-types")
-		},
-		IfTrue: app.jwtMiddleware,
-	})
-	app.API.Use(&rest.IfMiddleware{
-		Condition: func(r *rest.Request) bool {
-			return !strings.HasPrefix(r.URL.Path, "/event-types")
-		},
-		IfTrue: &utils.AuthMiddleware{},
-	})
+// Mount registers webhooks on echo with its previous middleware stack.
+func (app *App) Mount(s *echoutil.Server) {
+	const prefix = "/webhooks"
 
-	readScopes := []utils.Scope{
+	// /webhooks/event-types is public (no auth); every other route requires a JWT.
+	needsAuth := func(r *http.Request) bool {
+		return !strings.HasPrefix(r.URL.Path, "/event-types")
+	}
+
+	g := s.Mount(prefix,
+		echoutil.AccessLogJSON(log.New(os.Stdout, "/webhooks:", log.Lshortfile), prefix),
+		echoutil.AccessLogFluent(&utils.AccessLogFluentMiddleware{Prefix: "webhooks"}, prefix),
+		metrics.EchoMiddleware(prefix),
+		echoutil.Instrument(),
+		echoutil.Recover(),
+		echoutil.CORS(echoutil.CORSConfig{
+			RejectNonCorsRequests: false,
+			OriginValidator:       echoutil.AllowAllOrigins,
+			AllowedMethods:        []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+			AllowedHeaders: []string{
+				"Accept", "Content-Type", "Content-Length",
+				"Origin", "Authorization",
+				"X-Trace-ID", "Trace-Id", "x-request-id", "X-Request-ID",
+				"TraceID", "ParentID",
+				"Uber-Trace-ID", "uber-trace-id", "traceparent", "tracestate",
+			},
+			AccessControlAllowCredentials: true,
+			AccessControlMaxAge:           3600,
+		}),
+		echoutil.If(prefix, needsAuth, echoutil.JWT(app.jwtConfig)),
+		echoutil.If(prefix, needsAuth, echoutil.Auth()),
+	)
+
+	read := echoutil.ScopeFilterMW([]utils.Scope{
 		utils.Scopes.API,
 		utils.Scopes.APIReadOnly,
 		utils.Scopes.Webhooks,
 		utils.Scopes.ReadWebhooks,
-	}
-	writeScopes := []utils.Scope{
+	})
+	write := echoutil.ScopeFilterMW([]utils.Scope{
 		utils.Scopes.API,
 		utils.Scopes.Webhooks,
 		utils.Scopes.WriteWebhooks,
-	}
-
-	router, _ := rest.MakeRouter(
-		// Public catalog.
-		rest.Get("/event-types", app.handleProxy),
-
-		// Events. These must be registered before the /#id wildcards below,
-		// otherwise "/events" is swallowed by rest.Get("/#id") with
-		// id="events" — which happens to forward to the right upstream
-		// handler by luck, while "/events/<eid>" matches no route at all and
-		// is rejected with a 404 here without ever reaching the service.
-		rest.Get("/events", rest.WrapMiddlewares(
-			[]rest.Middleware{utils.InitScopeFilterMiddleware(readScopes)}, app.handleProxy)),
-		rest.Get("/events/#eid", rest.WrapMiddlewares(
-			[]rest.Middleware{utils.InitScopeFilterMiddleware(readScopes)}, app.handleProxy)),
-		rest.Get("/events/#eid/deliveries", rest.WrapMiddlewares(
-			[]rest.Middleware{utils.InitScopeFilterMiddleware(readScopes)}, app.handleProxy)),
-		rest.Post("/events/#eid/redeliver", rest.WrapMiddlewares(
-			[]rest.Middleware{utils.InitScopeFilterMiddleware(writeScopes)}, app.handleProxy)),
-
-		// Subscriptions.
-		rest.Get("/", rest.WrapMiddlewares(
-			[]rest.Middleware{utils.InitScopeFilterMiddleware(readScopes)}, app.handleProxy)),
-		rest.Post("/", rest.WrapMiddlewares(
-			[]rest.Middleware{utils.InitScopeFilterMiddleware(writeScopes)}, app.handleProxy)),
-		rest.Get("/#id", rest.WrapMiddlewares(
-			[]rest.Middleware{utils.InitScopeFilterMiddleware(readScopes)}, app.handleProxy)),
-		rest.Put("/#id", rest.WrapMiddlewares(
-			[]rest.Middleware{utils.InitScopeFilterMiddleware(writeScopes)}, app.handleProxy)),
-		rest.Patch("/#id", rest.WrapMiddlewares(
-			[]rest.Middleware{utils.InitScopeFilterMiddleware(writeScopes)}, app.handleProxy)),
-		rest.Delete("/#id", rest.WrapMiddlewares(
-			[]rest.Middleware{utils.InitScopeFilterMiddleware(writeScopes)}, app.handleProxy)),
-		rest.Post("/#id/rotate-secret", rest.WrapMiddlewares(
-			[]rest.Middleware{utils.InitScopeFilterMiddleware(writeScopes)}, app.handleProxy)),
-		rest.Post("/#id/test", rest.WrapMiddlewares(
-			[]rest.Middleware{utils.InitScopeFilterMiddleware(writeScopes)}, app.handleProxy)),
-
-		// Deliveries.
-		rest.Get("/#id/deliveries", rest.WrapMiddlewares(
-			[]rest.Middleware{utils.InitScopeFilterMiddleware(readScopes)}, app.handleProxy)),
-		rest.Get("/#id/deliveries/#did", rest.WrapMiddlewares(
-			[]rest.Middleware{utils.InitScopeFilterMiddleware(readScopes)}, app.handleProxy)),
-		rest.Post("/#id/deliveries/#did/replay", rest.WrapMiddlewares(
-			[]rest.Middleware{utils.InitScopeFilterMiddleware(writeScopes)}, app.handleProxy)),
-	)
-
-	app.API.Use(&tracer.OtelMiddleware{
-		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
-		Router:      router,
 	})
-	app.API.SetApp(router)
-	return app
+
+	// Public catalog.
+	g.GET("/event-types", app.handleProxy)
+
+	// Events.
+	g.GET("/events", app.handleProxy, read)
+	g.GET("/events/:eid", app.handleProxy, read)
+	g.GET("/events/:eid/deliveries", app.handleProxy, read)
+	g.POST("/events/:eid/redeliver", app.handleProxy, write)
+
+	// Subscriptions.
+	g.GET("/", app.handleProxy, read)
+	g.POST("/", app.handleProxy, write)
+	g.GET("/:id", app.handleProxy, read)
+	g.PUT("/:id", app.handleProxy, write)
+	g.PATCH("/:id", app.handleProxy, write)
+	g.DELETE("/:id", app.handleProxy, write)
+	g.POST("/:id/rotate-secret", app.handleProxy, write)
+	g.POST("/:id/test", app.handleProxy, write)
+
+	// Deliveries.
+	g.GET("/:id/deliveries", app.handleProxy, read)
+	g.GET("/:id/deliveries/:did", app.handleProxy, read)
+	g.POST("/:id/deliveries/:did/replay", app.handleProxy, write)
 }
 
 // handleProxy strips the inbound Authorization header, attaches the
 // resolved identity as X-Pantahub-* headers, then forwards via the
 // reverse proxy. The Director set in New() takes care of the URL.
-func (app *App) handleProxy(w rest.ResponseWriter, r *rest.Request) {
+func (app *App) handleProxy(c *echo.Context) error {
+	r := c.Request()
 	// Strip headers the upstream must never see.
-	r.Request.Header.Del("Authorization")
-	r.Request.Header.Del("Cookie")
+	r.Header.Del("Authorization")
+	r.Header.Del("Cookie")
 	// Defense in depth: strip any client-supplied trust headers; we set
 	// them ourselves below.
-	r.Request.Header.Del("X-Pantahub-Caller")
-	r.Request.Header.Del("X-Pantahub-Owner")
-	r.Request.Header.Del("X-Pantahub-Type")
-	r.Request.Header.Del("X-Pantahub-Scopes")
-	r.Request.Header.Del("X-Pantahub-Proxy-Timestamp")
-	r.Request.Header.Del("X-Pantahub-Proxy-Signature")
+	r.Header.Del("X-Pantahub-Caller")
+	r.Header.Del("X-Pantahub-Owner")
+	r.Header.Del("X-Pantahub-Type")
+	r.Header.Del("X-Pantahub-Scopes")
+	r.Header.Del("X-Pantahub-Proxy-Timestamp")
+	r.Header.Del("X-Pantahub-Proxy-Signature")
 
-	authInfo := utils.GetAuthInfo(r)
+	authInfo := echoutil.AuthInfo(c)
 	var owner, caller string
 	if authInfo != nil {
 		caller = string(authInfo.Caller)
 		owner = string(authInfo.Owner)
-		r.Request.Header.Set("X-Pantahub-Caller", caller)
-		r.Request.Header.Set("X-Pantahub-Owner", owner)
-		r.Request.Header.Set("X-Pantahub-Type", authInfo.CallerType)
+		r.Header.Set("X-Pantahub-Caller", caller)
+		r.Header.Set("X-Pantahub-Owner", owner)
+		r.Header.Set("X-Pantahub-Type", authInfo.CallerType)
 		if len(authInfo.Scopes) > 0 {
-			r.Request.Header.Set("X-Pantahub-Scopes", strings.Join(authInfo.Scopes, " "))
+			r.Header.Set("X-Pantahub-Scopes", strings.Join(authInfo.Scopes, " "))
 		}
 	}
 
@@ -266,48 +231,45 @@ func (app *App) handleProxy(w rest.ResponseWriter, r *rest.Request) {
 		nonce, err := newNonce()
 		if err != nil {
 			log.Printf("webhooks proxy: nonce: %v", err)
-			rest.Error(w, "internal error", http.StatusInternalServerError)
-			return
+			return echoutil.Error(c, "internal error", http.StatusInternalServerError)
 		}
 
 		// The body digest is part of the signed string, so the body has to
 		// be buffered and handed back for the proxy to forward. These are
 		// small JSON management-API payloads, never streams.
 		var body []byte
-		if r.Request.Body != nil {
-			body, err = io.ReadAll(r.Request.Body)
+		if r.Body != nil {
+			body, err = io.ReadAll(r.Body)
 			if err != nil {
-				rest.Error(w, "invalid body: "+err.Error(), http.StatusBadRequest)
-				return
+				return echoutil.Error(c, "invalid body: "+err.Error(), http.StatusBadRequest)
 			}
-			r.Request.Body = io.NopCloser(bytes.NewReader(body))
+			r.Body = io.NopCloser(bytes.NewReader(body))
 		}
 		bodySum := sha256.Sum256(body)
 
-		// The upstream's mux strips /webhooks; sign the path the upstream's
-		// inner router will see (which still includes /webhooks because
-		// the upstream re-prefixes), keeping signer/verifier in agreement.
-		signedPath := "/webhooks" + r.URL.Path
+		// Sign the full /webhooks/... path the upstream's router sees.
+		signedPath := r.URL.Path
 
 		// Sign the header values as actually set above, so signer and
 		// verifier read identical strings even when authInfo was nil.
 		base := strings.Join([]string{
-			"v2", ts, nonce, r.Request.Method, signedPath,
+			"v2", ts, nonce, r.Method, signedPath,
 			canonicalQuery(r.URL.RawQuery),
 			hex.EncodeToString(bodySum[:]),
-			r.Request.Header.Get("X-Pantahub-Owner"),
-			r.Request.Header.Get("X-Pantahub-Caller"),
-			r.Request.Header.Get("X-Pantahub-Type"),
-			r.Request.Header.Get("X-Pantahub-Scopes"),
+			r.Header.Get("X-Pantahub-Owner"),
+			r.Header.Get("X-Pantahub-Caller"),
+			r.Header.Get("X-Pantahub-Type"),
+			r.Header.Get("X-Pantahub-Scopes"),
 		}, "\n")
 		mac := hmac.New(sha256.New, app.proxySecrets[0])
 		mac.Write([]byte(base))
-		r.Request.Header.Set("X-Pantahub-Proxy-Timestamp", ts)
-		r.Request.Header.Set("X-Pantahub-Proxy-Nonce", nonce)
-		r.Request.Header.Set("X-Pantahub-Proxy-Signature", "v2="+hex.EncodeToString(mac.Sum(nil)))
+		r.Header.Set("X-Pantahub-Proxy-Timestamp", ts)
+		r.Header.Set("X-Pantahub-Proxy-Nonce", nonce)
+		r.Header.Set("X-Pantahub-Proxy-Signature", "v2="+hex.EncodeToString(mac.Sum(nil)))
 	}
 
-	app.proxy.ServeHTTP(flushSafeWriter{w.(http.ResponseWriter)}, r.Request)
+	app.proxy.ServeHTTP(flushSafeWriter{c.Response()}, r)
+	return nil
 }
 
 // newNonce returns a fresh random hex nonce for the proxy signature. The
@@ -355,11 +317,11 @@ func canonicalQuery(rawQuery string) string {
 // call.
 //
 // pantahub-base wraps the response writer in
-// datacounter.ResponseWriterCounter, which has no Flush method, and
-// go-json-rest's responseWriter.Flush type-asserts its wrapped writer to
-// http.Flusher without checking. ReverseProxy flushes from the
-// maxLatencyWriter goroutine, so that panic unwinds outside the recover
-// middleware and kills the whole process rather than failing one request.
+// datacounter.ResponseWriterCounter, which has no Flush method, and echo's
+// Response.Flush panics when its writer cannot flush. ReverseProxy flushes
+// from the maxLatencyWriter goroutine, so that panic unwinds outside the
+// recover middleware and kills the whole process rather than failing one
+// request.
 //
 // Implementing Flush here means the proxy calls this method instead, and the
 // flush degrades to a no-op when nothing underneath supports it.
@@ -373,9 +335,8 @@ func (f flushSafeWriter) Flush() {
 		return
 	}
 	// Implementing http.Flusher is not proof a writer can actually flush:
-	// go-json-rest's responseWriter satisfies the interface but its Flush
-	// type-asserts its own inner writer without checking, so it panics on
-	// the datacounter wrapper underneath. Recover here because this runs on
+	// echo's Response satisfies the interface but panics when its own
+	// writer cannot flush, e.g. the datacounter wrapper underneath. Recover here because this runs on
 	// ReverseProxy's maxLatencyWriter goroutine, outside the reach of the
 	// recover middleware, where a panic kills the process instead of the
 	// request. Losing an early flush only delays bytes; the response is

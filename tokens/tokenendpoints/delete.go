@@ -1,4 +1,4 @@
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,9 +16,9 @@ package tokenendpoints
 import (
 	"net/http"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/golang-jwt/jwt/v5"
-	"gitlab.com/pantacor/pantahub-base/utils"
+	"github.com/labstack/echo/v5"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 )
 
 // DeleteToken Delete a token for a user
@@ -35,29 +35,26 @@ import (
 // @Failure 403 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /tokens/{id} [delete]
-func (app *Endpoints) DeleteToken(w rest.ResponseWriter, r *rest.Request) {
+func (app *Endpoints) DeleteToken(c *echo.Context) error {
 	var owner interface{}
 
-	if jwtPayload, ok := r.Env["JWT_PAYLOAD"]; ok {
+	if jwtPayload, ok := echoutil.Lookup(c, echoutil.KeyJWTPayload); ok {
 		if owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"]; !ok {
-			utils.RestErrorWrapper(w, "Owner can't be defined", http.StatusBadRequest)
-			return
+			return echoutil.RestErrorWrapper(c, "Owner can't be defined", http.StatusBadRequest)
 		}
 	} else {
-		utils.RestErrorWrapper(w, "Owner can't be defined", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Owner can't be defined", http.StatusBadRequest)
 	}
 
-	id := r.PathParam("id")
-	err := app.service.DeleteToken(r.Context(), id, owner.(string))
+	id := c.Param("id")
+	err := app.service.DeleteToken(c.Request().Context(), id, owner.(string))
 	if err != nil {
-		utils.RestErrorWrapper(w, "token owner is not owner of the device -- "+err.Error(), http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "token owner is not owner of the device -- "+err.Error(), http.StatusForbidden)
 	}
 
 	response := map[string]interface{}{"success": true}
-	if err := w.WriteJson(response); err != nil {
-		utils.RestErrorWrapper(w, err.Error(), http.StatusInternalServerError)
-		return
+	if err := echoutil.WriteJSON(c, http.StatusOK, response); err != nil {
+		return echoutil.RestErrorWrapper(c, err.Error(), http.StatusInternalServerError)
 	}
+	return nil
 }

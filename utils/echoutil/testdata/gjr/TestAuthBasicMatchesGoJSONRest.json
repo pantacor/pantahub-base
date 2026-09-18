@@ -1,0 +1,90 @@
+{
+  "TestAuthBasicMatchesGoJSONRest/bearer_scheme|gjr": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Invalid authentication\"}",
+    "WWWAuth": "",
+    "Reached": false,
+    "User": null
+  },
+  "TestAuthBasicMatchesGoJSONRest/empty_credentials|gjr": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "WWWAuth": "Basic realm=Pantahub Health @ https://api.example.com/auth",
+    "Reached": false,
+    "User": null
+  },
+  "TestAuthBasicMatchesGoJSONRest/empty_header|gjr": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "WWWAuth": "Basic realm=Pantahub Health @ https://api.example.com/auth",
+    "Reached": false,
+    "User": null
+  },
+  "TestAuthBasicMatchesGoJSONRest/invalid_base64|gjr": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Invalid authentication\"}",
+    "WWWAuth": "",
+    "Reached": false,
+    "User": null
+  },
+  "TestAuthBasicMatchesGoJSONRest/lowercase_scheme|gjr": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Invalid authentication\"}",
+    "WWWAuth": "",
+    "Reached": false,
+    "User": null
+  },
+  "TestAuthBasicMatchesGoJSONRest/no_colon|gjr": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Invalid authentication\"}",
+    "WWWAuth": "",
+    "Reached": false,
+    "User": null
+  },
+  "TestAuthBasicMatchesGoJSONRest/no_header|gjr": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "WWWAuth": "Basic realm=Pantahub Health @ https://api.example.com/auth",
+    "Reached": false,
+    "User": null
+  },
+  "TestAuthBasicMatchesGoJSONRest/scheme_only|gjr": {
+    "Status": 400,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Invalid authentication\"}",
+    "WWWAuth": "",
+    "Reached": false,
+    "User": null
+  },
+  "TestAuthBasicMatchesGoJSONRest/valid_(password_contains_a_colon)|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "\"d1\"",
+    "WWWAuth": "",
+    "Reached": true,
+    "User": "saadmin"
+  },
+  "TestAuthBasicMatchesGoJSONRest/wrong_password|gjr": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "WWWAuth": "Basic realm=Pantahub Health @ https://api.example.com/auth",
+    "Reached": false,
+    "User": null
+  },
+  "TestAuthBasicMatchesGoJSONRest/wrong_user|gjr": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "WWWAuth": "Basic realm=Pantahub Health @ https://api.example.com/auth",
+    "Reached": false,
+    "User": null
+  }
+}

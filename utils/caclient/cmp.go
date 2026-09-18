@@ -1,4 +1,4 @@
-// Copyright 2026 Pantacor Ltd
+// Copyright (c) 2017-2026 Pantacor Ltd.
 
 //
 // Licensed under the Apache License, Version 2.0 (the "License");

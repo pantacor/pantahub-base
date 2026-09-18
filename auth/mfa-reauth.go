@@ -1,4 +1,4 @@
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,13 +23,13 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/auth/authmodels"
 	"gitlab.com/pantacor/pantahub-base/auth/mfaservice"
 	"gitlab.com/pantacor/pantahub-base/auth/storage"
-	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 )
 
 // The sudo endpoints let a logged-in user re-prove an existing factor and
@@ -40,14 +40,13 @@ import (
 // factor being managed, and stays phishing-resistant for WebAuthn.
 
 // issueSudo writes the sudo grant for the authenticated account
-func (a *App) issueSudo(writer rest.ResponseWriter, ownerPrn, factor string) {
-	token, err := mfaservice.CreateSudoToken(a.jwtMiddleware, ownerPrn, factor)
+func (a *App) issueSudo(c *echo.Context, ownerPrn, factor string) error {
+	token, err := mfaservice.CreateSudoToken(a.jwtConfig, ownerPrn, factor)
 	if err != nil {
-		utils.RestErrorWrapper(writer, "Error creating reauth token", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error creating reauth token", http.StatusInternalServerError)
 	}
-	noStore(writer)
-	writer.WriteJson(authmodels.SudoResponse{SudoToken: token})
+	noStore(c)
+	return echoutil.WriteJSON(c, http.StatusOK, authmodels.SudoResponse{SudoToken: token})
 }
 
 // @Summary Re-authenticate with an authenticator (TOTP) code
@@ -60,56 +59,48 @@ func (a *App) issueSudo(writer rest.ResponseWriter, ownerPrn, factor string) {
 // @Success 200 {object} authmodels.SudoResponse
 // @Failure 401 {object} utils.RError
 // @Router /auth/mfa/reauth/totp [post]
-func (a *App) handlePostReauthTOTP(writer rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePostReauthTOTP(c *echo.Context) error {
 	if !mfaFeatureEnabled() {
-		utils.RestErrorWrapperUser(writer, "MFA is not enabled on this server", "MFA is not enabled on this server", http.StatusNotImplemented)
-		return
+		return echoutil.RestErrorWrapperUser(c, "MFA is not enabled on this server", "MFA is not enabled on this server", http.StatusNotImplemented)
 	}
-	account, _, ok := a.mfaCaller(writer, r)
+	account, _, ok := a.mfaCaller(c)
 	if !ok {
-		return
+		return nil
 	}
 
 	payload := &authmodels.MFASudoCodeRequest{}
-	if err := r.DecodeJsonPayload(payload); err != nil {
-		utils.RestErrorWrapper(writer, "Failed to decode request", http.StatusBadRequest)
-		return
+	if err := echoutil.DecodeJsonPayload(c, payload); err != nil {
+		return echoutil.RestErrorWrapper(c, "Failed to decode request", http.StatusBadRequest)
 	}
 
-	ctx, cancel := context.WithTimeout(r.Request.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
 	settings, err := a.mfaRepo.GetByOwner(ctx, account.Prn)
 	if err != nil {
-		utils.RestErrorWrapper(writer, "Error with database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with database connectivity", http.StatusInternalServerError)
 	}
 	if !settings.HasConfirmedTOTP() {
-		utils.RestErrorWrapperUser(writer, "Authentication Failed", "Authentication Failed", http.StatusUnauthorized)
-		return
+		return echoutil.RestErrorWrapperUser(c, "Authentication Failed", "Authentication Failed", http.StatusUnauthorized)
 	}
 	if settings.IsLocked(time.Now()) {
-		utils.RestErrorWrapperUser(writer, "Too many attempts; try again later", "Too many attempts; try again later", http.StatusTooManyRequests)
-		return
+		return echoutil.RestErrorWrapperUser(c, "Too many attempts; try again later", "Too many attempts; try again later", http.StatusTooManyRequests)
 	}
 
 	secret, err := mfaservice.DecryptSecret(settings.TOTP.SecretEnc)
 	if err != nil {
-		utils.RestErrorWrapper(writer, "Error reading TOTP secret", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error reading TOTP secret", http.StatusInternalServerError)
 	}
 
 	step, valid := mfaservice.VerifyTOTPCode(secret, payload.Code, time.Now())
 	if !valid {
-		a.mfaLoginFailure(writer, r, account.Prn)
-		return
+		return a.mfaLoginFailure(c, account.Prn)
 	}
 	if err := a.mfaRepo.UseTOTPStep(ctx, account.Prn, step); err != nil {
-		a.mfaLoginFailure(writer, r, account.Prn)
-		return
+		return a.mfaLoginFailure(c, account.Prn)
 	}
 
-	a.issueSudo(writer, account.Prn, "otp")
+	return a.issueSudo(c, account.Prn, "otp")
 }
 
 // @Summary Re-authenticate with a recovery code
@@ -122,46 +113,40 @@ func (a *App) handlePostReauthTOTP(writer rest.ResponseWriter, r *rest.Request) 
 // @Success 200 {object} authmodels.SudoResponse
 // @Failure 401 {object} utils.RError
 // @Router /auth/mfa/reauth/recovery [post]
-func (a *App) handlePostReauthRecovery(writer rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePostReauthRecovery(c *echo.Context) error {
 	if !mfaFeatureEnabled() {
-		utils.RestErrorWrapperUser(writer, "MFA is not enabled on this server", "MFA is not enabled on this server", http.StatusNotImplemented)
-		return
+		return echoutil.RestErrorWrapperUser(c, "MFA is not enabled on this server", "MFA is not enabled on this server", http.StatusNotImplemented)
 	}
-	account, _, ok := a.mfaCaller(writer, r)
+	account, _, ok := a.mfaCaller(c)
 	if !ok {
-		return
+		return nil
 	}
 
 	payload := &authmodels.MFASudoCodeRequest{}
-	if err := r.DecodeJsonPayload(payload); err != nil {
-		utils.RestErrorWrapper(writer, "Failed to decode request", http.StatusBadRequest)
-		return
+	if err := echoutil.DecodeJsonPayload(c, payload); err != nil {
+		return echoutil.RestErrorWrapper(c, "Failed to decode request", http.StatusBadRequest)
 	}
 
-	ctx, cancel := context.WithTimeout(r.Request.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
 	settings, err := a.mfaRepo.GetByOwner(ctx, account.Prn)
 	if err != nil || settings == nil {
-		utils.RestErrorWrapperUser(writer, "Authentication Failed", "Authentication Failed", http.StatusUnauthorized)
-		return
+		return echoutil.RestErrorWrapperUser(c, "Authentication Failed", "Authentication Failed", http.StatusUnauthorized)
 	}
 	if settings.IsLocked(time.Now()) {
-		utils.RestErrorWrapperUser(writer, "Too many attempts; try again later", "Too many attempts; try again later", http.StatusTooManyRequests)
-		return
+		return echoutil.RestErrorWrapperUser(c, "Too many attempts; try again later", "Too many attempts; try again later", http.StatusTooManyRequests)
 	}
 
 	index, valid := mfaservice.VerifyRecoveryCode(settings.RecoveryCodes, payload.Code)
 	if !valid {
-		a.mfaLoginFailure(writer, r, account.Prn)
-		return
+		return a.mfaLoginFailure(c, account.Prn)
 	}
 	if err := a.mfaRepo.UseRecoveryCode(ctx, account.Prn, index); err != nil {
-		a.mfaLoginFailure(writer, r, account.Prn)
-		return
+		return a.mfaLoginFailure(c, account.Prn)
 	}
 
-	a.issueSudo(writer, account.Prn, "recovery")
+	return a.issueSudo(c, account.Prn, "recovery")
 }
 
 // @Summary Start a WebAuthn re-authentication
@@ -173,40 +158,35 @@ func (a *App) handlePostReauthRecovery(writer rest.ResponseWriter, r *rest.Reque
 // @Success 200 {object} authmodels.WebauthnOptionsResponse
 // @Failure 401 {object} utils.RError
 // @Router /auth/mfa/reauth/webauthn [post]
-func (a *App) handlePostReauthWebauthn(writer rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePostReauthWebauthn(c *echo.Context) error {
 	if !mfaFeatureEnabled() {
-		utils.RestErrorWrapperUser(writer, "MFA is not enabled on this server", "MFA is not enabled on this server", http.StatusNotImplemented)
-		return
+		return echoutil.RestErrorWrapperUser(c, "MFA is not enabled on this server", "MFA is not enabled on this server", http.StatusNotImplemented)
 	}
-	account, _, ok := a.mfaCaller(writer, r)
+	account, _, ok := a.mfaCaller(c)
 	if !ok {
-		return
+		return nil
 	}
 
 	wa, err := mfaservice.GetWebAuthn()
 	if err != nil {
-		utils.RestErrorWrapperUser(writer, "WebAuthn is not configured on this server", "WebAuthn is not configured on this server", http.StatusNotImplemented)
-		return
+		return echoutil.RestErrorWrapperUser(c, "WebAuthn is not configured on this server", "WebAuthn is not configured on this server", http.StatusNotImplemented)
 	}
 
-	ctx, cancel := context.WithTimeout(r.Request.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
 	settings, err := a.mfaRepo.GetByOwner(ctx, account.Prn)
 	if err != nil || settings == nil {
-		utils.RestErrorWrapperUser(writer, "Authentication Failed", "Authentication Failed", http.StatusUnauthorized)
-		return
+		return echoutil.RestErrorWrapperUser(c, "Authentication Failed", "Authentication Failed", http.StatusUnauthorized)
 	}
 
 	if settings.IsLocked(time.Now()) {
-		utils.RestErrorWrapperUser(writer, "Too many attempts; try again later", "Too many attempts; try again later", http.StatusTooManyRequests)
-		return
+		return echoutil.RestErrorWrapperUser(c, "Too many attempts; try again later", "Too many attempts; try again later", http.StatusTooManyRequests)
 	}
 
 	user, creds, err := a.webauthnUserFor(ctx, account, settings)
 	if err != nil || len(creds) == 0 {
-		utils.RestErrorWrapperUser(writer, "Authentication Failed", "Authentication Failed", http.StatusUnauthorized)
-		return
+		return echoutil.RestErrorWrapperUser(c, "Authentication Failed", "Authentication Failed", http.StatusUnauthorized)
 	}
 
 	// "preferred" lets a plain second-factor key assert without UV while a
@@ -215,24 +195,21 @@ func (a *App) handlePostReauthWebauthn(writer rest.ResponseWriter, r *rest.Reque
 	assertion, sessionData, err := wa.BeginLogin(user,
 		webauthn.WithUserVerification(protocol.VerificationPreferred))
 	if err != nil {
-		utils.RestErrorWrapper(writer, "Error starting WebAuthn reauth", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error starting WebAuthn reauth", http.StatusInternalServerError)
 	}
 
 	sessionJSON, err := json.Marshal(sessionData)
 	if err != nil {
-		utils.RestErrorWrapper(writer, "Error starting WebAuthn reauth", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error starting WebAuthn reauth", http.StatusInternalServerError)
 	}
 
 	sessionID, err := a.webauthnRepo.CreateSession(ctx, account.Prn, storage.WebauthnPurposeLogin, false, sessionJSON, mfaservice.PendingTokenTimeout())
 	if err != nil {
-		utils.RestErrorWrapper(writer, "Error with database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with database connectivity", http.StatusInternalServerError)
 	}
 
-	noStore(writer)
-	writer.WriteJson(authmodels.WebauthnOptionsResponse{
+	noStore(c)
+	return echoutil.WriteJSON(c, http.StatusOK, authmodels.WebauthnOptionsResponse{
 		SessionID: sessionID,
 		Options:   assertion,
 	})
@@ -248,73 +225,64 @@ func (a *App) handlePostReauthWebauthn(writer rest.ResponseWriter, r *rest.Reque
 // @Success 200 {object} authmodels.SudoResponse
 // @Failure 401 {object} utils.RError
 // @Router /auth/mfa/reauth/webauthn/finish [post]
-func (a *App) handlePostReauthWebauthnFinish(writer rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePostReauthWebauthnFinish(c *echo.Context) error {
 	if !mfaFeatureEnabled() {
-		utils.RestErrorWrapperUser(writer, "MFA is not enabled on this server", "MFA is not enabled on this server", http.StatusNotImplemented)
-		return
+		return echoutil.RestErrorWrapperUser(c, "MFA is not enabled on this server", "MFA is not enabled on this server", http.StatusNotImplemented)
 	}
-	account, _, ok := a.mfaCaller(writer, r)
+	account, _, ok := a.mfaCaller(c)
 	if !ok {
-		return
+		return nil
 	}
 
 	payload := &authmodels.WebauthnSudoFinishRequest{}
-	if err := r.DecodeJsonPayload(payload); err != nil {
-		utils.RestErrorWrapper(writer, "Failed to decode request", http.StatusBadRequest)
-		return
+	if err := echoutil.DecodeJsonPayload(c, payload); err != nil {
+		return echoutil.RestErrorWrapper(c, "Failed to decode request", http.StatusBadRequest)
 	}
 
 	wa, err := mfaservice.GetWebAuthn()
 	if err != nil {
-		utils.RestErrorWrapperUser(writer, "WebAuthn is not configured on this server", "WebAuthn is not configured on this server", http.StatusNotImplemented)
-		return
+		return echoutil.RestErrorWrapperUser(c, "WebAuthn is not configured on this server", "WebAuthn is not configured on this server", http.StatusNotImplemented)
 	}
 
-	ctx, cancel := context.WithTimeout(r.Request.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
 	session, err := a.webauthnRepo.ConsumeSession(ctx, payload.SessionID, storage.WebauthnPurposeLogin)
 	if err != nil || session.Owner != account.Prn {
-		utils.RestErrorWrapperUser(writer, "Authentication Failed", "Authentication Failed", http.StatusUnauthorized)
-		return
+		return echoutil.RestErrorWrapperUser(c, "Authentication Failed", "Authentication Failed", http.StatusUnauthorized)
 	}
 
 	sessionData := webauthn.SessionData{}
 	if err := json.Unmarshal(session.Data, &sessionData); err != nil {
-		utils.RestErrorWrapper(writer, "Error reading WebAuthn session", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error reading WebAuthn session", http.StatusInternalServerError)
 	}
 
 	settings, err := a.mfaRepo.GetByOwner(ctx, account.Prn)
 	if err != nil || settings == nil {
-		utils.RestErrorWrapperUser(writer, "Authentication Failed", "Authentication Failed", http.StatusUnauthorized)
-		return
+		return echoutil.RestErrorWrapperUser(c, "Authentication Failed", "Authentication Failed", http.StatusUnauthorized)
 	}
 
 	user, _, err := a.webauthnUserFor(ctx, account, settings)
 	if err != nil {
-		utils.RestErrorWrapper(writer, "Error with database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with database connectivity", http.StatusInternalServerError)
 	}
 
 	parsed, err := protocol.ParseCredentialRequestResponseBody(bytes.NewReader(payload.Credential))
 	if err != nil {
-		utils.RestErrorWrapper(writer, "Invalid WebAuthn assertion response", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Invalid WebAuthn assertion response", http.StatusBadRequest)
 	}
 
 	credential, err := wa.ValidateLogin(user, sessionData, parsed)
 	if err != nil {
-		a.mfaLoginFailure(writer, r, account.Prn)
-		return
+		return a.mfaLoginFailure(c, account.Prn)
 	}
 
 	// a sudo grant authorises factor changes, so a passkey must not get one
 	// with a weaker (possession-only) assertion than the one it signs in
 	// with; plain second-factor keys are still accepted without UV
-	if ok := a.acceptAssertedCredential(ctx, writer, r, account.Prn, credential, true); !ok {
-		return
+	if ok := a.acceptAssertedCredential(ctx, c, account.Prn, credential, true); !ok {
+		return nil
 	}
 
-	a.issueSudo(writer, account.Prn, "webauthn")
+	return a.issueSudo(c, account.Prn, "webauthn")
 }

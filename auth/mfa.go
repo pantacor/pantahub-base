@@ -1,4 +1,4 @@
-// Copyright 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,14 +23,15 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/auth/authmodels"
 	"gitlab.com/pantacor/pantahub-base/auth/authservices"
 	"gitlab.com/pantacor/pantahub-base/auth/mfaservice"
 	"gitlab.com/pantacor/pantahub-base/auth/storage"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 )
 
 const mfaFreshAuthWindow = 5 * time.Minute
@@ -43,30 +44,30 @@ func mfaFeatureEnabled() bool {
 // noStore marks a response as holding freshly issued authentication material
 // (TOTP secret, recovery codes, session/pending tokens) so no cache,
 // service worker or proxy retains it.
-func noStore(writer rest.ResponseWriter) {
-	writer.Header().Set("Cache-Control", "no-store, no-cache, max-age=0")
-	writer.Header().Set("Pragma", "no-cache")
-	writer.Header().Set("Referrer-Policy", "no-referrer")
+func noStore(c *echo.Context) {
+	c.Response().Header().Set("Cache-Control", "no-store, no-cache, max-age=0")
+	c.Response().Header().Set("Pragma", "no-cache")
+	c.Response().Header().Set("Referrer-Policy", "no-referrer")
 }
 
 // mfaCaller resolves the authenticated USER account behind a management
 // request. Non-USER callers (devices, services, sessions, clients) get a 403.
-func (a *App) mfaCaller(writer rest.ResponseWriter, r *rest.Request) (*accounts.Account, jwtgo.MapClaims, bool) {
-	authInfo := utils.GetAuthInfo(r)
+func (a *App) mfaCaller(c *echo.Context) (*accounts.Account, jwtgo.MapClaims, bool) {
+	authInfo := echoutil.AuthInfo(c)
 	if authInfo == nil || authInfo.CallerType != "USER" {
-		utils.RestErrorWrapperUser(writer, "Only users can manage two-factor authentication", "Only users can manage two-factor authentication", http.StatusForbidden)
+		_ = echoutil.RestErrorWrapperUser(c, "Only users can manage two-factor authentication", "Only users can manage two-factor authentication", http.StatusForbidden)
 		return nil, nil, false
 	}
 
-	claims, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)
+	claims, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)
 	if !ok {
-		utils.RestErrorWrapper(writer, "You need to be logged in", http.StatusForbidden)
+		_ = echoutil.RestErrorWrapper(c, "You need to be logged in", http.StatusForbidden)
 		return nil, nil, false
 	}
 
 	account, err := authservices.GetAccount(string(authInfo.Caller), a.mongoClient)
 	if err != nil {
-		utils.RestErrorWrapper(writer, "Account not found", http.StatusForbidden)
+		_ = echoutil.RestErrorWrapper(c, "Account not found", http.StatusForbidden)
 		return nil, nil, false
 	}
 
@@ -158,7 +159,7 @@ func (a *App) freshAuthOK(account *accounts.Account, password, sudoToken string,
 	}
 
 	if sudoToken != "" {
-		claimsSudo, err := mfaservice.ParseSudoToken(a.jwtMiddleware, sudoToken)
+		claimsSudo, err := mfaservice.ParseSudoToken(a.jwtConfig, sudoToken)
 		if err == nil && claimsSudo.Prn == account.Prn {
 			return true
 		}
@@ -216,24 +217,22 @@ func sessionIsFresh(claims jwtgo.MapClaims) bool {
 // @Failure 403 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /auth/mfa [get]
-func (a *App) handleGetMFAStatus(writer rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetMFAStatus(c *echo.Context) error {
 	if !mfaFeatureEnabled() {
-		utils.RestErrorWrapperUser(writer, "MFA is not enabled on this server", "MFA is not enabled on this server", http.StatusNotImplemented)
-		return
+		return echoutil.RestErrorWrapperUser(c, "MFA is not enabled on this server", "MFA is not enabled on this server", http.StatusNotImplemented)
 	}
 
-	account, _, ok := a.mfaCaller(writer, r)
+	account, _, ok := a.mfaCaller(c)
 	if !ok {
-		return
+		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(r.Request.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
 	settings, err := a.mfaRepo.GetByOwner(ctx, account.Prn)
 	if err != nil {
-		utils.RestErrorWrapper(writer, "Error with database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with database connectivity", http.StatusInternalServerError)
 	}
 
 	response := authmodels.MFAStatusResponse{
@@ -250,14 +249,13 @@ func (a *App) handleGetMFAStatus(writer rest.ResponseWriter, r *rest.Request) {
 
 	creds, err := a.webauthnRepo.ListByOwner(ctx, account.Prn)
 	if err != nil {
-		utils.RestErrorWrapper(writer, "Error with database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with database connectivity", http.StatusInternalServerError)
 	}
 	for i := range creds {
 		response.Webauthn = append(response.Webauthn, credentialInfo(&creds[i]))
 	}
 
-	writer.WriteJson(response)
+	return echoutil.WriteJSON(c, http.StatusOK, response)
 }
 
 // @Summary Start a TOTP (authenticator app) enrollment
@@ -274,40 +272,35 @@ func (a *App) handleGetMFAStatus(writer rest.ResponseWriter, r *rest.Request) {
 // @Failure 409 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /auth/mfa/totp [post]
-func (a *App) handlePostTOTPEnroll(writer rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePostTOTPEnroll(c *echo.Context) error {
 	if !mfaFeatureEnabled() {
-		utils.RestErrorWrapperUser(writer, "MFA is not enabled on this server", "MFA is not enabled on this server", http.StatusNotImplemented)
-		return
+		return echoutil.RestErrorWrapperUser(c, "MFA is not enabled on this server", "MFA is not enabled on this server", http.StatusNotImplemented)
 	}
 
-	account, claims, ok := a.mfaCaller(writer, r)
+	account, claims, ok := a.mfaCaller(c)
 	if !ok {
-		return
+		return nil
 	}
 
 	payload := &authmodels.MFAPasswordRequest{}
-	if err := r.DecodeJsonPayload(payload); err != nil {
-		utils.RestErrorWrapper(writer, "Failed to decode request", http.StatusBadRequest)
-		return
+	if err := echoutil.DecodeJsonPayload(c, payload); err != nil {
+		return echoutil.RestErrorWrapper(c, "Failed to decode request", http.StatusBadRequest)
 	}
 
 	if !a.freshAuthOK(account, payload.Password, payload.SudoToken, claims) {
-		utils.RestErrorWrapperUser(writer, "Password verification failed", "Password verification failed", http.StatusUnauthorized)
-		return
+		return echoutil.RestErrorWrapperUser(c, "Password verification failed", "Password verification failed", http.StatusUnauthorized)
 	}
 
-	ctx, cancel := context.WithTimeout(r.Request.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
 	settings, err := a.mfaRepo.GetByOwner(ctx, account.Prn)
 	if err != nil {
-		utils.RestErrorWrapper(writer, "Error with database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with database connectivity", http.StatusInternalServerError)
 	}
 
 	if settings.HasConfirmedTOTP() {
-		utils.RestErrorWrapperUser(writer, "An authenticator app is already enrolled; remove it first", "An authenticator app is already enrolled; remove it first", http.StatusConflict)
-		return
+		return echoutil.RestErrorWrapperUser(c, "An authenticator app is already enrolled; remove it first", "An authenticator app is already enrolled; remove it first", http.StatusConflict)
 	}
 
 	accountName := account.Email
@@ -317,25 +310,21 @@ func (a *App) handlePostTOTPEnroll(writer rest.ResponseWriter, r *rest.Request) 
 
 	key, err := mfaservice.GenerateTOTPKey(utils.GetEnv(utils.EnvPantahubProductName), accountName)
 	if err != nil {
-		utils.RestErrorWrapper(writer, "Error generating TOTP secret", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error generating TOTP secret", http.StatusInternalServerError)
 	}
 
 	secretEnc, err := mfaservice.EncryptSecret(key.Secret())
 	if err == mfaservice.ErrMFANotConfigured {
-		utils.RestErrorWrapperUser(writer, "MFA is not configured on this server", "MFA is not configured on this server", http.StatusNotImplemented)
-		return
+		return echoutil.RestErrorWrapperUser(c, "MFA is not configured on this server", "MFA is not configured on this server", http.StatusNotImplemented)
 	}
 	if err != nil {
-		utils.RestErrorWrapper(writer, "Error protecting TOTP secret", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error protecting TOTP secret", http.StatusInternalServerError)
 	}
 
 	if settings == nil {
 		userHandle := make([]byte, 32)
 		if _, err := rand.Read(userHandle); err != nil {
-			utils.RestErrorWrapper(writer, "Error generating user handle", http.StatusInternalServerError)
-			return
+			return echoutil.RestErrorWrapper(c, "Error generating user handle", http.StatusInternalServerError)
 		}
 		settings = &storage.MFASettings{
 			Owner:      account.Prn,
@@ -350,12 +339,11 @@ func (a *App) handlePostTOTPEnroll(writer rest.ResponseWriter, r *rest.Request) 
 	}
 
 	if err := a.mfaRepo.Upsert(ctx, settings); err != nil {
-		utils.RestErrorWrapper(writer, "Error with database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with database connectivity", http.StatusInternalServerError)
 	}
 
-	noStore(writer)
-	writer.WriteJson(authmodels.TOTPEnrollResponse{
+	noStore(c)
+	return echoutil.WriteJSON(c, http.StatusOK, authmodels.TOTPEnrollResponse{
 		Secret:     key.Secret(),
 		OtpauthURL: key.URL(),
 	})
@@ -374,54 +362,47 @@ func (a *App) handlePostTOTPEnroll(writer rest.ResponseWriter, r *rest.Request) 
 // @Failure 403 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /auth/mfa/totp/confirm [post]
-func (a *App) handlePostTOTPConfirm(writer rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePostTOTPConfirm(c *echo.Context) error {
 	if !mfaFeatureEnabled() {
-		utils.RestErrorWrapperUser(writer, "MFA is not enabled on this server", "MFA is not enabled on this server", http.StatusNotImplemented)
-		return
+		return echoutil.RestErrorWrapperUser(c, "MFA is not enabled on this server", "MFA is not enabled on this server", http.StatusNotImplemented)
 	}
 
-	account, _, ok := a.mfaCaller(writer, r)
+	account, _, ok := a.mfaCaller(c)
 	if !ok {
-		return
+		return nil
 	}
 
 	payload := &authmodels.TOTPConfirmRequest{}
-	if err := r.DecodeJsonPayload(payload); err != nil {
-		utils.RestErrorWrapper(writer, "Failed to decode request", http.StatusBadRequest)
-		return
+	if err := echoutil.DecodeJsonPayload(c, payload); err != nil {
+		return echoutil.RestErrorWrapper(c, "Failed to decode request", http.StatusBadRequest)
 	}
 
-	ctx, cancel := context.WithTimeout(r.Request.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
 	settings, err := a.mfaRepo.GetByOwner(ctx, account.Prn)
 	if err != nil {
-		utils.RestErrorWrapper(writer, "Error with database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with database connectivity", http.StatusInternalServerError)
 	}
 
 	if settings == nil || settings.TOTP == nil || settings.TOTP.Confirmed {
-		utils.RestErrorWrapperUser(writer, "No pending authenticator enrollment", "No pending authenticator enrollment", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapperUser(c, "No pending authenticator enrollment", "No pending authenticator enrollment", http.StatusBadRequest)
 	}
 
 	// same lockout as the login step-up: a pending enrollment must not be an
 	// unthrottled oracle for the freshly issued secret
 	if settings.IsLocked(time.Now()) {
-		utils.RestErrorWrapperUser(writer, "Too many attempts; try again later", "Too many attempts; try again later", http.StatusTooManyRequests)
-		return
+		return echoutil.RestErrorWrapperUser(c, "Too many attempts; try again later", "Too many attempts; try again later", http.StatusTooManyRequests)
 	}
 
 	secret, err := mfaservice.DecryptSecret(settings.TOTP.SecretEnc)
 	if err != nil {
-		utils.RestErrorWrapper(writer, "Error reading TOTP secret", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error reading TOTP secret", http.StatusInternalServerError)
 	}
 
 	step, valid := mfaservice.VerifyTOTPCode(secret, payload.Code, time.Now())
 	if !valid {
-		a.mfaLoginFailure(writer, r, account.Prn)
-		return
+		return a.mfaLoginFailure(c, account.Prn)
 	}
 
 	// keep any recovery codes still valid from another factor; generate the
@@ -431,20 +412,18 @@ func (a *App) handlePostTOTPConfirm(writer rest.ResponseWriter, r *rest.Request)
 	if settings.RecoveryCodesRemaining() == 0 {
 		plainCodes, hashedCodes, err = mfaservice.GenerateRecoveryCodes()
 		if err != nil {
-			utils.RestErrorWrapper(writer, "Error generating recovery codes", http.StatusInternalServerError)
-			return
+			return echoutil.RestErrorWrapper(c, "Error generating recovery codes", http.StatusInternalServerError)
 		}
 	}
 
 	if err := a.mfaRepo.ConfirmTOTP(ctx, account.Prn, step, hashedCodes); err != nil {
-		utils.RestErrorWrapper(writer, "Error with database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with database connectivity", http.StatusInternalServerError)
 	}
 
 	notifyFactorEnrolled(account, "an authenticator app")
 
-	noStore(writer)
-	writer.WriteJson(authmodels.RecoveryCodesResponse{
+	noStore(c)
+	return echoutil.WriteJSON(c, http.StatusOK, authmodels.RecoveryCodesResponse{
 		RecoveryCodes: plainCodes,
 	})
 }
@@ -463,54 +442,47 @@ func (a *App) handlePostTOTPConfirm(writer rest.ResponseWriter, r *rest.Request)
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /auth/mfa/totp [delete]
-func (a *App) handleDeleteTOTP(writer rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleDeleteTOTP(c *echo.Context) error {
 	if !mfaFeatureEnabled() {
-		utils.RestErrorWrapperUser(writer, "MFA is not enabled on this server", "MFA is not enabled on this server", http.StatusNotImplemented)
-		return
+		return echoutil.RestErrorWrapperUser(c, "MFA is not enabled on this server", "MFA is not enabled on this server", http.StatusNotImplemented)
 	}
 
-	account, claims, ok := a.mfaCaller(writer, r)
+	account, claims, ok := a.mfaCaller(c)
 	if !ok {
-		return
+		return nil
 	}
 
 	payload := &authmodels.MFAPasswordRequest{}
-	if err := r.DecodeJsonPayload(payload); err != nil && err != rest.ErrJsonPayloadEmpty {
-		utils.RestErrorWrapper(writer, "Failed to decode request", http.StatusBadRequest)
-		return
+	if err := echoutil.DecodeJsonPayload(c, payload); err != nil && err != echoutil.ErrJsonPayloadEmpty {
+		return echoutil.RestErrorWrapper(c, "Failed to decode request", http.StatusBadRequest)
 	}
 
 	if !a.freshAuthOK(account, payload.Password, payload.SudoToken, claims) {
-		utils.RestErrorWrapperUser(writer, "Password verification failed", "Password verification failed", http.StatusUnauthorized)
-		return
+		return echoutil.RestErrorWrapperUser(c, "Password verification failed", "Password verification failed", http.StatusUnauthorized)
 	}
 
-	ctx, cancel := context.WithTimeout(r.Request.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
 	settings, err := a.mfaRepo.GetByOwner(ctx, account.Prn)
 	if err != nil {
-		utils.RestErrorWrapper(writer, "Error with database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with database connectivity", http.StatusInternalServerError)
 	}
 
 	if settings == nil || settings.TOTP == nil {
-		utils.RestErrorWrapperUser(writer, "No authenticator enrolled", "No authenticator enrolled", http.StatusNotFound)
-		return
+		return echoutil.RestErrorWrapperUser(c, "No authenticator enrolled", "No authenticator enrolled", http.StatusNotFound)
 	}
 
 	credCount, err := a.webauthnRepo.CountByOwner(ctx, account.Prn)
 	if err != nil {
-		utils.RestErrorWrapper(writer, "Error with database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with database connectivity", http.StatusInternalServerError)
 	}
 
 	if err := a.mfaRepo.RemoveTOTP(ctx, account.Prn, credCount > 0); err != nil {
-		utils.RestErrorWrapper(writer, "Error with database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with database connectivity", http.StatusInternalServerError)
 	}
 
-	writer.WriteHeader(http.StatusNoContent)
+	return echoutil.WriteHeader(c, http.StatusNoContent)
 }
 
 // @Summary Regenerate recovery codes
@@ -527,55 +499,48 @@ func (a *App) handleDeleteTOTP(writer rest.ResponseWriter, r *rest.Request) {
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /auth/mfa/recovery/regenerate [post]
-func (a *App) handlePostRecoveryRegenerate(writer rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePostRecoveryRegenerate(c *echo.Context) error {
 	if !mfaFeatureEnabled() {
-		utils.RestErrorWrapperUser(writer, "MFA is not enabled on this server", "MFA is not enabled on this server", http.StatusNotImplemented)
-		return
+		return echoutil.RestErrorWrapperUser(c, "MFA is not enabled on this server", "MFA is not enabled on this server", http.StatusNotImplemented)
 	}
 
-	account, claims, ok := a.mfaCaller(writer, r)
+	account, claims, ok := a.mfaCaller(c)
 	if !ok {
-		return
+		return nil
 	}
 
 	payload := &authmodels.MFAPasswordRequest{}
-	if err := r.DecodeJsonPayload(payload); err != nil && err != rest.ErrJsonPayloadEmpty {
-		utils.RestErrorWrapper(writer, "Failed to decode request", http.StatusBadRequest)
-		return
+	if err := echoutil.DecodeJsonPayload(c, payload); err != nil && err != echoutil.ErrJsonPayloadEmpty {
+		return echoutil.RestErrorWrapper(c, "Failed to decode request", http.StatusBadRequest)
 	}
 
 	if !a.freshAuthOK(account, payload.Password, payload.SudoToken, claims) {
-		utils.RestErrorWrapperUser(writer, "Password verification failed", "Password verification failed", http.StatusUnauthorized)
-		return
+		return echoutil.RestErrorWrapperUser(c, "Password verification failed", "Password verification failed", http.StatusUnauthorized)
 	}
 
-	ctx, cancel := context.WithTimeout(r.Request.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
 	settings, err := a.mfaRepo.GetByOwner(ctx, account.Prn)
 	if err != nil {
-		utils.RestErrorWrapper(writer, "Error with database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with database connectivity", http.StatusInternalServerError)
 	}
 
 	if settings == nil || !settings.Enabled {
-		utils.RestErrorWrapperUser(writer, "Two-factor authentication is not enabled", "Two-factor authentication is not enabled", http.StatusNotFound)
-		return
+		return echoutil.RestErrorWrapperUser(c, "Two-factor authentication is not enabled", "Two-factor authentication is not enabled", http.StatusNotFound)
 	}
 
 	plainCodes, hashedCodes, err := mfaservice.GenerateRecoveryCodes()
 	if err != nil {
-		utils.RestErrorWrapper(writer, "Error generating recovery codes", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error generating recovery codes", http.StatusInternalServerError)
 	}
 
 	if err := a.mfaRepo.SetRecoveryCodes(ctx, account.Prn, hashedCodes); err != nil {
-		utils.RestErrorWrapper(writer, "Error with database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with database connectivity", http.StatusInternalServerError)
 	}
 
-	noStore(writer)
-	writer.WriteJson(authmodels.RecoveryCodesResponse{
+	noStore(c)
+	return echoutil.WriteJSON(c, http.StatusOK, authmodels.RecoveryCodesResponse{
 		RecoveryCodes: plainCodes,
 	})
 }
