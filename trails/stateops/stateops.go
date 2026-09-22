@@ -440,6 +440,7 @@ func SignatureWarnings(before, after map[string]interface{}) []string {
 	}
 
 	signedAfter := map[string]bool{}
+	excludedAfter := map[string]bool{}
 	for _, sig := range Signatures(after) {
 		if sig.Unreadable != "" {
 			warnings = append(warnings, fmt.Sprintf("%s cannot be read (%s); the device will refuse it", sig.Key, sig.Unreadable))
@@ -447,6 +448,12 @@ func SignatureWarnings(before, after map[string]interface{}) []string {
 		}
 		for _, file := range sig.Protects {
 			signedAfter[file] = true
+		}
+		// A file a signature names but excludes (pvr excludes src.json, and
+		// --noconfig excludes the overlay) is left out on purpose, not
+		// unsigned.
+		for _, file := range sig.Excludes {
+			excludedAfter[file] = true
 		}
 
 		old, existed := beforeSigs[sig.Key]
@@ -467,15 +474,24 @@ func SignatureWarnings(before, after map[string]interface{}) []string {
 	}
 
 	if len(beforeSigs) > 0 {
+		// A part counts as signed when a signature protects any of its files:
+		// the ones it leaves out are excluded on purpose.
+		signedParts := map[string]bool{}
+		for file := range signedAfter {
+			signedParts[PartOf(file)] = true
+		}
+
 		unsigned := map[string]bool{}
 		for key := range after {
-			if key == specKey || strings.HasPrefix(key, sigsPrefix) || signedAfter[key] {
+			part := PartOf(key)
+			if key == specKey || strings.HasPrefix(key, sigsPrefix) || signedAfter[key] ||
+				excludedAfter[key] || signedParts[part] {
 				continue
 			}
 			if _, wasThere := before[key]; wasThere && !isProtected(beforeSigs, key) {
 				continue // it was not signed before either
 			}
-			unsigned[PartOf(key)] = true
+			unsigned[part] = true
 		}
 		if len(unsigned) > 0 {
 			warnings = append(warnings, fmt.Sprintf(

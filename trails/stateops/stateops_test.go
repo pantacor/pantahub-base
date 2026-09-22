@@ -203,3 +203,30 @@ func TestSignatureWarningsNameUnsignedPartsOnSignedDevices(t *testing.T) {
 	require.NotEmpty(t, warnings)
 	assert.Contains(t, strings.Join(warnings, " "), "web")
 }
+
+// pvr excludes <app>/src.json from an app's signature, and --noconfig its
+// configuration. Those files are left out on purpose: importing such an app
+// into a signed state must not be reported as unsigned.
+func TestFilesASignatureExcludesAreNotUnsigned(t *testing.T) {
+	signed := signedState(t)
+
+	// nginx_config is signed apart and covers _config/nginx/**; the nginx
+	// signature excludes nginx/src.json, which is in the state already.
+	before, err := RemoveParts(signed, []string{"nginx"})
+	require.NoError(t, err)
+
+	after, err := Import(before, signed)
+	require.NoError(t, err)
+	assert.Contains(t, after, "nginx/src.json")
+
+	for _, warning := range SignatureWarnings(before, after) {
+		assert.NotContains(t, warning, "no signature protects", "an excluded file is not an unsigned part: %s", warning)
+	}
+
+	// A part nothing signs at all is still reported.
+	unsigned, err := SetDocument(after, "telemetry/run.json", map[string]interface{}{"name": "telemetry"})
+	require.NoError(t, err)
+	warnings := SignatureWarnings(after, unsigned)
+	require.NotEmpty(t, warnings)
+	assert.Contains(t, strings.Join(warnings, " "), "telemetry")
+}
