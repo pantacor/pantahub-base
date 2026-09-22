@@ -90,7 +90,9 @@ var writeTrailScopes = utils.MarshalScopes([]utils.Scope{
 
 func init() {
 	toolScopes[toolGetRevisionParts] = readTrailScopes
-	toolScopes[toolPlanRevision] = readTrailScopes
+	// It stores a plan under the account, and a plan is only good for
+	// commit_revision, which needs the same grant.
+	toolScopes[toolPlanRevision] = writeTrailScopes
 	toolScopes[toolCommitRevision] = writeTrailScopes
 	// The same scopes GET /exports/:owner/:nick/:rev/:filename takes.
 	toolScopes[toolGetExportLink] = readDeviceScopes
@@ -118,7 +120,7 @@ func (s *Service) registerRevisionTools(server *sdk.Server) {
 			"Binaries cannot be edited, only copied with the part they belong to. " +
 			"The answer lists every changed file and warns where a device that verifies signatures would refuse the result. " +
 			"Nothing reaches the device until commit_revision is called with its plan_id. Plans expire after an hour.",
-		Annotations: readOnly("Plan a revision"),
+		Annotations: changes("Plan a revision"),
 	}, s.planRevision)
 
 	destructive := true

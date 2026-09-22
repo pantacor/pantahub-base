@@ -250,6 +250,8 @@ var changingTools = map[string]bool{
 	toolUpdateDeviceToken: true,
 	toolUpdateApp:         true,
 	toolCommitRevision:    true,
+	// It stores a plan of its own, though it never reaches a device.
+	toolPlanRevision: true,
 	// Both put objects into the account.
 	toolGetExportUploadLink: true,
 	toolImportExportFromURL: true,

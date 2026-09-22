@@ -98,10 +98,10 @@ unlocks the tools:
 | Tools | Scopes |
 |---|---|
 | `list_devices`, `get_device`, `get_device_logs`, `list_device_tokens`, `get_device_token`, `get_export_link` | `devices.readonly`, `devices`, `all.readonly`, `all` |
-| `get_device_status`, `list_revisions`, `get_revision`, `get_revision_parts`, `plan_revision`, `get_export_upload` | `trails.readonly`, `trails`, `all.readonly`, `all` |
+| `get_device_status`, `list_revisions`, `get_revision`, `get_revision_parts`, `get_export_upload` | `trails.readonly`, `trails`, `all.readonly`, `all` |
 | `update_user_meta` | `devices.write`, `devices`, `all` |
 | `update_device_token` | `devices.change`, `devices`, `all` |
-| `commit_revision`, `get_export_upload_link`, `import_export_from_url` | `trails.write`, `trails`, `all` |
+| `plan_revision`, `commit_revision`, `get_export_upload_link`, `import_export_from_url` | `trails.write`, `trails`, `all` |
 | `list_apps`, `get_app` | `apps.readonly`, `all.readonly`, `all` |
 | `update_app` | `apps.write`, `all` |
 
