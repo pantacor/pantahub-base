@@ -46,9 +46,9 @@ const revisionInstructions = `New revisions are built like the web app's editor 
 get_revision_parts shows a revision's apps, BSP, configuration and signatures.
 plan_revision prepares a change from the newest revision (remove, copy from
 another device or revision, roll back, edit a JSON document, or import a pvr
-export) without sending anything; show the user its changes and warnings, and
-call commit_revision with its plan_id only once they approve. The device then
-installs it: follow it with get_device_status and get_device_logs.
+export) without sending anything: its answer lists the changes and the
+warnings. commit_revision takes that plan_id and sends the revision to the
+device, which installs it; the device's status and logs report how that went.
 
 Signatures are made with pvr or in CI, never here, and the device verifies
 them. A plan warns where a device that verifies signatures would refuse it.
@@ -117,7 +117,7 @@ func (s *Service) registerRevisionTools(server *sdk.Server) {
 			"and import_export (merge in a pvr export received through get_export_upload_link or import_export_from_url, as the web app's editor merges one). " +
 			"Binaries cannot be edited, only copied with the part they belong to. " +
 			"The answer lists every changed file and warns where a device that verifies signatures would refuse the result. " +
-			"Show the user the plan; nothing changes until commit_revision is called with its plan_id. Plans expire after an hour.",
+			"Nothing reaches the device until commit_revision is called with its plan_id. Plans expire after an hour.",
 		Annotations: readOnly("Plan a revision"),
 	}, s.planRevision)
 
@@ -127,9 +127,9 @@ func (s *Service) registerRevisionTools(server *sdk.Server) {
 		Name:  toolCommitRevision,
 		Title: "Commit a planned revision",
 		Description: "Send a planned revision to the device: exactly the state plan_revision showed becomes its next revision, " +
-			"which the device downloads and installs. Only commit a plan the user approved. " +
+			"which the device downloads and installs. " +
 			"It fails if the device got another revision since the plan was made; plan again then. " +
-			"Follow the installation with get_device_status and, if it fails, get_device_logs.",
+			"The device's status and its logs then report how the installation went.",
 		Annotations: &sdk.ToolAnnotations{
 			Title:           "Commit a planned revision",
 			DestructiveHint: &destructive,
@@ -142,8 +142,8 @@ func (s *Service) registerRevisionTools(server *sdk.Server) {
 		Name:  toolGetExportLink,
 		Title: "Get export download link",
 		Description: "Get a link that downloads a revision as a pvr export (a .tar.gz with the state and its objects), " +
-			"optionally only some parts. The link works without signing in and expires after ten minutes: " +
-			"give it to the user to open, or download it with curl. Anyone holding it can download the export until it expires.",
+			"optionally only some parts. The link works without signing in and expires after ten minutes. " +
+			"Anyone holding it can download the export until it expires.",
 		Annotations: readOnly("Get export download link"),
 	}, s.getExportLink)
 }

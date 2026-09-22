@@ -51,8 +51,8 @@ date, and get_device_logs to find out why a revision failed.
 update_user_meta changes a device's configuration. Device join tokens (what new
 devices enrol with) and the account's OAuth applications can be listed and
 edited, but not created or deleted here, and their secrets are never available:
-send the user to the Pantahub web app for that. Tools that change something ask
-the user first; say exactly what will change before calling one.`
+they are created and deleted in the Pantahub web app. Tools that change
+something are annotated as such and name what they change.`
 
 const (
 	defaultPageSize = 25

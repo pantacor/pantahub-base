@@ -67,9 +67,9 @@ func (s *Service) registerUploadTools(server *sdk.Server) {
 		Name:  toolGetExportUploadLink,
 		Title: "Get export upload link",
 		Description: "Get a single-use link that takes one pvr export (the .tar.gz `pvr export` writes) into the account, " +
-			"for the user to upload with curl: curl -T export.tar.gz '<upload_url>'. The link expires after thirty minutes. " +
-			"Its objects are stored in the account; the export then goes into a revision with the import_export operation of plan_revision. " +
-			"get_export_upload tells whether it arrived.",
+			"which the user uploads the file to with any HTTP client (curl -T export.tar.gz '<upload_url>'). " +
+			"The link expires after thirty minutes. Its objects are stored in the account, and the import_export operation of " +
+			"plan_revision then puts the export into a revision. get_export_upload reports whether it arrived.",
 		Annotations: changes("Get export upload link"),
 	}, s.getExportUploadLink)
 
@@ -77,8 +77,8 @@ func (s *Service) registerUploadTools(server *sdk.Server) {
 		Name:  toolImportExportFromURL,
 		Title: "Import export from URL",
 		Description: "Have the server fetch a pvr export from an https URL, such as a CI artifact, and take it into the account. " +
-			"Only hosts this server allows can be fetched from. The fetch runs in the background: " +
-			"poll get_export_upload until it is received, then plan_revision with import_export.",
+			"Only hosts this server allows can be fetched from. The fetch runs in the background; " +
+			"get_export_upload reports when it has been received, and the import_export operation of plan_revision merges it.",
 		Annotations: changes("Import export from URL"),
 	}, s.importExportFromURL)
 
