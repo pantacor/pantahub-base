@@ -97,6 +97,9 @@ func (app *App) Mount(s *echoutil.Server) {
 		}),
 		echoutil.BasicAuthToBearer(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtConfig, Mongo: app.mongoClient}),
 		bearerOrAnon(echoutil.JWT(app.jwtConfig), app.anonToken),
+		// Auth resolves the caller ScopeFilter checks; without it every
+		// export of an authenticated user answers 401.
+		echoutil.Auth(),
 	)
 
 	readDevicesScopes := []utils.Scope{

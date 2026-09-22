@@ -75,6 +75,7 @@ func (app *App) Mount(s *echoutil.Server) {
 		}),
 		echoutil.BasicAuthToBearer(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtConfig, Mongo: app.mongoClient}),
 		echoutil.JWT(app.jwtConfig),
+		echoutil.Auth(),
 	)
 
 	g.GET("/", echoutil.ScopeFilter(

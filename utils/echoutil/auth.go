@@ -34,7 +34,12 @@ const (
 func Auth() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
-			origCallerClaims := c.Get(KeyJWTPayload).(jwt.MapClaims)
+			// A group may let unauthenticated requests through (exports serves
+			// public devices); without claims there is no caller to resolve.
+			origCallerClaims, ok := c.Get(KeyJWTPayload).(jwt.MapClaims)
+			if !ok {
+				return next(c)
+			}
 
 			callerClaims, authInfo, forbidden := utils.ResolveCaller(origCallerClaims)
 
