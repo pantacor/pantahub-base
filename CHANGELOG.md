@@ -1,8 +1,52 @@
 
+<a name="057"></a>
+## [057](https://gitlab.com/pantacor/pantahub-base/compare/056...057)
+
+> 2026-09-22
+
+### Docs
+
+* **mcp:** describe what tools do, not how to behave
+
+### Feat
+
+* **mcp:** plan_revision is a write, and asks for a write grant
+* **mcp:** serve an MCP endpoint that manages and deploys to devices
+
+### Fix
+
+* **exports,metrics:** resolve the caller before checking scopes
+* **stateops:** a file a signature excludes is not an unsigned part
+
+
 <a name="056"></a>
-## [056](https://gitlab.com/pantacor/pantahub-base/compare/055...056)
+## [056](https://gitlab.com/pantacor/pantahub-base/compare/backup/echo-migration-presquash...056)
 
 > 2026-09-18
+
+### Chore
+
+* update CHANGELOG.md for release 056
+
+### Feat
+
+* migrate the API from go-json-rest to echo
+
+
+<a name="backup/echo-migration-presquash"></a>
+## [backup/echo-migration-presquash](https://gitlab.com/pantacor/pantahub-base/compare/echo-migration-presquash...backup/echo-migration-presquash)
+
+> 2026-09-17
+
+### Feat
+
+* migrate the API from go-json-rest to echo
+
+
+<a name="echo-migration-presquash"></a>
+## [echo-migration-presquash](https://gitlab.com/pantacor/pantahub-base/compare/055...echo-migration-presquash)
+
+> 2026-09-17
 
 ### Build
 
@@ -10,19 +54,58 @@
 
 ### Feat
 
-* migrate the API from go-json-rest to echo
+* serve /auth from echo; last service off go-json-rest
+* serve /devices from echo
+* serve /trails from echo
+* serve /objects from echo
+* serve /apps and /webhooks from echo
+* serve /logs from echo
+* serve /exports from echo
+* serve /subscriptions from echo
+* serve /healthz and /metrics from echo
+* serve /changes, /tokens and /profiles from echo
+* serve /plog, /callbacks and /cron from echo
+* **dash:** serve /dash from echo
+* **echo:** conditional middleware reusing go-json-rest conditions
+* **echo:** trace echo-served requests with otelecho
+* **echo:** ScopeFilter and ScopeFilterOptionalAuth for echo routes
+* **echo:** DecodeJsonPayload, UserTypeFilter and route-middleware filters
+* **echo:** go-json-rest-compatible Basic auth for the saadmin endpoints
+* **echo:** CanonicalJSON middleware for trails
+* **echo:** global server with per-service pre-routing middleware chains
+* **echo:** Prometheus metrics middleware with unchanged labels
+* **echo:** access logs identical to go-json-rest's
+* **echo:** go-json-rest-compatible CORS, routing and recover
+* **echo:** translate Basic personal tokens through the same code as go-json-rest
+* **echo:** resolve the caller through the same code as go-json-rest
+* **echo:** JWT authentication through the same code as go-json-rest
+* **echo:** wire-compatible response writers for migrated handlers
 
 ### Fix
 
+* **auth:** stop after writing an error in account and password recovery
+* **echo:** decide 404 vs 405 like go-json-rest
+* **echo:** range-check the response size before converting to uint64
 * **trails:** answer 404, not 500, for a revision that does not exist
 
 ### Refactor
 
+* remove go-json-rest
+* **echo:** framework-neutral jwtauth config for echo JWT
+* **echo:** drop go-json-rest types from echoutil and migrated services
 * **jwt:** vendor the go-json-rest JWT middleware fork
+
+### Style
+
+* shorten migration code comments
 
 ### Test
 
+* record go-json-rest reference outputs for the differential tests
 * repair the five test files that no longer compiled
+* **auth:** testcontainers Mongo and a wire contract golden
+* **golden:** skip live log bodies for query-string /logs probes
+* **golden:** drop probes whose slugs collided with existing ones
 * **golden:** keep the harness stable against a live, moving fleet
 * **golden:** pin the 500 a device gets when polling for a missing revision
 * **golden:** cover path-parameter routes and malformed identifiers
@@ -111,27 +194,28 @@
 * **auth:** accept passkeys as second factor without user verification
 * **auth:** generate account challenges with crypto/rand
 * **ci:** bump gorilla/websocket to v1.5.3 to clear GO-2026-6278
-* **devices:** stop honoring client-chosen _id takeover on /register
 * **devices:** 403 non-owner delete, scrub public metas, no secrets in logs
-* **devices:** let any logged-in user delete an unclaimed device
 * **devices:** accept body-less register and claim requests
 * **devices:** never touch the secret in PUT; unbreak device claims
 * **devices:** restore anonymous device self-registration
+* **devices:** let any logged-in user delete an unclaimed device
+* **devices:** stop honoring client-chosen _id takeover on /register
 * **features:** send CORS headers on GET /features
-* **mqtt:** store logs through the registered logs backend
-* **mqtt:** close five review findings in the OTA message plane
+* **mqtt:** bind device sessions to their own client id
 * **mqtt:** close notifier reconcile and publish gaps
 * **mqtt:** users can no longer claim device-shaped session ids
-* **mqtt:** bind device sessions to their own client id
+* **mqtt:** store logs through the registered logs backend
+* **mqtt:** close five review findings in the OTA message plane
 * **oauth:** carry social-connect state in the signed state param, not cross-site cookies
 * **objects:** re-check disk quota after the object insert
 * **objects:** stop signing object tokens with the placeholder secret
 * **profiles:** reject bad meta payloads; 403s no longer nil-deref
 * **querymongo:** stop panicking on crafted pagination params
 * **subscriptions:** stop mutating the default-subscription template
-* **tokens:** answer caller errors with 400/409 instead of 500 on create
 * **tokens:** users can no longer mint SERVICE-type PATs
+* **tokens:** answer caller errors with 400/409 instead of 500 on create
 * **trails:** quota 412 without nil-deref, missing returns, decode check
+* **trails,objects:** validate client-supplied Mongo filters
 * **utils:** UserTypeFilter fails closed without auth info
 * **utils:** rate-limit on the ingress-observed client address
 
