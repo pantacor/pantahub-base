@@ -186,6 +186,58 @@ func CheckDeviceQuota(
 	return result, nil
 }
 
+// ErrDeviceNotOwned is returned when the device to change does not exist or
+// belongs to somebody else. The two are not told apart on purpose.
+var ErrDeviceNotOwned = errors.New("device not found")
+
+// PatchUserMeta merges data into the user-meta of one of owner's devices and
+// returns what was applied. A nil value removes its key, and nested maps are
+// merged key by key, so a patch never drops the siblings of what it touches.
+//
+// It is the one implementation behind PATCH /devices/:id/user-meta and every
+// other way of changing a device's configuration, so that they cannot drift
+// apart. owner has to come from the authenticated identity: it is what pins
+// the update to the caller's own devices.
+func PatchUserMeta(ctx context.Context, mongoClient *mongo.Client, owner string, deviceID primitive.ObjectID, data map[string]interface{}) (map[string]interface{}, error) {
+	// Quote the BSON keys first to handle dots in key names (e.g. "lo.ipv4")
+	data = utils.BsonQuoteMap(&data)
+
+	collection := mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
+	if collection == nil {
+		return nil, errors.New("error with database connectivity")
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	setFields := bson.M{}
+	unsetFields := bson.M{}
+
+	// Deep flatten the quoted data to allow atomic nested updates
+	flattenMap("user-meta", data, setFields, unsetFields)
+
+	// Always update timemodified
+	setFields["timemodified"] = time.Now()
+
+	updateDoc := bson.M{}
+	if len(setFields) > 0 {
+		updateDoc["$set"] = setFields
+	}
+	if len(unsetFields) > 0 {
+		updateDoc["$unset"] = unsetFields
+	}
+
+	updateResult, err := collection.UpdateOne(ctx, bson.M{"_id": deviceID, "owner": owner}, updateDoc)
+	if err != nil {
+		return nil, err
+	}
+	if updateResult.MatchedCount == 0 {
+		return nil, ErrDeviceNotOwned
+	}
+
+	return utils.BsonUnquoteMap(&data), nil
+}
+
 // flattenMap flattens a nested map into dot-notation keys for MongoDB atomic updates
 func flattenMap(prefix string, m map[string]interface{}, setFields bson.M, unsetFields bson.M) {
 	for k, v := range m {

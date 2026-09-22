@@ -73,6 +73,8 @@ type IScopes struct {
 	Webhooks        Scope
 	ReadWebhooks    Scope
 	WriteWebhooks   Scope
+	ReadApps        Scope
+	WriteApps       Scope
 }
 
 // Scopes variable with all the posible scopes
@@ -206,6 +208,19 @@ var Scopes = &IScopes{
 		ID:          "webhooks.write",
 		Service:     PantahubServiceID,
 		Description: "Write only webhooks",
+	},
+	// The third party applications an account registered (/apps). Managing
+	// them is its own grant: an integration allowed to look after a user's
+	// devices has no business editing where that user's OAuth clients redirect.
+	ReadApps: Scope{
+		ID:          "apps.readonly",
+		Service:     PantahubServiceID,
+		Description: "Read only your registered applications",
+	},
+	WriteApps: Scope{
+		ID:          "apps.write",
+		Service:     PantahubServiceID,
+		Description: "Update your registered applications",
 	},
 }
 

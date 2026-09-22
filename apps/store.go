@@ -134,12 +134,57 @@ func SearchApp(ctx context.Context, owner string, id string, database *mongo.Dat
 	}
 
 	if len(apps) != 1 {
+		// A client lookup (no owner) that finds no stored application falls
+		// back to the built-in one. A stored application with that nick,
+		// created before it was built in, keeps precedence.
+		if builtin := builtinApp(id); owner == "" && len(apps) == 0 && builtin != nil {
+			return builtin, 0, nil
+		}
 		return nil, http.StatusNotFound, errors.New("App not found (id " + id + ")")
 	}
 
 	tpApp := apps[0]
 
 	return &tpApp, 0, nil
+}
+
+// UpdateApp sets fields on one of owner's applications, named by id, prn or
+// nick as in SearchApp, and returns it as stored afterwards. Only those fields
+// and time-modified change. Built-in clients and applications without an owner
+// are never found, so they cannot be changed through it.
+func UpdateApp(ctx context.Context, owner, id string, fields map[string]interface{}, database *mongo.Database) (*TPApp, int, error) {
+	if owner == "" {
+		return nil, http.StatusNotFound, errors.New("App not found (id " + id + ")")
+	}
+	if len(fields) == 0 {
+		return nil, http.StatusBadRequest, errors.New("nothing to update")
+	}
+
+	app, httpCode, err := SearchApp(ctx, owner, id, database)
+	if err != nil {
+		return nil, httpCode, err
+	}
+
+	set := bson.M{"time-modified": time.Now()}
+	for key, value := range fields {
+		set[key] = value
+	}
+
+	ctxC, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	updated := &TPApp{}
+	err = database.Collection(DBCollection).FindOneAndUpdate(ctxC,
+		bson.M{"_id": app.ID, "owner": owner, "deleted-at": nil},
+		bson.M{"$set": set},
+		options.FindOneAndUpdate().SetReturnDocument(options.After)).Decode(updated)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, http.StatusNotFound, errors.New("App not found (id " + id + ")")
+	}
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.New("error updating third party application " + err.Error())
+	}
+	return updated, 0, nil
 }
 
 // SearchApps search all third party app by id or prn

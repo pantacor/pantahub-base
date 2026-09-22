@@ -74,8 +74,14 @@ func (a *App) handleGetExport(c *echo.Context) error {
 		return echoutil.RestErrorWrapper(c, "Session has no owner info", http.StatusBadRequest)
 	}
 
-	authType := authTypeI.(string)
+	authType, _ := authTypeI.(string)
 
+	return a.serveExport(c, owner, nick, rev, filename, frags, meta, tokenOwner, authType)
+}
+
+// serveExport writes the export of one revision of a device, as the caller
+// identified by tokenOwner and authType may see it.
+func (a *App) serveExport(c *echo.Context, owner, nick, rev, filename, frags string, meta bool, tokenOwner, authType string) error {
 	exportservice := exportservices.CreateService(a.mongoClient, utils.MongoDb)
 
 	account, err := exportservice.GetUserAccountByNick(c.Request().Context(), owner)

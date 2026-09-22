@@ -262,3 +262,121 @@ X-Runtime: 0.000193
 
 Implicit access tokens need renewal after given expiry timeout (currently 1h)
 
+
+# Standard OAuth 2.1 clients (MCP clients such as claude.ai)
+
+The PKCE flow under `/auth/oauth` also serves clients that were never registered
+here and only know the API's URL. Everything below is opt-in per request: a
+client that names no `resource` and has a registered `client_id` gets exactly
+what it got before, including the JSON request and response shapes.
+
+## Discovery
+
+`GET /.well-known/oauth-authorization-server` (RFC 8414) names the authorize and
+token endpoints, the dynamic registration endpoint (when enabled), `S256` as the
+only PKCE method, `none` as the only token endpoint auth method, and the scopes
+of the registered resources.
+
+## Dynamic Client Registration (RFC 7591)
+
+Public clients without a hosted metadata document (such as OpenCode or other
+CLI/desktop MCP tools) register dynamically through `POST /auth/oauth/register`,
+advertised as `registration_endpoint` in the metadata document.
+
+Registration is anonymous, so it is fenced in:
+
+- It is only offered when a resource is registered (the MCP endpoint, with
+  `PANTAHUB_MCP_ENABLED=true`) and `PANTAHUB_OAUTH_DCR_ALLOWED_REDIRECT_HOSTS`
+  is set.
+- Every redirect URI must be on a host in that list, comma separated, for
+  example `claude.ai,127.0.0.1,localhost` (the loopback entries admit desktop
+  clients). Cleartext HTTP is loopback only. An empty list turns registration
+  off. It is independent of `PANTAHUB_OAUTH_CIMD_ALLOWED_HOSTS`, which only
+  says where URL client ids may live.
+- The client is stored as *dynamic*: its redirect URIs are matched exactly (no
+  paths beneath them), it gets no scopes of its own, and it can only complete
+  the authorization code flow with a `resource`, so it only ever gets
+  resource-bound tokens. The polling flow (`/auth/oauth/pkce/init`), `/auth/code`
+  and the implicit flow refuse it.
+- Registrations are throttled per address and in total, the name and links it
+  gives itself are sanitised, and a registration with no live refresh token is
+  removed after 7 days (the client registers again).
+
+## Clients identified by a URL
+
+With `PANTAHUB_OAUTH_CIMD_ENABLED=true` a `client_id` may be an `https` URL that
+serves a Client ID Metadata Document. The API fetches it, requires the document
+to name that same URL as its `client_id`, and accepts only the `redirect_uris`
+it lists, compared exactly (the loopback port excepted, RFC 8252). Registered
+applications are PRNs, so the two kinds of client id cannot be confused.
+
+The fetch is fenced against request forgery: `https` only, no redirects, no IP
+literals, a 64 KB and 5 second budget, and a dialer that refuses any address
+that is not publicly routable at connect time. Set
+`PANTAHUB_OAUTH_CIMD_ALLOWED_HOSTS` (comma separated, for example `claude.ai`)
+to only admit the clients you know; empty allows any public host. Fetches are
+throttled per host and in total, since the authorize endpoint triggers them
+without a login.
+
+A URL client, like a dynamic one, must name a `resource`; without one the
+authorize endpoint answers `invalid_target` on its redirect URI.
+
+`GET /auth/oauth/client?client_id=<id>[&redirect_uri=<uri>]` (signed-in users
+only) describes a client to the consent page. `host` is the one field the client
+cannot make up: the host of a URL client id, or of the redirect URI the consent
+is for (pass it). `unverified` is set for URL and dynamic clients.
+
+## Authorization codes
+
+The `auth_code` on the consent URL is only a handle: it has passed through the
+browser of whoever started the flow. The code delivered to the redirect URI is
+minted when the user approves, and the handle is never redeemable.
+
+## Resource-bound tokens
+
+A client that sends `resource=<url>` (RFC 8707) on the authorize request gets a
+token that is only good at that resource: `aud` is the resource, `iss` is this
+API, and `scopes` is what was asked for narrowed to what the resource allows,
+never the account-wide scope. The REST API and the MQTT plane refuse such a
+token; only the resource accepts it. Resources are registered in code
+(`App.RegisterOAuthResource`); the MCP endpoint registers itself.
+
+An unknown resource, a PKCE method other than `S256` or a `response_type` other
+than `code` is reported to such a client on its redirect URI (`error=`,
+`state=`, `iss=`), once that URI has been validated. Before that, errors are
+shown, never redirected.
+
+## Token endpoint
+
+`POST /auth/oauth/token` accepts `application/x-www-form-urlencoded`, as OAuth
+specifies, as well as the JSON it always took. Responses carry `access_token`
+next to `token`. Form-encoded requests get RFC 6749 errors
+(`{"error": "invalid_grant", "error_description": "..."}`); JSON requests keep
+this API's error shape.
+
+Resource-bound grants always get a `refresh_token`; `offline_access` is neither
+needed nor advertised. `grant_type=refresh_token`
+(with `client_id`) returns a new access token and a new refresh token; the one
+presented is spent. Refresh tokens are stored hashed, last
+`PANTAHUB_OAUTH_REFRESH_TOKEN_DAYS` (default 30) from their last use, and are
+bound to their client. Presenting a spent one after a 30 second retry grace
+revokes every token descended from the same consent.
+
+## Connected applications
+
+A resource-bound grant is a *connection*: an application that may act for the
+user until they say otherwise. Every access token issued under it carries the
+connection id in its `cnx` claim.
+
+- `GET /auth/oauth/connections` lists the caller's connections: client id, the
+  name the client gave itself, the host a URL client lives on (the part it
+  cannot make up), the resource, the granted scopes, when it was granted, when
+  it last refreshed and when it lapses if unused.
+- `DELETE /auth/oauth/connections/:id` ends one. Its refresh token stops working
+  and the resource stops accepting access tokens issued under it, so the
+  application is cut off within seconds (the resource caches "still connected"
+  for 15 seconds), not when its current token expires.
+
+Both take a `USER` or `SESSION` login. A connected application cannot call them:
+its token is resource-bound and this API refuses those. Resetting a password
+ends every connection of the account.

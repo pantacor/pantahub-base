@@ -571,6 +571,13 @@ func (a *App) handlePasswordReset(c *echo.Context) error {
 		return echoutil.RestError(c, err, err.Error(), http.StatusInternalServerError)
 	}
 
+	// A password is reset when an account may have been in the wrong hands, and
+	// whoever had it may have connected an application that would outlive the
+	// new password. End every connection; the user connects again what they
+	// still want. The reset itself has succeeded, so a failure here is logged
+	// rather than reported as a failed reset.
+	endOAuthConnections(c.Request().Context(), account.Prn, "password reset")
+
 	return echoutil.WriteJSON(c, http.StatusOK, true)
 }
 
@@ -674,7 +681,6 @@ func (a *App) handlePostToken(c *echo.Context) error {
 	// this is the claim of the service authenticating itself
 	caller := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"].(string)
 
-	log.Println("Requesting code " + tokenRequest.Code)
 	// we parse the accessCode to see if we can swap it out.
 	tok, err := jwtgo.Parse(tokenRequest.Code, func(token *jwtgo.Token) (interface{}, error) {
 		if token.Method.Alg() != a.jwtConfig.SigningAlgorithm {
@@ -694,14 +700,23 @@ func (a *App) handlePostToken(c *echo.Context) error {
 		return echoutil.RestErrorWrapper(c, "Failed validating the access Code claims", http.StatusUnauthorized)
 	}
 
-	claims := tok.Claims.(jwtgo.MapClaims)
+	claims, ok := tok.Claims.(jwtgo.MapClaims)
+	if !ok {
+		return echoutil.RestErrorWrapper(c, "Failed validating the access Code claims", http.StatusUnauthorized)
+	}
 
-	user := claims["approver_prn"].(string)
-	userNick := claims["approver_nick"].(string)
-	userType := claims["approver_type"].(string)
-	userRoles := claims["approver_roles"].(string)
-	service := claims["service"].(string)
-	scopes := claims["scopes"].(string)
+	// Any token signed with this key parses; only an access code carries
+	// these claims, and anything else (a login or resource-bound token) is
+	// refused rather than trusted.
+	user, _ := claims["approver_prn"].(string)
+	userNick, _ := claims["approver_nick"].(string)
+	userType, _ := claims["approver_type"].(string)
+	userRoles, _ := claims["approver_roles"].(string)
+	service, _ := claims["service"].(string)
+	scopes, _ := claims["scopes"].(string)
+	if user == "" || service == "" || utils.IsResourceBoundAudience(claims["aud"]) {
+		return echoutil.RestErrorWrapper(c, "Failed validating the access Code claims", http.StatusUnauthorized)
+	}
 	log.Println("DEBUG: request to issue accesstoken: service=" + service + "user=" + user + " scopes=" + scopes)
 
 	if service != caller {

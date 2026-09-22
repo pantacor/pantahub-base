@@ -20,6 +20,9 @@
 package trails
 
 import (
+	"errors"
+	"fmt"
+	"go.mongodb.org/mongo-driver/mongo"
 	"log"
 	"net/http"
 	"strconv"
@@ -117,11 +120,6 @@ func (a *App) handlePostStep(c *echo.Context) error {
 		}
 	}
 
-	collSteps := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
-	if collSteps == nil {
-		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
-	}
-
 	collDevices := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collDevices == nil {
 		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
@@ -136,25 +134,58 @@ func (a *App) handlePostStep(c *echo.Context) error {
 	}
 
 	newStep := trailmodels.Step{}
-	previousStep := trailmodels.Step{}
 	if err := echoutil.DecodeJsonPayload(c, &newStep); err != nil {
 		return echoutil.RestErrorWrapper(c, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
+	}
+
+	autoLink := true
+	autolinkValue, ok := c.Request().URL.Query()["autolink"]
+	if ok && autolinkValue[0] == "no" {
+		autoLink = false
+	}
+
+	created, status, err := a.CreateStep(rContext, trail, newStep, autoLink)
+	if err != nil {
+		return echoutil.RestErrorWrapper(c, err.Error(), status)
+	}
+	return echoutil.WriteJSON(c, http.StatusOK, created)
+}
+
+// ErrStepExists means the revision asked for was created in the meantime.
+var ErrStepExists = errors.New("that revision already exists")
+
+// CreateStep adds newStep to trail as the next revision the device is asked
+// to run. newStep.Rev -1 means the one after the newest; any other value must
+// follow an existing revision and not exist yet. The caller has checked that
+// it may post to trail. It answers the HTTP status to report on failure.
+func (a *App) CreateStep(rContext context.Context, trail trailmodels.Trail, newStep trailmodels.Step, autoLink bool) (*trailmodels.Step, int, error) {
+	var (
+		err    error
+		ctx    context.Context
+		cancel context.CancelFunc
+	)
+	previousStep := trailmodels.Step{}
+
+	collTrails := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_trails")
+	collSteps := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
+	if collTrails == nil || collSteps == nil {
+		return nil, http.StatusInternalServerError, errors.New("Error with Database connectivity")
 	}
 
 	if newStep.Rev == -1 {
 		ctx, cancel := context.WithTimeout(rContext, 10*time.Second)
 		defer cancel()
 
-		newStep.Rev, err = a.getLatestStepRev(ctx, trailObjectID)
+		newStep.Rev, err = a.getLatestStepRev(ctx, trail.ID)
 		if err != nil {
-			return echoutil.RestErrorWrapper(c, "Error with getLatestStepRev: "+err.Error(), http.StatusInternalServerError)
+			return nil, http.StatusInternalServerError, errors.New("Error with getLatestStepRev: " + err.Error())
 		}
 
 		newStep.Rev++
 	}
 
 	if newStep.Rev > 0 {
-		previousStepID := trailID + "-" + strconv.Itoa(newStep.Rev-1)
+		previousStepID := trail.ID.Hex() + "-" + strconv.Itoa(newStep.Rev-1)
 		ctx, cancel = context.WithTimeout(rContext, 10*time.Second)
 		defer cancel()
 
@@ -164,7 +195,7 @@ func (a *App) handlePostStep(c *echo.Context) error {
 		}
 		err = collSteps.FindOne(ctx, query).Decode(&previousStep)
 		if err != nil {
-			return echoutil.RestErrorWrapper(c, "No access to resource or bad step "+previousStepID, http.StatusInternalServerError)
+			return nil, http.StatusInternalServerError, errors.New("No access to resource or bad step " + previousStepID)
 		}
 	}
 
@@ -194,20 +225,14 @@ func (a *App) handlePostStep(c *echo.Context) error {
 
 	isDevicePublic, err := a.IsDevicePublic(ctx, newStep.TrailID)
 	if err != nil {
-		return echoutil.RestErrorWrapper(c, "Error checking device is public or not: "+err.Error(), http.StatusInternalServerError)
+		return nil, http.StatusInternalServerError, errors.New("Error checking device is public or not: " + err.Error())
 	}
 	newStep.IsPublic = isDevicePublic
 
 	// IMPORTANT: statesha has to be before state as that will be escaped
 	newStep.StateSha, err = utils.StateSha(&newStep.State)
 	if err != nil {
-		return echoutil.RestErrorWrapper(c, "Error calculating Sha "+err.Error(), http.StatusInternalServerError)
-	}
-
-	autoLink := true
-	autolinkValue, ok := c.Request().URL.Query()["autolink"]
-	if ok && autolinkValue[0] == "no" {
-		autoLink = false
+		return nil, http.StatusInternalServerError, errors.New("Error calculating Sha " + err.Error())
 	}
 
 	ctx, cancel = context.WithTimeout(rContext, 10*time.Second)
@@ -215,7 +240,7 @@ func (a *App) handlePostStep(c *echo.Context) error {
 
 	objectList, err := ProcessObjectsInState(ctx, newStep.Owner, newStep.State, autoLink, a)
 	if err != nil {
-		return echoutil.RestErrorWrapper(c, "Error processing step objects in state: "+err.Error(), http.StatusInternalServerError)
+		return nil, http.StatusInternalServerError, errors.New("Error processing step objects in state: " + err.Error())
 	}
 
 	newStep.UsedObjects = objectList
@@ -234,8 +259,11 @@ func (a *App) handlePostStep(c *echo.Context) error {
 		newStep,
 	)
 
+	if mongo.IsDuplicateKeyError(err) {
+		return nil, http.StatusConflict, fmt.Errorf("%w: revision %d", ErrStepExists, newStep.Rev)
+	}
 	if err != nil {
-		return echoutil.RestErrorWrapper(c, "No access to resource or bad step rev1 "+err.Error(), http.StatusInternalServerError)
+		return nil, http.StatusInternalServerError, errors.New("No access to resource or bad step rev1 " + err.Error())
 	}
 	ctx, cancel = context.WithTimeout(rContext, 10*time.Second)
 	defer cancel()
@@ -252,12 +280,12 @@ func (a *App) handlePostStep(c *echo.Context) error {
 	if err != nil {
 		log.Printf("Error updating last-touched for trail in poststep; not failing because step was written: %s\n  => ERROR: %s\n ", trail.ID.Hex(), err.Error())
 	}
-	if updateResult.MatchedCount == 0 {
-		return echoutil.RestErrorWrapper(c, "Trail not found", http.StatusBadRequest)
+	if updateResult != nil && updateResult.MatchedCount == 0 {
+		return nil, http.StatusBadRequest, errors.New("Trail not found")
 	}
 
 	newStep.State = utils.BsonUnquoteMap(&newStep.State)
 	newStep.Meta = utils.BsonUnquoteMap(&newStep.Meta)
 
-	return echoutil.WriteJSON(c, http.StatusOK, newStep)
+	return &newStep, http.StatusOK, nil
 }

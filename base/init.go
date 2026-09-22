@@ -40,6 +40,7 @@ import (
 	"gitlab.com/pantacor/pantahub-base/exports"
 	"gitlab.com/pantacor/pantahub-base/healthz"
 	"gitlab.com/pantacor/pantahub-base/logs"
+	"gitlab.com/pantacor/pantahub-base/mcp"
 	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/mqtt"
 	"gitlab.com/pantacor/pantahub-base/objects"
@@ -124,18 +125,26 @@ func DoInit() http.Handler {
 	subService := subscriptions.NewService(mongoClient, utils.Prn("prn::subscriptions:"),
 		adminUsers, subscriptions.SubscriptionProperties)
 
+	// Kept in scope for the MCP endpoint below, which registers itself as a
+	// resource this authorization server may bind tokens to.
+	// auth gets its own config: New installs its Authenticator/PayloadFunc.
+	authApp := auth.New(&jwtauth.Config{
+		Key:              jwtSecret,
+		Pub:              jwtPub,
+		Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
+		Timeout:          time.Minute * time.Duration(timeout),
+		MaxRefresh:       time.Minute * time.Duration(maxRefresh),
+		SigningAlgorithm: "RS256",
+	}, mongoClient)
 	{
-		// auth gets its own config: New installs its Authenticator/PayloadFunc.
-		app := auth.New(&jwtauth.Config{
-			Key:              jwtSecret,
-			Pub:              jwtPub,
-			Realm:            "\"pantahub services\", ph-aeps=\"" + phAuth + "\"",
-			Timeout:          time.Minute * time.Duration(timeout),
-			MaxRefresh:       time.Minute * time.Duration(maxRefresh),
-			SigningAlgorithm: "RS256",
-		}, mongoClient)
-		app.Mount(echoServer)
+		authApp.Mount(echoServer)
 		mux.Handle("/auth/", echoServer.E) // echo
+
+		// RFC 8414 discovery: how an OAuth client that only knows this API's
+		// URL finds the authorize and token endpoints under /auth/oauth.
+		for _, path := range auth.AuthorizationServerMetadataPaths() {
+			mux.Handle(path, authApp.AuthorizationServerMetadataHandler())
+		}
 	}
 	{
 		app := objects.New(jwtConfig, subService, mongoClient)
@@ -217,12 +226,12 @@ func DoInit() http.Handler {
 		app.Mount(echoServer)
 		mux.Handle("/callbacks/", echoServer.E) // echo
 	}
-	{
-		anonToken := func() string { return authservices.CreateAnonToken(jwtConfig) }
-		app := exports.New(jwtConfig, anonToken, mongoClient)
-		app.Mount(echoServer)
-		mux.Handle("/exports/", echoServer.E) // echo
-	}
+	// Kept in scope: export imports store objects through the file server
+	// below, and the MCP endpoint starts uploads through it.
+	anonToken := func() string { return authservices.CreateAnonToken(jwtConfig) }
+	exportsApp := exports.New(jwtConfig, anonToken, mongoClient)
+	exportsApp.Mount(echoServer)
+	mux.Handle("/exports/", echoServer.E) // echo
 	{
 		app := tokens.New(jwtConfig, mongoClient)
 		app.Mount(echoServer)
@@ -251,6 +260,8 @@ func DoInit() http.Handler {
 
 	// @deprecated
 	mux.Handle("/local-s3/", http.StripPrefix("/local-s3", fserver))
+	// Object signed put URLs name /local-s3/; imports use the same handler.
+	exportsApp.SetObjectServer(http.StripPrefix("/local-s3", fservermux))
 
 	// handle s3 storage request's
 	mux.Handle("/s3/", http.StripPrefix("/s3", fserver))
@@ -268,6 +279,32 @@ func DoInit() http.Handler {
 			path := mqtt.WsPath()
 			mux.Handle(path, service.Handler())
 			log.Println("INFO: mqtt message plane serving at " + path)
+		}
+	}
+
+	// The MCP endpoint lets an AI assistant manage the devices of the user who
+	// authorized it. Like MQTT it is a plain handler on this mux rather than an
+	// echo route, and it brings its own authentication.
+	if mcp.Enabled() {
+		service, err := mcp.New(mongoClient, logsApp)
+		if err == nil {
+			// Tokens for the endpoint are issued by /auth/oauth, which has to
+			// know the endpoint exists and what a token for it may carry.
+			err = authApp.RegisterOAuthResource(auth.OAuthResource{
+				URL:           service.ResourceURL(),
+				Scopes:        service.Scopes(),
+				DefaultScopes: service.DefaultScopes(),
+			})
+		}
+		if err != nil {
+			log.Println("ERROR: could not start mcp endpoint: " + err.Error())
+		} else {
+			service.SetExportUploads(exportsApp)
+			mux.Handle(mcp.Path(), service.Handler())
+			for _, path := range service.MetadataPaths() {
+				mux.Handle(path, service.MetadataHandler())
+			}
+			log.Println("INFO: mcp endpoint serving at " + mcp.Path() + " as " + service.ResourceURL())
 		}
 	}
 

@@ -19,6 +19,7 @@ package exports
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -42,6 +43,8 @@ type App struct {
 	jwtConfig   *jwtauth.Config
 	anonToken   func() string
 	mongoClient *mongo.Client
+	// objectServer stores object content; see SetObjectServer.
+	objectServer http.Handler
 }
 
 // Build factory a new Device App only with mongoClient
@@ -102,6 +105,9 @@ func (app *App) Mount(s *echoutil.Server) {
 		utils.Scopes.ReadDevices,
 	}
 
+	// A link is its own credential; see links.go.
+	g.GET("/links/:token/:filename", app.handleGetExportLink)
+	g.PUT("/uploads/:token", app.handlePutExportUpload)
 	g.GET("/:owner/:nick/:rev/:filename", echoutil.ScopeFilter(readDevicesScopes, app.handleGetExport))
 }
 

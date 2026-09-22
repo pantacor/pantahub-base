@@ -344,6 +344,12 @@ func parseToken(raw string) (jwtgo.MapClaims, bool) {
 		return nil, false
 	}
 
+	// A token bound to an OAuth protected resource is only good at that
+	// resource, exactly as on the REST API (echoutil.JWT).
+	if utils.IsResourceBoundAudience(claims["aud"]) {
+		return nil, false
+	}
+
 	return claims, true
 }
 

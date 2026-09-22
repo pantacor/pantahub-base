@@ -147,6 +147,41 @@ func (db *PKCERepo) Update(ctx context.Context, pks *PKCEState) error {
 	return db.Repo.UpdateOne(ctx, pks, false)
 }
 
+// Claim marks the PKCEState of authCode as used and returns it, provided it is
+// unused, unexpired and already bound to a user. It is one atomic update, so a
+// code presented twice at the same moment is redeemed once.
+func (db *PKCERepo) Claim(ctx context.Context, authCode string) (*PKCEState, error) {
+	pks := &PKCEState{}
+	err := db.Repo.FindOneAndUpdate(ctx,
+		bson.M{
+			"auth_code":  authCode,
+			"is_used":    false,
+			"user_id":    bson.M{"$nin": bson.A{"", nil}},
+			"expires_at": bson.M{"$gt": time.Now()},
+		},
+		bson.M{"$set": bson.M{"is_used": true}},
+		pks)
+	return pks, err
+}
+
+// Approve binds the not yet approved PKCEState of handle to userID and
+// replaces its auth_code with newCode, atomically. The handle travels through
+// the browser before consent, so it must never be redeemable itself.
+func (db *PKCERepo) Approve(ctx context.Context, handle, userID, newCode string) (*PKCEState, error) {
+	pks := &PKCEState{}
+	err := db.Repo.FindOneAndUpdate(ctx,
+		bson.M{
+			"auth_code":  handle,
+			"is_used":    false,
+			"user_id":    bson.M{"$in": bson.A{"", nil}},
+			"expires_at": bson.M{"$gt": time.Now()},
+		},
+		bson.M{"$set": bson.M{"auth_code": newCode, "user_id": userID}},
+		pks,
+		options.FindOneAndUpdate().SetReturnDocument(options.After))
+	return pks, err
+}
+
 // Delete deletes a PKCEState from the database by its auth_code
 func (db *PKCERepo) Delete(ctx context.Context, authCode string) error {
 	query := bson.M{"auth_code": authCode}

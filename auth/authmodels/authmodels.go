@@ -32,6 +32,13 @@ type TokenResponse struct {
 	TokenType   string `json:"token_type,omitempty"`
 	Scopes      string `json:"scopes,omitempty"`
 	ExpiresIn   int    `json:"expires_in,omitempty"`
+
+	// AccessToken repeats Token under the name OAuth gives it (RFC 6749
+	// section 5.1). Token stays because the clients written against this API
+	// read that; standard OAuth clients only look for access_token.
+	AccessToken  string `json:"access_token,omitempty"`
+	RefreshToken string `json:"refresh_token,omitempty"`
+	Scope        string `json:"scope,omitempty"`
 }
 
 type PasswordResetRequest struct {

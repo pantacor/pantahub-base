@@ -33,7 +33,7 @@ require (
 	github.com/tiaguinho/gosoap v1.4.4
 	gitlab.com/pantacor/pantahub-gc v0.0.0-20220111192912-df394e800210
 	gitlab.com/pantacor/pantahub-testharness v0.0.0-20190311155708-e39aa76a7650
-	gitlab.com/pantacor/pvr v0.0.0-20260811205759-acd46081bf80
+	gitlab.com/pantacor/pvr v0.0.0-20260922150918-f2e31aab1231
 	go.mongodb.org/mongo-driver v1.17.7
 	go.opentelemetry.io/contrib/instrumentation/go.mongodb.org/mongo-driver/mongo/otelmongo v0.36.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.69.0
@@ -47,6 +47,25 @@ require (
 	google.golang.org/grpc v1.83.1
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 	gopkg.in/resty.v1 v1.12.0
+)
+
+require (
+	github.com/godbus/dbus/v5 v5.1.0 // indirect
+	github.com/google/jsonschema-go v0.4.3 // indirect
+	github.com/justincampbell/timeago v0.0.0-20160528003754-027f40306f1d // indirect
+	github.com/saltosystems/winrt-go v0.0.0-20260317170058-9c2fec580d96 // indirect
+	github.com/segmentio/asm v1.1.3 // indirect
+	github.com/segmentio/encoding v0.5.4 // indirect
+	github.com/soypat/cyw43439 v0.1.0 // indirect
+	github.com/soypat/lneto v0.1.0 // indirect
+	github.com/soypat/seqs v0.0.0-20250124201400-0d65bc7c1710 // indirect
+	github.com/tinygo-org/cbgo v0.0.4 // indirect
+	github.com/tinygo-org/pio v0.3.0 // indirect
+	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
+	gitlab.com/pantacor/pvwificonnect v1.7.0 // indirect
+	golang.org/x/exp v0.0.0-20241204233417-43b7b7cde48d // indirect
+	lure.sh/fakeroot v0.0.0-20231024205152-b2da39c1be0c // indirect
+	tinygo.org/x/bluetooth v0.15.0 // indirect
 )
 
 require (
@@ -199,6 +218,7 @@ require (
 	github.com/mitchellh/reflectwalk v1.0.1 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/mochi-mqtt/server/v2 v2.7.9
+	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect

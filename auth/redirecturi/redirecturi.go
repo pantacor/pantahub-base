@@ -297,6 +297,40 @@ func Validate(registered []string, candidate string, ctx AuditContext) error {
 	return nil
 }
 
+// IsLoopbackHost reports whether host names the user's own machine, the only
+// place a plain http redirect is acceptable.
+func IsLoopbackHost(host string) bool {
+	return loopbackHosts[strings.ToLower(host)]
+}
+
+// ValidateExact is Validate for clients whose callback list this server does
+// not curate, such as one read from a client metadata document. It differs in
+// two ways: the path has to be identical rather than beneath a registered one,
+// because nobody here reviewed what else lives under that path, and an empty
+// list rejects instead of leaving the client unconstrained, because that
+// leniency exists only for registrations older than the callback requirement.
+// The loopback port stays excluded, as RFC 8252 section 7.3 requires.
+func ValidateExact(registered []string, candidate string, ctx AuditContext) error {
+	c, err := parse(candidate)
+	if err != nil {
+		ctx.reject(candidate, ErrMalformed)
+		return ErrMalformed
+	}
+
+	for _, entry := range registered {
+		r, err := parse(entry)
+		if err != nil {
+			continue
+		}
+		if r.path == c.path && equal(r, c) {
+			return nil
+		}
+	}
+
+	ctx.reject(candidate, ErrNotRegistered)
+	return ErrNotRegistered
+}
+
 // AuditContext carries the request metadata attached to a rejection event so
 // that unexpected redirect targets can be alerted on.
 type AuditContext struct {

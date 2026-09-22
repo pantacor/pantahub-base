@@ -131,3 +131,41 @@ func TestJWTUnauthorizedHeaderIsExact(t *testing.T) {
 		t.Fatalf("WWW-Authenticate = %q, want %q", got, want)
 	}
 }
+
+// A token bound to an OAuth protected resource is signed with the same key as
+// every other token; the audience is the only thing that keeps it out of here.
+func TestJWTRefusesResourceBoundTokens(t *testing.T) {
+	claims := func(aud interface{}) jwt.MapClaims {
+		c := jwt.MapClaims{"id": "prn:pantahub.com:auth:/user1", "nick": "user1", "exp": time.Now().Add(time.Hour).Unix()}
+		if aud != nil {
+			c["aud"] = aud
+		}
+		return c
+	}
+
+	for name, aud := range map[string]interface{}{
+		"bound to an mcp endpoint":  "https://api.example.com/mcp",
+		"bound, in a list":          []string{"prn:pantahub.com:auth:/service1", "https://api.example.com/mcp"},
+		"bound over plain http":     "http://localhost:12365/mcp",
+		"bound, odd capitalisation": "HTTPS://api.example.com/mcp",
+	} {
+		got := authViaEcho(t, "Bearer "+signed(t, claims(aud), testKey))
+		if got.Reached || got.Status != http.StatusUnauthorized {
+			t.Errorf("%s: reached=%v status=%d, want 401 and not reached", name, got.Reached, got.Status)
+		}
+		if got.WWWAuth == "" {
+			t.Errorf("%s: a refusal still carries the challenge", name)
+		}
+	}
+
+	// The audiences in use before are PRNs and keep working.
+	for name, aud := range map[string]interface{}{
+		"no audience":            nil,
+		"on behalf of a service": "prn:pantahub.com:auth:/service1",
+	} {
+		got := authViaEcho(t, "Bearer "+signed(t, claims(aud), testKey))
+		if !got.Reached || got.Status != http.StatusOK {
+			t.Errorf("%s: reached=%v status=%d, want 200", name, got.Reached, got.Status)
+		}
+	}
+}

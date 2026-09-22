@@ -32,6 +32,13 @@ const (
 
 // CreatePKCEState creates and stores a new PKCE state
 func CreatePKCEState(ctx context.Context, codeChallenge, codeChallengeMethod, redirectURI, state, clientID, scope string) (*storage.PKCEState, error) {
+	return CreatePKCEStateForResource(ctx, codeChallenge, codeChallengeMethod, redirectURI, state, clientID, scope, "")
+}
+
+// CreatePKCEStateForResource is CreatePKCEState for a client that named the
+// resource it wants a token for (RFC 8707). The resource travels with the state
+// so the token minted from it can be bound to that audience.
+func CreatePKCEStateForResource(ctx context.Context, codeChallenge, codeChallengeMethod, redirectURI, state, clientID, scope, resource string) (*storage.PKCEState, error) {
 	pkceRepo, err := storage.GetPKCERepo()
 	if err != nil {
 		return nil, err
@@ -62,6 +69,7 @@ func CreatePKCEState(ctx context.Context, codeChallenge, codeChallengeMethod, re
 	pks.UserCode = userCode
 	pks.ClientID = clientID
 	pks.Scope = scope
+	pks.Resource = resource
 	pks.CodeChallenge = codeChallenge
 	pks.CodeChallengeMethod = codeChallengeMethod
 	pks.RedirectURI = redirectURI
@@ -151,6 +159,42 @@ func GetPKCEStateBySessionID(ctx context.Context, sessionID string) (*storage.PK
 }
 
 // MarkPKCEStateAsUsed marks a PKCE state as used
+// ClaimPKCEState redeems authCode exactly once. It reports false when the code
+// is unknown, expired, not yet authorized by a user, or already redeemed.
+func ClaimPKCEState(ctx context.Context, authCode string) (*storage.PKCEState, bool) {
+	pkceRepo, err := storage.GetPKCERepo()
+	if err != nil {
+		return nil, false
+	}
+	pks, err := pkceRepo.Claim(ctx, authCode)
+	if err != nil {
+		return nil, false
+	}
+	return pks, true
+}
+
+// ApprovePKCEState records userID's consent to the authorization behind handle
+// and returns it under a fresh auth code, the only one that can be redeemed.
+// It reports false when handle is unknown, expired, used or already approved.
+func ApprovePKCEState(ctx context.Context, handle, userID string) (*storage.PKCEState, bool) {
+	if handle == "" || userID == "" {
+		return nil, false
+	}
+	pkceRepo, err := storage.GetPKCERepo()
+	if err != nil {
+		return nil, false
+	}
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return nil, false
+	}
+	pks, err := pkceRepo.Approve(ctx, handle, userID, base64.RawURLEncoding.EncodeToString(b))
+	if err != nil {
+		return nil, false
+	}
+	return pks, true
+}
+
 func MarkPKCEStateAsUsed(ctx context.Context, authCode string) bool {
 	pkceRepo, err := storage.GetPKCERepo()
 	if err != nil {

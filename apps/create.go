@@ -92,6 +92,9 @@ func (app *App) handleCreateApp(c *echo.Context) error {
 	if payload.Nick == "" {
 		payload.Nick = petname.Generate(2, "_")
 	}
+	if reservedNick(payload.Nick) {
+		return echoutil.RestErrorWrapperUser(c, "nick is reserved for a built-in client", "nick is reserved for a built-in client", http.StatusConflict)
+	}
 
 	scopes, err := parseScopes(payload.Scopes, payload.Nick)
 	if err != nil {

@@ -24,6 +24,7 @@ import (
 
 	"gitlab.com/pantacor/pantahub-base/apps"
 	"gitlab.com/pantacor/pantahub-base/auth/authservices"
+	"gitlab.com/pantacor/pantahub-base/auth/cimd"
 	"gitlab.com/pantacor/pantahub-base/auth/redirecturi"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -69,6 +70,19 @@ func (a *App) registeredCallbacks(ctx context.Context, clientID string) ([]strin
 // simply by naming an application that does not exist.
 func (a *App) validateRedirectURI(ctx context.Context, clientID, candidate string, audit redirecturi.AuditContext) error {
 	audit.ClientID = clientID
+
+	// A client that identifies itself with a URL has no record here; its
+	// callbacks are the ones its own metadata document lists. Registered
+	// clients are PRNs, so the two cannot be mistaken for one another.
+	if cimd.IsClientIDURL(clientID) {
+		return a.validateURLClientRedirect(ctx, clientID, candidate, audit)
+	}
+
+	// Nobody reviewed the callbacks of a self-registered client, so nothing
+	// beneath them is trusted either.
+	if dynamic, _, err := apps.SearchApp(ctx, "", clientID, a.mongoClient.Database(utils.MongoDb)); err == nil && dynamic.Dynamic {
+		return redirecturi.ValidateExact(dynamic.RedirectURIs, candidate, audit)
+	}
 
 	registered, err := a.registeredCallbacks(ctx, clientID)
 	if err != nil {

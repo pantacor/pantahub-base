@@ -64,6 +64,12 @@ func (app *App) HandlePostPKCEInit(c *echo.Context) error {
 		return echoutil.RestErrorWrapperUser(c, "invalid_request", "Missing required PKCE parameters", http.StatusBadRequest)
 	}
 
+	// The polling flow mints account-wide tokens for whoever started it, so it
+	// is only for clients registered by someone here.
+	if app.untrustedClient(ctx, req.ClientID) {
+		return echoutil.RestErrorWrapperUser(c, "unauthorized_client", "This client has to use the authorization code flow with a resource", http.StatusBadRequest)
+	}
+
 	// Pin the redirect target to the callback URLs registered on client_id
 	// before it is persisted into the PKCE state.
 	if err := app.validateRedirectURI(ctx, req.ClientID, req.RedirectURI, auditContext(c.Request(), "pkce_init")); err != nil {
@@ -131,6 +137,9 @@ func (app *App) HandlePostPKCEAuthorize(c *echo.Context) error {
 		if pks.IsUsed {
 			return echoutil.RestErrorWrapperUser(c, "invalid_grant", "Session already used", http.StatusBadRequest)
 		}
+		if pks.UserID != "" && pks.UserID != caller {
+			return echoutil.RestErrorWrapperUser(c, "invalid_grant", "Session already approved", http.StatusBadRequest)
+		}
 
 		// Link user to PKCE session
 		if !pkceservice.UpdatePKCEStateUserID(ctx, pks.AuthCode, caller) {
@@ -168,9 +177,11 @@ func (app *App) HandlePostPKCEAuthorize(c *echo.Context) error {
 		return echoutil.RestErrorWrapperUser(c, "invalid_grant", "Invalid redirect URI", http.StatusBadRequest)
 	}
 
-	// Link user to PKCE session
-	if !pkceservice.UpdatePKCEStateUserID(ctx, pks.AuthCode, caller) {
-		return echoutil.RestErrorWrapperUser(c, "internal_error", "Failed to update PKCE state", http.StatusInternalServerError)
+	// Link user to PKCE session under a fresh code: the cookie value was set
+	// before consent and is only a handle.
+	pks, approved := pkceservice.ApprovePKCEState(ctx, pks.AuthCode, caller)
+	if !approved {
+		return echoutil.RestErrorWrapperUser(c, "invalid_grant", "The authorization request was already approved or has expired", http.StatusBadRequest)
 	}
 
 	// Clean up cookies
@@ -192,17 +203,13 @@ func (app *App) HandlePostPKCEAuthorize(c *echo.Context) error {
 func (app *App) HandlePKCEToken(c *echo.Context) error {
 	ctx := c.Request().Context()
 
-	req := struct {
-		GrantType    string `json:"grant_type"`
-		Code         string `json:"code"`
-		AccessCode   string `json:"access-code"`
-		CodeVerifier string `json:"code_verifier"`
-		RedirectURI  string `json:"redirect_uri"`
-		ClientID     string `json:"client_id"`
-	}{}
+	req := tokenRequest{}
+	if err := decodeTokenRequest(c, &req); err != nil {
+		return req.fail(c, "invalid_request", "Invalid request payload", http.StatusBadRequest)
+	}
 
-	if err := echoutil.DecodeJsonPayload(c, &req); err != nil {
-		return echoutil.RestErrorWrapperUser(c, "invalid_request", "Invalid request payload", http.StatusBadRequest)
+	if req.GrantType == grantRefreshToken {
+		return app.handleRefreshTokenGrant(c, &req)
 	}
 
 	// Normalize code
@@ -244,6 +251,10 @@ func (app *App) HandlePKCEToken(c *echo.Context) error {
 			}
 		default:
 			return echoutil.RestErrorWrapperUser(c, "invalid_request", "Unsupported code challenge method", http.StatusBadRequest)
+		}
+
+		if pks.Resource != "" || app.untrustedClient(ctx, pks.ClientID) {
+			return echoutil.RestErrorWrapperUser(c, "invalid_grant", "This client can only be issued resource-bound tokens", http.StatusBadRequest)
 		}
 
 		// Generate token on-demand (never pre-stored)
@@ -290,24 +301,24 @@ func (app *App) HandlePKCEToken(c *echo.Context) error {
 
 	// Validate grant_type
 	if req.GrantType != "authorization_code" {
-		return echoutil.RestErrorWrapperUser(c, "unsupported_grant_type", "The grant type is not supported", http.StatusBadRequest)
+		return req.fail(c, "unsupported_grant_type", "The grant type is not supported", http.StatusBadRequest)
 	}
 
 	// Retrieve PKCE state
 	pks, found := pkceservice.GetPKCEState(ctx, code)
 	if !found {
-		return echoutil.RestErrorWrapperUser(c, "invalid_grant", "Authorization code is invalid or expired", http.StatusBadRequest)
+		return req.fail(c, "invalid_grant", "Authorization code is invalid or expired", http.StatusBadRequest)
 	}
 
 	// Check if already used or expired
 	if pks.IsUsed || time.Now().After(pks.ExpiresAt) {
 		pkceservice.DeletePKCEState(ctx, code) // Clean up
-		return echoutil.RestErrorWrapperUser(c, "invalid_grant", "Authorization code already used or expired", http.StatusBadRequest)
+		return req.fail(c, "invalid_grant", "Authorization code already used or expired", http.StatusBadRequest)
 	}
 
 	// Validate redirect_uri
 	if pks.RedirectURI != req.RedirectURI {
-		return echoutil.RestErrorWrapperUser(c, "invalid_redirect_uri", "Provided redirect_uri does not match the one in the authorization request", http.StatusBadRequest)
+		return req.failRedirectMismatch(c)
 	}
 
 	// Validate code_verifier
@@ -316,18 +327,35 @@ func (app *App) HandlePKCEToken(c *echo.Context) error {
 		h := sha256.Sum256([]byte(req.CodeVerifier))
 		calculatedCodeChallenge := base64.RawURLEncoding.EncodeToString(h[:])
 		if calculatedCodeChallenge != pks.CodeChallenge {
-			return echoutil.RestErrorWrapperUser(c, "invalid_grant", "Code verifier is invalid", http.StatusBadRequest)
+			return req.fail(c, "invalid_grant", "Code verifier is invalid", http.StatusBadRequest)
 		}
 	default:
-		return echoutil.RestErrorWrapperUser(c, "invalid_request", "Unsupported code challenge method", http.StatusBadRequest)
+		return req.fail(c, "invalid_request", "Unsupported code challenge method", http.StatusBadRequest)
 	}
 
-	// Mark PKCE state as used
-	pkceservice.MarkPKCEStateAsUsed(ctx, code)
+	// A client bound to a resource follows current OAuth, where the public
+	// client has to name itself when redeeming the code.
+	if pks.Resource != "" && req.ClientID != pks.ClientID {
+		return req.fail(c, "invalid_grant", "client_id does not match the authorization request", http.StatusBadRequest)
+	}
+
+	// Redeem the code. This is a single atomic update, so a code presented
+	// twice at once is honoured once; it also refuses a code no user approved.
+	if _, claimed := pkceservice.ClaimPKCEState(ctx, code); !claimed {
+		return req.fail(c, "invalid_grant", "Authorization code already used or expired", http.StatusBadRequest)
+	}
+	defer pkceservice.DeletePKCEState(ctx, code)
+
+	if pks.Resource != "" {
+		return app.completeBoundGrant(c, pks, &req)
+	}
+	if app.untrustedClient(ctx, pks.ClientID) {
+		return req.fail(c, "invalid_grant", "This client can only be issued resource-bound tokens", http.StatusBadRequest)
+	}
 
 	acc, err := authservices.GetAccount(pks.UserID, app.mongoClient)
 	if err != nil {
-		return echoutil.RestErrorWrapperUser(c, err.Error(), "Failed to retrieve account information", http.StatusInternalServerError)
+		return req.fail(c, err.Error(), "Failed to retrieve account information", http.StatusInternalServerError)
 	}
 
 	token := jwtgo.New(jwtgo.GetSigningMethod(app.jwtConfig.SigningAlgorithm))
@@ -339,12 +367,8 @@ func (app *App) HandlePKCEToken(c *echo.Context) error {
 	}
 	applyPKCEScope(claims, pks.Scope)
 
-	timeoutStr := utils.GetEnv(utils.EnvPantahubJWTTimeoutMinutes)
-	timeout, err := strconv.Atoi(timeoutStr)
-	if err != nil {
-		timeout = 60
-	}
-	claims["exp"] = time.Now().Add(time.Minute * time.Duration(timeout)).Unix()
+	lifetime := accessTokenLifetime()
+	claims["exp"] = time.Now().Add(lifetime).Unix()
 
 	if app.jwtConfig.MaxRefresh != 0 {
 		claims["orig_iat"] = time.Now().Unix()
@@ -352,15 +376,15 @@ func (app *App) HandlePKCEToken(c *echo.Context) error {
 
 	tokenString, err := token.SignedString(app.jwtConfig.Key)
 	if err != nil {
-		return echoutil.RestErrorWrapperUser(c, err.Error(), "Error signing new token", http.StatusInternalServerError)
+		return req.fail(c, err.Error(), "Error signing new token", http.StatusInternalServerError)
 	}
 
-	// Delete PKCE state after successful token issuance
-	pkceservice.DeletePKCEState(ctx, code)
-
+	noStore(c)
 	return echoutil.WriteJSON(c, http.StatusOK, authmodels.TokenResponse{
-		Token:     tokenString,
-		TokenType: "bearer",
+		Token:       tokenString,
+		AccessToken: tokenString,
+		TokenType:   "bearer",
+		ExpiresIn:   int(lifetime.Seconds()),
 	})
 }
 
@@ -419,9 +443,46 @@ func (app *App) HandlePKCEAuthorize(c *echo.Context) error {
 		return echoutil.RestErrorWrapperUser(c, "invalid_request", err.Error(), http.StatusBadRequest)
 	}
 
-	// Store the PKCE state
-	pks, err := pkceservice.CreatePKCEState(ctx, codeChallenge, codeChallengeMethod, redirectURI, state, clientID, scope)
+	// From here on the redirect URI is known to belong to the client, so a
+	// client that speaks current OAuth (it named a resource, or identifies
+	// itself with a URL) is told about errors there, as the protocol specifies.
+	// Older clients keep getting the JSON errors they were written against.
+	resourceParam := queryParams.Get("resource")
+	untrusted := app.untrustedClient(ctx, clientID)
+	standardClient := resourceParam != "" || untrusted
+
+	resource, err := app.resolveResource(resourceParam)
 	if err != nil {
+		return authorizeErrorRedirect(c, redirectURI, state, "invalid_target", err.Error())
+	}
+	// Without a resource the token would be account-wide, which only a
+	// client registered by someone here may be given.
+	if untrusted && resource == nil {
+		return authorizeErrorRedirect(c, redirectURI, state, "invalid_target", "this client has to name the resource it wants a token for")
+	}
+	if standardClient {
+		if responseType != "code" {
+			return authorizeErrorRedirect(c, redirectURI, state, "unsupported_response_type", "only response_type=code is supported")
+		}
+		if codeChallengeMethod != "S256" {
+			return authorizeErrorRedirect(c, redirectURI, state, "invalid_request", "code_challenge_method must be S256")
+		}
+	}
+
+	boundTo := ""
+	if resource != nil {
+		boundTo = resource.URL
+		// Store what will be granted rather than what was asked for, so the
+		// consent page and the token agree.
+		scope = strings.Join(grantedScopes(resource, scope), " ")
+	}
+
+	// Store the PKCE state
+	pks, err := pkceservice.CreatePKCEStateForResource(ctx, codeChallenge, codeChallengeMethod, redirectURI, state, clientID, scope, boundTo)
+	if err != nil {
+		if standardClient {
+			return authorizeErrorRedirect(c, redirectURI, state, "server_error", "Failed to start the authorization")
+		}
 		return echoutil.RestErrorWrapperUser(c, "internal_error", "Failed to create PKCE state", http.StatusInternalServerError)
 	}
 
@@ -431,19 +492,21 @@ func (app *App) HandlePKCEAuthorize(c *echo.Context) error {
 
 	wwwHost := utils.GetEnv("PANTAHUB_HOST_WWW")
 	scheme := utils.GetEnv("PANTAHUB_SCHEME")
-	url := fmt.Sprintf(
+	// Every value is escaped: a client id can be a URL and a state is whatever
+	// the client chose, and unescaped either could add parameters of its own.
+	consentURL := fmt.Sprintf(
 		"%s://%s/oauth2/authorize?client_id=%s&auth_code=%s&redirect_uri=%s&state=%s&scope=%s&response_type=%s",
 		scheme,
 		wwwHost,
-		clientID,
-		pks.AuthCode,
+		url.QueryEscape(clientID),
+		url.QueryEscape(pks.AuthCode),
 		url.QueryEscape(redirectURI),
-		state,
-		scope,
-		responseType,
+		url.QueryEscape(state),
+		url.QueryEscape(scope),
+		url.QueryEscape(responseType),
 	)
 
-	http.Redirect(c.Response(), c.Request(), url, http.StatusTemporaryRedirect)
+	http.Redirect(c.Response(), c.Request(), consentURL, http.StatusTemporaryRedirect)
 	return nil
 }
 

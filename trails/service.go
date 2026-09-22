@@ -41,6 +41,13 @@ import (
 //	post walk
 //	get walks
 //	search attributes for advanced steps/walk searching inside trail
+//
+// Build returns an App over mongoClient for the functions other packages
+// share, without mounting routes or touching indexes.
+func Build(mongoClient *mongo.Client) *App {
+	return &App{mongoClient: mongoClient}
+}
+
 func New(jwtConfig *jwtauth.Config, mongoClient *mongo.Client) *App {
 	app := new(App)
 	app.jwtConfig = jwtConfig

@@ -82,15 +82,44 @@ func (a *App) handlePostObject(c *echo.Context) error {
 
 	newObject.Owner = ownerStr
 
+	autoLink := true
+	autolinkValue, ok := c.Request().URL.Query()["autolink"]
+	if ok && autolinkValue[0] == "no" {
+		autoLink = false
+	}
+
+	created, status, objectType, err := a.CreateObject(c.Request().Context(), ownerStr, newObject, autoLink)
+	if err != nil {
+		if utils.IsUserError(err) {
+			return echoutil.RestErrorWrapperUser(c, err.Error(), err.Error(), status)
+		}
+		return echoutil.RestErrorWrapper(c, err.Error(), status)
+	}
+	c.Response().Header().Add(HttpHeaderPantahubObjectType, objectType)
+
+	newObjectWithAccess := GetObjectWithAccess(created, "/objects")
+	return echoutil.WriteJSON(c, status, &newObjectWithAccess)
+}
+
+// CreateObject records newObject for owner the way POST /objects does: an
+// object whose content is already stored answers 409 with it, one the owner
+// can link to a public copy of is stored as that link (also 409), and any
+// other is recorded, within the owner's quota, for its content to be uploaded
+// to its signed put URL. objectType tells an object from a link. On failure
+// status is the HTTP status to answer.
+func (a *App) CreateObject(ctx context.Context, ownerStr string, newObject Object, autoLink bool) (created Object, status int, objectType string, err error) {
+	status = http.StatusOK
+	newObject.Owner = ownerStr
+
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 
 	if collection == nil {
-		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
+		return newObject, http.StatusInternalServerError, "", errors.New("Error with Database connectivity")
 	}
 
 	// check preconditions
 	if newObject.Sha == "" {
-		return echoutil.RestErrorWrapper(c, "Post New Object must set a sha", http.StatusBadRequest)
+		return newObject, http.StatusBadRequest, "", errors.New("Post New Object must set a sha")
 	}
 
 	if newObject.ID == "" {
@@ -98,74 +127,66 @@ func (a *App) handlePostObject(c *echo.Context) error {
 	}
 
 	if newObject.ID != newObject.Sha {
-		return echoutil.RestErrorWrapper(c, "Post New Object must not have conflicting id and sha field", http.StatusBadRequest)
-	}
-
-	autoLink := true
-	autolinkValue, ok := c.Request().URL.Query()["autolink"]
-	if ok && autolinkValue[0] == "no" {
-		autoLink = false
+		return newObject, http.StatusBadRequest, "", errors.New("Post New Object must not have conflicting id and sha field")
 	}
 
 	shabyte, err := utils.DecodeSha256HexString(newObject.Sha)
 	if err != nil {
-		return echoutil.RestErrorWrapper(c, "Object sha must be a valid sha256:"+err.Error(), http.StatusBadRequest)
+		return newObject, http.StatusBadRequest, "", errors.New("Object sha must be a valid sha256:" + err.Error())
 	}
 	newObject.StorageID = MakeStorageID(ownerStr, shabyte)
 
-	childCtx := context.WithoutCancel(c.Request().Context())
+	childCtx := context.WithoutCancel(ctx)
 	resolvedObject, err := a.ResolveObjectWithBacking(childCtx, ownerStr, newObject.Sha)
 
 	if err != nil && err != ErrNoBackingFile && err != mongo.ErrNoDocuments {
-		return echoutil.RestErrorWrapper(c, "Error resolving Object "+err.Error(), http.StatusBadRequest)
+		return newObject, http.StatusBadRequest, "", errors.New("Error resolving Object " + err.Error())
 	}
 
 	// if there was a backing file we have conflict
 	if resolvedObject != nil {
-		c.Response().Header().Add(HttpHeaderPantahubObjectType, ObjectTypeObject)
+		objectType = ObjectTypeObject
 		status = http.StatusConflict
 		newObject = *resolvedObject
-		goto conflict
+		return newObject, status, objectType, nil
 	}
 
 	// here we had no backing file to link to and no object at all
 	// we will try to create a link to an object available in a public step
-	childCtx = context.WithoutCancel(c.Request().Context())
+	childCtx = context.WithoutCancel(ctx)
 	resolvedObject, err = a.ResolveObjectWithLinks(childCtx, ownerStr, newObject.Sha, autoLink)
 
 	// if this was possible, we use this object with adjusted Name from newObject
 	// and store it in our object collection
 	if err == nil {
 		resolvedObject.ObjectName = newObject.ObjectName
-		childCtx = context.WithoutCancel(c.Request().Context())
+		childCtx = context.WithoutCancel(ctx)
 		err = a.SaveObject(childCtx, resolvedObject, false)
 		if err != nil {
-			return echoutil.RestErrorWrapper(c, "Error saving our linkified object "+err.Error(), http.StatusInternalServerError)
+			return newObject, http.StatusInternalServerError, "", errors.New("Error saving our linkified object " + err.Error())
 		}
 		// we have a gettable object in our db now so we conflict
-		c.Response().Header().Add(HttpHeaderPantahubObjectType, ObjectTypeLink)
+		objectType = ObjectTypeLink
 		status = http.StatusConflict
 		newObject = *resolvedObject
-		goto conflict
+		return newObject, status, objectType, nil
 	} else if err != ErrNoLinkTargetAvail && err != mongo.ErrNoDocuments && err != ErrNoBackingFile {
-		return echoutil.RestErrorWrapper(c, "Internal issue loading looking up object "+err.Error(), http.StatusInternalServerError)
+		return newObject, http.StatusInternalServerError, "", errors.New("Internal issue loading looking up object " + err.Error())
 	}
 
-	childCtx = context.WithoutCancel(c.Request().Context())
+	childCtx = context.WithoutCancel(ctx)
 	err = a.SaveObject(childCtx, &newObject, false)
 	if err != nil {
 		if utils.IsUserError(err) {
-			return echoutil.RestErrorWrapperUser(c, err.Error(), err.Error(), http.StatusInternalServerError)
+			return newObject, http.StatusInternalServerError, "", err
 		}
-		return echoutil.RestErrorWrapper(c, "Error saving our linkified object "+err.Error(), http.StatusInternalServerError)
+		return newObject, http.StatusInternalServerError, "", errors.New("Error saving our linkified object " + err.Error())
 	}
 	if newObject.LinkedObject != "" {
-		c.Response().Header().Add(HttpHeaderPantahubObjectType, ObjectTypeLink)
+		objectType = ObjectTypeLink
 	} else {
-		c.Response().Header().Add(HttpHeaderPantahubObjectType, ObjectTypeObject)
+		objectType = ObjectTypeObject
 	}
 
-conflict:
-	newObjectWithAccess := GetObjectWithAccess(newObject, "/objects")
-	return echoutil.WriteJSON(c, status, &newObjectWithAccess)
+	return newObject, status, objectType, nil
 }

@@ -30,6 +30,7 @@ import (
 	"gitlab.com/pantacor/pantahub-base/accounts/accountsdata"
 	"gitlab.com/pantacor/pantahub-base/auth/authmodels"
 	"gitlab.com/pantacor/pantahub-base/auth/authservices"
+	"gitlab.com/pantacor/pantahub-base/auth/cimd"
 	"gitlab.com/pantacor/pantahub-base/auth/storage"
 	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/utils"
@@ -59,6 +60,12 @@ type App struct {
 	mongoClient  *mongo.Client
 	mfaRepo      *storage.MFARepo
 	webauthnRepo *storage.WebauthnRepo
+
+	// oauthResources are the protected resources tokens can be bound to, and
+	// clientMetadata resolves clients that identify themselves with a URL. See
+	// oauth_server.go.
+	oauthResources map[string]OAuthResource
+	clientMetadata *cimd.Resolver
 }
 
 // demoAccountsEnabled tells whether the built-in demo accounts (admin:admin,
@@ -126,6 +133,15 @@ func New(jwtConfig *jwtauth.Config, mongoClient *mongo.Client) *App {
 	app := new(App)
 	app.jwtConfig = jwtConfig
 	app.mongoClient = mongoClient
+	app.clientMetadata = cimd.NewResolver()
+
+	migrateCtx, cancelMigrate := context.WithTimeout(context.Background(), time.Minute)
+	if n, err := markLegacyDynamicClients(migrateCtx, mongoClient.Database(utils.MongoDb)); err != nil {
+		log.Fatalln("can't mark dynamically registered oauth clients: " + err.Error())
+	} else if n > 0 {
+		log.Printf("auth: marked %d dynamically registered oauth clients", n)
+	}
+	cancelMigrate()
 
 	//key := flag.String("nick", "", "The field you'd like to place an index on")
 	//unique := flag.Bool("unique", true, "Would you like the index to be unique?")
@@ -314,9 +330,13 @@ func (app *App) Mount(s *echoutil.Server) {
 	g.GET("/oauth/login/:service", app.HandleGetThirdPartyLogin)
 	g.GET("/oauth/callback/:service", app.HandleGetThirdPartyCallback)
 	g.POST("/oauth/token", app.HandlePKCEToken)
+	g.POST("/oauth/register", app.HandleOAuthRegister)
 	g.GET("/oauth/authorize", app.HandlePKCEAuthorize)
 	g.POST("/oauth/authorize", app.HandlePostPKCEAuthorize)
 	g.POST("/oauth/pkce/init", app.HandlePostPKCEInit)
+	g.GET("/oauth/client", app.HandleGetOAuthClient)
+	g.GET("/oauth/connections", app.HandleListOAuthConnections)
+	g.DELETE("/oauth/connections/:id", app.HandleDeleteOAuthConnection)
 }
 
 func handleGetEncryptedAccount(accountData *authmodels.AccountCreationPayload) (*authmodels.EncryptedAccountToken, error) {
@@ -440,6 +460,9 @@ func isWhiteListedForAuthentication(request *http.Request) bool {
 
 	// Path prefix and method matches for OAuth endpoints
 	if strings.HasPrefix(request.URL.Path, "/oauth/token") && request.Method == "POST" {
+		return false
+	}
+	if strings.HasPrefix(request.URL.Path, "/oauth/register") && request.Method == "POST" {
 		return false
 	}
 	if strings.HasPrefix(request.URL.Path, "/oauth/pkce/init") && request.Method == "POST" {

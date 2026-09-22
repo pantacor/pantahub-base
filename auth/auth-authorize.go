@@ -218,6 +218,12 @@ func (app *App) handlePostCode(c *echo.Context) error {
 	if err != nil {
 		return echoutil.RestErrorWrapper(c, err.Error(), http.StatusInternalServerError)
 	}
+	// A client that identifies itself with a URL has no application record for
+	// the checks below to run against; its consent is completed separately.
+	if handled, err := app.completeURLClientConsent(c, caller, &req); handled {
+		return err
+	}
+
 	errCode, err := app.validateScopesAndURIs(c.Request().Context(), "", req.Service, req.Scopes, req.RedirectURI, auditContext(c.Request(), "authorization_code"))
 	if err != nil {
 		return echoutil.RestErrorWrapper(c, err.Error(), errCode)
@@ -264,10 +270,16 @@ func (app *App) handlePostCode(c *echo.Context) error {
 		utils.DeleteCookie(c.Response(), c.Request(), "pkce_redirect_uri")
 		utils.DeleteCookie(c.Response(), c.Request(), "pkce_auth_code")
 
+		// Bind only the authorization this consent is about, and hand out a
+		// fresh code: the one in the consent URL was seen by whoever started
+		// the flow.
 		pks, found := pkceservice.GetPKCEState(c.Request().Context(), pkceAuthCode)
-		if found {
-			pkceservice.UpdatePKCEStateUserID(c.Request().Context(), pks.AuthCode, caller)
-			response.Code = pks.AuthCode
+		if found && pks.ClientID == req.Service && pks.RedirectURI == pkceRedirectURI {
+			approved, ok := pkceservice.ApprovePKCEState(c.Request().Context(), pks.AuthCode, caller)
+			if !ok {
+				return echoutil.RestErrorWrapperUser(c, "invalid_grant", "The authorization request was already approved or has expired", http.StatusBadRequest)
+			}
+			response.Code = approved.AuthCode
 		}
 	}
 
@@ -298,6 +310,12 @@ func (app *App) validateScopesAndURIs(ctx context.Context, caller, reqService, r
 		service.Scopes = utils.PhScopeArray
 		service.RedirectURIs = serviceAccount.Oauth2RedirectURIs
 		defaultAccount = true
+	}
+
+	// A self-registered client only gets resource-bound tokens, which these
+	// flows do not issue.
+	if service.Dynamic {
+		return http.StatusBadRequest, errors.New("error access token failed, this client has to use the oauth authorization code flow with a resource")
 	}
 
 	// Validate scope only when the app comes from database

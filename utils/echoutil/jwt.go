@@ -19,6 +19,7 @@ import (
 
 	jwt "github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v5"
+	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 )
 
@@ -40,12 +41,20 @@ func JWT(cfg *jwtauth.Config) echo.MiddlewareFunc {
 				return unauthorized(c, cfg)
 			}
 
-			c.Set(KeyJWTPayload, token.Claims)
-
 			claims, ok := token.Claims.(jwt.MapClaims)
 			if !ok {
 				return echo.NewHTTPError(http.StatusInternalServerError, "unexpected JWT claims type")
 			}
+
+			// A token bound to an OAuth protected resource (an MCP endpoint) is
+			// only good there. It is signed with the same key as every other
+			// token, so without this it would pass here too, and what a user
+			// granted to one integration would work across the whole API.
+			if utils.IsResourceBoundAudience(claims["aud"]) {
+				return unauthorized(c, cfg)
+			}
+
+			c.Set(KeyJWTPayload, token.Claims)
 			c.Set(KeyRemoteUser, claims["id"])
 
 			return next(c)

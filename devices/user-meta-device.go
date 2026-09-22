@@ -18,6 +18,7 @@ package devices
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -89,50 +90,15 @@ func (a *App) handlePatchUserData(c *echo.Context) error {
 		return echoutil.RestErrorWrapper(c, "Error parsing data: "+err.Error(), http.StatusBadRequest)
 	}
 
-	// 1. Quote the BSON keys first to handle dots in key names (e.g. "lo.ipv4")
-	data = utils.BsonQuoteMap(&data)
-
-	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
-	if collection == nil {
-		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
-	}
-
-	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
-	defer cancel()
-
-	setFields := bson.M{}
-	unsetFields := bson.M{}
-
-	// 2. Deep flatten the quoted data to allow atomic nested updates
-	flattenMap("user-meta", data, setFields, unsetFields)
-
-	// Always update timemodified
-	setFields["timemodified"] = time.Now()
-
-	updateDoc := bson.M{}
-	if len(setFields) > 0 {
-		updateDoc["$set"] = setFields
-	}
-	if len(unsetFields) > 0 {
-		updateDoc["$unset"] = unsetFields
-	}
-
-	updateResult, err := collection.UpdateOne(
-		ctx,
-		bson.M{
-			"_id":   deviceID,
-			"owner": owner.(string),
-		},
-		updateDoc,
-	)
+	applied, err := PatchUserMeta(c.Request().Context(), a.mongoClient, owner.(string), *deviceID, data)
 	if err != nil {
+		if errors.Is(err, ErrDeviceNotOwned) {
+			return echoutil.RestErrorWrapper(c, "Error updating device user-meta: not found", http.StatusBadRequest)
+		}
 		return echoutil.RestErrorWrapper(c, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
 	}
-	if updateResult.MatchedCount == 0 {
-		return echoutil.RestErrorWrapper(c, "Error updating device user-meta: not found", http.StatusBadRequest)
-	}
 
-	return echoutil.WriteJSON(c, http.StatusOK, utils.BsonUnquoteMap(&data))
+	return echoutil.WriteJSON(c, http.StatusOK, applied)
 }
 
 // handlePutUserData Update user metadata using the user credentials

@@ -69,9 +69,12 @@ type TPApp struct {
 	Scopes              []utils.Scope `json:"scopes,omitempty" bson:"scopes,omitempty"`
 	ExposedScopes       []utils.Scope `json:"exposed_scopes,omitempty" bson:"exposed_scopes,omitempty"`
 	ExposedScopesLength int           `bson:"exposed_scopes_length,omit"`
-	TimeCreated         time.Time     `json:"time-created" bson:"time-created"`
-	TimeModified        time.Time     `json:"time-modified" bson:"time-modified"`
-	DeletedAt           *time.Time    `json:"deleted-at,omitempty" bson:"deleted-at,omitempty"`
+	// Dynamic marks a client that registered itself (RFC 7591): nobody here
+	// vouches for it, so it only gets resource-bound tokens.
+	Dynamic      bool       `json:"-" bson:"dynamic,omitempty"`
+	TimeCreated  time.Time  `json:"time-created" bson:"time-created"`
+	TimeModified time.Time  `json:"time-modified" bson:"time-modified"`
+	DeletedAt    *time.Time `json:"deleted-at,omitempty" bson:"deleted-at,omitempty"`
 }
 
 // App thirdparty application manager

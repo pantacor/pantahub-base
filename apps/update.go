@@ -76,6 +76,11 @@ func (app *App) handleUpdateApp(c *echo.Context) error {
 		return echoutil.RestErrorWrapperUser(c, err.Error(), err.Error(), http.StatusBadRequest)
 	}
 
+	// An application that already has a now built-in nick may keep it.
+	if payload.Nick != "" && payload.Nick != tpApp.Nick && reservedNick(payload.Nick) {
+		return echoutil.RestErrorWrapperUser(c, "nick is reserved for a built-in client", "nick is reserved for a built-in client", http.StatusConflict)
+	}
+
 	if payload.Nick != "" {
 		tpApp.Nick = payload.Nick
 		tpApp.Prn = utils.BuildScopePrn(payload.Nick)
