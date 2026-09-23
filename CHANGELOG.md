@@ -1,8 +1,26 @@
 
+<a name="058"></a>
+## [058](https://gitlab.com/pantacor/pantahub-base/compare/057...058)
+
+> 2026-09-22
+
+### Fix
+
+* **devices:** show strangers only the public view of a public device
+
+### Refactor
+
+* **devices,mcp:** read and write join tokens through one implementation
+
+
 <a name="057"></a>
 ## [057](https://gitlab.com/pantacor/pantahub-base/compare/056...057)
 
 > 2026-09-22
+
+### Chore
+
+* update CHANGELOG.md for release 057
 
 ### Docs
 
