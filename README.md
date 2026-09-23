@@ -1,208 +1,122 @@
-
-Pantahub Base APIs reference implementation.
+Pantahub Base: the Pantacor Hub API, the backend that devices running
+Pantavisor, the `pvr` tool, the Hub web app and Pantacor Fleet talk to.
 
 # Prepare
 
- * get a reasonable fresh golang engine (1.9++) and install it
- * Install a mongodb database locally or get credentials for hosted instance
- * Install elasticsearch 6.x.x and start it using default settings
- * Install fluentd or td-agent (on windows) and start it using with the config
-   include in pantahub-base source: fluentd.localhost.conf
- * Decide where you want to store the objects. By default we store objects in
-   $CWD/../local-s3/ folder; you can use environment variables (see below)
-   to adjust this
+ * Go 1.26.8, the release pinned in `go.mod` and in every Dockerfile
+ * Docker with Compose, for the local stack and for the tests that start a
+   throwaway MongoDB
+
+The stack the API needs (MongoDB, Elasticsearch, fluentd, Kafka and the local
+S3) is defined in `docker-compose.yml`; you do not have to install any of it by
+hand.
 
 # Build
 
 ```
-$ go get -v u gitlab.com/pantacor/pantahub-base
-...
-
-$ go build -o ~/bin/pantahub-base gitlab.com/pantacor/pantahub-base
-...
-``` 
-# Test
-
-* Note:Make Sure testharness project is accessible
-
+$ go build -o ~/bin/pantahub-base .
 ```
-$ git clone -b develop https://gitlab.com/pantacor/pantahub-testharness
-...
-
-```
-$ go test -v ./tests/...
-...
 
 # Run
 
+The quickest way is the Compose stack, which builds the API from
+`Dockerfile.development` with live reload:
+
 ```
-$ pantahub-base
-mongodb connect: mongodb://localhost:27017/pantabase-serv
-S3 Development Path: ../local-s3/
-2017/06/19 21:56:04 Serving @ https://127.0.0.1:12366/
-2017/06/19 21:56:04 Serving @ http://127.0.0.1:12365/
-2017/06/19 21:56:04 Serving @ https://::1:12366/
-2017/06/19 21:56:04 Serving @ http://::1:12365/
-2017/06/19 21:56:04 Serving @ https://10.42.0.1:12366/
-2017/06/19 21:56:04 Serving @ http://10.42.0.1:12365/
-2017/06/19 21:56:04 Serving @ https://fe80::90a9:7a0:a5d5:f808:12366/
-2017/06/19 21:56:04 Serving @ http://fe80::90a9:7a0:a5d5:f808:12365/
-2017/06/19 21:56:04 Serving @ https://192.168.178.75:12366/
-2017/06/19 21:56:04 Serving @ http://192.168.178.75:12365/
-2017/06/19 21:56:04 Serving @ https://2a02:2028:66c:1201:3bae:315f:3ad8:c6ee:12366/
-2017/06/19 21:56:04 Serving @ http://2a02:2028:66c:1201:3bae:315f:3ad8:c6ee:12365/
-2017/06/19 21:56:04 Serving @ https://fe80::f64a:6b7d:ede:b208:12366/
-2017/06/19 21:56:04 Serving @ http://fe80::f64a:6b7d:ede:b208:12365/
-2017/06/19 21:56:04 Serving @ https://172.18.0.1:12366/
-2017/06/19 21:56:04 Serving @ http://172.18.0.1:12365/
-2017/06/19 21:56:04 Serving @ https://fe80::42:82ff:fea9:63a4:12366/
-2017/06/19 21:56:04 Serving @ http://fe80::42:82ff:fea9:63a4:12365/
-2017/06/19 21:56:04 Serving @ https://172.17.0.1:12366/
-2017/06/19 21:56:04 Serving @ http://172.17.0.1:12365/
-2017/06/19 21:56:04 Serving @ https://fe80::42:97ff:fef7:9daa:12366/
-2017/06/19 21:56:04 Serving @ http://fe80::42:97ff:fef7:9daa:12365/
-2017/06/19 21:56:04 Serving @ https://fe80::5491:a3ff:fed7:c798:12366/
-2017/06/19 21:56:04 Serving @ http://fe80::5491:a3ff:fed7:c798:12365/
-2017/06/19 21:56:04 Serving @ https://fe80::c0a3:b4ff:fe0d:e3b8:12366/
-2017/06/19 21:56:04 Serving @ http://fe80::c0a3:b4ff:fe0d:e3b8:12365/
+$ docker compose up -d
+```
+
+The API then listens on http://localhost:12365 (and https on 12366). Objects go
+to the `testing` bucket of the LocalStack S3 in the stack; create it once:
+
+```
+$ docker compose exec localstack awslocal s3 mb s3://testing
 ```
 
 # Configure
 
-We currently support the environment variables you can find in utils/env.go:
+The API is configured through environment variables. They are all declared,
+with their defaults, in [`utils/env.go`](utils/env.go); `env.default` holds the
+values the development stack uses.
+
+# Test
 
 ```
-const (
-	// Pantahub JWT Secret. THIS MUST BE SET TO SOMETHING SECRET!!
-	// default: "THIS MUST BE CHANGED"
-	EnvPantahubJWTAuthSecret = "PANTAHUB_JWT_SECRET"
-
-	// Host you want clients to reach this server under
-	// default: localhost
-	EnvPantahubHost       = "PANTAHUB_HOST"
-
-	// Port you want to make this server available under
-	// default: 12365 for http and 12366 for https
-	EnvPantahubPort       = "PANTAHUB_PORT"
-
-	// Default scheme to use for urls pointing at this server when we encode
-	// them in json or redirect (e.g. for auth)
-	// default: http
-	EnvPantahubScheme     = "PANTAHUB_SCHEME"
-
-	// XXX: not used
-	EnvPantahubAPIVersion = "PANTAHUB_APIVERSION"
-
-	// Authentication endpoint to point clients to that need access tokens
-	// or need more privileged access tokens.
-	// default: $PANTAHUB_SCHEME://$PANTAHUB_HOST:$PANTAHUB_PORT/auth
-	EnvPantahubAuth       = "PH_AUTH"
-
-	// port to listen to on for http on internal interfaces
-	// default: 12365
-	EnvPantahubPortInt     = "PANTAHUB_PORT_INT"
-
-	// port to listen to on for https on internal interfaces
-	// default: 12366
-	EnvPantahubPortIntTLS = "PANTAHUB_PORT_INT_TLS"
-
-	// Hostname for mongodb connection
-	// default: localhost
-	EnvMongoHost          = "MONGO_HOST"
-
-	// Port for mongodb connection
-	// default: 27017
-	EnvMongoPort          = "MONGO_PORT"
-
-	// Database name for mongodb connection
-	// default: pantabase-serv
-	EnvMongoDb            = "MONGO_DB"
-
-	// Database user for mongodb connection
-	// default: <none>
-	EnvMongoUser          = "MONGO_USER"
-
-	// Database password for mongodb connection
-	// default: <none>
-	EnvMongoPassword          = "MONGO_PASS"
-
-	// SMTP host to use for sending mails
-	// default: <none>
-	EnvSMTPHost           = "SMTP_HOST"
-
-	// SMTP port to use for sending mails
-	// default: <none>
-	EnvSMTPPort           = "SMTP_PORT"
-
-	// SMTP user to use for sending mails
-	// default: <none>
-	EnvSMTPUser           = "SMTP_USER"
-
-	// SMTP pass to use for sending mails
-	// default: <none>
-	EnvSMTPPass           = "SMTP_PASS"
-)
+$ go test ./...
 ```
+
+Tests that need MongoDB either start their own with testcontainers (Docker must
+be running) or read a connection string from the environment and are skipped
+without it:
+
+| Variable | Package |
+| --- | --- |
+| `PANTAHUB_DEVICES_TEST_MONGO` | `devices` |
+| `PANTAHUB_MCP_TEST_MONGO` | `mcp` |
+| `PANTAHUB_EXPORTS_TEST_MONGO` | `exports` |
+| `PH_TEST_MONGO_URI` | `trails/trailmodels` |
+
+Point them at a single-node replica set, for example:
+
+```
+$ docker run -d --rm --name ph-test-mongo -p 127.0.0.1:27099:27017 mongo:6.0 --replSet rs0
+$ docker exec ph-test-mongo mongosh --quiet --eval 'rs.initiate({_id:"rs0",members:[{_id:0,host:"127.0.0.1:27017"}]})'
+$ export PANTAHUB_DEVICES_TEST_MONGO="mongodb://127.0.0.1:27099/?directConnection=true"
+```
+
+`./security_check.sh` runs the same gosec and govulncheck scan as the CI's
+security stage, which gates every build and deploy.
 
 # APIs
 
-The following APIs are currently included and documented:
+ * [Auth](auth/README.md): accounts, logins, OAuth 2.1 and two-factor authentication
+ * [Devices](devices/README.md)
+ * [Trails](trails/README.md): revisions and their states
+ * [Objects](objects/README.md)
+ * [Logs](logs/README.md)
+ * [Apps](apps/README.md): OAuth applications
+ * [MCP](mcp/README.md): the Model Context Protocol endpoint for AI assistants
+ * [Profiles](profiles/README.md)
+ * [Subscriptions](subscriptions/README.md)
+ * [Dash](dash/README.md)
+ * [Callbacks](callbacks/README.md)
+ * [Cron](cron/README.md)
+ * [Healthz](healthz/README.md)
+ * [Metrics](metrics/README.md)
 
- * [Auth API](auth/README.md)
- * [Devices API](devices/README.md)
- * [Trails API](trails/README.md)
- * [Logs API](logs/README.md)
+`/exports`, `/tokens`, `/webhooks`, `/changes` and `/plog` are served as well,
+and devices can use an MQTT message plane over WebSocket at `/mqtt/`.
 
+# Branches, CI and releases
 
-# PVR
+`master` is the default branch. Start every branch from it and open merge
+requests against it.
 
-The most convenient way to interface with pantahub for a subset of its features is through the ```pvr``` tool.
+| Event | CI |
+| --- | --- |
+| any push | the security scan (gosec, govulncheck) |
+| merge to `master` | builds `registry.gitlab.com/pantacor/pantahub-base:master-<sha>` and deploys it to stage |
+| a release tag `NNN` | builds `pantahub-base:NNN-<sha>` and deploys it to production |
 
-See https://gitlab.com/pantacor/pvr for more features.
-
-# Docker
-
-Convenience docker builds are available in gcr.io/pantahub-registry/pantahub-base
-
-To run the latest:
+A release is a `chore: update CHANGELOG.md for release NNN` commit on `master`,
+tagged `NNN`. The changelog is generated with
+[git-chglog](https://github.com/git-chglog/git-chglog):
 
 ```
-docker run -it --rm \
-	-v/path/to/storage:/opt/ph/local-s3 \
-	gcr.io/pantahub-registry/pantahub-base:latest
+$ git-chglog --next-tag NNN -o CHANGELOG.md
 ```
 
-# Build your own Docker
-
-Want to build your own docker images? Check out https://gitlab.com/pantacor/pantahub-containers/
-and the readmes there
-
-# Docker Compose
-
-Get start with `docker-compose`:
-
-```bash
-$ docker-compose up -d
-```
-
-Create the test local s3 bucket
-
-```bash
-$ ./locals3.bash mb s3://testing/
-make_bucket: testing
-```
-
-Run all tests
-
-```bash
-$ docker-compose exec base go test ./...
-```
+Pushing the tag is the production deploy; there is no separate step.
 
 # Kubernetes
 
-Check our example deployment manifest in https://gitlab.com/pantacor/pantahub-containers/api/k8s directory.
+The Helm chart is in [`charts/pantahub`](charts/pantahub).
 
-# Issues/Support:
+# PVR
 
-Please use Issue trackers on gitlab.
+The most convenient way to work with Pantahub for a subset of its features is
+the `pvr` tool: https://gitlab.com/pantacor/pvr
 
+# Issues/Support
+
+Please use the issue tracker on GitLab.
