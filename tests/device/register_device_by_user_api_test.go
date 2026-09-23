@@ -1,17 +1,16 @@
-//
-// Copyright 2019  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//   http://www.apache.org/licenses/LICENSE-2.0
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
-//   Unless required by applicable law or agreed to in writing, software
-//   distributed under the License is distributed on an "AS IS" BASIS,
-//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//   See the License for the specific language governing permissions and
-//   limitations under the License.
+//	Unless required by applicable law or agreed to in writing, software
+//	distributed under the License is distributed on an "AS IS" BASIS,
+//	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	See the License for the specific language governing permissions and
+//	limitations under the License.
 package tests
 
 import (
@@ -39,27 +38,27 @@ func TestRegisterDeviceAccountByUser(t *testing.T) {
 		"testnick",
 	)
 	if res.StatusCode() != 200 {
-		t.Errorf("Error Registering User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Errorf("%s", "Error Registering User Account:Expected Response code:200 but got:"+strconv.Itoa(res.StatusCode()))
 		t.Error(res)
 	}
 	account := helpers.GetUser(t, "test@gmail.com", MongoDb)
-	_, res = helpers.VerifyUserAccount(t, account.Id.Hex(), account.Challenge)
+	_, res = helpers.VerifyUserAccount(t, account.ID.Hex(), account.Challenge)
 	if res.StatusCode() != 200 {
-		t.Errorf("Error Verifying User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Errorf("%s", "Error Verifying User Account:Expected Response code:200 but got:"+strconv.Itoa(res.StatusCode()))
 		t.Error(res)
 	}
 	_, res = helpers.Login(t, "testnick", "testpassword")
 	if res.StatusCode() != 200 {
-		t.Errorf("Error Login User Account:Expected Response code:200 but got:" + strconv.Itoa(res.StatusCode()))
+		t.Errorf("%s", "Error Login User Account:Expected Response code:200 but got:"+strconv.Itoa(res.StatusCode()))
 		t.Error(res)
 	}
 	result, res := helpers.CreateDevice(t, true, "123")
 	if res.StatusCode() != 200 {
-		t.Errorf("Expected Response code:200 OK but got:" + strconv.Itoa(res.StatusCode()))
+		t.Errorf("%s", "Expected Response code:200 OK but got:"+strconv.Itoa(res.StatusCode()))
 	}
 	expectedResult := devices.Device{}
 	expectedResult.Secret = "123"
-	expectedResult.Owner = "prn:::accounts:/" + account.Id.Hex()
+	expectedResult.Owner = "prn:::accounts:/" + account.ID.Hex()
 	if expectedResult.Secret == result.Secret &&
 		expectedResult.Owner == result.Owner {
 		log.Print(" Case 1:Passed")

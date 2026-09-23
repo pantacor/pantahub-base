@@ -1,4 +1,4 @@
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,9 +20,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 )
 
 // handleUpdateApp update a oauth client
@@ -39,43 +40,45 @@ import (
 // @Failure 404 {object} utils.RError "App not found"
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /apps/{id} [put]
-func (app *App) handleUpdateApp(w rest.ResponseWriter, r *rest.Request) {
-	id := r.PathParam("id")
+func (app *App) handleUpdateApp(c *echo.Context) error {
+	id := c.Param("id")
 
 	payload := &CreateAppPayload{}
-	r.DecodeJsonPayload(payload)
+	if err := echoutil.DecodeJsonPayload(c, payload); err != nil {
+		return echoutil.RestErrorWrapperUser(c, err.Error(), "invalid request body", http.StatusBadRequest)
+	}
 
 	err := validatePayload(payload)
 	if err != nil {
-		utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapperUser(c, err.Error(), err.Error(), http.StatusBadRequest)
 	}
 
 	var owner string
-	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
+	jwtPayload, ok := echoutil.Lookup(c, echoutil.KeyJWTPayload)
 	if ok {
 		owner, _ = jwtPayload.(jwtgo.MapClaims)["prn"].(string)
 	} else {
-		utils.RestErrorWrapper(w, "Owner can't be defined", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Owner can't be defined", http.StatusInternalServerError)
 	}
 
 	database := app.mongoClient.Database(utils.MongoDb)
-	tpApp, httpCode, err := SearchApp(r.Context(), owner, id, database)
+	tpApp, httpCode, err := SearchApp(c.Request().Context(), owner, id, database)
 	if err != nil {
-		utils.RestErrorWrapper(w, err.Error(), httpCode)
-		return
+		return echoutil.RestErrorWrapper(c, err.Error(), httpCode)
 	}
 
 	if tpApp == nil {
-		utils.RestErrorWrapper(w, "App not found", http.StatusNotFound)
-		return
+		return echoutil.RestErrorWrapper(c, "App not found", http.StatusNotFound)
 	}
 
 	apptype, err := parseType(payload.Type)
 	if err != nil {
-		utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapperUser(c, err.Error(), err.Error(), http.StatusBadRequest)
+	}
+
+	// An application that already has a now built-in nick may keep it.
+	if payload.Nick != "" && payload.Nick != tpApp.Nick && reservedNick(payload.Nick) {
+		return echoutil.RestErrorWrapperUser(c, "nick is reserved for a built-in client", "nick is reserved for a built-in client", http.StatusConflict)
 	}
 
 	if payload.Nick != "" {
@@ -85,27 +88,28 @@ func (app *App) handleUpdateApp(w rest.ResponseWriter, r *rest.Request) {
 
 	scopes, err := parseScopes(payload.Scopes, tpApp.Nick)
 	if err != nil {
-		utils.RestErrorWrapper(w, err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, err.Error(), http.StatusInternalServerError)
 	}
 
 	if apptype == AppTypePublic {
 		tpApp.Secret = ""
+		tpApp.SecretHash = ""
 	}
 
-	if apptype == AppTypeConfidential && tpApp.Secret == "" {
+	// a confidential app without a stored secret hash gets a fresh secret,
+	// returned in this response only
+	if apptype == AppTypeConfidential && tpApp.SecretHash == "" {
 		tpApp.Secret, err = utils.GenerateSecret(30)
 		if err != nil {
-			utils.RestErrorWrapper(w, err.Error(), http.StatusInternalServerError)
-			return
+			return echoutil.RestErrorWrapper(c, err.Error(), http.StatusInternalServerError)
 		}
+		tpApp.SecretHash = utils.HashSecret(tpApp.Secret)
 	}
 
 	if apptype == AppTypeConfidential && len(payload.ExposedScopes) > 0 {
 		tpApp.ExposedScopes, err = parseScopes(payload.ExposedScopes, payload.Nick)
 		if err != nil {
-			utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
-			return
+			return echoutil.RestErrorWrapperUser(c, err.Error(), err.Error(), http.StatusBadRequest)
 		}
 	}
 
@@ -116,11 +120,10 @@ func (app *App) handleUpdateApp(w rest.ResponseWriter, r *rest.Request) {
 	tpApp.Logo = payload.Logo
 	tpApp.TimeModified = time.Now()
 
-	_, err = CreateOrUpdateApp(r.Context(), tpApp, database)
+	_, err = CreateOrUpdateApp(c.Request().Context(), tpApp, database)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error creating third party application "+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error creating third party application "+err.Error(), http.StatusInternalServerError)
 	}
 
-	w.WriteJson(tpApp)
+	return echoutil.WriteJSON(c, http.StatusOK, tpApp)
 }

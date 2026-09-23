@@ -1,8 +1,37 @@
 stages:
+    - security
     - build
     - deploy
 
 image: docker:27.3.1-cli # Use a modern client
+
+security-scan:
+    stage: security
+    # Builds and runs Dockerfile.security-scan instead of naming a golang image
+    # here, so the Go release used by the scan is defined in one place and
+    # cannot drift from the one the application is built with. It also makes
+    # security_check.sh an exact local reproduction of this job.
+    script:
+        # Create the artifact up front: if anything below fails before the scan
+        # produces one, the job still has a file to upload instead of erroring
+        # a second time on a missing artifact.
+        - touch gosec.sarif
+        - docker build -f Dockerfile.security-scan -t pantahub-base-security-scan .
+        - scan_status=0
+        # Addressed by id rather than by name. The docker-in-docker daemon keeps
+        # its state between pipelines, so a fixed --name collides with the
+        # container the previous run left behind.
+        - scan_container=$(docker create pantahub-base-security-scan)
+        - docker start --attach "$scan_container" || scan_status=$?
+        # Keep the SAST artifact uploadable whether or not the scan passed.
+        - docker cp "$scan_container:/src/gosec.sarif" gosec.sarif || true
+        - docker rm -f "$scan_container" > /dev/null || true
+        - exit "$scan_status"
+    artifacts:
+        reports:
+            sast: gosec.sarif
+        when: always
+
 services:
     - name: docker:27.3.1-dind # Use a matching server
       alias: docker
@@ -84,6 +113,11 @@ deploy-devel:
         - mkdir -p $HOME/.kube
         - echo -n $KUBE_CONFIG_DEV | base64 -d > $HOME/.kube/config
         - kubectl set image deploy/pv-pantahub-base pantahub-base=$CONTAINER_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
+    # develop only: KUBE_CONFIG_DEV is a protected variable and only master and
+    # develop are protected branches, so on a feature branch it is not injected,
+    # the kubeconfig written above is empty, and kubectl falls back to
+    # localhost:8080 and fails. Feature branches still build and push an image
+    # (build-branch), so deploying one is a manual kubectl set image away.
     only:
         - develop
 

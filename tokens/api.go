@@ -1,5 +1,5 @@
 //
-// Copyright 2024  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,134 +19,115 @@ package tokens
 
 //
 import (
+	"context"
 	"log"
 	"os"
+	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/tokens/tokenendpoints"
 	"gitlab.com/pantacor/pantahub-base/tokens/tokenrepo"
 	"gitlab.com/pantacor/pantahub-base/tokens/tokenservice"
 	"gitlab.com/pantacor/pantahub-base/utils"
-	"gitlab.com/pantacor/pantahub-base/utils/tracer"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // App logs rest application
 type App struct {
-	jwtMiddleware *jwt.JWTMiddleware
-	API           *rest.Api
-	mongoClient   *mongo.Client
+	jwtConfig   *jwtauth.Config
+	mongoClient *mongo.Client
+	endpoints   *tokenendpoints.Endpoints
 }
 
 var (
 	onlyUserFilter = []accounts.AccountType{
 		accounts.AccountTypeUser,
 	}
-	onlyUserMiddleware = []rest.Middleware{
-		utils.InitUserTypeFilterMiddleware(onlyUserFilter),
-	}
 )
 
 // New create a new tokens rest application
-func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
+func New(jwtConfig *jwtauth.Config, mongoClient *mongo.Client) *App {
 	app := new(App)
-	app.jwtMiddleware = jwtMiddleware
+	app.jwtConfig = jwtConfig
 	app.mongoClient = mongoClient
 
 	repo := tokenrepo.New(mongoClient)
-	endpoints := tokenendpoints.New(tokenservice.New(repo))
+	app.endpoints = tokenendpoints.New(tokenservice.New(repo))
 	if err := repo.SetIndexes(); err != nil {
 		log.Fatal("can't create indexes to tokens app: ", err)
 		return nil
 	}
 
-	app.API = rest.NewApi()
-
-	// we dont use default stack because we dont want content type enforcement
-	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout, "/tokens:", log.Lshortfile)})
-	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "tokens"})
-
-	app.API.Use(&rest.StatusMiddleware{})
-	app.API.Use(&rest.TimerMiddleware{})
-	app.API.Use(&metrics.Middleware{})
-	app.API.Use(rest.DefaultCommonStack...)
-
-	// we allow calls from other domains to allow webapps; XXX: review
-	app.API.Use(&rest.CorsMiddleware{
-		RejectNonCorsRequests: false,
-		OriginValidator: func(origin string, request *rest.Request) bool {
-			return true
-		},
-		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{
-			"Accept",
-			"Content-Type",
-			"Content-Length",
-			"X-Custom-Header",
-			"Origin",
-			"Authorization",
-			"X-Trace-ID",
-			"Trace-Id",
-			"x-request-id",
-			"X-Request-ID",
-			"TraceID",
-			"ParentID",
-			"Uber-Trace-ID",
-			"uber-trace-id",
-			"traceparent",
-			"tracestate",
-		},
-		AccessControlAllowCredentials: true,
-		AccessControlMaxAge:           3600,
-	})
-
-	app.API.Use(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtMiddleware, Mongo: app.mongoClient})
-	app.API.Use(&rest.IfMiddleware{
-		Condition: func(request *rest.Request) bool {
-			return true
-		},
-		IfTrue: app.jwtMiddleware,
-	})
-
-	app.API.Use(&rest.IfMiddleware{
-		Condition: func(request *rest.Request) bool {
-			return true
-		},
-		IfTrue: &utils.AuthMiddleware{},
-	})
-
-	apiRouter, _ := rest.MakeRouter(
-		rest.Get("/", endpoints.ListTokens),
-		rest.Post(
-			"/",
-			rest.WrapMiddlewares(
-				onlyUserMiddleware,
-				endpoints.CreateToken,
-			),
-		),
-		rest.Get(
-			"/#id",
-			rest.WrapMiddlewares(
-				onlyUserMiddleware,
-				endpoints.GetToken,
-			),
-		),
-		rest.Delete(
-			"/#id",
-			rest.WrapMiddlewares(
-				onlyUserMiddleware,
-				endpoints.DeleteToken,
-			),
-		),
-	)
-	app.API.Use(&tracer.OtelMiddleware{
-		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
-		Router:      apiRouter,
-	})
-	app.API.SetApp(apiRouter)
+	// idempotent: add a sha256 digest to any token still stored in plaintext.
+	// The plaintext is kept until PANTAHUB_PURGE_PLAINTEXT_SECRETS is
+	// enabled, so a rolling deploy from a build that verifies the plaintext
+	// keeps working.
+	migrateCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	if n, err := repo.MigratePlaintextSecrets(migrateCtx); err != nil {
+		log.Fatal("can't migrate plaintext token secrets: ", err)
+		return nil
+	} else if n > 0 {
+		log.Printf("tokens: hashed %d plaintext token secrets", n)
+	}
+	if utils.GetEnv(utils.EnvPantahubPurgePlaintextSecrets) == "true" {
+		if n, err := repo.PurgePlaintextSecrets(migrateCtx); err != nil {
+			log.Fatal("can't purge plaintext token secrets: ", err)
+			return nil
+		} else if n > 0 {
+			log.Printf("tokens: purged %d plaintext token secrets", n)
+		}
+	}
 
 	return app
+}
+
+// Mount registers tokens on the echo server.
+func (app *App) Mount(s *echoutil.Server) {
+	const prefix = "/tokens"
+
+	g := s.Mount(prefix,
+		echoutil.AccessLogJSON(log.New(os.Stdout, "/tokens:", log.Lshortfile), prefix),
+		echoutil.AccessLogFluent(&utils.AccessLogFluentMiddleware{Prefix: "tokens"}, prefix),
+		metrics.EchoMiddleware(prefix),
+		echoutil.Instrument(),
+		echoutil.Recover(),
+		echoutil.CORS(echoutil.CORSConfig{
+			RejectNonCorsRequests: false,
+			OriginValidator:       echoutil.AllowAllOrigins,
+			AllowedMethods:        []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+			AllowedHeaders: []string{
+				"Accept",
+				"Content-Type",
+				"Content-Length",
+				"X-Custom-Header",
+				"Origin",
+				"Authorization",
+				"X-Trace-ID",
+				"Trace-Id",
+				"x-request-id",
+				"X-Request-ID",
+				"TraceID",
+				"ParentID",
+				"Uber-Trace-ID",
+				"uber-trace-id",
+				"traceparent",
+				"tracestate",
+			},
+			AccessControlAllowCredentials: true,
+			AccessControlMaxAge:           3600,
+		}),
+		echoutil.BasicAuthToBearer(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtConfig, Mongo: app.mongoClient}),
+		echoutil.JWT(app.jwtConfig),
+		echoutil.Auth(),
+	)
+
+	onlyUser := echoutil.UserTypeFilterMW(onlyUserFilter)
+	g.GET("/", app.endpoints.ListTokens)
+	g.POST("/", app.endpoints.CreateToken, onlyUser)
+	g.GET("/:id", app.endpoints.GetToken, onlyUser)
+	g.DELETE("/:id", app.endpoints.DeleteToken, onlyUser)
 }

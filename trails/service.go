@@ -1,5 +1,5 @@
 //
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,14 +26,13 @@ import (
 
 	"context"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/utils"
-	"gitlab.com/pantacor/pantahub-base/utils/tracer"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/x/bsonx"
 )
 
 // New create a new trails rest application
@@ -42,9 +41,16 @@ import (
 //	post walk
 //	get walks
 //	search attributes for advanced steps/walk searching inside trail
-func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
+//
+// Build returns an App over mongoClient for the functions other packages
+// share, without mounting routes or touching indexes.
+func Build(mongoClient *mongo.Client) *App {
+	return &App{mongoClient: mongoClient}
+}
+
+func New(jwtConfig *jwtauth.Config, mongoClient *mongo.Client) *App {
 	app := new(App)
-	app.jwtMiddleware = jwtMiddleware
+	app.jwtConfig = jwtConfig
 	app.mongoClient = mongoClient
 
 	// Indexing for the owner,garbage fields in pantahub_trails
@@ -59,9 +65,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	indexOptions.SetBackground(true)
 
 	index := mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "owner", Value: bsonx.Int32(1)},
-			{Key: "garbage", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "owner", Value: int32(1)},
+			{Key: "garbage", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -80,9 +86,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "device", Value: bsonx.Int32(1)},
-			{Key: "garbage", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "device", Value: int32(1)},
+			{Key: "garbage", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -101,9 +107,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "owner", Value: bsonx.Int32(1)},
-			{Key: "garbage", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "owner", Value: int32(1)},
+			{Key: "garbage", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -122,9 +128,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "device", Value: bsonx.Int32(1)},
-			{Key: "garbage", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "device", Value: int32(1)},
+			{Key: "garbage", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -144,12 +150,12 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "trail-id", Value: bsonx.Int32(1)},
-			{Key: "owner", Value: bsonx.Int32(1)},
-			{Key: "progress.status", Value: bsonx.Int32(1)},
-			{Key: "garbage", Value: bsonx.Int32(1)},
-			{Key: "rev", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "trail-id", Value: int32(1)},
+			{Key: "owner", Value: int32(1)},
+			{Key: "progress.status", Value: int32(1)},
+			{Key: "garbage", Value: int32(1)},
+			{Key: "rev", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -169,12 +175,12 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "trail-id", Value: bsonx.Int32(1)},
-			{Key: "device", Value: bsonx.Int32(1)},
-			{Key: "progress.status", Value: bsonx.Int32(1)},
-			{Key: "garbage", Value: bsonx.Int32(1)},
-			{Key: "rev", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "trail-id", Value: int32(1)},
+			{Key: "device", Value: int32(1)},
+			{Key: "progress.status", Value: int32(1)},
+			{Key: "garbage", Value: int32(1)},
+			{Key: "rev", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -194,11 +200,11 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "trail-id", Value: bsonx.Int32(1)},
-			{Key: "progress.status", Value: bsonx.Int32(1)},
-			{Key: "garbage", Value: bsonx.Int32(1)},
-			{Key: "rev", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "trail-id", Value: int32(1)},
+			{Key: "progress.status", Value: int32(1)},
+			{Key: "garbage", Value: int32(1)},
+			{Key: "rev", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -208,88 +214,66 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		return nil
 	}
 
-	app.API = rest.NewApi()
+	return app
+}
 
-	// we dont use default stack because we dont want content type enforcement
-	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
-		"/trails:", log.Lshortfile)})
-	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "trails"})
-	app.API.Use(&rest.StatusMiddleware{})
-	app.API.Use(&rest.TimerMiddleware{})
-	app.API.Use(&metrics.Middleware{})
-	app.API.Use(&utils.CanonicalJSONMiddleware{})
+// Mount registers trails on echo with its previous middleware stack.
+func (app *App) Mount(s *echoutil.Server) {
+	const prefix = "/trails"
 
-	app.API.Use(rest.DefaultCommonStack...)
-	app.API.Use(&rest.CorsMiddleware{
-		RejectNonCorsRequests: false,
-		OriginValidator: func(origin string, request *rest.Request) bool {
-			return true
-		},
-		AllowedMethods:                []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:                []string{"Accept", "Content-Type", "X-Custom-Header", "Origin", "Authorization", "Content-Length"},
-		AccessControlAllowCredentials: true,
-		AccessControlMaxAge:           3600,
-	})
-	app.API.Use(&utils.URLCleanMiddleware{})
+	g := s.Mount(prefix,
+		echoutil.AccessLogJSON(log.New(os.Stdout, "/trails:", log.Lshortfile), prefix),
+		echoutil.AccessLogFluent(&utils.AccessLogFluentMiddleware{Prefix: "trails"}, prefix),
+		metrics.EchoMiddleware(prefix),
+		echoutil.CanonicalJSON(),
+		echoutil.Instrument(),
+		echoutil.Recover(),
+		echoutil.CORS(echoutil.CORSConfig{
+			RejectNonCorsRequests:         false,
+			OriginValidator:               echoutil.AllowAllOrigins,
+			AllowedMethods:                []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+			AllowedHeaders:                []string{"Accept", "Content-Type", "X-Custom-Header", "Origin", "Authorization", "Content-Length"},
+			AccessControlAllowCredentials: true,
+			AccessControlMaxAge:           3600,
+		}),
+		echoutil.URLClean(),
+		echoutil.BasicAuthToBearer(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtConfig, Mongo: app.mongoClient}),
+		echoutil.JWT(app.jwtConfig),
+		echoutil.Auth(),
+	)
 
-	app.API.Use(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtMiddleware, Mongo: app.mongoClient})
-	app.API.Use(&rest.IfMiddleware{
-		Condition: func(request *rest.Request) bool {
-			return true
-		},
-		IfTrue: app.jwtMiddleware,
-	})
-	app.API.Use(&rest.IfMiddleware{
-		Condition: func(request *rest.Request) bool {
-			return true
-		},
-		IfTrue: &utils.AuthMiddleware{},
-	})
-
-	// /auth_status endpoints
-	// XXX: this is all needs to be done so that paths that do not trail with /
-	//      get a MOVED PERMANTENTLY error with the redir path with / like the main
-	//      API routers (bad rest.MakeRouter I suspect)
-
-	readTrailsScopes := []utils.Scope{
+	read := echoutil.ScopeFilterMW([]utils.Scope{
 		utils.Scopes.API,
 		utils.Scopes.Trails,
 		utils.Scopes.ReadTrails,
-	}
-	writeTrailsScopes := []utils.Scope{
+	})
+	write := echoutil.ScopeFilterMW([]utils.Scope{
 		utils.Scopes.API,
 		utils.Scopes.Trails,
 		utils.Scopes.WriteTrails,
-	}
-	apiRouter, _ := rest.MakeRouter(
-		rest.Get("/auth_status", utils.ScopeFilter(readTrailsScopes, handleAuth)),
-		rest.Get("/", utils.ScopeFilter(readTrailsScopes, app.handleGetTrails)),
-		rest.Post("/", utils.ScopeFilter(writeTrailsScopes, app.handlePostTrail)),
-		rest.Get("/summary", utils.ScopeFilter(readTrailsScopes, app.handleGetTrailSummary)),
-		rest.Get("/#id", utils.ScopeFilter(readTrailsScopes, app.handleGetTrail)),
-		rest.Get("/#id/.pvrremote", utils.ScopeFilter(readTrailsScopes, app.handleGetTrailPvrInfo)),
-		rest.Get("/#id/steps", utils.ScopeFilter(readTrailsScopes, app.handleGetSteps)),
-		rest.Post("/#id/steps", utils.ScopeFilter(writeTrailsScopes, app.handlePostStep)),
-		rest.Get("/#id/steps/#rev", utils.ScopeFilter(readTrailsScopes, app.handleGetStep)),
-		rest.Get("/#id/steps/#rev/.pvrremote", utils.ScopeFilter(readTrailsScopes, app.handleGetStepPvrInfo)),
-		rest.Get("/#id/steps/#rev/meta", utils.ScopeFilter(readTrailsScopes, app.handleGetStepMeta)),
-		rest.Get("/#id/steps/#rev/state", utils.ScopeFilter(readTrailsScopes, app.handleGetStepState)),
-		rest.Get("/#id/steps/#rev/objects", utils.ScopeFilter(readTrailsScopes, app.handleGetStepsObjects)),
-		rest.Get("/#id/steps/#rev/objects/#obj", utils.ScopeFilter(readTrailsScopes, app.handleGetStepsObject)),
-		rest.Get("/#id/steps/#rev/objects/#obj/blob", utils.ScopeFilter(readTrailsScopes, app.handleGetStepsObjectFile)),
-		rest.Post("/#id/steps/#rev/objects", utils.ScopeFilter(writeTrailsScopes, app.handlePostStepsObject)),
-		rest.Put("/#id/steps/#rev/meta", utils.ScopeFilter(writeTrailsScopes, app.handlePutStepMeta)),
-		rest.Put("/#id/steps/#rev/state", utils.ScopeFilter(writeTrailsScopes, app.handlePutStepState)),
-		rest.Put("/#id/steps/#rev/progress", utils.ScopeFilter(writeTrailsScopes, app.handlePutStepProgress)),
-		rest.Put("/#id/steps/#rev/cancel", utils.ScopeFilter(writeTrailsScopes, app.handlePutStepProgressCancel)),
-		rest.Put("/#id/steps/#rev/wontgo", utils.ScopeFilter(writeTrailsScopes, app.handlePutStepProgressWontgo)),
-		rest.Get("/#id/summary", utils.ScopeFilter(readTrailsScopes, app.handleGetTrailStepSummary)),
-	)
-	app.API.Use(&tracer.OtelMiddleware{
-		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
-		Router:      apiRouter,
 	})
-	app.API.SetApp(apiRouter)
 
-	return app
+	// URLClean strips the trailing "/", so the root is the bare prefix.
+	g.GET("/auth_status", handleAuth, read)
+	g.GET("", app.handleGetTrails, read)
+	g.POST("", app.handlePostTrail, write)
+	g.GET("/summary", app.handleGetTrailSummary, read)
+	g.GET("/:id", app.handleGetTrail, read)
+	g.GET("/:id/.pvrremote", app.handleGetTrailPvrInfo, read)
+	g.GET("/:id/steps", app.handleGetSteps, read)
+	g.POST("/:id/steps", app.handlePostStep, write)
+	g.GET("/:id/steps/:rev", app.handleGetStep, read)
+	g.GET("/:id/steps/:rev/.pvrremote", app.handleGetStepPvrInfo, read)
+	g.GET("/:id/steps/:rev/meta", app.handleGetStepMeta, read)
+	g.GET("/:id/steps/:rev/state", app.handleGetStepState, read)
+	g.GET("/:id/steps/:rev/objects", app.handleGetStepsObjects, read)
+	g.GET("/:id/steps/:rev/objects/:obj", app.handleGetStepsObject, read)
+	g.GET("/:id/steps/:rev/objects/:obj/blob", app.handleGetStepsObjectFile, read)
+	g.POST("/:id/steps/:rev/objects", app.handlePostStepsObject, write)
+	g.PUT("/:id/steps/:rev/meta", app.handlePutStepMeta, write)
+	g.PUT("/:id/steps/:rev/state", app.handlePutStepState, write)
+	g.PUT("/:id/steps/:rev/progress", app.handlePutStepProgress, write)
+	g.PUT("/:id/steps/:rev/cancel", app.handlePutStepProgressCancel, write)
+	g.PUT("/:id/steps/:rev/wontgo", app.handlePutStepProgressWontgo, write)
+	g.GET("/:id/summary", app.handleGetTrailStepSummary, read)
 }

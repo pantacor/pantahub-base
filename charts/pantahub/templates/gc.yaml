@@ -1,0 +1,69 @@
+{{- if .Values.gc.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: gc
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "gc") | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 2000
+      targetPort: 2000
+  selector:
+    {{- include "pantahub.selectorLabels" (dict "ctx" . "name" "gc") | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gc
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "gc") | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "pantahub.selectorLabels" (dict "ctx" . "name" "gc") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "pantahub.labels" (dict "ctx" . "name" "gc") | nindent 8 }}
+      annotations:
+        checksum/env: {{ include "pantahub.effectiveEnv" . | sha256sum }}
+    spec:
+      enableServiceLinks: false
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: gc
+          image: "{{ .Values.gc.image }}:{{ .Values.gc.tag }}"
+          envFrom:
+            - configMapRef:
+                name: pantahub-env
+          env:
+            {{- include "pantahub.envMap" .Values.gc.env | nindent 12 }}
+          ports:
+            - containerPort: 2000
+          readinessProbe:
+            tcpSocket:
+              port: 2000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          volumeMounts:
+            # blank out the image's baked env.default so container env wins
+            # (compose mounts .env.local over it for the same reason)
+            - name: empty-envfile
+              mountPath: /opt/ph/bin/env.default
+              subPath: env.default
+          {{- with .Values.gc.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: empty-envfile
+          configMap:
+            name: pantahub-empty-envfile
+{{- end }}

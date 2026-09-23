@@ -1,0 +1,73 @@
+{{- if .Values.ingress.enabled }}
+{{- $apiHost := include "pantahub.apiHost" . }}
+{{- $hubHost := include "pantahub.hubHost" . }}
+{{- $pvrHost := include "pantahub.pvrHost" . }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pantahub
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "pantahub") | nindent 4 }}
+  annotations:
+    {{- if and .Values.ingress.tls.enabled .Values.ingress.letsencrypt.enabled }}
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.letsencrypt.issuer }}
+    {{- end }}
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - secretName: {{ .Values.ingress.tls.secretName }}
+      hosts:
+        {{- if .Values.base.enabled }}
+        - {{ $apiHost }}
+        {{- end }}
+        {{- if .Values.www.enabled }}
+        - {{ $hubHost }}
+        {{- end }}
+        {{- if .Values.pvr.enabled }}
+        - {{ $pvrHost }}
+        {{- end }}
+  {{- end }}
+  rules:
+    {{- if .Values.base.enabled }}
+    - host: {{ $apiHost }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: base
+                port:
+                  number: 12365
+    {{- end }}
+    {{- if .Values.www.enabled }}
+    - host: {{ $hubHost }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: www
+                port:
+                  number: 80
+    {{- end }}
+    {{- if .Values.pvr.enabled }}
+    - host: {{ $pvrHost }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pvr
+                port:
+                  number: 12367
+    {{- end }}
+{{- end }}

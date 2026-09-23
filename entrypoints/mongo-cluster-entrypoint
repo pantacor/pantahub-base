@@ -14,17 +14,17 @@ chmod 600 /keys/mongokey.yaml
     sleep 2
   done
 
+  # Single-node replica set: change streams (Kafka Connect, watch()) need a replica set, but one
+  # member is enough locally and uses a third of the disk (three members = three full copies).
   replicaSet="{
     \"_id\": \"${MONGO_RS}\",
     \"members\": [
-      { \"_id\": 0, \"host\": \"mongo:27017\" },
-      { \"_id\": 1, \"host\": \"mongo2:30002\" },
-      { \"_id\": 2, \"host\": \"mongo3:30003\" }
+      { \"_id\": 0, \"host\": \"mongo:27017\" }
     ]
   }"
 
   echo "Mongo Initializer: Initializing replica set..."
-  until mongo --port ${MONGO_PORT} --quiet --eval "rs.initiate($replicaSet).ok || rs.status().ok"; do
+  until mongo --port ${MONGO_PORT} --quiet --eval "quit((rs.initiate($replicaSet).ok || rs.status().ok) ? 0 : 1)"; do
     echo "Mongo Initializer: checking mongo replica set"
     sleep 2
   done
@@ -51,6 +51,22 @@ chmod 600 /keys/mongokey.yaml
     done
   fi
 
+  # Webhooks user (pantahub-webhooks service, webhooks/docker-compose.yml)
+  if ! mongo --eval 'db.getUsers()' "mongodb://webhooks:pass@localhost:${MONGO_PORT}/pantabase-webhooks?authSource=pantabase-webhooks&authMechanism=SCRAM-SHA-1&replicaSet=${MONGO_RS}" > /dev/null 2>&1; then
+    until mongo --eval 'db.createUser({user: "webhooks", pwd: "pass", roles: [{role: "readWrite", db:"pantabase-webhooks"}], mechanisms: ["SCRAM-SHA-1"]})' "mongodb://localhost:${MONGO_PORT}/pantabase-webhooks?replicaSet=${MONGO_RS}"; do
+      sleep 2
+    done
+  fi
+
+  # Fleet user. fleet/ no longer runs its own replica set; it shares this
+  # cluster and keeps its own simplefleet database. Matches the user that
+  # fleet/entrypoints/mongo-cluster-entrypoint used to create.
+  if ! mongo --eval 'db.getUsers()' "mongodb://user:pass@localhost:${MONGO_PORT}/simplefleet?authSource=simplefleet&authMechanism=SCRAM-SHA-1&replicaSet=${MONGO_RS}" > /dev/null 2>&1; then
+    until mongo --eval 'db.createUser({user: "user", pwd: "pass", roles: [{role: "readWrite", db:"simplefleet"}], mechanisms: ["SCRAM-SHA-1"]})' "mongodb://localhost:${MONGO_PORT}/simplefleet?replicaSet=${MONGO_RS}"; do
+      sleep 2
+    done
+  fi
+
   # Source user
   if ! mongo --eval 'db.getUsers()' "mongodb://phskafkaconnectsource:pass@localhost:${MONGO_PORT}/admin?authSource=admin&authMechanism=SCRAM-SHA-1&replicaSet=${MONGO_RS}" > /dev/null 2>&1; then
     until mongo --eval 'db.createUser({user: "phskafkaconnectsource", pwd: "pass", roles: [{role: "readWrite", db:"admin"}, {role: "read", db:"local"}, {role: "read", db:"config"}], mechanisms: ["SCRAM-SHA-1"]})' "mongodb://localhost:${MONGO_PORT}/admin?replicaSet=${MONGO_RS}"; do
@@ -61,4 +77,6 @@ chmod 600 /keys/mongokey.yaml
 ) &
 
 # Execute mongod as main process
-exec mongod --keyFile /keys/mongokey.yaml --transitionToAuth --port ${MONGO_PORT} --replSet ${MONGO_RS} --bind_ip_all --oplogSize ${MONGO_OPLOG_SIZE_MB:-990} "$@"
+# mirrorReads samplingRate 0: with a single member there is no secondary to mirror reads to, and
+# MirrorMaestro otherwise retries removed hosts once a second forever.
+exec mongod --keyFile /keys/mongokey.yaml --transitionToAuth --port ${MONGO_PORT} --replSet ${MONGO_RS} --bind_ip_all --oplogSize ${MONGO_OPLOG_SIZE_MB:-990} --setParameter mirrorReads='{samplingRate: 0.0}' "$@"

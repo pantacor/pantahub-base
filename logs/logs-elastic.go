@@ -1,5 +1,5 @@
 //
-// Copyright 2017, 2018  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -44,6 +44,10 @@ import (
 )
 
 const defaultTimeoutSec = 30
+
+// sortTieBreaker makes the sort order total. See buildSearchSource for why it
+// is the ObjectID's keyword subfield and not the tsec/tnano event clock.
+const sortTieBreaker = "id.keyword"
 
 type elasticLogEntry struct {
 	*Entry
@@ -186,20 +190,15 @@ func (s *elasticLogger) unregister(deleteIndex bool) error {
 	return nil
 }
 
-func (s *elasticLogger) getLogs(pctx context.Context, start int64, page int64, before *time.Time,
-	after *time.Time, query Filters, sort Sorts, cursor bool) (*Pager, error) {
-	queryFmt := fmt.Sprintf("%s-*/_search", s.elasticIndexPrefix)
-
-	queryURL, err := url.Parse(queryFmt)
-
-	if err != nil {
-		return nil, err
-	}
-
-	queryURI := s.elasticURL.ResolveReference(queryURL)
+// buildSearchSource assembles the Elasticsearch query body for a log page:
+// filters, paging (offset or search_after) and the sort tuple. It is kept
+// free of I/O so the query shape can be asserted directly in tests.
+func buildSearchSource(start int64, page int64, before *time.Time, after *time.Time,
+	query Filters, sort Sorts, searchAfter []interface{}) (interface{}, error) {
 
 	// build query part
 	q := elastic.NewBoolQuery()
+
 	if query.Owner != "" {
 		q = q.Filter(elastic.NewMatchPhraseQuery("own", query.Owner))
 	}
@@ -253,11 +252,27 @@ func (s *elasticLogger) getLogs(pctx context.Context, start int64, page int64, b
 	// build search
 	searchS := elastic.NewSearchSource().
 		Query(q).
-		From(int(start)).
 		Size(int(page))
 
-		// lets do the sort part
-	for _, v := range sort {
+	// search_after continues from the previous page's sort values and cannot
+	// be combined with a from offset.
+	if len(searchAfter) > 0 {
+		searchS = searchS.SearchAfter(searchAfter...)
+	} else if start > 0 {
+		searchS = searchS.From(int(start))
+	}
+
+	// Mirror the mongo backend's default rather than leaving the search
+	// unsorted: every clause above is a Filter, so scores are constant and an
+	// unsorted search comes back in index order.
+	if len(sort) == 0 {
+		sort = Sorts{"-time-created"}
+	}
+
+	// lets do the sort part
+	sorted := map[string]bool{}
+	primaryAsc := true
+	for i, v := range sort {
 		var asc bool
 		if v[0] == '-' {
 			asc = false
@@ -268,97 +283,57 @@ func (s *elasticLogger) getLogs(pctx context.Context, start int64, page int64, b
 		if v[0] == '+' || v[0] == '-' {
 			v = v[1:]
 		}
+		if i == 0 {
+			primaryAsc = asc
+		}
+		sorted[v] = true
 		searchS = searchS.Sort(v, asc)
 	}
 
-	searchBody, err := searchS.Source()
-	if err != nil {
-		return nil, err
+	// The sort tuple has to be unique. `time-created` is a millisecond-
+	// precision date, so one device batch lands many entries on the same
+	// value; ordering between them is then decided per shard and is not stable
+	// between two requests. That breaks search_after -- it cannot tell where
+	// the previous page ended -- and it silently drops every entry sharing the
+	// boundary millisecond when the caller pages with an exclusive
+	// before/after bound instead.
+	//
+	// `id` is the per-entry ObjectID, set unconditionally on ingest, and it is
+	// the only unique field actually present in every index. tsec/tnano look
+	// like the natural choice but are tagged omitempty and are absent from
+	// most documents, so sorting on them throws
+	// "No mapping found for [tsec] in order to sort on" -- and because the
+	// search spans an index wildcard, that surfaces as a 200 with partially
+	// failed shards, i.e. entries silently missing from every index that
+	// lacks the field. unmapped_type keeps that from ever happening again.
+	//
+	// Note this relies on `id` keeping its dynamic text+keyword mapping; it
+	// must not be pinned to `keyword` in the template, or the `.keyword`
+	// subfield would stop existing on new indices.
+	if !sorted[sortTieBreaker] {
+		searchS = searchS.SortBy(
+			elastic.NewFieldSort(sortTieBreaker).
+				Order(primaryAsc).
+				UnmappedType("keyword"),
+		)
 	}
 
-	// add scroll to query; XXX: we need limits here for
-	if cursor {
-		q1 := queryURI.Query()
-		q1.Add("scroll", "1m")
-		queryURI.RawQuery = q1.Encode()
-	}
-
-	response, err := s.r(defaultTimeoutSec, false).SetContext(pctx).SetBody(searchBody).Post(queryURI.String())
-	if err != nil {
-		return nil, err
-	}
-
-	if response.StatusCode() != http.StatusOK {
-		errStr := fmt.Sprintf("WARN: getLogs call failed: %d - %s\n", response.StatusCode(), response.Body())
-		return nil, errors.New(errStr)
-	}
-
-	var elasticResult elastic.SearchResult
-
-	body := response.Body()
-	err = json.Unmarshal(body, &elasticResult)
-
-	if err != nil {
-		return nil, err
-	}
-
-	var pagerResult Pager
-
-	pagerResult.Count = elasticResult.TotalHits()
-	pagerResult.Start = start
-	pagerResult.Page = int64(len(elasticResult.Hits.Hits))
-	pagerResult.NextCursor = elasticResult.ScrollId
-
-	prototype := Entry{}
-	arr := elasticResult.Each(reflect.TypeOf(&prototype))
-
-	for _, v := range arr {
-		pagerResult.Entries = append(pagerResult.Entries, v.(*Entry))
-	}
-	pagerResult.Count = int64(len(arr))
-
-	return &pagerResult, nil
+	return searchS.Source()
 }
 
-func (s *elasticLogger) scrollBuildNextURL(pretty bool) (string, url.Values, error) {
-	path := "/_search/scroll"
-
-	// Add query string parameters
-	params := url.Values{}
-
-	if pretty {
-		params.Set("pretty", "1")
-	}
-
-	return path, params, nil
-}
-
-func (s *elasticLogger) scrollBuildBodyNext(keepAlive string, scrollID string) (interface{}, error) {
-	body := struct {
-		Scroll   string `json:"scroll"`
-		ScrollID string `json:"scroll_id,omitempty"`
-	}{
-		Scroll:   keepAlive,
-		ScrollID: scrollID,
-	}
-	return body, nil
-}
-
-func (s *elasticLogger) getLogsByCursor(pctx context.Context, nextCursor string) (*Pager, error) {
-	queryFmt, values, err := s.scrollBuildNextURL(false)
-	if err != nil {
-		return nil, err
-	}
+func (s *elasticLogger) getLogs(pctx context.Context, start int64, page int64, before *time.Time,
+	after *time.Time, query Filters, sort Sorts, searchAfter []interface{}, cursor bool) (*Pager, error) {
+	queryFmt := fmt.Sprintf("%s-*/_search", s.elasticIndexPrefix)
 
 	queryURL, err := url.Parse(queryFmt)
+
 	if err != nil {
 		return nil, err
 	}
 
-	queryURL.RawQuery = values.Encode()
 	queryURI := s.elasticURL.ResolveReference(queryURL)
 
-	searchBody, err := s.scrollBuildBodyNext("1m", nextCursor)
+	searchBody, err := buildSearchSource(start, page, before, after, query, sort, searchAfter)
 	if err != nil {
 		return nil, err
 	}
@@ -384,10 +359,12 @@ func (s *elasticLogger) getLogsByCursor(pctx context.Context, nextCursor string)
 
 	var pagerResult Pager
 
-	pagerResult.Count = elasticResult.TotalHits()
-	pagerResult.Start = 0
+	pagerResult.Start = start
 	pagerResult.Page = int64(len(elasticResult.Hits.Hits))
-	pagerResult.NextCursor = elasticResult.ScrollId
+	// Total matching entries, not the size of this page. This used to be
+	// assigned from TotalHits and then immediately overwritten with the page
+	// length, so no caller could tell how much was left.
+	pagerResult.Count = elasticResult.TotalHits()
 
 	prototype := Entry{}
 	arr := elasticResult.Each(reflect.TypeOf(&prototype))
@@ -395,7 +372,23 @@ func (s *elasticLogger) getLogsByCursor(pctx context.Context, nextCursor string)
 	for _, v := range arr {
 		pagerResult.Entries = append(pagerResult.Entries, v.(*Entry))
 	}
-	pagerResult.Count = int64(len(arr))
+
+	// Hand back the last entry's sort values so the caller can continue with
+	// search_after. This is emitted for a short page too: a caller tailing a
+	// device needs to resume from exactly where it stopped, and re-issuing the
+	// same cursor later simply returns whatever has arrived since. Callers
+	// paging through a finite result set should stop when a page comes back
+	// shorter than the one they asked for, not when the cursor runs out.
+	if cursor && len(elasticResult.Hits.Hits) > 0 {
+		lastHit := elasticResult.Hits.Hits[len(elasticResult.Hits.Hits)-1]
+		if len(lastHit.Sort) > 0 {
+			encoded, err := json.Marshal(lastHit.Sort)
+			if err != nil {
+				return nil, err
+			}
+			pagerResult.NextCursor = string(encoded)
+		}
+	}
 
 	return &pagerResult, nil
 }
@@ -441,6 +434,25 @@ func (s *elasticLogger) postLogsv2(_ context.Context, e []Entry, _ bool) error {
 	}
 
 	return nil
+}
+
+// elasticBulkItemResult is the per-item result inside an Elasticsearch _bulk
+// response. Status is the item's HTTP-style status and Error carries the
+// failure type/reason when the item was not indexed.
+type elasticBulkItemResult struct {
+	Status int `json:"status"`
+	Error  struct {
+		Type   string `json:"type"`
+		Reason string `json:"reason"`
+	} `json:"error"`
+}
+
+// elasticBulkResponse is the subset of the _bulk response we inspect to detect
+// per-item indexing failures: the API returns HTTP 200 even when individual
+// documents fail, and those failures live per item under Items.
+type elasticBulkResponse struct {
+	Errors bool                               `json:"errors"`
+	Items  []map[string]elasticBulkItemResult `json:"items"`
 }
 
 func (s *elasticLogger) postLogsv1(parentCtx context.Context, e []Entry, debug bool) error {
@@ -527,7 +539,79 @@ func (s *elasticLogger) postLogsv1(parentCtx context.Context, e []Entry, debug b
 		return errors.New("WARNING: elasticsearch log entry failed " + response.Status() + "\nReturned Body: " + string(response.Body()))
 	}
 
+	// Elasticsearch _bulk returns HTTP 200 even when individual documents
+	// fail to index (e.g. es_rejected_execution_exception write-queue
+	// rejections on big batches, or max_bytes_length_exceeded_exception when
+	// a msg field exceeds the keyword 32KB limit). Those per-item failures
+	// live in the response body and must be inspected explicitly; otherwise
+	// entries are dropped silently while the handler still replies ok.
+	var bulkResp elasticBulkResponse
+	if err := json.Unmarshal(response.Body(), &bulkResp); err != nil {
+		return fmt.Errorf("WARNING: elasticsearch _bulk response could not be parsed: %s\nReturned Body: %s", err, string(response.Body()))
+	}
+
+	if bulkResp.Errors {
+		failed, permanent, transient := 0, 0, 0
+		firstError := ""
+		for _, item := range bulkResp.Items {
+			for _, result := range item {
+				if result.Status < 300 && result.Error.Type == "" {
+					continue
+				}
+				failed++
+				if firstError == "" && result.Error.Type != "" {
+					firstError = fmt.Sprintf("%s: %s", result.Error.Type, result.Error.Reason)
+				}
+				if isTransientBulkError(result.Status, result.Error.Type) {
+					transient++
+				} else {
+					permanent++
+				}
+			}
+		}
+		const maxSample = 512
+		if len(firstError) > maxSample {
+			firstError = firstError[:maxSample]
+		}
+		msg := fmt.Sprintf("elasticsearch _bulk indexed with errors: %d of %d entries failed (%d permanent, %d transient); first error: %s",
+			failed, len(bulkResp.Items), permanent, transient, firstError)
+
+		// A permanent per-item failure (mapper_parsing_exception,
+		// max_bytes_length_exceeded_exception, illegal_argument_exception, ...)
+		// will never index no matter how often the batch is resent. Returning
+		// an error here would wedge the device: ph_logger does not advance its
+		// saved log-file position on a failed push, so it would resend the same
+		// "poison" batch forever -- re-indexing the healthy items as duplicates
+		// and never uploading newer logs. So we drop-and-log the permanent
+		// failures and reply ok, letting the device advance past the batch.
+		// Only when *every* failure is transient (es_rejected_execution_exception
+		// / 429 write-queue pressure, unavailable shards, ...) do we return an
+		// error, because resending the same batch can then still succeed.
+		if permanent > 0 {
+			log.Printf("WARNING: dropping %d unindexable log entr(ies); %s", permanent, msg)
+			return nil
+		}
+		log.Printf("WARNING: %s", msg)
+		return errors.New(msg)
+	}
+
 	return nil
+}
+
+// isTransientBulkError reports whether an Elasticsearch _bulk per-item failure
+// is retryable (transient backpressure) versus a permanent rejection of the
+// document's content. Transient failures clear on a resend; permanent ones do
+// not, so the caller must not block the device's log stream on them.
+func isTransientBulkError(status int, errType string) bool {
+	switch errType {
+	case "es_rejected_execution_exception",
+		"unavailable_shards_exception",
+		"circuit_breaking_exception",
+		"cluster_block_exception",
+		"no_shard_available_action_exception":
+		return true
+	}
+	return status == http.StatusTooManyRequests || status == http.StatusServiceUnavailable
 }
 
 // NewElasticLogger uses environment settings to
@@ -607,6 +691,22 @@ func newElasticLogger() (*elasticLogger, error) {
 				},
 				"dev": bson.M{
 					"type": "keyword",
+				},
+				// The field queries sort on. It had no mapping and relied on
+				// dynamic date detection from whichever document happened to
+				// create each daily index; existing indices all resolved to
+				// `date`, and pinning that keeps a stray document from ever
+				// making it `text`, which would fail the sort outright.
+				//
+				// Deliberately not pinned here: `id`, which must keep its
+				// dynamic text+keyword mapping so the `id.keyword` sort
+				// tiebreaker keeps existing, and `rev`, which existing indices
+				// map as text+keyword -- pinning it to keyword would diverge
+				// the type across indices for no gain, as the filter uses
+				// match_phrase either way.
+				"time-created": bson.M{
+					"type":   "date",
+					"format": "strict_date_optional_time||epoch_millis",
 				},
 			},
 		},

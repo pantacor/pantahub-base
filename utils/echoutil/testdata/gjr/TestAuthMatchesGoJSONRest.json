@@ -1,0 +1,162 @@
+{
+  "TestAuthMatchesGoJSONRest/call-as_impersonation|gjr": {
+    "Res": {
+      "Status": 200,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "{\"ok\":\"yes\"}"
+    },
+    "ID": {
+      "Reached": true,
+      "AuthInfo": {
+        "Caller": "prn:::devices:/d1",
+        "CallerType": "DEVICE",
+        "Owner": "prn:::accounts:/owner1",
+        "Roles": "",
+        "Audience": "",
+        "Scopes": null,
+        "Nick": "device1",
+        "RemoteUser": "fleet-service==\u003edevice1"
+      },
+      "Payload": {
+        "exp": 4102444800,
+        "nick": "device1",
+        "orig_iat": 1700000000,
+        "owner": "prn:::accounts:/owner1",
+        "prn": "prn:::devices:/d1",
+        "type": "DEVICE"
+      },
+      "Orig": {
+        "call-as": {
+          "exp": 4102444800,
+          "nick": "device1",
+          "orig_iat": 1700000000,
+          "owner": "prn:::accounts:/owner1",
+          "prn": "prn:::devices:/d1",
+          "type": "DEVICE"
+        },
+        "exp": 4102444800,
+        "id": "svc",
+        "nick": "fleet-service",
+        "orig_iat": 1700000000,
+        "prn": "prn:::accounts:/svc",
+        "type": "SERVICE"
+      }
+    }
+  },
+  "TestAuthMatchesGoJSONRest/call-as_without_prn_is_forbidden|gjr": {
+    "Res": {
+      "Status": 403,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "{\"error\":\"REST-ERR-ID-N\",\"code\":403}"
+    },
+    "ID": {
+      "Reached": false,
+      "AuthInfo": null,
+      "Payload": null,
+      "Orig": null
+    }
+  },
+  "TestAuthMatchesGoJSONRest/missing_prn_is_forbidden|gjr": {
+    "Res": {
+      "Status": 403,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "{\"error\":\"REST-ERR-ID-N\",\"code\":403}"
+    },
+    "ID": {
+      "Reached": false,
+      "AuthInfo": null,
+      "Payload": null,
+      "Orig": null
+    }
+  },
+  "TestAuthMatchesGoJSONRest/missing_type_is_forbidden|gjr": {
+    "Res": {
+      "Status": 403,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "{\"error\":\"REST-ERR-ID-N\",\"code\":403}"
+    },
+    "ID": {
+      "Reached": false,
+      "AuthInfo": null,
+      "Payload": null,
+      "Orig": null
+    }
+  },
+  "TestAuthMatchesGoJSONRest/no_nick_on_the_original_caller|gjr": {
+    "Res": {
+      "Status": 200,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "{\"ok\":\"yes\"}"
+    },
+    "ID": {
+      "Reached": true,
+      "AuthInfo": {
+        "Caller": "prn:::accounts:/x",
+        "CallerType": "USER",
+        "Owner": "",
+        "Roles": "",
+        "Audience": "",
+        "Scopes": null,
+        "Nick": "",
+        "RemoteUser": "_unknown_==\u003e"
+      },
+      "Payload": {
+        "exp": 4102444800,
+        "id": "x",
+        "prn": "prn:::accounts:/x",
+        "type": "USER"
+      },
+      "Orig": {
+        "exp": 4102444800,
+        "id": "x",
+        "prn": "prn:::accounts:/x",
+        "type": "USER"
+      }
+    }
+  },
+  "TestAuthMatchesGoJSONRest/user|gjr": {
+    "Res": {
+      "Status": 200,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "{\"ok\":\"yes\"}"
+    },
+    "ID": {
+      "Reached": true,
+      "AuthInfo": {
+        "Caller": "prn:::accounts:/u1",
+        "CallerType": "USER",
+        "Owner": "prn:::accounts:/u1",
+        "Roles": "user",
+        "Audience": "prn:pantahub.com:apis:/api",
+        "Scopes": [
+          "prn:pantahub.com:apis:/base/all",
+          "prn:pantahub.com:apis:/fleet/all"
+        ],
+        "Nick": "user1",
+        "RemoteUser": "user1==\u003euser1"
+      },
+      "Payload": {
+        "aud": "prn:pantahub.com:apis:/api",
+        "exp": 4102444800,
+        "id": "user1",
+        "nick": "user1",
+        "owner": "prn:::accounts:/u1",
+        "prn": "prn:::accounts:/u1",
+        "roles": "user",
+        "scopes": "prn:pantahub.com:apis:/base/all  prn:pantahub.com:apis:/fleet/all",
+        "type": "USER"
+      },
+      "Orig": {
+        "aud": "prn:pantahub.com:apis:/api",
+        "exp": 4102444800,
+        "id": "user1",
+        "nick": "user1",
+        "owner": "prn:::accounts:/u1",
+        "prn": "prn:::accounts:/u1",
+        "roles": "user",
+        "scopes": "prn:pantahub.com:apis:/base/all  prn:pantahub.com:apis:/fleet/all",
+        "type": "USER"
+      }
+    }
+  }
+}

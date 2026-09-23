@@ -1,4 +1,4 @@
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,9 +18,9 @@ package profiles
 import (
 	"net/http"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
-	"gitlab.com/pantacor/pantahub-base/utils"
+	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 )
 
 // handleGetProfile Get a user profile by user ID
@@ -44,53 +44,46 @@ import (
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /profiles/{id} [get]
-func (a *App) handleGetProfile(w rest.ResponseWriter, r *rest.Request) {
-	accountNick := r.PathParam("nick")
+func (a *App) handleGetProfile(c *echo.Context) error {
+	accountNick := c.Param("nick")
 	var tokenOwner string
-	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
+	jwtPayload, ok := echoutil.Lookup(c, echoutil.KeyJWTPayload)
 	if !ok {
-		utils.RestErrorWrapper(w, "Token owner can't be defined", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Token owner can't be defined", http.StatusInternalServerError)
 	}
 	tokenOwner, ok = jwtPayload.(jwtgo.MapClaims)["prn"].(string)
 	if !ok {
-		utils.RestErrorWrapper(w, "Token owner can't be defined", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Token owner can't be defined", http.StatusInternalServerError)
 	}
 
-	account, err := a.getUserAccount(r.Context(), accountNick, "")
+	account, err := a.getUserAccount(c.Request().Context(), accountNick, "")
 	if err != nil {
 		switch err.(type) {
 		default:
-			utils.RestErrorWrapper(w, "Account "+err.Error(), http.StatusInternalServerError)
-			return
+			return echoutil.RestErrorWrapper(c, "Account "+err.Error(), http.StatusInternalServerError)
 		}
 	}
 
-	haveProfile, err := a.ExistsInProfiles(r.Context(), account.ID)
+	haveProfile, err := a.ExistsInProfiles(c.Request().Context(), account.ID)
 	if err != nil {
-		utils.RestErrorWrapper(w, err.Error(), http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, err.Error(), http.StatusForbidden)
 	}
 
 	// Make a new private profile if user have no profile & have public devices
 	if !haveProfile {
-		_, err := a.MakeUserProfile(r.Context(), account, nil)
+		_, err := a.MakeUserProfile(c.Request().Context(), account, nil)
 		if err != nil {
-			utils.RestErrorWrapper(w, err.Error(), http.StatusForbidden)
-			return
+			return echoutil.RestErrorWrapper(c, err.Error(), http.StatusForbidden)
 		}
 	}
 
-	profile, err := a.getProfile(r.Context(), account.Prn, nil)
+	profile, err := a.getProfile(c.Request().Context(), account.Prn, nil)
 	if err != nil {
-		utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "No Access", http.StatusForbidden)
 	}
 
 	if !profile.Public && account.Prn != tokenOwner {
-		utils.RestErrorWrapperUser(w, err.Error(), "Profile is not public", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapperUser(c, "profile is not public", "Profile is not public", http.StatusForbidden)
 	}
 
 	if account.Prn == tokenOwner {
@@ -99,5 +92,5 @@ func (a *App) handleGetProfile(w rest.ResponseWriter, r *rest.Request) {
 
 	profile.Nick = account.Nick
 
-	w.WriteJson(profile)
+	return echoutil.WriteJSON(c, http.StatusOK, profile)
 }

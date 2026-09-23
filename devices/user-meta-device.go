@@ -1,5 +1,5 @@
 //
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,16 +18,18 @@ package devices
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/accounts/accountsdata"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-base/utils/decoder"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -48,100 +50,55 @@ import (
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /devices/{id}/user-meta [patch]
-func (a *App) handlePatchUserData(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePatchUserData(c *echo.Context) error {
 
-	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
+	jwtPayload, ok := echoutil.Lookup(c, echoutil.KeyJWTPayload)
 	if !ok {
-		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Missing JWT_PAYLOAD", http.StatusBadRequest)
 	}
 
 	var owner interface{}
 	owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
 	if !ok {
-		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
 	}
 
 	var authType interface{}
 	authType, ok = jwtPayload.(jwtgo.MapClaims)["type"]
 	if !ok {
-		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
 	}
 
 	ownerStr, ok := owner.(string)
 	if !ok {
-		utils.RestErrorWrapper(w, "Session has no valid caller/owner info.", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Session has no valid caller/owner info.", http.StatusBadRequest)
 	}
 
-	deviceID, err := a.ResolveDeviceIDOrNick(r.Context(), ownerStr, r.PathParam("id"))
+	deviceID, err := a.ResolveDeviceIDOrNick(c.Request().Context(), ownerStr, c.Param("id"))
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error Parsing Device ID or Nick:"+err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Error Parsing Device ID or Nick:"+err.Error(), http.StatusBadRequest)
 	}
 
 	// allow write by USER and SESSION owner, and for the device itself
 	if (authType != "USER" && authType != "SESSION") && !strings.HasSuffix(owner.(string), "/"+deviceID.Hex()) {
-		utils.RestErrorWrapper(w, "User Meta data can only be patched by owning user/session or the device itself", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "User Meta data can only be patched by owning user/session or the device itself", http.StatusBadRequest)
 	}
 
 	data := map[string]interface{}{}
-	err = r.DecodeJsonPayload(&data)
+	err = echoutil.DecodeJsonPayload(c, &data)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error parsing data: "+err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Error parsing data: "+err.Error(), http.StatusBadRequest)
 	}
 
-	// 1. Quote the BSON keys first to handle dots in key names (e.g. "lo.ipv4")
-	data = utils.BsonQuoteMap(&data)
-
-	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
-	if collection == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-	defer cancel()
-
-	setFields := bson.M{}
-	unsetFields := bson.M{}
-
-	// 2. Deep flatten the quoted data to allow atomic nested updates
-	flattenMap("user-meta", data, setFields, unsetFields)
-
-	// Always update timemodified
-	setFields["timemodified"] = time.Now()
-
-	updateDoc := bson.M{}
-	if len(setFields) > 0 {
-		updateDoc["$set"] = setFields
-	}
-	if len(unsetFields) > 0 {
-		updateDoc["$unset"] = unsetFields
-	}
-
-	updateResult, err := collection.UpdateOne(
-		ctx,
-		bson.M{
-			"_id":   deviceID,
-			"owner": owner.(string),
-		},
-		updateDoc,
-	)
+	applied, err := PatchUserMeta(c.Request().Context(), a.mongoClient, owner.(string), *deviceID, data)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-	if updateResult.MatchedCount == 0 {
-		utils.RestErrorWrapper(w, "Error updating device user-meta: not found", http.StatusBadRequest)
-		return
+		if errors.Is(err, ErrDeviceNotOwned) {
+			return echoutil.RestErrorWrapper(c, "Error updating device user-meta: not found", http.StatusBadRequest)
+		}
+		return echoutil.RestErrorWrapper(c, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
 	}
 
-	w.WriteJson(utils.BsonUnquoteMap(&data))
+	return echoutil.WriteJSON(c, http.StatusOK, applied)
 }
 
 // handlePutUserData Update user metadata using the user credentials
@@ -158,52 +115,45 @@ func (a *App) handlePatchUserData(w rest.ResponseWriter, r *rest.Request) {
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /devices/{id}/user-meta [put]
-func (a *App) handlePutUserData(w rest.ResponseWriter, r *rest.Request) {
-	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
+func (a *App) handlePutUserData(c *echo.Context) error {
+	jwtPayload, ok := echoutil.Lookup(c, echoutil.KeyJWTPayload)
 	if !ok {
-		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Missing JWT_PAYLOAD", http.StatusBadRequest)
 	}
 
 	var owner interface{}
 	owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
 	if !ok {
-		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
 	}
 
 	var authType interface{}
 	authType, ok = jwtPayload.(jwtgo.MapClaims)["type"]
 	if !ok {
-		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
 	}
 
-	deviceID := r.PathParam("id")
+	deviceID := c.Param("id")
 	if (authType != "USER" && authType != "SESSION") && !strings.HasSuffix(owner.(string), "/"+deviceID) {
-		utils.RestErrorWrapper(w, "User data can only be updated by User or the device itself", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "User data can only be updated by User or the device itself", http.StatusBadRequest)
 	}
 
 	data := map[string]interface{}{}
-	err := decoder.DecodeJsonPayload(r, &data)
+	err := decoder.DecodeJsonBody(c.Request().Body, &data)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error parsing data: "+err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Error parsing data: "+err.Error(), http.StatusBadRequest)
 	}
 	data = utils.BsonQuoteMap(&data)
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	deviceObjectID, err := primitive.ObjectIDFromHex(deviceID)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 	}
 
 	query := bson.M{
@@ -226,15 +176,13 @@ func (a *App) handlePutUserData(w rest.ResponseWriter, r *rest.Request) {
 		}},
 	)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Error updating device user-meta: "+err.Error(), http.StatusBadRequest)
 	}
 	if updateResult.MatchedCount == 0 {
-		utils.RestErrorWrapper(w, "Error updating device user-meta: not found", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Error updating device user-meta: not found", http.StatusBadRequest)
 	}
 
-	w.WriteJson(utils.BsonUnquoteMap(&data))
+	return echoutil.WriteJSON(c, http.StatusOK, utils.BsonUnquoteMap(&data))
 }
 
 type UserMeta map[string]string
@@ -252,33 +200,30 @@ type UserMeta map[string]string
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /devices/{id}/user-meta [get]
-func (a *App) handleGetUserData(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetUserData(c *echo.Context) error {
 	var device Device
 
-	authID, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	authID, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in.", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in.", http.StatusForbidden)
 	}
 
-	ownerPtr := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["owner"]
+	ownerPtr := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["owner"]
 	if ownerPtr == nil {
 		ownerPtr = authID
 	}
 
 	owner, ok := ownerPtr.(string)
 	if !ok {
-		utils.RestErrorWrapper(w, "Session has no owner info", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Session has no owner info", http.StatusBadRequest)
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+	authType, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["type"]
 
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in with a known authentication type.", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in with a known authentication type.", http.StatusForbidden)
 	}
 
 	callerIsUser := false
@@ -293,41 +238,36 @@ func (a *App) handleGetUserData(w rest.ResponseWriter, r *rest.Request) {
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
 	if collection == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
 	collectionAccounts := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
 
 	if collectionAccounts == nil {
-		utils.RestErrorWrapper(w, "Error with Database (accounts) connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database (accounts) connectivity", http.StatusInternalServerError)
 	}
 
-	value, useOtherOwnerPrn := r.URL.Query()["owner"]
+	value, useOtherOwnerPrn := c.Request().URL.Query()["owner"]
 	if useOtherOwnerPrn {
 		ok, err := utils.ValidateUserPrn(value[0])
 		if err != nil || !ok {
-			utils.RestErrorWrapper(w, "Invalid owner prn", http.StatusForbidden)
-			return
+			return echoutil.RestErrorWrapper(c, "Invalid owner prn", http.StatusForbidden)
 		}
 		owner = value[0]
 	}
 
-	value, useOtherOwnerNick := r.URL.Query()["owner-nick"]
+	value, useOtherOwnerNick := c.Request().URL.Query()["owner-nick"]
 	if useOtherOwnerNick {
-		account, err := a.GetUserAccountByNick(r.Context(), value[0])
+		account, err := a.GetUserAccountByNick(c.Request().Context(), value[0])
 		if err != nil {
-			utils.RestErrorWrapper(w, "Error finding owner user account by nick:"+err.Error(), http.StatusForbidden)
-			return
+			return echoutil.RestErrorWrapper(c, "Error finding owner user account by nick:"+err.Error(), http.StatusForbidden)
 		}
 		owner = account.Prn
 	}
 
-	mgoid, err := a.ResolveDeviceIDOrNick(r.Context(), owner, r.PathParam("id"))
+	mgoid, err := a.ResolveDeviceIDOrNick(c.Request().Context(), owner, c.Param("id"))
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error Parsing Device ID or Nick:"+err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Error Parsing Device ID or Nick:"+err.Error(), http.StatusBadRequest)
 	}
 
 	query := bson.M{
@@ -350,21 +290,18 @@ func (a *App) handleGetUserData(w rest.ResponseWriter, r *rest.Request) {
 		"user-meta": 1,
 	})
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	err = collection.FindOne(ctx, query).Decode(&device)
 	if err != nil && mongoutils.IsNotFound(err) {
-		utils.RestErrorWrapper(w, "Device not found", http.StatusNotFound)
-		return
+		return echoutil.RestErrorWrapper(c, "Device not found", http.StatusNotFound)
 	}
 	if err != nil {
-		utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "No Access", http.StatusForbidden)
 	}
 
 	if authID != device.Prn && authID != device.Owner {
-		utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "No Access", http.StatusForbidden)
 	}
 
 	if device.Owner != "" {
@@ -373,22 +310,20 @@ func (a *App) handleGetUserData(w rest.ResponseWriter, r *rest.Request) {
 		// first check default accounts like user1, user2, etc...
 		ownerAccount, ok := accountsdata.DefaultAccounts[device.Owner]
 		if !ok {
-			ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+			ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 			defer cancel()
 			err := collectionAccounts.FindOne(ctx,
 				bson.M{"prn": device.Owner}).
 				Decode(&ownerAccount)
 
 			if err != nil {
-				utils.RestErrorWrapper(w, "Owner account not Found", http.StatusInternalServerError)
-				return
+				return echoutil.RestErrorWrapper(c, "Owner account not Found", http.StatusInternalServerError)
 			}
 		}
 
-		profileMeta, _ := a.getProfileMetaData(r.Context(), device.Owner)
-		device.UserMeta = utils.MergeMaps(profileMeta, device.UserMeta)
+		device.UserMeta = EffectiveUserMeta(c.Request().Context(), a.mongoClient, device.Owner, device.UserMeta)
 		device.OwnerNick = ownerAccount.Nick
 	}
 
-	w.WriteJson(utils.BsonUnquoteMap(&device.UserMeta))
+	return echoutil.WriteJSON(c, http.StatusOK, utils.BsonUnquoteMap(&device.UserMeta))
 }

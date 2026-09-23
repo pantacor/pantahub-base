@@ -1,5 +1,5 @@
 //
-// Copyright 2024  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 )
 
 func TestCreateBearerFromPersonalToken_MalformedBase64(t *testing.T) {
@@ -62,8 +62,8 @@ func TestCreateBearerFromPersonalToken_NilMiddleware(t *testing.T) {
 
 func TestCreateBearerFromPersonalToken_NilMongo(t *testing.T) {
 	input := base64.RawURLEncoding.EncodeToString([]byte("tokenid:secret"))
-	jwtMiddleware := &jwt.JWTMiddleware{SigningAlgorithm: "RS256"}
-	_, rerr := CreateBearerFromPersonalToken(nil, "user", input, jwtMiddleware, nil, time.Minute)
+	jwtConfig := &jwtauth.Config{SigningAlgorithm: "RS256"}
+	_, rerr := CreateBearerFromPersonalToken(nil, "user", input, jwtConfig, nil, time.Minute)
 	if rerr == nil {
 		t.Fatal("expected error for nil mongoClient")
 	}

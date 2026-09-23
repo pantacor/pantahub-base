@@ -1,7 +1,5 @@
 #!/bin/sh
 
-set -x
-
 dirname=`sh -c "cd $(dirname $0); pwd"`
 
 ENVFILE=${ENVFILE:-$dirname/env.default}

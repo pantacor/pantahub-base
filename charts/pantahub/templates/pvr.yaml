@@ -1,0 +1,54 @@
+{{- if .Values.pvr.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: pvr
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "pvr") | nindent 4 }}
+spec:
+  type: {{ .Values.pvr.service.type }}
+  ports:
+    - name: http
+      port: 12367
+      targetPort: 12367
+  selector:
+    {{- include "pantahub.selectorLabels" (dict "ctx" . "name" "pvr") | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pvr
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "pvr") | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "pantahub.selectorLabels" (dict "ctx" . "name" "pvr") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "pantahub.labels" (dict "ctx" . "name" "pvr") | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: pvr
+          image: "{{ .Values.pvr.image }}:{{ .Values.pvr.tag }}"
+          env:
+            {{- include "pantahub.envMap" .Values.pvr.env | nindent 12 }}
+          ports:
+            - containerPort: 12367
+          readinessProbe:
+            tcpSocket:
+              port: 12367
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          {{- with .Values.pvr.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

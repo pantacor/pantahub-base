@@ -1,0 +1,30 @@
+# The Go security scan environment, used by CI and reproducible locally
+# through security_check.sh.
+#
+# CI builds and runs this image (see the security-scan job in .gitlab-ci.yml)
+# rather than naming a golang image of its own, so the scan environment is
+# defined here and nowhere else.
+#
+# Pinned to an exact patch, and kept identical to the builder stage in
+# Dockerfile and to Dockerfile.development. govulncheck reports
+# standard-library advisories against the toolchain it runs with, so a scan on
+# a different release than the one that ships reports on a standard library no
+# user ever runs -- and a floating tag lets the two drift apart silently
+# whenever a runner's cache is older than another's.
+#
+# Bumping this means bumping all three together. govulncheck failing on
+# standard-library advisories is the signal that the pin has gone stale.
+FROM golang:1.26.8
+
+ENV GOPRIVATE=gitlab.com/pantacor/*
+WORKDIR /src
+
+# Baked in rather than mounted, because CI builds this under docker-in-docker,
+# where a -v bind mount resolves against the daemon's own filesystem and not
+# the job's checkout. Locally, security_check.sh still shadows it with
+# -v "$PWD:/src" so a scan picks up uncommitted work.
+COPY . .
+
+RUN chmod +x security_scan.sh
+
+CMD ["./security_scan.sh"]

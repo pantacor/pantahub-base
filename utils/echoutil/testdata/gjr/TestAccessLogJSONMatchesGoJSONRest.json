@@ -1,0 +1,37 @@
+{
+  "TestAccessLogJSONMatchesGoJSONRest/authenticated_success|gjr": {
+    "HttpMethod": "GET",
+    "RemoteUser": "user1",
+    "RequestURI": "/?page=2",
+    "StatusCode": 200,
+    "UserAgent": "differential-test/1"
+  },
+  "TestAccessLogJSONMatchesGoJSONRest/handler_panic_500|gjr": {
+    "HttpMethod": "GET",
+    "RemoteUser": "user1",
+    "RequestURI": "/boom",
+    "StatusCode": 500,
+    "UserAgent": "differential-test/1"
+  },
+  "TestAccessLogJSONMatchesGoJSONRest/unauthenticated_401|gjr": {
+    "HttpMethod": "GET",
+    "RemoteUser": "",
+    "RequestURI": "/",
+    "StatusCode": 401,
+    "UserAgent": "differential-test/1"
+  },
+  "TestAccessLogJSONMatchesGoJSONRest/unknown_route_404|gjr": {
+    "HttpMethod": "GET",
+    "RemoteUser": "user1",
+    "RequestURI": "/nope",
+    "StatusCode": 404,
+    "UserAgent": "differential-test/1"
+  },
+  "TestAccessLogJSONMatchesGoJSONRest/wrong_method_405|gjr": {
+    "HttpMethod": "DELETE",
+    "RemoteUser": "user1",
+    "RequestURI": "/",
+    "StatusCode": 405,
+    "UserAgent": "differential-test/1"
+  }
+}

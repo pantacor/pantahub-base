@@ -1,0 +1,56 @@
+{
+  "TestBasicAuthToBearerMatchesGoJSONRest/empty_username|gjr": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "WWWAuth": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Reached": false,
+    "BasicUser": null,
+    "Remote": null
+  },
+  "TestBasicAuthToBearerMatchesGoJSONRest/malformed_basic|gjr": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "WWWAuth": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Reached": false,
+    "BasicUser": null,
+    "Remote": null
+  },
+  "TestBasicAuthToBearerMatchesGoJSONRest/no_factory_configured|gjr": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "WWWAuth": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Reached": false,
+    "BasicUser": null,
+    "Remote": null
+  },
+  "TestBasicAuthToBearerMatchesGoJSONRest/no_header|gjr": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Not Authorized\"}",
+    "WWWAuth": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "Reached": false,
+    "BasicUser": null,
+    "Remote": null
+  },
+  "TestBasicAuthToBearerMatchesGoJSONRest/valid_personal_token|gjr": {
+    "Status": 200,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"ok\":\"yes\"}",
+    "WWWAuth": "",
+    "Reached": true,
+    "BasicUser": "user1",
+    "Remote": "user1"
+  },
+  "TestBasicAuthToBearerMatchesGoJSONRest/wrong_personal_token|gjr": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"error\":\"REST-ERR-ID-N\",\"code\":401}",
+    "WWWAuth": "Basic realm=\"pantahub\", Bearer realm=\"pantahub\"",
+    "Reached": false,
+    "BasicUser": null,
+    "Remote": null
+  }
+}

@@ -1,5 +1,5 @@
 //
-// Copyright 2016-2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -40,14 +40,18 @@ func GenerateDeviceNick() string {
 func createDevice(id, secret, owner string) (*Device, error) {
 	newDevice := &Device{}
 
-	mgoid := bson.ObjectIdHex(id)
-	ObjectID, err := primitive.ObjectIDFromHex(mgoid.Hex())
-	if err != nil {
-		return nil, err
+	if id == "" {
+		newDevice.ID = primitive.NewObjectID()
+	} else {
+		ObjectID, err := primitive.ObjectIDFromHex(id)
+		if err != nil {
+			return nil, err
+		}
+		newDevice.ID = ObjectID
 	}
-	newDevice.ID = ObjectID
 	newDevice.Prn = "prn:::devices:/" + newDevice.ID.Hex()
 	newDevice.Secret = secret
+	newDevice.SecretHash = utils.HashSecret(secret)
 	newDevice.Owner = owner
 	newDevice.UserMeta = utils.BsonQuoteMap(&newDevice.UserMeta)
 	newDevice.DeviceMeta = map[string]interface{}{}
@@ -58,6 +62,11 @@ func createDevice(id, secret, owner string) (*Device, error) {
 	return newDevice, nil
 }
 
+// save upserts the device, binding the filter to the owner: a fresh id is
+// inserted, a re-register by the same owner is updated, and an id already
+// owned by someone else fails the filter and hits the duplicate-_id error on
+// the upsert insert — the id is client-supplied on /register, so an unbound
+// upsert would let anyone overwrite (take over) another owner's device.
 func (device *Device) save(ctx context.Context, collection *mongo.Collection) (*mongo.UpdateResult, error) {
 	if collection == nil {
 		return nil, errors.New("Error with Database connectivity")
@@ -69,7 +78,7 @@ func (device *Device) save(ctx context.Context, collection *mongo.Collection) (*
 	updateOptions.SetUpsert(true)
 	result, err := collection.UpdateOne(
 		ctxC,
-		bson.M{"_id": device.ID},
+		bson.M{"_id": device.ID, "owner": device.Owner},
 		bson.M{"$set": device},
 		updateOptions,
 	)
@@ -175,6 +184,58 @@ func CheckDeviceQuota(
 	}
 
 	return result, nil
+}
+
+// ErrDeviceNotOwned is returned when the device to change does not exist or
+// belongs to somebody else. The two are not told apart on purpose.
+var ErrDeviceNotOwned = errors.New("device not found")
+
+// PatchUserMeta merges data into the user-meta of one of owner's devices and
+// returns what was applied. A nil value removes its key, and nested maps are
+// merged key by key, so a patch never drops the siblings of what it touches.
+//
+// It is the one implementation behind PATCH /devices/:id/user-meta and every
+// other way of changing a device's configuration, so that they cannot drift
+// apart. owner has to come from the authenticated identity: it is what pins
+// the update to the caller's own devices.
+func PatchUserMeta(ctx context.Context, mongoClient *mongo.Client, owner string, deviceID primitive.ObjectID, data map[string]interface{}) (map[string]interface{}, error) {
+	// Quote the BSON keys first to handle dots in key names (e.g. "lo.ipv4")
+	data = utils.BsonQuoteMap(&data)
+
+	collection := mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
+	if collection == nil {
+		return nil, errors.New("error with database connectivity")
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	setFields := bson.M{}
+	unsetFields := bson.M{}
+
+	// Deep flatten the quoted data to allow atomic nested updates
+	flattenMap("user-meta", data, setFields, unsetFields)
+
+	// Always update timemodified
+	setFields["timemodified"] = time.Now()
+
+	updateDoc := bson.M{}
+	if len(setFields) > 0 {
+		updateDoc["$set"] = setFields
+	}
+	if len(unsetFields) > 0 {
+		updateDoc["$unset"] = unsetFields
+	}
+
+	updateResult, err := collection.UpdateOne(ctx, bson.M{"_id": deviceID, "owner": owner}, updateDoc)
+	if err != nil {
+		return nil, err
+	}
+	if updateResult.MatchedCount == 0 {
+		return nil, ErrDeviceNotOwned
+	}
+
+	return utils.BsonUnquoteMap(&data), nil
 }
 
 // flattenMap flattens a nested map into dot-notation keys for MongoDB atomic updates

@@ -1,0 +1,110 @@
+{
+  "TestServerMountMatchesGoJSONRest/alpha_authenticated|gjr": {
+    "Result": {
+      "Status": 200,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "{\"caller\":\"prn:::accounts:/u1\",\"svc\":\"alpha\"}"
+    },
+    "WWWAuth": "",
+    "ACAH": ""
+  },
+  "TestServerMountMatchesGoJSONRest/alpha_path_param|gjr": {
+    "Result": {
+      "Status": 200,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "\"x1\""
+    },
+    "WWWAuth": "",
+    "ACAH": ""
+  },
+  "TestServerMountMatchesGoJSONRest/alpha_preflight_allows_Authorization|gjr": {
+    "Result": {
+      "Status": 200,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": ""
+    },
+    "WWWAuth": "",
+    "ACAH": "Authorization,Content-Type"
+  },
+  "TestServerMountMatchesGoJSONRest/authenticated,_route_does_not_exist|gjr": {
+    "Result": {
+      "Status": 404,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "{\"Error\":\"Resource not found\"}"
+    },
+    "WWWAuth": "",
+    "ACAH": ""
+  },
+  "TestServerMountMatchesGoJSONRest/authenticated,_wrong_method|gjr": {
+    "Result": {
+      "Status": 405,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "{\"Error\":\"Method not allowed\"}"
+    },
+    "WWWAuth": "",
+    "ACAH": ""
+  },
+  "TestServerMountMatchesGoJSONRest/beta_authenticated|gjr": {
+    "Result": {
+      "Status": 200,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "\"beta\""
+    },
+    "WWWAuth": "",
+    "ACAH": ""
+  },
+  "TestServerMountMatchesGoJSONRest/beta_preflight_rejects_Authorization|gjr": {
+    "Result": {
+      "Status": 403,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "{\"Error\":\"Invalid Preflight Request\"}"
+    },
+    "WWWAuth": "",
+    "ACAH": ""
+  },
+  "TestServerMountMatchesGoJSONRest/mux_redirect_without_trailing_slash|gjr": {
+    "Result": {
+      "Status": 307,
+      "ContentType": "text/html; charset=utf-8",
+      "Body": "\u003ca href=\"/beta/\"\u003eTemporary Redirect\u003c/a\u003e.\n\n"
+    },
+    "WWWAuth": "",
+    "ACAH": ""
+  },
+  "TestServerMountMatchesGoJSONRest/param_swallowing_is_still_refused_through_the_mount|gjr": {
+    "Result": {
+      "Status": 404,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "{\"Error\":\"Resource not found\"}"
+    },
+    "WWWAuth": "",
+    "ACAH": ""
+  },
+  "TestServerMountMatchesGoJSONRest/preflight_to_a_route_that_does_not_exist|gjr": {
+    "Result": {
+      "Status": 200,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": ""
+    },
+    "WWWAuth": "",
+    "ACAH": "Authorization,Content-Type"
+  },
+  "TestServerMountMatchesGoJSONRest/unauthenticated,_route_does_not_exist|gjr": {
+    "Result": {
+      "Status": 401,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "{\"Error\":\"Not Authorized\"}"
+    },
+    "WWWAuth": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "ACAH": ""
+  },
+  "TestServerMountMatchesGoJSONRest/unauthenticated,_route_exists|gjr": {
+    "Result": {
+      "Status": 401,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "{\"Error\":\"Not Authorized\"}"
+    },
+    "WWWAuth": "JWT realm=\"pantahub services\", ph-aeps=\"https://api.example.com/auth\"",
+    "ACAH": ""
+  }
+}

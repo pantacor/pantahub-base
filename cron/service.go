@@ -1,5 +1,5 @@
 //
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,92 +17,82 @@
 package cron
 
 import (
+	"crypto/subtle"
 	"log"
 	"os"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/utils"
-	"gitlab.com/pantacor/pantahub-base/utils/tracer"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // App define a new rest application for profiles
 type App struct {
-	jwtMiddleware  *jwt.JWTMiddleware
-	API            *rest.Api
+	jwtConfig      *jwtauth.Config
 	CronJobTimeout time.Duration
 	mongoClient    *mongo.Client
 }
 
 // New create a callbacks rest application
-func New(jwtMiddleware *jwt.JWTMiddleware,
+func New(jwtConfig *jwtauth.Config,
 	cronJobTimeout time.Duration,
 	mongoClient *mongo.Client) *App {
 
 	app := new(App)
-	app.jwtMiddleware = jwtMiddleware
+	app.jwtConfig = jwtConfig
 	app.CronJobTimeout = cronJobTimeout
 	app.mongoClient = mongoClient
 
-	app.API = rest.NewApi()
-	// we dont use default stack because we dont want content type enforcement
-	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
-		"/cron:", log.Lshortfile)})
-	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "cron"})
+	return app
+}
 
-	app.API.Use(rest.DefaultCommonStack...)
-	app.API.Use(&rest.CorsMiddleware{
-		RejectNonCorsRequests: false,
-		OriginValidator: func(origin string, request *rest.Request) bool {
-			return true
-		},
-		AllowedMethods: []string{"PUT"},
-		AllowedHeaders: []string{
-			"Accept",
-			"Content-Type",
-			"Content-Length",
-			"X-Custom-Header",
-			"Origin",
-			"Authorization",
-			"X-Trace-ID",
-			"Trace-Id",
-			"x-request-id",
-			"X-Request-ID",
-			"TraceID",
-			"ParentID",
-			"Uber-Trace-ID",
-			"uber-trace-id",
-			"traceparent",
-			"tracestate",
-		},
-		AccessControlAllowCredentials: true,
-		AccessControlMaxAge:           3600,
-	})
+// Mount registers cron on the echo server.
+func (app *App) Mount(s *echoutil.Server) {
+	const prefix = "/cron"
 
 	saAdminSecret := utils.GetEnv(utils.EnvPantahubSaAdminSecret)
-
-	basicAuthMW := &rest.AuthBasicMiddleware{
+	basicAuthMW := echoutil.BasicAuthConfig{
 		Realm: "Pantahub Health @ " + utils.GetEnv(utils.EnvPantahubAuth),
-		Authenticator: func(userId string, password string) bool {
-			return saAdminSecret != "" && userId == "saadmin" && password == saAdminSecret
+		Authenticator: func(userID string, password string) bool {
+			return saAdminSecret != "" && userID == "saadmin" && subtle.ConstantTimeCompare([]byte(password), []byte(saAdminSecret)) == 1
 		},
 	}
 
-	// Using basic authentication for /callbacks
-	app.API.Use(basicAuthMW)
-
-	// end points
-	apiRouter, _ := rest.MakeRouter(
-		rest.Put("/public/devices", app.handlePutDevices),
-		rest.Put("/public/steps", app.handlePutSteps),
+	g := s.Mount(prefix,
+		echoutil.AccessLogJSON(log.New(os.Stdout, "/cron:", log.Lshortfile), prefix),
+		echoutil.AccessLogFluent(&utils.AccessLogFluentMiddleware{Prefix: "cron"}, prefix),
+		echoutil.Instrument(),
+		echoutil.Recover(),
+		echoutil.CORS(echoutil.CORSConfig{
+			RejectNonCorsRequests: false,
+			OriginValidator:       echoutil.AllowAllOrigins,
+			AllowedMethods:        []string{"PUT"},
+			AllowedHeaders: []string{
+				"Accept",
+				"Content-Type",
+				"Content-Length",
+				"X-Custom-Header",
+				"Origin",
+				"Authorization",
+				"X-Trace-ID",
+				"Trace-Id",
+				"x-request-id",
+				"X-Request-ID",
+				"TraceID",
+				"ParentID",
+				"Uber-Trace-ID",
+				"uber-trace-id",
+				"traceparent",
+				"tracestate",
+			},
+			AccessControlAllowCredentials: true,
+			AccessControlMaxAge:           3600,
+		}),
+		echoutil.AuthBasic(basicAuthMW),
 	)
-	app.API.Use(&tracer.OtelMiddleware{
-		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
-		Router:      apiRouter,
-	})
-	app.API.SetApp(apiRouter)
 
-	return app
+	g.PUT("/public/devices", app.handlePutDevices)
+	g.PUT("/public/steps", app.handlePutSteps)
 }

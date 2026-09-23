@@ -1,4 +1,4 @@
-// Copyright 2017  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"time"
 
 	"gitlab.com/pantacor/pantahub-base/base"
 	"gitlab.com/pantacor/pantahub-base/docs"
@@ -64,7 +65,7 @@ import (
 func main() {
 
 	utils.InitScopes()
-	base.DoInit()
+	handler := base.DoInit()
 
 	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" && os.Getenv("OTEL_SERVICE_NAME") != "" {
 		tp := tracer.Init(os.Getenv("OTEL_SERVICE_NAME"))
@@ -83,7 +84,16 @@ func main() {
 	portIntTLS := utils.GetEnv(utils.EnvPantahubPortIntTLS)
 
 	go func() {
-		log.Fatal(http.ListenAndServeTLS(":"+portIntTLS, "localhost.cert.pem", "localhost.key.pem", nil))
+		// ReadHeaderTimeout bounds slowloris-style header stalls without
+		// capping large object/log body transfers; no Read/WriteTimeout so
+		// streaming uploads and downloads are not truncated.
+		tlsSrv := &http.Server{
+			Addr:              ":" + portIntTLS,
+			Handler:           handler,
+			ReadHeaderTimeout: 15 * time.Second,
+			IdleTimeout:       120 * time.Second,
+		}
+		log.Fatal(tlsSrv.ListenAndServeTLS("localhost.cert.pem", "localhost.key.pem"))
 	}()
 
 	ifaces, _ := net.Interfaces()
@@ -97,9 +107,15 @@ func main() {
 			case *net.IPAddr:
 				ip = v.IP
 			}
-			log.Printf("Serving @ https://" + ip.String() + ":" + portIntTLS + "/\n")
-			log.Printf("Serving @ http://" + ip.String() + ":" + portInt + "/\n")
+			log.Printf("%s", "Serving @ https://"+ip.String()+":"+portIntTLS+"/\n")
+			log.Printf("%s", "Serving @ http://"+ip.String()+":"+portInt+"/\n")
 		}
 	}
-	log.Fatal(http.ListenAndServe(":"+portInt, nil))
+	srv := &http.Server{
+		Addr:              ":" + portInt,
+		Handler:           handler,
+		ReadHeaderTimeout: 15 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+	log.Fatal(srv.ListenAndServe())
 }

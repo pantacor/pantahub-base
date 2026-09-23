@@ -1,3 +1,17 @@
+// Copyright (c) 2017-2026 Pantacor Ltd.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+
 //
 // Package utils offers reusable utils for pantahub-base developers
 //
@@ -17,63 +31,15 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
 	"github.com/fatih/structs"
 	"github.com/fluent/fluent-logger-golang/fluent"
+	jwtgo "github.com/golang-jwt/jwt/v5"
 )
 
 var (
 	maxReadBodySize int = int(math.Pow(2, 24)) // 16M
 	readBlockSize   int = int(math.Pow(2, 16)) // 64k
 )
-
-// ResponseWriterFunc rest http writer func
-type ResponseWriterFunc func(string, rest.Request)
-
-// ResponseWriterWrapper response writer wrapper for rest
-type ResponseWriterWrapper struct {
-	responseWriter rest.ResponseWriter
-	RequestBody    []byte
-	ResponseBody   []byte
-}
-
-// Count count length of writer
-func (r *ResponseWriterWrapper) Count() uint64 {
-	return r.responseWriter.Count()
-}
-
-// EncodeJson encode json using a interface
-func (r *ResponseWriterWrapper) EncodeJson(v interface{}) ([]byte, error) {
-	return r.responseWriter.EncodeJson(v)
-}
-
-// Header get writer header
-func (r *ResponseWriterWrapper) Header() http.Header {
-	return r.responseWriter.Header()
-}
-
-// WriteHeader write a header code
-func (r *ResponseWriterWrapper) WriteHeader(code int) {
-	r.responseWriter.WriteHeader(code)
-}
-
-// WriteJson write a json response
-func (r *ResponseWriterWrapper) WriteJson(v interface{}) error {
-	c, _ := json.Marshal(v)
-	r.ResponseBody = c
-	return r.responseWriter.WriteJson(v)
-}
-
-func (r *ResponseWriterWrapper) Write(c []byte) (int, error) {
-	r.ResponseBody = c
-	return r.responseWriter.Write(c)
-}
-
-// NewResponseWriterWrapper create a new wrapper for writer
-func NewResponseWriterWrapper(w rest.ResponseWriter) *ResponseWriterWrapper {
-	return &ResponseWriterWrapper{responseWriter: w}
-}
 
 // AccessLogFluentMiddleware produces the access log with records written as JSON. This middleware
 // depends on TimerMiddleware and RecorderMiddleware that must be in the wrapped middlewares. It
@@ -86,9 +52,9 @@ type AccessLogFluentMiddleware struct {
 	Hostname  string
 }
 
-// MiddlewareFunc makes AccessLogJsonMiddleware implement the Middleware interface.
-func (mw *AccessLogFluentMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.HandlerFunc {
-
+// Init sets up the fluent logger and defaults; false when FLUENT_PORT is empty.
+// Init, LogsBody, BuildAccessLogFluentRecord and Post are shared with utils/echoutil.
+func (mw *AccessLogFluentMiddleware) Init() bool {
 	// set the default Logger
 	if mw.Logger == nil {
 		var err error
@@ -97,9 +63,7 @@ func (mw *AccessLogFluentMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.Han
 
 		portStr := GetEnv(EnvFluentPort)
 		if portStr == "" {
-			return func(w rest.ResponseWriter, r *rest.Request) {
-				h(w, r)
-			}
+			return false
 		}
 
 		port, err = strconv.Atoi(portStr)
@@ -145,61 +109,36 @@ func (mw *AccessLogFluentMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.Han
 		mw.Namespace = GetEnv(EnvK8SNamespace)
 	}
 
-	return func(w rest.ResponseWriter, r *rest.Request) {
-		requestBody := []byte{}
-		responseBody := []byte{}
+	return true
+}
 
-		ct := r.Header.Get("Content-Type")
+// LogsBody reports whether bodies are logged (JSON only, PANTAHUB_LOG_BODY=true).
+func (mw *AccessLogFluentMiddleware) LogsBody(r *http.Request) bool {
+	return r.Header.Get("Content-Type") == "application/json" && GetEnv(EnvPantahubLogBody) == "true"
+}
 
-		// only read body if the content is json to avoid read binary or uploaded files
-		if ct == "application/json" && GetEnv(EnvPantahubLogBody) == "true" {
-			// Read the entire body
-			bodyBytes, err := io.ReadAll(r.Request.Body)
-			if err != nil {
-				// Handle error
-				log.Printf("Error reading body: %v", err)
-				// You might want to return or handle the error appropriately
-			}
+// ReadAndRestoreBody reads the whole request body and puts back an equivalent
+// reader, so the handler still sees it.
+func ReadAndRestoreBody(r *http.Request) []byte {
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		// Handle error
+		log.Printf("Error reading body: %v", err)
+		// You might want to return or handle the error appropriately
+	}
 
-			// Restore the body for future reads
-			r.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+	// Restore the body for future reads
+	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+	return bodyBytes
+}
 
-			// Your logging or processing logic
-			requestBody = bodyBytes
+// Post sends a record to fluentd.
+func (mw *AccessLogFluentMiddleware) Post(rec *AccessLogFluentRecord) {
+	m := structs.Map(rec)
 
-			// call the handler
-			responseWrapper := NewResponseWriterWrapper(w)
-			h(responseWrapper, r)
-
-			responseBody = responseWrapper.ResponseBody
-		} else {
-			// call the handler
-			h(w, r)
-		}
-
-		// if fluent logging is disabled in config, just do nothing...
-		if mw.Logger == nil {
-			return
-		}
-
-		// // limit response size to MAX_READ_BODY_SIZE
-		// if len(responseBody) > maxReadBodySize {
-		// 	responseBody = responseBody[:maxReadBodySize]
-		// }
-
-		// // limit request size to MAX_READ_BODY_SIZE
-		// if len(requestBody) > maxReadBodySize {
-		// 	requestBody = requestBody[:maxReadBodySize]
-		// }
-
-		logRec := mw.makeAccessLogFluentRecord(w, responseBody, r, requestBody)
-
-		m := structs.Map(logRec)
-
-		err := mw.Logger.Post(mw.Tag, m)
-		if err != nil {
-			log.Println("WARNING: error posting logs to fluentd: " + err.Error())
-		}
+	err := mw.Logger.Post(mw.Tag, m)
+	if err != nil {
+		log.Println("WARNING: error posting logs to fluentd: " + err.Error())
 	}
 }
 
@@ -230,27 +169,29 @@ type AccessLogFluentRecord struct {
 	UserAgent      string
 }
 
-func (mw *AccessLogFluentMiddleware) makeAccessLogFluentRecord(w rest.ResponseWriter, responseBody []byte, r *rest.Request, requestBody []byte) *AccessLogFluentRecord {
+// BuildAccessLogFluentRecord builds a record from r.Env-style values. r must carry
+// the prefix-stripped URL the service saw.
+func BuildAccessLogFluentRecord(mw *AccessLogFluentMiddleware, r *http.Request, env map[string]interface{}, responseSize uint64, requestBody, responseBody []byte) *AccessLogFluentRecord {
 	var timestamp *time.Time
-	if r.Env["START_TIME"] != nil {
-		timestamp = r.Env["START_TIME"].(*time.Time)
+	if env["START_TIME"] != nil {
+		timestamp = env["START_TIME"].(*time.Time)
 	}
 
 	var statusCode int
-	if r.Env["STATUS_CODE"] != nil {
-		statusCode = r.Env["STATUS_CODE"].(int)
+	if env["STATUS_CODE"] != nil {
+		statusCode = env["STATUS_CODE"].(int)
 	}
 
 	var responseTime *time.Duration
-	if r.Env["ELAPSED_TIME"] != nil {
-		responseTime = r.Env["ELAPSED_TIME"].(*time.Duration)
+	if env["ELAPSED_TIME"] != nil {
+		responseTime = env["ELAPSED_TIME"].(*time.Duration)
 	}
 
 	var remoteUser string
-	if r.Env["REMOTE_USER"] != nil {
-		remoteUser = r.Env["REMOTE_USER"].(string)
-	} else if r.Env["JWT_PAYLOAD"] != nil {
-		payload := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)
+	if env["REMOTE_USER"] != nil {
+		remoteUser = env["REMOTE_USER"].(string)
+	} else if env["JWT_PAYLOAD"] != nil {
+		payload := env["JWT_PAYLOAD"].(jwtgo.MapClaims)
 		if payload["id"] != nil {
 			remoteUser = payload["id"].(string)
 		}
@@ -282,7 +223,7 @@ func (mw *AccessLogFluentMiddleware) makeAccessLogFluentRecord(w rest.ResponseWr
 		RequestHeaders: reqMap,
 		RequestParams:  reqParams,
 		RequestURI:     r.URL.RequestURI(),
-		ResponseSize:   w.Count(),
+		ResponseSize:   responseSize,
 		ResponseTime:   responseTime.Nanoseconds(),
 		StatusCode:     statusCode,
 		Timestamp:      timestamp.Unix(),

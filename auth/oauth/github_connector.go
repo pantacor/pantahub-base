@@ -1,4 +1,4 @@
-// Copyright 2016-2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,9 +24,10 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"golang.org/x/oauth2"
@@ -42,6 +43,7 @@ var (
 const oauthGithubURLAPI = "https://api.github.com/user"
 
 type githubPayload struct {
+	ID    int64  `json:"id"`
 	Login string `json:"login"`
 	Email string `json:"email"`
 }
@@ -68,12 +70,13 @@ func GetGithubConfig() *oauth2.Config {
 }
 
 // GithubAuthorize use google to authorize user
-func GithubAuthorize(redirectURI string, config *oauth2.Config, w rest.ResponseWriter, r *rest.Request) {
+func GithubAuthorize(redirectURI string, config *oauth2.Config, c *echo.Context) error {
 	// Create oauthState cookie
-	oauthState := generateStateOauthCookie(redirectURI, w)
+	oauthState := generateStateOauthCookie(redirectURI, c.Response())
 
 	u := config.AuthCodeURL(oauthState)
-	http.Redirect(w, r.Request, u, http.StatusTemporaryRedirect)
+	http.Redirect(c.Response(), c.Request(), u, http.StatusTemporaryRedirect)
+	return nil
 }
 
 // GithubCb use code to retrive service user data
@@ -88,11 +91,15 @@ func GithubCb(ctx context.Context, config *oauth2.Config, code string) (*Respons
 	if err != nil {
 		return &ResponsePayload{RedirectTo: ""}, err
 	}
+	if payload.ID <= 0 {
+		return &ResponsePayload{RedirectTo: ""}, fmt.Errorf("github user ID is missing")
+	}
 
 	return &ResponsePayload{
-		Email: payload.Email,
-		Nick:  payload.Login,
-		Raw:   string(data),
+		Email:      payload.Email,
+		Nick:       payload.Login,
+		ProviderID: strconv.FormatInt(payload.ID, 10),
+		Raw:        string(data),
 	}, nil
 }
 

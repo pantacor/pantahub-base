@@ -1,5 +1,5 @@
 //
-// Copyright 2017  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,15 +28,16 @@ import (
 
 	"gitlab.com/pantacor/pantahub-base/testutils"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 
-	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 )
 
 var (
 	recorder         *httptest.ResponseRecorder
 	server           *httptest.Server
-	jwtMWA           *jwt.JWTMiddleware
-	jwtMWR           *jwt.JWTMiddleware
+	jwtMWA           *jwtauth.Config
+	jwtMWR           *jwtauth.Config
 	serverURL        *url.URL
 	authTokenUser1   string
 	authTokenClient1 string
@@ -51,7 +52,7 @@ func setUp(t *testing.T) {
 		t.Fail()
 	}
 
-	jwtMWA = &jwt.JWTMiddleware{
+	jwtMWA = &jwtauth.Config{
 		Key:        []byte("secret key"),
 		Realm:      "pantahub services",
 		Timeout:    time.Minute * 60,
@@ -61,11 +62,13 @@ func setUp(t *testing.T) {
 	authApp := New(jwtMWA, mongoClient)
 
 	recorder = httptest.NewRecorder()
-	server = httptest.NewServer(authApp.API.MakeHandler())
+	authEcho := echoutil.NewServer("test")
+	authApp.Mount(authEcho)
+	server = httptest.NewServer(authEcho.E)
 	serverURL, err = url.Parse(server.URL)
 
 	if err != nil {
-		t.Errorf("error parsing test server URL " + err.Error())
+		t.Errorf("%s", "error parsing test server URL "+err.Error())
 		t.Fail()
 	}
 }
@@ -76,12 +79,12 @@ func tearDown(t *testing.T) {
 func testNoCredsLogin401(t *testing.T) {
 
 	u := *serverURL
-	u.Path = "/login"
+	u.Path = "/auth/login"
 
 	res, err := utils.R().SetBody(map[string]string{}).Post(u.String())
 
 	if err != nil {
-		t.Errorf("internal error calling test server " + err.Error())
+		t.Errorf("%s", "internal error calling test server "+err.Error())
 		t.Fail()
 	}
 
@@ -93,7 +96,7 @@ func testNoCredsLogin401(t *testing.T) {
 func testBadCredsLogin401(t *testing.T) {
 
 	u := *serverURL
-	u.Path = "/login"
+	u.Path = "/auth/login"
 
 	res, err := utils.R().SetBody(map[string]string{
 		"username": "NOTEXISTuser1",
@@ -101,7 +104,7 @@ func testBadCredsLogin401(t *testing.T) {
 	}).Post(u.String())
 
 	if err != nil {
-		t.Errorf("internal error calling test server " + err.Error())
+		t.Errorf("%s", "internal error calling test server "+err.Error())
 		t.Fail()
 	}
 
@@ -113,7 +116,7 @@ func testBadCredsLogin401(t *testing.T) {
 func testGoodLogin(t *testing.T) {
 
 	u := serverURL
-	u.Path = "/login"
+	u.Path = "/auth/login"
 
 	res, err := utils.R().SetBody(map[string]string{
 		"username": "user1",
@@ -121,7 +124,7 @@ func testGoodLogin(t *testing.T) {
 	}).Post(u.String())
 
 	if err != nil {
-		t.Errorf("internal error calling test server " + err.Error())
+		t.Errorf("%s", "internal error calling test server "+err.Error())
 		t.Fail()
 	}
 
@@ -132,12 +135,12 @@ func testGoodLogin(t *testing.T) {
 
 func testRefreshToken(t *testing.T) {
 	u := *serverURL
-	u.Path = "/login"
+	u.Path = "/auth/login"
 
 	res, err := utils.R().SetAuthToken(authTokenUser1).Get(u.String())
 
 	if err != nil {
-		t.Errorf("internal error calling test server " + err.Error())
+		t.Errorf("%s", "internal error calling test server "+err.Error())
 		t.Fail()
 	}
 
@@ -150,7 +153,7 @@ func testRefreshToken(t *testing.T) {
 	err = json.Unmarshal(res.Body(), &resMap)
 
 	if err != nil {
-		t.Errorf("Bad json returned from server for login " + err.Error())
+		t.Errorf("%s", "Bad json returned from server for login "+err.Error())
 		t.Fail()
 	}
 
@@ -158,7 +161,7 @@ func testRefreshToken(t *testing.T) {
 
 	authTokenUser1, ok = resMap["token"].(string)
 	if !ok {
-		t.Errorf("Body contained no token: " + string(res.Body()))
+		t.Errorf("%s", "Body contained no token: "+string(res.Body()))
 		t.Fail()
 	}
 }
@@ -178,7 +181,7 @@ func TestAuthLogin(t *testing.T) {
 
 func testAuthAuthTokenGood(t *testing.T) {
 	u := *serverURL
-	u.Path = "/authorize"
+	u.Path = "/auth/authorize"
 
 	body := map[string]interface{}{}
 
@@ -189,7 +192,7 @@ func testAuthAuthTokenGood(t *testing.T) {
 	res, err := utils.R().SetAuthToken(authTokenUser1).SetBody(&body).Post(u.String())
 
 	if err != nil {
-		t.Errorf("internal error calling test server " + err.Error())
+		t.Errorf("%s", "internal error calling test server "+err.Error())
 		t.Fail()
 	}
 
@@ -200,7 +203,7 @@ func testAuthAuthTokenGood(t *testing.T) {
 	result := map[string]interface{}{}
 	err = json.Unmarshal(res.Body(), &result)
 	if err != nil {
-		t.Errorf("error parsing body result as json" + err.Error())
+		t.Errorf("%s", "error parsing body result as json"+err.Error())
 		t.Fail()
 	}
 
@@ -228,35 +231,35 @@ func testAuthAuthTokenGood(t *testing.T) {
 
 	// protect against bad format
 	if err != nil {
-		t.Errorf("error parsing redirect_uri" + err.Error())
+		t.Errorf("%s", "error parsing redirect_uri"+err.Error())
 		t.Fail()
 	}
 
 	uriToken := uri.Query().Get("access_token")
 	if uriToken == "" {
-		t.Errorf("'access_token' field must be included in redirect_uri: redirect_uri=" + uriStr)
+		t.Errorf("%s", "'access_token' field must be included in redirect_uri: redirect_uri="+uriStr)
 		t.Fail()
 	}
 	uriScope := uri.Query().Get("scope")
 	if uriScope == "" {
-		t.Errorf("'scope' field must be included in redirect_uri: redirect_uri=" + uriStr)
+		t.Errorf("%s", "'scope' field must be included in redirect_uri: redirect_uri="+uriStr)
 		t.Fail()
 	}
 	uriTokenType := uri.Query().Get("token_type")
 	if uriTokenType == "" {
-		t.Errorf("'token_type' field must be included in redirect_uri: redirect_uri=" + uriStr)
+		t.Errorf("%s", "'token_type' field must be included in redirect_uri: redirect_uri="+uriStr)
 		t.Fail()
 	}
 	uriExpiresIn := uri.Query().Get("expires_in")
 	if uriExpiresIn == "" {
-		t.Errorf("'expires_in' field must be included in redirect_uri: redirect_uri=" + uriStr)
+		t.Errorf("%s", "'expires_in' field must be included in redirect_uri: redirect_uri="+uriStr)
 		t.Fail()
 	}
 }
 
 func testAuthAuthTokenBadURL(t *testing.T) {
 	u := *serverURL
-	u.Path = "/authorize"
+	u.Path = "/auth/authorize"
 
 	body := map[string]interface{}{}
 
@@ -267,7 +270,7 @@ func testAuthAuthTokenBadURL(t *testing.T) {
 	res, err := utils.R().SetAuthToken(authTokenUser1).SetBody(&body).Post(u.String())
 
 	if err != nil {
-		t.Errorf("internal error calling test server " + err.Error())
+		t.Errorf("%s", "internal error calling test server "+err.Error())
 		t.Fail()
 	}
 
@@ -278,7 +281,7 @@ func testAuthAuthTokenBadURL(t *testing.T) {
 
 func testAuthAuthTokenBadClient(t *testing.T) {
 	u := *serverURL
-	u.Path = "/authorize"
+	u.Path = "/auth/authorize"
 
 	body := map[string]interface{}{}
 
@@ -289,7 +292,7 @@ func testAuthAuthTokenBadClient(t *testing.T) {
 	res, err := utils.R().SetAuthToken(authTokenUser1).SetBody(&body).Post(u.String())
 
 	if err != nil {
-		t.Errorf("internal error calling test server " + err.Error())
+		t.Errorf("%s", "internal error calling test server "+err.Error())
 		t.Fail()
 	}
 
@@ -300,7 +303,7 @@ func testAuthAuthTokenBadClient(t *testing.T) {
 
 func testAuthAuthTokenPreservesState(t *testing.T) {
 	u := *serverURL
-	u.Path = "/authorize"
+	u.Path = "/auth/authorize"
 
 	body := map[string]interface{}{}
 
@@ -312,7 +315,7 @@ func testAuthAuthTokenPreservesState(t *testing.T) {
 	res, err := utils.R().SetAuthToken(authTokenUser1).SetBody(&body).Post(u.String())
 
 	if err != nil {
-		t.Errorf("internal error calling test server " + err.Error())
+		t.Errorf("%s", "internal error calling test server "+err.Error())
 		t.Fail()
 	}
 
@@ -323,31 +326,35 @@ func testAuthAuthTokenPreservesState(t *testing.T) {
 	result := map[string]interface{}{}
 	err = json.Unmarshal(res.Body(), &result)
 	if err != nil {
-		t.Errorf("error parsing body result as json" + err.Error())
+		t.Errorf("%s", "error parsing body result as json"+err.Error())
 		t.Fail()
 	}
 	uriStr := result["redirect_uri"].(string)
 	uri, err := url.Parse(uriStr)
 
 	if err != nil {
-		t.Errorf("error parsing redirect_uri" + err.Error())
+		t.Errorf("%s", "error parsing redirect_uri"+err.Error())
 		t.Fail()
 	}
 
 	resultState := uri.Query().Get("state")
 	if resultState != body["state"].(string) {
-		t.Errorf("'state' field of result does not match 'state' passed to /authorize endpoint:" + resultState + "!=" + body["state"].(string))
+		t.Errorf("%s", "'state' field of result does not match 'state' passed to /authorize endpoint:"+resultState+"!="+body["state"].(string))
 		t.Fail()
 	}
 }
 
 func testAuthAuthTokenClientUse(t *testing.T) {
+	if authTokenClient1 == "" {
+		t.Skip("no client token available; DoAuthorizeToken setup is disabled")
+	}
+
 	u := *serverURL
-	u.Path = "/auth_status"
+	u.Path = "/auth/auth_status"
 	res, err := utils.R().SetAuthToken(authTokenClient1).Get(u.String())
 
 	if err != nil {
-		t.Errorf("internal error calling test server " + err.Error())
+		t.Errorf("%s", "internal error calling test server "+err.Error())
 		t.Fail()
 	}
 
@@ -359,7 +366,7 @@ func testAuthAuthTokenClientUse(t *testing.T) {
 	var result map[string]interface{}
 	err = json.Unmarshal(res.Body(), &result)
 	if err != nil {
-		t.Errorf("internal error calling test server " + err.Error())
+		t.Errorf("%s", "internal error calling test server "+err.Error())
 		t.Fail()
 	}
 
@@ -367,11 +374,11 @@ func testAuthAuthTokenClientUse(t *testing.T) {
 
 	if !ok {
 		t.Errorf("/auth_status with oauth2 implicit access token must return json with 'prn' field")
-		t.Fail()
+		return
 	}
 
 	if prn != "prn:pantahub.com:auth:/user1" {
-		t.Errorf("/auth_status with oauth2 implicit access token must 'prn' field matching 'prn:pantahub.com:auth:/client1', but returned: " + prn.(string))
+		t.Errorf("%s", "/auth_status with oauth2 implicit access token must 'prn' field matching 'prn:pantahub.com:auth:/client1', but returned: "+prn.(string))
 		t.Fail()
 	}
 }

@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017-2023 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@ package trailmodels
 
 import (
 	"time"
+
+	"gitlab.com/pantacor/pantahub-base/utils/models"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -60,6 +62,7 @@ type Step struct {
 	State               map[string]interface{} `json:"state"` // json blurb
 	StateSha            string                 `json:"state-sha" bson:"statesha"`
 	StepProgress        StepProgress           `json:"progress" bson:"progress"`
+	ProgressLog         []ProgressLogEntry     `json:"progress-log,omitempty" bson:"progress-log"` // capped history of progress changes, see progresslog.go
 	StepTime            time.Time              `json:"step-time" bson:"step-time"`
 	ProgressTime        time.Time              `json:"progress-time" bson:"progress-time"`
 	Meta                map[string]interface{} `json:"meta"` // json blurb
@@ -78,7 +81,7 @@ type StepProgress struct {
 	StatusMsg string           `json:"status-msg" bson:"statusmsg"` // message of progress status
 	Data      interface{}      `json:"data,omitempty" bson:"data"`  // data field that can hold things the device wants to remember
 	Status    string           `json:"status"`                      // status code
-	Logs      string           `json:"logs"`                        // log if available
+	Logs      string           `json:"logs"`                        // log if available (truncated to ProgressLogsFieldMax on write)
 	Retries   int              `json:"retries" bson:"retries"`      // number of retries attempted
 }
 
@@ -108,9 +111,10 @@ type TrailSummary struct {
 	Progress         int       `json:"progress" bson:"progress"` // progress number. steps or 1-100
 	IsPublic         bool      `json:"public" bson:"public"`
 	StateSha         string    `json:"state-sha" bson:"state_sha256"`
-	StatusMsg        string    `json:"status-msg" bson:"status_msg"` // message of progress status
-	Status           string    `json:"status" bson:"status"`         // status code
-	Timestamp        time.Time `json:"timestamp" bson:"timestamp"`   // greater of last seen and last modified
+	StatusMsg        string    `json:"status-msg" bson:"status_msg"`   // message of progress status
+	Status           string    `json:"status" bson:"status"`           // status code
+	Timestamp        time.Time `json:"timestamp" bson:"timestamp"`     // greater of last seen and last modified
+	LastSeen         time.Time `json:"last-seen" bson:"meta_modified"` // last time the device pushed device-meta
 	StepTime         time.Time `json:"step-time" bson:"step_time"`
 	ProgressTime     time.Time `json:"progress-time" bson:"progress_time"`
 	TrailTouchedTime time.Time `json:"trail-touched-time" bson:"trail_touched_time"`
@@ -120,4 +124,16 @@ type TrailSummary struct {
 	FleetLocation    string    `json:"fleet-location" bson:"fleet_location"`
 	FleetRev         string    `json:"fleet-rev" bson:"fleet_rev"`
 	Owner            string    `json:"-" bson:"owner"`
+	// OVMode is filled by the API from the device document when the device
+	// still needs owner verification; it is not part of the summary stream.
+	OVMode *models.OVModeExtension `json:"ovmode,omitempty" bson:"-"`
+}
+
+// FillLastSeen falls back to Timestamp for summaries created before
+// devices started reporting meta-modified. The devicesummary sink stores
+// unset values as the unix epoch, so both zero times count as unset.
+func (s *TrailSummary) FillLastSeen() {
+	if s.LastSeen.IsZero() || s.LastSeen.Unix() == 0 {
+		s.LastSeen = s.Timestamp
+	}
 }

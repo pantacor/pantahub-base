@@ -33,7 +33,6 @@ HTTP/1.1 200 OK
 Content-Length: 331
 Content-Type: application/json; charset=utf-8
 Date: Wed, 12 Jul 2017 21:13:08 GMT
-X-Powered-By: go-json-rest
 
 [
     {
@@ -65,7 +64,6 @@ HTTP/1.1 200 OK
 Content-Length: 331
 Content-Type: application/json; charset=utf-8
 Date: Wed, 12 Jul 2017 21:13:08 GMT
-X-Powered-By: go-json-rest
 
 [
     {
@@ -89,7 +87,6 @@ HTTP/1.1 200 OK
 Content-Length: 331
 Content-Type: application/json; charset=utf-8
 Date: Wed, 12 Jul 2017 21:13:08 GMT
-X-Powered-By: go-json-rest
 
  {
         "nick": "abc",
@@ -111,7 +108,6 @@ HTTP/1.1 200 OK
 Content-Length: 331
 Content-Type: application/json; charset=utf-8
 Date: Wed, 12 Jul 2017 21:13:08 GMT
-X-Powered-By: go-json-rest
 
 [
     {

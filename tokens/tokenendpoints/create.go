@@ -1,4 +1,4 @@
-// Copyright 2024  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,12 +14,13 @@
 package tokenendpoints
 
 import (
+	"errors"
 	"net/http"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/tokens/tokenservice"
-	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -35,40 +36,40 @@ import (
 // @Success 200 {object} tokenmodels.AuthToken
 // @Failure 400 {object} utils.RError
 // @Failure 403 {object} utils.RError
+// @Failure 409 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /tokens/ [post]
-func (app *Endpoints) CreateToken(w rest.ResponseWriter, r *rest.Request) {
+func (app *Endpoints) CreateToken(c *echo.Context) error {
 	var owner interface{}
 
-	if jwtPayload, ok := r.Env["JWT_PAYLOAD"]; ok {
+	if jwtPayload, ok := echoutil.Lookup(c, echoutil.KeyJWTPayload); ok {
 		if owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"]; !ok {
-			utils.RestErrorWrapper(w, "Owner can't be defined", http.StatusBadRequest)
-			return
+			return echoutil.RestErrorWrapper(c, "Owner can't be defined", http.StatusBadRequest)
 		}
 	} else {
-		utils.RestErrorWrapper(w, "Owner can't be defined", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Owner can't be defined", http.StatusBadRequest)
 	}
 
 	payload := tokenservice.AuthTokenReqPayload{}
-	if err := r.DecodeJsonPayload(&payload); err != nil {
-		utils.RestErrorWrapper(w, "Can't process payload", http.StatusBadRequest)
-		return
+	if err := echoutil.DecodeJsonPayload(c, &payload); err != nil {
+		return echoutil.RestErrorWrapper(c, "Can't process payload", http.StatusBadRequest)
 	}
 
-	response, err := app.service.CreateToken(r.Context(), &payload, owner.(string))
+	response, err := app.service.CreateToken(c.Request().Context(), &payload, owner.(string))
 	if err != nil {
-		if mongo.IsDuplicateKeyError(err) {
-			utils.RestErrorUser(w, err, "token name is already taken", http.StatusInternalServerError)
-			return
+		if errors.Is(err, tokenservice.ErrInvalidTokenType) {
+			return echoutil.RestErrorUser(c, err, "invalid token type", http.StatusBadRequest)
 		}
 
-		utils.RestErrorUser(w, err, "can't create token", http.StatusInternalServerError)
-		return
+		if mongo.IsDuplicateKeyError(err) {
+			return echoutil.RestErrorUser(c, err, "token name is already taken", http.StatusConflict)
+		}
+
+		return echoutil.RestErrorUser(c, err, "can't create token", http.StatusInternalServerError)
 	}
 
-	if err := w.WriteJson(response); err != nil {
-		utils.RestErrorWrapper(w, err.Error(), http.StatusInternalServerError)
-		return
+	if err := echoutil.WriteJSON(c, http.StatusOK, response); err != nil {
+		return echoutil.RestErrorWrapper(c, err.Error(), http.StatusInternalServerError)
 	}
+	return nil
 }

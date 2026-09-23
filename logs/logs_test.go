@@ -1,5 +1,5 @@
 //
-// Copyright 2017  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@
 package logs
 
 import (
+	"gitlab.com/pantacor/pantahub-base/testutils/mongotest"
 	"log"
 	"os"
 	"testing"
@@ -141,6 +142,12 @@ func TestUnmarshalBodyArrayEmpty(t *testing.T) {
 }
 
 func TestMain(m *testing.M) {
+	// Nothing listens on the default localhost:27017; start a throwaway MongoDB.
+	cleanup, code := mongotest.SetupEnv()
+	if code != 0 {
+		os.Exit(code)
+	}
+	defer cleanup()
 
 	exitCode := m.Run()
 
@@ -148,5 +155,7 @@ func TestMain(m *testing.M) {
 		log.Printf("error running tests %d\n", exitCode)
 	}
 
+	// os.Exit skips deferred functions, so release the container first.
+	cleanup()
 	os.Exit(exitCode)
 }

@@ -1,4 +1,351 @@
 
+<a name="058"></a>
+## [058](https://gitlab.com/pantacor/pantahub-base/compare/057...058)
+
+> 2026-09-22
+
+### Fix
+
+* **devices:** show strangers only the public view of a public device
+
+### Refactor
+
+* **devices,mcp:** read and write join tokens through one implementation
+
+
+<a name="057"></a>
+## [057](https://gitlab.com/pantacor/pantahub-base/compare/056...057)
+
+> 2026-09-22
+
+### Chore
+
+* update CHANGELOG.md for release 057
+
+### Docs
+
+* **mcp:** describe what tools do, not how to behave
+
+### Feat
+
+* **mcp:** plan_revision is a write, and asks for a write grant
+* **mcp:** serve an MCP endpoint that manages and deploys to devices
+
+### Fix
+
+* **exports,metrics:** resolve the caller before checking scopes
+* **stateops:** a file a signature excludes is not an unsigned part
+
+
+<a name="056"></a>
+## [056](https://gitlab.com/pantacor/pantahub-base/compare/backup/echo-migration-presquash...056)
+
+> 2026-09-18
+
+### Chore
+
+* update CHANGELOG.md for release 056
+
+### Feat
+
+* migrate the API from go-json-rest to echo
+
+
+<a name="backup/echo-migration-presquash"></a>
+## [backup/echo-migration-presquash](https://gitlab.com/pantacor/pantahub-base/compare/echo-migration-presquash...backup/echo-migration-presquash)
+
+> 2026-09-17
+
+### Feat
+
+* migrate the API from go-json-rest to echo
+
+
+<a name="echo-migration-presquash"></a>
+## [echo-migration-presquash](https://gitlab.com/pantacor/pantahub-base/compare/055...echo-migration-presquash)
+
+> 2026-09-17
+
+### Build
+
+* bump x/crypto, grpc and moby/go-archive out of known vulnerabilities
+
+### Feat
+
+* serve /auth from echo; last service off go-json-rest
+* serve /devices from echo
+* serve /trails from echo
+* serve /objects from echo
+* serve /apps and /webhooks from echo
+* serve /logs from echo
+* serve /exports from echo
+* serve /subscriptions from echo
+* serve /healthz and /metrics from echo
+* serve /changes, /tokens and /profiles from echo
+* serve /plog, /callbacks and /cron from echo
+* **dash:** serve /dash from echo
+* **echo:** conditional middleware reusing go-json-rest conditions
+* **echo:** trace echo-served requests with otelecho
+* **echo:** ScopeFilter and ScopeFilterOptionalAuth for echo routes
+* **echo:** DecodeJsonPayload, UserTypeFilter and route-middleware filters
+* **echo:** go-json-rest-compatible Basic auth for the saadmin endpoints
+* **echo:** CanonicalJSON middleware for trails
+* **echo:** global server with per-service pre-routing middleware chains
+* **echo:** Prometheus metrics middleware with unchanged labels
+* **echo:** access logs identical to go-json-rest's
+* **echo:** go-json-rest-compatible CORS, routing and recover
+* **echo:** translate Basic personal tokens through the same code as go-json-rest
+* **echo:** resolve the caller through the same code as go-json-rest
+* **echo:** JWT authentication through the same code as go-json-rest
+* **echo:** wire-compatible response writers for migrated handlers
+
+### Fix
+
+* **auth:** stop after writing an error in account and password recovery
+* **echo:** decide 404 vs 405 like go-json-rest
+* **echo:** range-check the response size before converting to uint64
+* **trails:** answer 404, not 500, for a revision that does not exist
+
+### Refactor
+
+* remove go-json-rest
+* **echo:** framework-neutral jwtauth config for echo JWT
+* **echo:** drop go-json-rest types from echoutil and migrated services
+* **jwt:** vendor the go-json-rest JWT middleware fork
+
+### Style
+
+* shorten migration code comments
+
+### Test
+
+* record go-json-rest reference outputs for the differential tests
+* repair the five test files that no longer compiled
+* **auth:** testcontainers Mongo and a wire contract golden
+* **golden:** skip live log bodies for query-string /logs probes
+* **golden:** drop probes whose slugs collided with existing ones
+* **golden:** keep the harness stable against a live, moving fleet
+* **golden:** pin the 500 a device gets when polling for a missing revision
+* **golden:** cover path-parameter routes and malformed identifiers
+* **golden:** capture the HTTP contract before the echo migration
+* **jwt:** freeze v3-minted tokens as a wire-compatibility guard
+* **logs:** run the Mongo-backed tests, and correct their pager expectations
+* **mongo:** start a throwaway replica set with testcontainers
+
+
+<a name="055"></a>
+## [055](https://gitlab.com/pantacor/pantahub-base/compare/054...055)
+
+> 2026-09-15
+
+### Chore
+
+* update CHANGELOG.md for release 055
+
+### Ci
+
+* scan with the same pinned Go release the application ships
+* pin govulncheck and gosec instead of tracking [@latest](https://gitlab.com/latest)
+* **security:** actually run gosec and gate build and deploy on it
+
+### Fix
+
+* **ci:** address the scan container by id, not a fixed name
+* **logs:** resolve the shortened device ids that pvr prints
+* **logs:** always return a cursor, so followers are not bounced to login
+* **logs:** tiebreak the sort on id, not the absent tsec/tnano
+* **logs:** page with search_after and stop leaking scroll contexts
+* **security:** clear the gosec gate, fixing the real findings
+
+
+<a name="054"></a>
+## [054](https://gitlab.com/pantacor/pantahub-base/compare/053...054)
+
+> 2026-09-08
+
+### Feat
+
+* **trails:** keep a capped progress-log on every step
+* **trails:** let cancel cover INPROGRESS too, deprecate wontgo
+* **trails:** allow owners to cancel steps in QUEUED or DOWNLOADING
+
+### Fix
+
+* **trails:** accept session tokens for step cancel
+
+
+<a name="053"></a>
+## [053](https://gitlab.com/pantacor/pantahub-base/compare/052...053)
+
+> 2026-09-04
+
+### Apps
+
+* return validation reason to the client on create/update
+
+### Chore
+
+* update CHANGELOG.md for release 053
+* change certs folder
+* bump copyright headers to 2026
+
+### Ci
+
+* deploy to the dev cluster from develop only
+* bump go to 1.25.13 for the security scan
+* deploy feature/* and feat/* branches to the dev cluster
+
+### Feat
+
+* **auth:** hash secrets at rest and close security-review findings
+* **devices:** manual owner verification for device tokens
+* **features:** env feature flags for optional subsystems + GET /features
+* **mqtt:** device pull requests for user-meta and revision catch-up
+* **mqtt:** serve native MQTTS on the TCP listener
+* **mqtt:** add MQTT message plane for push-based OTA
+* **trails:** expose device meta-modified as last-seen in device summary
+
+### Fix
+
+* check every JSON decode; add missing returns after error writes
+* **accounts:** stop serializing password hashes in account responses
+* **auth:** accept passkeys as second factor without user verification
+* **auth:** generate account challenges with crypto/rand
+* **ci:** bump gorilla/websocket to v1.5.3 to clear GO-2026-6278
+* **devices:** 403 non-owner delete, scrub public metas, no secrets in logs
+* **devices:** accept body-less register and claim requests
+* **devices:** never touch the secret in PUT; unbreak device claims
+* **devices:** restore anonymous device self-registration
+* **devices:** let any logged-in user delete an unclaimed device
+* **devices:** stop honoring client-chosen _id takeover on /register
+* **features:** send CORS headers on GET /features
+* **mqtt:** bind device sessions to their own client id
+* **mqtt:** close notifier reconcile and publish gaps
+* **mqtt:** users can no longer claim device-shaped session ids
+* **mqtt:** store logs through the registered logs backend
+* **mqtt:** close five review findings in the OTA message plane
+* **oauth:** carry social-connect state in the signed state param, not cross-site cookies
+* **objects:** re-check disk quota after the object insert
+* **objects:** stop signing object tokens with the placeholder secret
+* **profiles:** reject bad meta payloads; 403s no longer nil-deref
+* **querymongo:** stop panicking on crafted pagination params
+* **subscriptions:** stop mutating the default-subscription template
+* **tokens:** users can no longer mint SERVICE-type PATs
+* **tokens:** answer caller errors with 400/409 instead of 500 on create
+* **trails:** quota 412 without nil-deref, missing returns, decode check
+* **trails,objects:** validate client-supplied Mongo filters
+* **utils:** UserTypeFilter fails closed without auth info
+* **utils:** rate-limit on the ingress-observed client address
+
+### Refactor
+
+* **secrets:** consolidate secret-at-rest logic into utils/secretstore
+
+### Security
+
+* stop storing the unused scrypt password hash (PH-M6)
+* harden auth and connect OAuth providers
+* constant-time compare of SA admin secret (PH-M7)
+* **apps:** reject malformed request body on create/update (PH-L16)
+* **apps:** validate redirect URIs at registration (PH-H16)
+* **auth:** make access-token and auth-code exp numeric (PH-H2)
+* **auth:** reject revoked device certificates (PH-H1)
+* **authz:** require write scope on token/meta writes (PH-H7)
+* **chart:** replace committed JWT/JWE keys with placeholders (PH-C2)
+* **devices:** scrub device secret from delete response (PH-H4)
+* **dos:** add ReadHeaderTimeout + IdleTimeout to HTTP servers (PH-H14 partial)
+* **mail:** auto-escape user data in HTML emails (PH-L17)
+* **tls:** restore outbound TLS verification (PH-H9)
+* **trails:** device may only post steps to its own trail (PH-H6)
+* **trails:** return after 403 on step write (PH-H5)
+
+
+<a name="052"></a>
+## [052](https://gitlab.com/pantacor/pantahub-base/compare/051...052)
+
+> 2026-08-10
+
+### Feat
+
+* **auth:** two-factor authentication and passkeys
+* **webhooks:** mount the webhooks reverse-proxy module
+
+### Fix
+
+* **chart:** review fixes — dep guards, checksums, ingress env, localstack
+* **fluentd:** bound memory buffers and drop ReqHeaders from access logs
+* **webhooks:** sign proxy requests with the v2 canonical form
+
+
+<a name="051"></a>
+## [051](https://gitlab.com/pantacor/pantahub-base/compare/050...051)
+
+> 2026-07-30
+
+### Auth
+
+* leave applications without registered callbacks unconstrained
+* validate OAuth redirect_uri against an allowlist
+
+### Feature
+
+* add pantahub Helm chart translating the docker-compose stack
+
+### Fix
+
+* **chart:** valid http01 solver when ingress.className is empty
+* **docs:** drop old and irrelevant walkthrough docs
+
+
+<a name="050"></a>
+## [050](https://gitlab.com/pantacor/pantahub-base/compare/049...050)
+
+> 2026-07-21
+
+### Fix
+
+* support HTTP Range requests on S3-backed object downloads
+* **trails:** name the object that cannot be resolved in a state
+
+
+<a name="049"></a>
+## [049](https://gitlab.com/pantacor/pantahub-base/compare/048...049)
+
+> 2026-07-14
+
+### Feat
+
+* support HTTP Basic Auth on POST /auth/login
+* HTTP Basic Auth → Bearer JWT translation middleware
+
+### Feature
+
+* add MetaModified field to Device struct
+* device export should buffer and calculate the sha
+* add devicemetamodified
+* add /auth/token/refresh for service-issued tokens
+
+### Fix
+
+* update golang-petname dependency
+* require service identity to refresh service-issued tokens
+* bson quote and unquote does walk the whole json
+* subscriptions is admin, allow token with roles or type admin
+* reset mark_public_processed when device ispublic changes
+* add cronjobs into the docker-compose
+* use a create device nick function
+* create a retry and change the nick in case of colision
+* make the device nick less prone to collitions
+* set defaullt for authorize token to 5 days
+* token refresh use the jwt authorize timeout
+* **logs:** drop-and-log permanent _bulk failures so devices don't stall
+* **logs:** detect elasticsearch _bulk per-item errors so large batches are not silently dropped
+
+### Refactor
+
+* bson tool have less point with the string to replace
+
+
 <a name="048"></a>
 ## [048](https://gitlab.com/pantacor/pantahub-base/compare/047...048)
 

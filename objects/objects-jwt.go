@@ -1,5 +1,5 @@
 //
-// Copyright 2016-2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	jwt "github.com/golang-jwt/jwt/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
 
@@ -41,7 +41,7 @@ type ObjectAccessToken struct {
 
 // ObjectAccessClaims object claims for access
 type ObjectAccessClaims struct {
-	jwt.StandardClaims
+	jwt.RegisteredClaims
 	DispositionName string
 	Size            int64
 	Method          string
@@ -62,12 +62,12 @@ func NewObjectAccessToken(
 	issuedAt int64,
 	expiresAt int64) *ObjectAccessToken {
 	claims := ObjectAccessClaims{
-		StandardClaims: jwt.StandardClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    issuer,
 			Subject:   subject,
-			Audience:  audience,
-			IssuedAt:  issuedAt,
-			ExpiresAt: expiresAt,
+			Audience:  jwt.ClaimStrings{audience},
+			IssuedAt:  jwt.NewNumericDate(time.Unix(issuedAt, 0)),
+			ExpiresAt: jwt.NewNumericDate(time.Unix(expiresAt, 0)),
 		},
 		DispositionName: name,
 		Size:            size,
@@ -99,7 +99,7 @@ func NewObjectAccessForSec(
 func NewFromValidToken(encodedToken string) (*ObjectAccessToken, error) {
 	claim := ObjectAccessClaims{}
 	tok, err := jwt.ParseWithClaims(encodedToken, &claim, func(*jwt.Token) (interface{}, error) {
-		return []byte(utils.GetEnv(utils.EnvPantahubJWTObjectSecret)), nil
+		return utils.GetObjectTokenSecret(), nil
 	})
 
 	if err != nil {
@@ -116,5 +116,14 @@ func NewFromValidToken(encodedToken string) (*ObjectAccessToken, error) {
 
 // Sign sign a access token
 func (o *ObjectAccessToken) Sign() (string, error) {
-	return o.SignedString([]byte(utils.GetEnv(utils.EnvPantahubJWTObjectSecret)))
+	return o.SignedString(utils.GetObjectTokenSecret())
+}
+
+// StorageID returns the token's single audience (the storage id). ok is false
+// otherwise: an empty id would make path.Join resolve to the directory.
+func (c ObjectAccessClaims) StorageID() (string, bool) {
+	if len(c.Audience) != 1 || c.Audience[0] == "" {
+		return "", false
+	}
+	return c.Audience[0], true
 }

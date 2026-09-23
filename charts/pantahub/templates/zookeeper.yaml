@@ -1,0 +1,61 @@
+{{- if .Values.zookeeper.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "zookeeper") | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: client
+      port: 2181
+      targetPort: 2181
+  selector:
+    {{- include "pantahub.selectorLabels" (dict "ctx" . "name" "zookeeper") | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zookeeper
+  labels:
+    {{- include "pantahub.labels" (dict "ctx" . "name" "zookeeper") | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "pantahub.selectorLabels" (dict "ctx" . "name" "zookeeper") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "pantahub.labels" (dict "ctx" . "name" "zookeeper") | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: zookeeper
+          image: "{{ .Values.zookeeper.image }}:{{ .Values.zookeeper.tag }}"
+          env:
+            - name: ZOOKEEPER_CLIENT_PORT
+              value: "2181"
+            - name: ZOOKEEPER_TICK_TIME
+              value: "2000"
+            - name: ZOOKEEPER_SYNC_LIMIT
+              value: "2"
+          ports:
+            - containerPort: 2181
+          readinessProbe:
+            tcpSocket:
+              port: 2181
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          {{- with .Values.zookeeper.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

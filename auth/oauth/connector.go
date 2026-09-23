@@ -1,4 +1,4 @@
-// Copyright 2016-2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,15 +18,22 @@ package oauth
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
+	"strings"
+	"sync"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"golang.org/x/oauth2"
 )
 
@@ -38,9 +45,13 @@ type Config struct {
 type ResponsePayload struct {
 	Nick       string      `json:"nick"`
 	Email      string      `json:"email"`
+	ProviderID string      `json:"provider_id"`
 	RedirectTo string      `json:"redirect_uri"`
 	Raw        string      `json:"raw"`
 	Service    ServiceType `json:"service_type"`
+	// ConnectPRN is the authenticated account PRN carried in the signed OAuth
+	// state during a connect flow. It is never serialised to clients.
+	ConnectPRN string `json:"-"`
 }
 
 // ServiceType type of service
@@ -50,7 +61,7 @@ type ServiceType string
 type GetServiceConfigFunc func() *oauth2.Config
 
 // AuthorizeServiceFunc use service authorization method
-type AuthorizeServiceFunc func(redirectURI string, config *oauth2.Config, w rest.ResponseWriter, r *rest.Request)
+type AuthorizeServiceFunc func(redirectURI string, config *oauth2.Config, c *echo.Context) error
 
 // CallbackServiceFunc use service authorization method
 type CallbackServiceFunc func(ctx context.Context, config *oauth2.Config, code string) (*ResponsePayload, error)
@@ -68,8 +79,7 @@ const (
 	// ServiceEntraid entraid service enum
 	ServiceEntraid = ServiceType("entraid")
 
-	oauthCookie    = "oauthstate"
-	redirectCookie = "redirecturi"
+	oauthCookie = "oauthstate"
 )
 
 // ServicesConfigs get service config
@@ -96,80 +106,245 @@ var ServicesCallback = map[ServiceType]CallbackServiceFunc{
 	ServiceEntraid: EntraidCb,
 }
 
-// AuthorizeByService use service to autorize
-func AuthorizeByService(w rest.ResponseWriter, r *rest.Request) {
-	service := ServiceType(r.PathParam("service"))
-	redirectURI := r.Request.URL.Query().Get("redirect_uri")
+// RedirectValidator reports whether redirectURI is an acceptable return target
+// for the social login flow. It is supplied by the caller so this package stays
+// free of configuration and database dependencies.
+type RedirectValidator func(redirectURI string) error
 
-	getConfig, found := ServicesConfigs[service]
-	if !found {
-		utils.RestError(w, nil, "We can't connect to that service", http.StatusForbidden)
-		return
+// AuthorizeByService use service to autorize
+func AuthorizeByService(c *echo.Context, validate RedirectValidator) error {
+	service := ServiceType(c.Param("service"))
+	if service == "" {
+		// Authenticated connect flows start at /connected-providers and carry
+		// the selected service in the request body. The caller places it in the
+		// query only while invoking this shared authorizer.
+		service = ServiceType(c.Request().URL.Query().Get("service"))
+	}
+	redirectURI := c.Request().URL.Query().Get("redirect_uri")
+
+	if _, found := ServicesConfigs[service]; !found {
+		return echoutil.RestError(c, nil, "We can't connect to that service", http.StatusForbidden)
 	}
 
-	ServicesAutorize[service](redirectURI, getConfig(), w, r)
+	// The callback returns a signed-in user token in the fragment, so the
+	// return target has to be our own web interface. This is checked before we
+	// go anywhere near the identity provider.
+	if redirectURI != "" {
+		if err := validate(redirectURI); err != nil {
+			return echoutil.RestError(c, err, err.Error(), http.StatusBadRequest)
+		}
+	}
+
+	authorizeURL, err := AuthorizationURLByService(service, redirectURI, c.Response())
+	if err != nil {
+		return echoutil.RestError(c, err, err.Error(), http.StatusInternalServerError)
+	}
+	http.Redirect(c.Response(), c.Request(), authorizeURL, http.StatusTemporaryRedirect)
+	return nil
+}
+
+// AuthorizationURLByService creates a provider authorization URL and pins its
+// signed state to the current browser session. Callers that need to initiate
+// OAuth from an authenticated API request can return this URL as JSON and let
+// the browser navigate to it afterwards.
+func AuthorizationURLByService(service ServiceType, redirectURI string, w http.ResponseWriter) (string, error) {
+	getConfig, found := ServicesConfigs[service]
+	if !found {
+		return "", fmt.Errorf("we can't connect to service: %s", service)
+	}
+	state := generateStateOauthCookie(redirectURI, w)
+	if state == "" {
+		return "", errors.New("unable to create OAuth state")
+	}
+	return getConfig().AuthCodeURL(state), nil
+}
+
+// AuthorizationURLByServiceWithConnect builds a provider authorization URL for an
+// authenticated connect flow. The account PRN is carried inside the signed,
+// short-lived state so the callback can complete the connect without relying on
+// a cross-site cookie (the hub and API are on different registrable domains, so
+// browsers drop such cookies). The HMAC signature makes the PRN unforgeable.
+func AuthorizationURLByServiceWithConnect(service ServiceType, redirectURI, connectPRN string) (string, error) {
+	getConfig, found := ServicesConfigs[service]
+	if !found {
+		return "", fmt.Errorf("we can't connect to service: %s", service)
+	}
+
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("unable to generate OAuth state: %w", err)
+	}
+
+	state, err := encodeState(stateClaims{
+		Nonce:       base64.RawURLEncoding.EncodeToString(b),
+		RedirectURI: redirectURI,
+		ConnectPRN:  connectPRN,
+		IssuedAt:    time.Now().Unix(),
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return getConfig().AuthCodeURL(state), nil
 }
 
 // CbByService use service callback
-func CbByService(r *rest.Request) (*ResponsePayload, error) {
+func CbByService(c *echo.Context) (*ResponsePayload, error) {
 	var err error
-	service := ServiceType(r.PathParam("service"))
+	service := ServiceType(c.Param("service"))
 	getConfig, found := ServicesConfigs[service]
 	if !found {
 		payload := &ResponsePayload{RedirectTo: ""}
 		return payload, fmt.Errorf("we can't connect to service: %s", service)
 	}
 
-	code := r.FormValue("code")
-	payload, err := ServicesCallback[service](r.Context(), getConfig(), code)
+	code := c.Request().FormValue("code")
+	payload, err := ServicesCallback[service](c.Request().Context(), getConfig(), code)
 	if err != nil {
 		return payload, fmt.Errorf("%s error -- %s", service, err)
 	}
 
-	oauthState, err := r.Cookie(oauthCookie)
+	// The state travels only in the signed `state` parameter the provider echoes
+	// back. It is HMAC-signed and short-lived, so it cannot be forged or tampered
+	// with, and it does not depend on a cross-site cookie surviving the provider
+	// redirect. The provider's authorization code is single-use, which prevents a
+	// completed callback from being replayed.
+	returnedState := c.Request().FormValue("state")
+	claims, err := decodeState(returnedState)
 	if err != nil {
 		payload := &ResponsePayload{RedirectTo: ""}
-		return payload, fmt.Errorf("error reading cookie: %s", err)
+		return payload, fmt.Errorf("we can't validate the state: %s", err)
 	}
 
-	if r.FormValue("state") != oauthState.Value {
-		payload := &ResponsePayload{RedirectTo: ""}
-		return payload, errors.New("we can't validate the state")
-	}
-
-	redirectURI, _ := r.Cookie(redirectCookie)
-	if redirectURI != nil {
-		payload.RedirectTo = redirectURI.Value
-	}
-
+	payload.RedirectTo = claims.RedirectURI
+	payload.ConnectPRN = claims.ConnectPRN
 	payload.Service = service
 
 	return payload, nil
 }
 
+// stateClaims is the payload carried inside the OAuth state parameter. Binding
+// the flow parameters to the state means a tampered redirect target invalidates
+// the signature instead of silently redirecting somewhere else.
+type stateClaims struct {
+	Nonce       string `json:"n"`
+	RedirectURI string `json:"r,omitempty"`
+	ConnectPRN  string `json:"p,omitempty"`
+	IssuedAt    int64  `json:"t"`
+}
+
+// stateTTL bounds how long an issued state stays acceptable.
+const stateTTL = 15 * time.Minute
+
+var (
+	stateKeyOnce sync.Once
+	stateKey     []byte
+)
+
+// stateSigningKey derives the HMAC key used to sign state values. The JWT
+// secret is reused so every replica signs with the same key; if it is missing
+// we fall back to a per-process key, which keeps flows working on a single
+// instance and fails closed across replicas rather than signing with nothing.
+func stateSigningKey() []byte {
+	stateKeyOnce.Do(func() {
+		secret := utils.GetEnv(utils.EnvPantahubJWTAuthSecret)
+		if secret != "" {
+			sum := sha256.Sum256([]byte("pantahub-oauth-state:" + secret))
+			stateKey = sum[:]
+			return
+		}
+
+		log.Printf("WARNING: %s is unset; OAuth state signing falls back to a per-process key", utils.EnvPantahubJWTAuthSecret)
+		stateKey = make([]byte, 32)
+		if _, err := rand.Read(stateKey); err != nil {
+			log.Printf("CRITICAL: unable to generate an OAuth state signing key: %v", err)
+		}
+	})
+
+	return stateKey
+}
+
+// encodeState serialises and signs the flow parameters into a single opaque
+// state value of the form <payload>.<mac>.
+func encodeState(claims stateClaims) (string, error) {
+	encoded, err := json.Marshal(claims)
+	if err != nil {
+		return "", err
+	}
+
+	payload := base64.RawURLEncoding.EncodeToString(encoded)
+	mac := hmac.New(sha256.New, stateSigningKey())
+	mac.Write([]byte(payload))
+
+	return payload + "." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil)), nil
+}
+
+// decodeState verifies the signature and freshness of a state value and
+// returns the parameters it carries.
+func decodeState(state string) (*stateClaims, error) {
+	payload, signature, found := strings.Cut(state, ".")
+	if !found {
+		return nil, errors.New("malformed state")
+	}
+
+	expected := hmac.New(sha256.New, stateSigningKey())
+	expected.Write([]byte(payload))
+
+	provided, err := base64.RawURLEncoding.DecodeString(signature)
+	if err != nil {
+		return nil, errors.New("malformed state signature")
+	}
+
+	if !hmac.Equal(provided, expected.Sum(nil)) {
+		return nil, errors.New("state signature mismatch")
+	}
+
+	decoded, err := base64.RawURLEncoding.DecodeString(payload)
+	if err != nil {
+		return nil, errors.New("malformed state payload")
+	}
+
+	claims := &stateClaims{}
+	if err := json.Unmarshal(decoded, claims); err != nil {
+		return nil, errors.New("malformed state payload")
+	}
+
+	if time.Since(time.Unix(claims.IssuedAt, 0)) > stateTTL {
+		return nil, errors.New("state has expired")
+	}
+
+	return claims, nil
+}
+
+// generateStateOauthCookie issues a signed state carrying the flow parameters
+// and pins it to this browser session with a cookie.
 func generateStateOauthCookie(redirectURL string, w http.ResponseWriter) string {
-	var expiration = time.Now().Add(365 * 24 * time.Hour)
-
 	b := make([]byte, 16)
-	rand.Read(b)
-	state := base64.URLEncoding.EncodeToString(b)
-
-	cookie := &http.Cookie{
-		Name:    oauthCookie,
-		Value:   state,
-		Expires: expiration,
-		Path:    "/",
+	if _, err := rand.Read(b); err != nil {
+		log.Printf("CRITICAL: crypto/rand.Read failed while generating OAuth state: %v", err)
+		return ""
 	}
 
-	redirectURICookie := &http.Cookie{
-		Name:    redirectCookie,
-		Value:   redirectURL,
-		Expires: expiration,
-		Path:    "/",
+	state, err := encodeState(stateClaims{
+		Nonce:       base64.RawURLEncoding.EncodeToString(b),
+		RedirectURI: redirectURL,
+		IssuedAt:    time.Now().Unix(),
+	})
+	if err != nil {
+		log.Printf("CRITICAL: unable to encode OAuth state: %v", err)
+		return ""
 	}
 
-	http.SetCookie(w, cookie)
-	http.SetCookie(w, redirectURICookie)
+	//#nosec G124 -- Secure follows the deployment scheme (PANTAHUB_SCHEME)
+	http.SetCookie(w, &http.Cookie{
+		Name:     oauthCookie,
+		Value:    state,
+		Expires:  time.Now().Add(stateTTL),
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   utils.GetEnv(utils.EnvPantahubScheme) == "https",
+		SameSite: http.SameSiteLaxMode,
+	})
 
 	return state
 }

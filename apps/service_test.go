@@ -1,4 +1,4 @@
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,14 +20,14 @@ import (
 	"reflect"
 	"testing"
 
-	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func TestNew(t *testing.T) {
 	type args struct {
-		jwtMiddleware *jwt.JWTMiddleware
-		mongoClient   *mongo.Client
+		jwtConfig   *jwtauth.Config
+		mongoClient *mongo.Client
 	}
 	tests := []struct {
 		name string
@@ -38,23 +38,9 @@ func TestNew(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := New(tt.args.jwtMiddleware, tt.args.mongoClient); !reflect.DeepEqual(got, tt.want) {
+			if got := New(tt.args.jwtConfig, tt.args.mongoClient); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("New() = %v, want %v", got, tt.want)
 			}
-		})
-	}
-}
-
-func TestApp_setAPI(t *testing.T) {
-	tests := []struct {
-		name string
-		app  *App
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.app.setupAPI()
 		})
 	}
 }

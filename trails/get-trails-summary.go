@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017-2023 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,10 +26,13 @@ import (
 
 	"context"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
+	"gitlab.com/pantacor/pantahub-base/utils/models"
+	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -46,42 +49,41 @@ import (
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /trails/summary [get]
-func (a *App) handleGetTrailSummary(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetTrailSummary(c *echo.Context) error {
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	owner, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in", http.StatusForbidden)
 	}
 
 	summaryCol := a.mongoClient.Database("pantabase_devicesummary").Collection("device_summary_short_new_v2")
 
 	if summaryCol == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+	authType, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["type"]
 
 	if authType != "USER" && authType != "SESSION" {
-		utils.RestErrorWrapper(w, "Need to be logged in as USER/SESSION user to get trail summary", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Need to be logged in as USER/SESSION user to get trail summary", http.StatusForbidden)
 	}
 
-	sortParam := r.FormValue("sort")
+	sortParam := c.Request().FormValue("sort")
 
 	if sortParam == "" {
 		sortParam = "-timestamp"
 	}
 
 	m := bson.M{}
-	filterParam := r.FormValue("filter")
+	filterParam := c.Request().FormValue("filter")
 	if filterParam != "" {
 		err := json.Unmarshal([]byte(filterParam), &m)
 		if err != nil {
-			utils.RestErrorWrapper(w, "Illegal Filter "+err.Error(), http.StatusBadRequest)
-			return
+			return echoutil.RestErrorWrapper(c, "Illegal Filter "+err.Error(), http.StatusBadRequest)
+		}
+		if err := mongoutils.ValidateClientFilter(map[string]interface{}(m)); err != nil {
+			return echoutil.RestErrorWrapper(c, "Illegal Filter: "+err.Error(), http.StatusBadRequest)
 		}
 	}
 
@@ -100,23 +102,68 @@ func (a *App) handleGetTrailSummary(w rest.ResponseWriter, r *rest.Request) {
 		findOptions.SetSort(bson.M{sortParam: 1})
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	cur, err := summaryCol.Find(ctx, m, findOptions)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error on fetching summaries:"+err.Error(), http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Error on fetching summaries:"+err.Error(), http.StatusForbidden)
 	}
 	defer cur.Close(ctx)
 	for cur.Next(ctx) {
 		result := trailmodels.TrailSummary{}
 		err := cur.Decode(&result)
 		if err != nil {
-			utils.RestErrorWrapper(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
-			return
+			return echoutil.RestErrorWrapper(c, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
 		}
+		result.FillLastSeen()
 		summaries = append(summaries, result)
 	}
 
-	w.WriteJson(summaries)
+	a.attachPendingOwnership(ctx, owner, summaries)
+
+	return echoutil.WriteJSON(c, http.StatusOK, summaries)
+}
+
+// attachPendingOwnership marks summaries of devices whose owner verification
+// is still pending, so the device list can offer to accept them. The summary
+// stream never carries ovmode, and only pending devices are looked up.
+func (a *App) attachPendingOwnership(ctx context.Context, owner interface{}, summaries []trailmodels.TrailSummary) {
+	if len(summaries) == 0 {
+		return
+	}
+	devicesCol := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
+	if devicesCol == nil {
+		return
+	}
+	cur, err := devicesCol.Find(ctx, bson.M{
+		"owner":         owner,
+		"garbage":       bson.M{"$ne": true},
+		"ovmode.mode":   bson.M{"$in": []string{models.TLSVerification.String(), models.ManualVerification.String()}},
+		"ovmode.status": bson.M{"$nin": []string{models.Completed.String(), models.ValidationNotNeeded.String()}},
+	}, options.Find().SetProjection(bson.M{"prn": 1, "ovmode": 1}))
+	if err != nil {
+		return
+	}
+	defer cur.Close(ctx)
+
+	pending := map[string]*models.OVModeExtension{}
+	for cur.Next(ctx) {
+		doc := struct {
+			Prn    string                  `bson:"prn"`
+			OVMode *models.OVModeExtension `bson:"ovmode"`
+		}{}
+		if err := cur.Decode(&doc); err != nil || doc.OVMode == nil {
+			continue
+		}
+		doc.OVMode.RootOfTrust = ""
+		pending[doc.Prn] = doc.OVMode
+	}
+	if len(pending) == 0 {
+		return
+	}
+	for i := range summaries {
+		if ov, ok := pending[summaries[i].Device]; ok {
+			summaries[i].OVMode = ov
+		}
+	}
 }

@@ -1,4 +1,4 @@
-// Copyright 2016-2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,21 +17,26 @@
 package auth
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	"github.com/dgrijalva/jwt-go"
+	jwt "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/accounts"
+	"gitlab.com/pantacor/pantahub-base/auth/authmodels"
 	"gitlab.com/pantacor/pantahub-base/auth/authservices"
+	"gitlab.com/pantacor/pantahub-base/auth/mfaservice"
 	"gitlab.com/pantacor/pantahub-base/auth/oauth"
 	"gitlab.com/pantacor/pantahub-base/auth/pkceservice"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -59,8 +64,13 @@ type TokenPayload struct {
 // @Failure 404 {object} utils.RError "Account not found"
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /auth/oauth/login/{service} [get]
-func (a *App) HandleGetThirdPartyLogin(w rest.ResponseWriter, r *rest.Request) {
-	oauth.AuthorizeByService(w, r)
+func (a *App) HandleGetThirdPartyLogin(c *echo.Context) error {
+	audit := auditContext(c.Request(), "social_login")
+	audit.Service = c.Param("service")
+
+	return oauth.AuthorizeByService(c, func(redirectURI string) error {
+		return validateSocialRedirectURI(redirectURI, audit)
+	})
 }
 
 // HandleGetThirdPartyCallback login or register user using thirdparty integration
@@ -78,85 +88,232 @@ func (a *App) HandleGetThirdPartyLogin(w rest.ResponseWriter, r *rest.Request) {
 // @Failure 404 {object} utils.RError "Account not found"
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /auth/oauth/callback/{service} [get]
-func (a *App) HandleGetThirdPartyCallback(w rest.ResponseWriter, r *rest.Request) {
-	payload, err := oauth.CbByService(r)
+func (a *App) HandleGetThirdPartyCallback(c *echo.Context) error {
+	payload, err := oauth.CbByService(c)
 	if err != nil {
-		processErr(w, r.Request, err, "Unable to connect to thirdparty service", http.StatusForbidden, payload.RedirectTo)
-		return
+		redirectTo := ""
+		if payload != nil {
+			redirectTo = payload.RedirectTo
+		}
+		return processErr(c, err, "Unable to connect to thirdparty service", http.StatusForbidden, redirectTo)
+	}
+	if payload == nil {
+		return processErr(c, fmt.Errorf("empty OAuth provider response"), "Unable to connect to thirdparty service", http.StatusForbidden, "")
 	}
 
-	if payload.Email == "" {
-		errMg := fmt.Sprintf("You need to validate your email or make it public on %s", payload.Service)
-		processErr(w, r.Request, err, errMg, http.StatusForbidden, payload.RedirectTo)
-		return
-	}
+	// The return target is carried inside the signed state, so it cannot have
+	// been tampered with since we issued it. It is checked again here so that a
+	// target that was allowed at authorize time but is no longer configured
+	// cannot receive a token.
+	if payload.RedirectTo != "" {
+		audit := auditContext(c.Request(), "social_login_callback")
+		audit.Service = string(payload.Service)
 
-	if !authservices.IsEmailDomainAllowed(payload.Email) {
-		errMg := fmt.Sprintf("Email domain not allowed: %s", payload.Email)
-		processErr(w, r.Request, err, errMg, http.StatusForbidden, payload.RedirectTo)
-		return
+		if err := validateSocialRedirectURI(payload.RedirectTo, audit); err != nil {
+			payload.RedirectTo = ""
+			return echoutil.RestError(c, err, err.Error(), http.StatusBadRequest)
+		}
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
-	account, err := getUserByEmail(r.Context(), payload.Email, collection)
-	if err != nil && err != mongo.ErrNoDocuments {
-		processErr(w, r.Request, err, "Error with Database connectivity", http.StatusInternalServerError, payload.RedirectTo)
-		return
+	if payload.ProviderID == "" {
+		return processErr(c, fmt.Errorf("OAuth provider ID is missing"), "Unable to identify OAuth account", http.StatusForbidden, payload.RedirectTo)
+	}
+	if payload.Email != "" && !authservices.IsEmailDomainAllowed(payload.Email) {
+		errMg := fmt.Sprintf("Email domain not allowed: %s", payload.Email)
+		return processErr(c, fmt.Errorf("email domain is not allowed"), errMg, http.StatusForbidden, payload.RedirectTo)
 	}
 
+	// A connect flow carries the authenticated account PRN inside the signed
+	// OAuth state (see AuthorizationURLByServiceWithConnect), not a cross-site
+	// cookie. The state signature means the callback trusts only a PRN we signed
+	// when the authenticated request started the flow; the browser cannot supply
+	// one of its own.
+	if payload.ConnectPRN != "" {
+		account, err := getUserByPRN(c.Request().Context(), payload.ConnectPRN, collection)
+		if err != nil {
+			return processErr(c, err, "Account not found", http.StatusForbidden, payload.RedirectTo)
+		}
+		provider := accounts.ConnectedProvider{
+			Service:     string(payload.Service),
+			ProviderID:  payload.ProviderID,
+			Email:       payload.Email,
+			ConnectedAt: time.Now(),
+		}
+		if err := connectProvider(c.Request().Context(), account.Prn, provider, collection); err != nil {
+			status := http.StatusInternalServerError
+			if isDubplicateKey("connected_providers", err) {
+				status = http.StatusConflict
+			}
+			return processErr(c, err, "OAuth provider is already connected to another account", status, payload.RedirectTo)
+		}
+		return redirectAfterProviderConnect(c, payload.RedirectTo, provider)
+	}
+
+	// Login is resolved by service + stable provider ID. Email is only used to
+	// provision a brand-new OAuth account; it is never sufficient to sign in to
+	// an existing account.
+	account, err := getUserByProvider(c.Request().Context(), string(payload.Service), payload.ProviderID, collection)
+	if err != nil && err != mongo.ErrNoDocuments {
+		return processErr(c, err, "Error with Database connectivity", http.StatusInternalServerError, payload.RedirectTo)
+	}
 	if err == mongo.ErrNoDocuments {
-		account, err = createUser(r.Context(), payload.Email, payload.Nick, "", "", collection)
-		if err != nil && isDubplicateKey("nick", err) {
-			scopeNick := payload.Nick + "_" + string(payload.Service)
-			account, err = createUser(r.Context(), payload.Email, scopeNick, "", "", collection)
+		if payload.Email == "" {
+			errMg := fmt.Sprintf("You need to validate your email or make it public on %s", payload.Service)
+			return processErr(c, fmt.Errorf("email is missing"), errMg, http.StatusForbidden, payload.RedirectTo)
 		}
 
-		urlPrefix := utils.GetEnv(utils.EnvPantahubScheme) + "://" + utils.GetEnv(utils.EnvPantahubWWWHost)
-		if utils.GetEnv(utils.EnvPantahubPort) != "" {
-			urlPrefix += ":"
-			urlPrefix += utils.GetEnv(utils.EnvPantahubPort)
+		account, err = getUserByEmail(c.Request().Context(), payload.Email, collection)
+		if err != nil && err != mongo.ErrNoDocuments {
+			return processErr(c, err, "Error with Database connectivity", http.StatusInternalServerError, payload.RedirectTo)
 		}
+		if err == mongo.ErrNoDocuments {
+			account, err = createUser(c.Request().Context(), payload.Email, payload.Nick, "", "", collection)
+			if err != nil && isDubplicateKey("nick", err) {
+				scopeNick := payload.Nick + "_" + string(payload.Service)
+				account, err = createUser(c.Request().Context(), payload.Email, scopeNick, "", "", collection)
+			}
+			if err == nil {
+				provider := accounts.ConnectedProvider{
+					Service:     string(payload.Service),
+					ProviderID:  payload.ProviderID,
+					Email:       payload.Email,
+					ConnectedAt: time.Now(),
+				}
+				err = connectProvider(c.Request().Context(), account.Prn, provider, collection)
+			}
 
-		utils.SendWelcome(account.Email, account.Nick, urlPrefix)
+			if err == nil {
+				urlPrefix := utils.GetEnv(utils.EnvPantahubScheme) + "://" + utils.GetEnv(utils.EnvPantahubWWWHost)
+				if utils.GetEnv(utils.EnvPantahubPort) != "" {
+					urlPrefix += ":"
+					urlPrefix += utils.GetEnv(utils.EnvPantahubPort)
+				}
+				if err := utils.SendWelcome(account.Email, account.Nick, urlPrefix); err != nil {
+					log.Printf("WARNING: sending welcome mail to the new account failed: %v", err)
+				}
+			}
+		} else if connectedAccountsEnforced() {
+			return processErr(c, fmt.Errorf("OAuth provider is not connected to this account"), "This OAuth account is not connected; sign in with your password and connect it first", http.StatusForbidden, payload.RedirectTo)
+		} else {
+			// Legacy opt-out mode keeps email-based social login working, but
+			// records the stable identity for subsequent logins.
+			provider := accounts.ConnectedProvider{
+				Service:     string(payload.Service),
+				ProviderID:  payload.ProviderID,
+				Email:       payload.Email,
+				ConnectedAt: time.Now(),
+			}
+			err = connectProvider(c.Request().Context(), account.Prn, provider, collection)
+		}
 	}
 	if err != nil {
-		processErr(w, r.Request, err, "Error with Database connectivity", http.StatusInternalServerError, payload.RedirectTo)
-		return
+		return processErr(c, err, "Error with Database connectivity", http.StatusInternalServerError, payload.RedirectTo)
 	}
 
-	pkceAuthCode := utils.GetCookie(r, "pkce_auth_code")
-	pkceRedirectURI := utils.GetCookie(r, "pkce_redirect_uri")
+	pkceAuthCode := utils.GetCookie(c.Request(), "pkce_auth_code")
+	pkceRedirectURI := utils.GetCookie(c.Request(), "pkce_redirect_uri")
 	if pkceRedirectURI != "" && pkceAuthCode != "" && isValidCallbackURL(pkceRedirectURI) {
-		utils.DeleteCookie(w, r, "pkce_redirect_uri")
-		utils.DeleteCookie(w, r, "pkce_auth_code")
+		utils.DeleteCookie(c.Response(), c.Request(), "pkce_redirect_uri")
+		utils.DeleteCookie(c.Response(), c.Request(), "pkce_auth_code")
 
-		pks, found := pkceservice.GetPKCEState(r.Context(), pkceAuthCode)
+		pks, found := pkceservice.GetPKCEState(c.Request().Context(), pkceAuthCode)
 		if found {
-			pkceservice.UpdatePKCEStateUserID(r.Context(), pks.AuthCode, account.Prn)
+			pkceservice.UpdatePKCEStateUserID(c.Request().Context(), pks.AuthCode, account.Prn)
 		}
+	}
+
+	// social logins step up to the second factor like password logins do;
+	// the challenge is carried to the login page via the redirect fragment
+	if handled := a.maybeStartSocialMFALogin(c, account, payload.RedirectTo); handled {
+		return nil
 	}
 
 	token, err := createAccountToken(account)
 	if err != nil {
-		processErr(w, r.Request, err, err.Error(), http.StatusInternalServerError, payload.RedirectTo)
-		return
+		return processErr(c, err, err.Error(), http.StatusInternalServerError, payload.RedirectTo)
 	}
 
 	if payload.RedirectTo != "" {
 		redirectURI := fmt.Sprintf("%s#token=%s", payload.RedirectTo, url.QueryEscape(token.Token))
-		http.Redirect(w, r.Request, redirectURI, http.StatusTemporaryRedirect)
+		http.Redirect(c.Response(), c.Request(), redirectURI, http.StatusTemporaryRedirect)
+		return nil
 	}
 
-	w.WriteJson(token)
+	return echoutil.WriteJSON(c, http.StatusOK, token)
 }
 
-func processErr(w rest.ResponseWriter, r *http.Request, err error, msg string, code int, redirectTo string) {
-	if redirectTo != "" {
-		redirectURI := fmt.Sprintf("%s?error=%s", redirectTo, url.QueryEscape(msg))
-		http.Redirect(w, r, redirectURI, http.StatusTemporaryRedirect)
+func connectedAccountsEnforced() bool {
+	return strings.ToLower(strings.TrimSpace(utils.GetEnv(utils.EnvPantahubOAuthConnectedAccountsEnforce))) != "false"
+}
+
+// maybeStartSocialMFALogin issues the MFA challenge for social logins into
+// accounts that have two-factor authentication enabled. Returns handled ==
+// true when a response was already written.
+func (a *App) maybeStartSocialMFALogin(c *echo.Context, account *accounts.Account, redirectTo string) bool {
+	if !mfaFeatureEnabled() || a.mfaRepo == nil {
+		return false
 	}
 
-	utils.RestError(w, err, msg, code)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
+	defer cancel()
+
+	settings, err := a.mfaRepo.GetByOwner(ctx, account.Prn)
+	if err != nil {
+		// fail closed: never fall through to a single-factor social session
+		// for an account that may be MFA-protected when the state is unknown
+		_ = processErr(c, err, "Please try again later", http.StatusServiceUnavailable, redirectTo)
+		return true
+	}
+	if settings == nil || !settings.Enabled {
+		return false
+	}
+
+	methods := a.availableMFAMethods(ctx, settings)
+
+	mfaToken, err := mfaservice.CreateMFAPendingToken(
+		a.jwtConfig,
+		account.Nick,
+		account.Prn,
+		"",
+		[]string{"oauth"},
+		methods,
+	)
+	if err != nil {
+		_ = processErr(c, err, "Error creating MFA token", http.StatusInternalServerError, redirectTo)
+		return true
+	}
+
+	if redirectTo != "" {
+		redirectURI := fmt.Sprintf("%s#mfa_token=%s&mfa_methods=%s",
+			redirectTo,
+			url.QueryEscape(mfaToken),
+			url.QueryEscape(strings.Join(methods, ",")),
+		)
+		http.Redirect(c.Response(), c.Request(), redirectURI, http.StatusTemporaryRedirect)
+		return true
+	}
+
+	noStore(c)
+	_ = echoutil.WriteJSON(c, http.StatusOK, authmodels.MFARequiredResponse{
+		MFARequired: true,
+		MFAToken:    mfaToken,
+		Methods:     methods,
+	})
+	return true
+}
+
+// processErr reports an error to the caller, bouncing back to the return target
+// when there is one. redirectTo must already have been validated: it is only
+// ever the value carried in the signed state.
+func processErr(c *echo.Context, err error, msg string, code int, redirectTo string) error {
+	if redirectTo != "" {
+		redirectURI := fmt.Sprintf("%s?error=%s", redirectTo, url.QueryEscape(msg))
+		http.Redirect(c.Response(), c.Request(), redirectURI, http.StatusTemporaryRedirect)
+		return nil
+	}
+
+	return echoutil.RestError(c, err, msg, code)
 }
 
 func createAccountToken(account *accounts.Account) (*TokenPayload, error) {

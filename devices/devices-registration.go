@@ -1,4 +1,4 @@
-// Copyright 2016-2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,9 +22,11 @@ import (
 	"encoding/base64"
 	"net/http"
 
-	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-base/utils/caclient"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type registerReq struct {
@@ -94,43 +96,38 @@ var phCertExtensionIDs = &PHCertExtensions{
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /devices/register [post]
-func (a *App) handleRegister(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleRegister(c *echo.Context) error {
 	ca, err := caclient.GetDefaultCAClient()
 	if err != nil {
-		utils.RestErrorWrapper(w, "This feature is not available: "+err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "This feature is not available: "+err.Error(), http.StatusBadRequest)
 	}
 
 	reqPayload := &registerReq{}
-	err = r.DecodeJsonPayload(reqPayload)
+	err = echoutil.DecodeJsonPayload(c, reqPayload)
 	if err != nil {
-		utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, err.Error(), http.StatusBadRequest)
 	}
 
 	certRaw, err := base64.StdEncoding.DecodeString(reqPayload.Cert)
 	if err != nil {
-		utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, err.Error(), http.StatusBadRequest)
 	}
 
 	cert, err := x509.ParseCertificateRequest(certRaw)
 	if err != nil {
-		utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, err.Error(), http.StatusBadRequest)
 	}
 
 	err = cert.CheckSignature()
 	if err != nil {
-		utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, err.Error(), http.StatusBadRequest)
 	}
 
 	extensions := ProcessPHExtentions(cert)
 
 	col := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
 	err = utils.ValidateOwnerSig(
-		r.Context(),
+		c.Request().Context(),
 		base64.StdEncoding.EncodeToString([]byte(extensions.NameSigByOwner)),
 		extensions.TokenID,
 		extensions.Owner,
@@ -138,49 +135,47 @@ func (a *App) handleRegister(w rest.ResponseWriter, r *rest.Request) {
 		col,
 	)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Invalid signature: "+err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Invalid signature: "+err.Error(), http.StatusBadRequest)
 	}
 
 	// Check device quota before creating device
-	quotaResult, err := CheckDeviceQuota(r.Context(), extensions.Owner, a.mongoClient, a.subService)
+	quotaResult, err := CheckDeviceQuota(c.Request().Context(), extensions.Owner, a.mongoClient, a.subService)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error checking device quota: "+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error checking device quota: "+err.Error(), http.StatusInternalServerError)
 	}
 	if quotaResult.Exceeded {
-		utils.RestErrorWrapperUser(w, "device quota exceeded",
+		return echoutil.RestErrorWrapperUser(c, "device quota exceeded",
 			"Device quota exceeded; delete some devices or request a quota bump from team@pantahub.com",
 			http.StatusForbidden)
-		return
 	}
 
 	secret := base64.RawStdEncoding.EncodeToString([]byte(extensions.NameSigByOwner))
 	device, err := createDevice(reqPayload.DeviceName, secret, extensions.Owner)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error creating device: "+err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Error creating device: "+err.Error(), http.StatusBadRequest)
 	}
 
 	finalCert, err := ca.CertRequest(cert, device.ID.Hex(), secret)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Failed to generate certificate on CA:"+err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Failed to generate certificate on CA:"+err.Error(), http.StatusBadRequest)
 	}
 
 	// Create or update device with the new certificate
 	device.DeviceMeta["idevid"] = finalCert
-	_, err = device.save(r.Context(), a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices"))
+	_, err = device.save(c.Request().Context(), a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices"))
+	if mongo.IsDuplicateKeyError(err) {
+		// the id exists under another owner; the owner-bound upsert refused it
+		return echoutil.RestErrorWrapper(c, "Device id already in use", http.StatusConflict)
+	}
 	if err != nil {
-		utils.RestErrorWrapper(w, "Failed to save device:"+err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Failed to save device:"+err.Error(), http.StatusBadRequest)
 	}
 
 	response := &registerRes{
 		Cert:   string(finalCert),
 		Device: device,
 	}
-	w.WriteJson(response)
+	return echoutil.WriteJSON(c, http.StatusOK, response)
 }
 
 // ProcessPHExtentions process all pantacor extensions if they exists

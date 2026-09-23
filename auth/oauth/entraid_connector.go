@@ -1,4 +1,4 @@
-// Copyright 2016-2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package oauth
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -27,7 +28,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"golang.org/x/oauth2"
@@ -74,17 +75,18 @@ func GetEntraidConfig() *oauth2.Config {
 }
 
 // EntraidAuthorize use google to authorize user
-func EntraidAuthorize(redirectURI string, config *oauth2.Config, w rest.ResponseWriter, r *rest.Request) {
+func EntraidAuthorize(redirectURI string, config *oauth2.Config, c *echo.Context) error {
 	// Create oauthState cookie
-	oauthState := generateStateOauthCookie(redirectURI, w)
+	oauthState := generateStateOauthCookie(redirectURI, c.Response())
 
 	u := config.AuthCodeURL(oauthState)
-	http.Redirect(w, r.Request, u, http.StatusTemporaryRedirect)
+	http.Redirect(c.Response(), c.Request(), u, http.StatusTemporaryRedirect)
+	return nil
 }
 
 // EntraidCb use code to retrive service user data
 func EntraidCb(ctx context.Context, config *oauth2.Config, code string) (*ResponsePayload, error) {
-	data, err := getUserDataFromEntraid(ctx, config, code)
+	data, token, err := getUserDataFromEntraid(ctx, config, code)
 	if err != nil {
 		return &ResponsePayload{RedirectTo: ""}, err
 	}
@@ -102,6 +104,13 @@ func EntraidCb(ctx context.Context, config *oauth2.Config, code string) (*Respon
 	if email == "" {
 		return &ResponsePayload{RedirectTo: ""}, fmt.Errorf("userPrincipalName is empty in Entra ID response")
 	}
+	if payload.ID == "" {
+		return &ResponsePayload{RedirectTo: ""}, fmt.Errorf("Entra ID user ID is missing")
+	}
+	tenantScopedID, err := entraTenantScopedID(token, payload.ID)
+	if err != nil {
+		return &ResponsePayload{RedirectTo: ""}, err
+	}
 
 	// Split the email address to get the part before the '@'
 	nick := payload.DisplayName
@@ -111,23 +120,24 @@ func EntraidCb(ctx context.Context, config *oauth2.Config, code string) (*Respon
 	}
 
 	return &ResponsePayload{
-		Email:   email,
-		Nick:    nick,
-		Raw:     string(data),
-		Service: ServiceEntraid,
+		Email:      email,
+		Nick:       nick,
+		ProviderID: tenantScopedID,
+		Raw:        string(data),
+		Service:    ServiceEntraid,
 	}, nil
 }
 
-func getUserDataFromEntraid(ctx context.Context, config *oauth2.Config, code string) ([]byte, error) {
+func getUserDataFromEntraid(ctx context.Context, config *oauth2.Config, code string) ([]byte, *oauth2.Token, error) {
 	// Use code to get token and get user info from Entraid.
 	token, err := config.Exchange(ctx, code)
 	if err != nil {
-		return nil, fmt.Errorf("code exchange wrong: %s", err.Error())
+		return nil, nil, fmt.Errorf("code exchange wrong: %s", err.Error())
 	}
 
 	request, err := http.NewRequest(http.MethodGet, oauthEntraidURLAPI, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %s", err.Error())
+		return nil, nil, fmt.Errorf("error creating request: %s", err.Error())
 	}
 
 	request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
@@ -151,18 +161,47 @@ func getUserDataFromEntraid(ctx context.Context, config *oauth2.Config, code str
 	}
 	response, err := httpClient.Do(request)
 	if err != nil {
-		return nil, fmt.Errorf("failed getting user info: %s", err.Error())
+		return nil, nil, fmt.Errorf("failed getting user info: %s", err.Error())
 	}
 	defer response.Body.Close()
 
 	contents, err := io.ReadAll(response.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed read response: %s", err.Error())
+		return nil, nil, fmt.Errorf("failed read response: %s", err.Error())
 	}
 
 	if response.StatusCode >= 300 {
-		return nil, fmt.Errorf("can't get account information: %s", contents)
+		return nil, nil, fmt.Errorf("can't get account information: %s", contents)
 	}
 
-	return contents, nil
+	return contents, token, nil
+}
+
+// entraTenantScopedID namespaces Microsoft's tenant-local object ID. The
+// access token has already been accepted by Microsoft Graph for /me, so its
+// tenant claim is safe to use as the namespace for the persisted provider key.
+func entraTenantScopedID(token *oauth2.Token, objectID string) (string, error) {
+	if token == nil || objectID == "" {
+		return "", fmt.Errorf("Entra ID token or user ID is missing")
+	}
+
+	claimsToken := token.AccessToken
+	if idToken, ok := token.Extra("id_token").(string); ok && idToken != "" {
+		claimsToken = idToken
+	}
+	parts := strings.Split(claimsToken, ".")
+	if len(parts) != 3 {
+		return "", fmt.Errorf("Entra ID token has no tenant claim")
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return "", fmt.Errorf("invalid Entra ID token claims: %w", err)
+	}
+	var claims struct {
+		TenantID string `json:"tid"`
+	}
+	if err := json.Unmarshal(payload, &claims); err != nil || claims.TenantID == "" {
+		return "", fmt.Errorf("Entra ID token has no tenant claim")
+	}
+	return claims.TenantID + ":" + objectID, nil
 }

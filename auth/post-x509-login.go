@@ -1,4 +1,4 @@
-// Copyright 2016-2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,16 +19,18 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/cloudflare/cfssl/revoke"
-	"github.com/dgrijalva/jwt-go"
+	jwt "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 )
 
 const (
@@ -36,6 +38,8 @@ const (
 	HTTPHeaderPhClientCertificate = "Pantahub-TLS-Client-Cert"
 
 	// HTTPHeaderPhProxyTLSToken pantahub proxy token
+	//
+	//#nosec G101 -- the name of an HTTP header, not a token value
 	HTTPHeaderPhProxyTLSToken = "Pantahub-TLS-Proxy-Token"
 )
 
@@ -52,36 +56,40 @@ const (
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /auth/x509/login [post]
-func (a *App) handleAuthUsingDeviceCert(w rest.ResponseWriter, r *rest.Request) {
-	cert := tlsProxyCertFilter(w, r)
+func (a *App) handleAuthUsingDeviceCert(c *echo.Context) error {
+	cert := tlsProxyCertFilter(c)
 	if cert == nil {
-		utils.RestErrorWrapper(w, "IDevID need to be used as tls certificate", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "IDevID need to be used as tls certificate", http.StatusForbidden)
 	}
 
 	err := utils.ValidateCaSigned(cert)
 	if err != nil {
-		utils.RestErrorWrapper(w, "The certificate is can't be trusted", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "The certificate is can't be trusted", http.StatusForbidden)
 	}
 
+	// fail closed: ok == false means the CRL/OCSP responder could not be
+	// consulted, so the revocation status is unknown, not "not revoked"
 	revoked, ok := revoke.VerifyCertificate(cert)
-	if revoked && !ok {
-		utils.RestErrorWrapper(w, "The certificate is not valid anymore, could be revoked or is expired", http.StatusForbidden)
-		return
+	if revoked || !ok {
+		if !ok {
+			log.Printf("WARNING: x509 login: revocation status of %q could not be determined; refusing", cert.Subject.SerialNumber)
+		}
+		return echoutil.RestErrorWrapper(c, "The certificate is not valid anymore, could be revoked or is expired", http.StatusForbidden)
 	}
 
 	deviceID := cert.Subject.SerialNumber
 
-	device, err := devices.GetDeviceByID(r.Context(), deviceID, a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices"))
+	device, err := devices.GetDeviceByID(c.Request().Context(), deviceID, a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices"))
 	if err != nil {
-		utils.RestErrorWrapper(w, err.Error(), http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, err.Error(), http.StatusForbidden)
 	}
 
 	token, err := createToken(device)
+	if err != nil {
+		return echoutil.RestErrorWrapper(c, "Error creating device token", http.StatusInternalServerError)
+	}
 
-	w.WriteJson(token)
+	return echoutil.WriteJSON(c, http.StatusOK, token)
 }
 
 func createToken(device *devices.Device) (*TokenPayload, error) {
@@ -128,39 +136,42 @@ func createToken(device *devices.Device) (*TokenPayload, error) {
 // behind a proxy it is mandatory that the proxy authenticates itself to the backend in order
 // to enable the code path that uses the "PhClientCertificate" Http header field to retrieve
 // the client certificate used.
-func tlsProxyCertFilter(w rest.ResponseWriter, req *rest.Request) *x509.Certificate {
+func tlsProxyCertFilter(c *echo.Context) *x509.Certificate {
 	var cert *x509.Certificate
 
-	phProxyTLSUnlockAuth := req.Header.Get(HTTPHeaderPhProxyTLSToken)
+	phProxyTLSUnlockAuth := c.Request().Header.Get(HTTPHeaderPhProxyTLSToken)
 
 	if phProxyTLSUnlockAuth != "" {
 		if phProxyTLSUnlockAuth != utils.GetEnv(utils.EnvProxyTLSUnlockAuthToken) {
-			utils.RestErrorWrapper(w, "invalid proxy tls token configuration", http.StatusInternalServerError)
+			_ = echoutil.RestErrorWrapper(c, "invalid proxy tls token configuration", http.StatusInternalServerError)
 			return nil
 		}
-		phCertificate := req.Header.Get(HTTPHeaderPhClientCertificate)
+		phCertificate := c.Request().Header.Get(HTTPHeaderPhClientCertificate)
 		if phCertificate != "" {
 			// Nginx encode the client certificate using url escape instead of hex
 			decodedValue, err := url.QueryUnescape(phCertificate)
 			if err != nil {
-				utils.RestErrorWrapper(w, "parse client certificate error", http.StatusInternalServerError)
+				_ = echoutil.RestErrorWrapper(c, "parse client certificate error", http.StatusInternalServerError)
 				return nil
 			}
 
 			cert, err = utils.ParsePEMCertString([]byte(decodedValue))
 			if err != nil {
-				utils.RestErrorWrapper(w, "parse client certificate error", http.StatusInternalServerError)
+				_ = echoutil.RestErrorWrapper(c, "parse client certificate error", http.StatusInternalServerError)
 				return nil
 			}
 		}
 		return cert
-	} else if req.Request.TLS != nil {
+	} else if c.Request().TLS != nil {
 		// if we are NOT behind proxy we extract directlty from TLS connection
-		if req.Request.TLS != nil && len(req.Request.TLS.PeerCertificates) == 0 {
-			utils.RestErrorWrapper(w, "No TLS Certificate available through TLS session", http.StatusInternalServerError)
+		if c.Request().TLS != nil && len(c.Request().TLS.PeerCertificates) == 0 {
+			_ = echoutil.RestErrorWrapper(c, "No TLS Certificate available through TLS session", http.StatusInternalServerError)
 			return nil
 		}
-		cert = req.Request.TLS.PeerCertificates[len(req.Request.TLS.PeerCertificates)-1]
+		// PeerCertificates[0] is always the leaf the client proved possession
+		// of; the remaining entries are whatever chain it chose to send and
+		// must never be used as the identity
+		cert = c.Request().TLS.PeerCertificates[0]
 		return cert
 	}
 

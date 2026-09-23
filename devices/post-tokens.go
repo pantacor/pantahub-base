@@ -1,5 +1,5 @@
 //
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,10 +24,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
 	petname "github.com/dustinkirkland/golang-petname"
+	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -46,41 +47,35 @@ import (
 // @Failure 400 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /devices/tokens [post]
-func (a *App) handlePostTokens(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePostTokens(c *echo.Context) error {
 
-	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
+	jwtPayload, ok := echoutil.Lookup(c, echoutil.KeyJWTPayload)
 	if !ok {
-		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Missing JWT_PAYLOAD", http.StatusBadRequest)
 	}
 
 	var caller interface{}
 	caller, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
 	if !ok {
-		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
 	}
 
 	var authType interface{}
 	authType, ok = jwtPayload.(jwtgo.MapClaims)["type"]
 	if !ok {
-		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
 	}
 
 	if authType != "USER" && authType != "SESSION" {
-		utils.RestErrorWrapper(w, "Can only be updated by User or Session: handle_posttoken", http.StatusBadRequest)
-		return
-
+		return echoutil.RestErrorWrapper(c, "Can only be updated by User or Session: handle_posttoken", http.StatusBadRequest)
 	}
 
 	req := utils.PantahubDevicesJoinToken{}
 
-	err := r.DecodeJsonPayload(&req)
+	err := echoutil.DecodeJsonPayload(c, &req)
 
-	if err != nil && err != rest.ErrJsonPayloadEmpty {
-		utils.RestErrorWrapper(w, "error decoding request: "+err.Error(), http.StatusBadRequest)
-		return
+	if err != nil && err != echoutil.ErrJsonPayloadEmpty {
+		return echoutil.RestErrorWrapper(c, "error decoding request: "+err.Error(), http.StatusBadRequest)
 	}
 
 	req.ID = primitive.NewObjectID()
@@ -99,8 +94,7 @@ func (a *App) handlePostTokens(w rest.ResponseWriter, r *rest.Request) {
 
 	_, err = rand.Read(key)
 	if err != nil {
-		utils.RestErrorWrapper(w, "error generating random token: "+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "error generating random token: "+err.Error(), http.StatusInternalServerError)
 	}
 
 	// calc sha for secret to store in DB
@@ -114,14 +108,13 @@ func (a *App) handlePostTokens(w rest.ResponseWriter, r *rest.Request) {
 	req.TimeModified = req.TimeCreated
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
 	_, err = collection.InsertOne(ctx, &req)
 
 	if err != nil {
-		utils.RestErrorWrapper(w, "error inserting device token into database: "+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "error inserting device token into database: "+err.Error(), http.StatusInternalServerError)
 	}
 
 	// do not return TokenSha, return encoded key
@@ -133,5 +126,5 @@ func (a *App) handlePostTokens(w rest.ResponseWriter, r *rest.Request) {
 		req.OVMode.RootOfTrust = ""
 	}
 
-	w.WriteJson(&req)
+	return echoutil.WriteJSON(c, http.StatusOK, &req)
 }

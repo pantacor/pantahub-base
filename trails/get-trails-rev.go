@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017-2023 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,16 +20,19 @@
 package trails
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
 	"context"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"gitlab.com/pantacor/pantahub-base/utils/querymongo"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -51,43 +54,40 @@ import (
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /trails/{id}/steps/{rev} [get]
-func (a *App) handleGetStep(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetStep(c *echo.Context) error {
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	owner, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in", http.StatusForbidden)
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+	authType, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["type"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in", http.StatusForbidden)
 	}
 
-	trailID := r.PathParam("id")
-	isPublic, err := a.isTrailPublic(r.Context(), trailID)
+	trailID := c.Param("id")
+	isPublic, err := a.isTrailPublic(c.Request().Context(), trailID)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error getting trail public:"+err.Error(), http.StatusInternalServerError)
+		return echoutil.RestErrorWrapper(c, "Error getting trail public:"+err.Error(), http.StatusInternalServerError)
 	}
 
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 	if coll == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
-	asp := querymongo.GetAllQueryPagination(r.URL, filterByKeys)
+	asp := querymongo.GetAllQueryPagination(c.Request().URL, filterByKeys)
 	step := trailmodels.Step{}
-	rev := r.PathParam("rev")
+	rev := c.Param("rev")
 	query := bson.M{
 		"_id":     trailID + "-" + rev,
 		"garbage": bson.M{"$ne": true},
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
 	findOptions := options.FindOne()
@@ -104,17 +104,20 @@ func (a *App) handleGetStep(w rest.ResponseWriter, r *rest.Request) {
 		query["owner"] = owner
 		err = coll.FindOne(ctx, query, findOptions).Decode(&step)
 	} else {
-		utils.RestErrorWrapper(w, "No Access to step", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "No Access to step", http.StatusForbidden)
 	}
 
 	if err != nil {
-		utils.RestErrorWrapper(w, "No access", http.StatusInternalServerError)
-		return
+		// Missing revision is normal (devices poll for the next one): 404, not 500.
+		// The query is owner/device-scoped, so this reveals nothing about other accounts.
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return echoutil.RestErrorWrapper(c, "No step "+rev+" for trail "+trailID, http.StatusNotFound)
+		}
+		return echoutil.RestErrorWrapper(c, "No access", http.StatusInternalServerError)
 	}
 
 	step.Meta = utils.BsonUnquoteMap(&step.Meta)
 	step.State = utils.BsonUnquoteMap(&step.State)
 
-	w.WriteJson(step)
+	return echoutil.WriteJSON(c, http.StatusOK, step)
 }

@@ -1,5 +1,5 @@
 //
-// Copyright 2016-2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,16 +22,18 @@ import (
 	"errors"
 	"log"
 	"math/rand"
+	"net/http"
+	"strings"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/gcapi"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/x/bsonx"
-	"gopkg.in/mgo.v2/bson"
 	"gopkg.in/resty.v1"
 )
 
@@ -52,9 +54,9 @@ func (app *App) EnsureDevicesIndices() error {
 	indexOptions.SetBackground(true)
 
 	index := mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "owner", Value: bsonx.Int32(1)},
-			{Key: "nick", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "owner", Value: int32(1)},
+			{Key: "nick", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -73,8 +75,8 @@ func (app *App) EnsureDevicesIndices() error {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "timemodified", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "timemodified", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -94,8 +96,8 @@ func (app *App) EnsureDevicesIndices() error {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "prn", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "prn", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -115,9 +117,9 @@ func (app *App) EnsureDevicesIndices() error {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "owner", Value: bsonx.Int32(1)},
-			{Key: "garbage", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "owner", Value: int32(1)},
+			{Key: "garbage", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -137,9 +139,9 @@ func (app *App) EnsureDevicesIndices() error {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "device", Value: bsonx.Int32(1)},
-			{Key: "garbage", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "device", Value: int32(1)},
+			{Key: "garbage", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -153,15 +155,22 @@ func (app *App) EnsureDevicesIndices() error {
 	return nil
 }
 
-func handleAuth(w rest.ResponseWriter, r *rest.Request) {
-	jwtClaims := r.Env["JWT_PAYLOAD"]
-	w.WriteJson(jwtClaims)
+func handleAuth(c *echo.Context) error {
+	jwtClaims := c.Get(echoutil.KeyJWTPayload)
+	return echoutil.WriteJSON(c, http.StatusOK, jwtClaims)
 }
 
-// ResolveDeviceIDOrNick : Parse DeviceID Or Nick from the given string and return device objectID
+// ParseDeviceRef reads how callers name a device: its id, its PRN or, when it
+// is neither, its nick. ok is false for a nick.
+func ParseDeviceRef(ref string) (id primitive.ObjectID, ok bool) {
+	id, err := primitive.ObjectIDFromHex(strings.TrimPrefix(strings.TrimSpace(ref), "prn:::devices:/"))
+	return id, err == nil
+}
+
+// ResolveDeviceIDOrNick : Parse DeviceID, PRN Or Nick from the given string and return device objectID
 func (a *App) ResolveDeviceIDOrNick(ctx context.Context, owner string, param string) (*primitive.ObjectID, error) {
-	mgoid, err := primitive.ObjectIDFromHex(param)
-	if err != nil {
+	mgoid, ok := ParseDeviceRef(param)
+	if !ok {
 		return a.LookupDeviceNick(ctx, owner, param)
 	}
 	return &mgoid, nil

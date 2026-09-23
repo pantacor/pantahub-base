@@ -1,4 +1,4 @@
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,13 +26,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/apps"
 	"gitlab.com/pantacor/pantahub-base/auth/authmodels"
 	"gitlab.com/pantacor/pantahub-base/auth/authservices"
 	"gitlab.com/pantacor/pantahub-base/auth/pkceservice"
+	"gitlab.com/pantacor/pantahub-base/auth/redirecturi"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -72,42 +74,38 @@ type implicitTokenRequest struct {
 // @Failure 400 {object} utils.RError "Invalid payload"
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /auth/authorize [post]
-func (app *App) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Request) {
+func (app *App) handlePostAuthorizeToken(c *echo.Context) error {
 	var err error
 
 	// this is the claim of the service authenticating itself
-	caller := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"].(string)
+	caller := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"].(string)
 	if caller == "" {
-		utils.RestErrorWrapper(w, "must be authenticated as user", http.StatusUnauthorized)
-		return
+		return echoutil.RestErrorWrapper(c, "must be authenticated as user", http.StatusUnauthorized)
 	}
 
 	req := implicitTokenRequest{}
-	err = r.DecodeJsonPayload(&req)
+	err = echoutil.DecodeJsonPayload(c, &req)
 
 	if err != nil {
-		utils.RestErrorWrapper(w, "error decoding token request", http.StatusBadRequest)
 		log.Println("WARNING: implicit access token request received with wrong request body: " + err.Error())
-		return
+		return echoutil.RestErrorWrapper(c, "error decoding token request", http.StatusBadRequest)
 	}
 
 	if req.Service == "" {
-		utils.RestErrorWrapper(w, "implicit  access token requested with invalid service", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "implicit  access token requested with invalid service", http.StatusBadRequest)
 	}
 
-	errCode, err := app.validateScopesAndURIs(r.Context(), "", req.Service, req.Scopes, req.RedirectURI)
+	errCode, err := app.validateScopesAndURIs(c.Request().Context(), "", req.Service, req.Scopes, req.RedirectURI, auditContext(c.Request(), "implicit_token"))
 	if err != nil {
-		utils.RestErrorWrapper(w, err.Error(), errCode)
-		return
+		return echoutil.RestErrorWrapper(c, err.Error(), errCode)
 	}
 
-	token := jwtgo.New(jwtgo.GetSigningMethod(app.jwtMiddleware.SigningAlgorithm))
+	token := jwtgo.New(jwtgo.GetSigningMethod(app.jwtConfig.SigningAlgorithm))
 	tokenClaims := token.Claims.(jwtgo.MapClaims)
 
 	// lets get the standard payload for a user and modify it so its a service accesstoken
-	if app.jwtMiddleware.PayloadFunc != nil {
-		for key, value := range app.jwtMiddleware.PayloadFunc(caller) {
+	if app.jwtConfig.PayloadFunc != nil {
+		for key, value := range app.jwtConfig.PayloadFunc(caller) {
 			tokenClaims[key] = value
 		}
 	}
@@ -118,13 +116,12 @@ func (app *App) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Request)
 	tokenClaims["scopes"] = req.Scopes
 	tokenClaims["prn"] = caller
 	tokenClaims["orig_iat"] = time.Now().Unix()
-	tokenClaims["exp"] = time.Now().Add(app.jwtMiddleware.Timeout)
-	tokenString, err := token.SignedString(app.jwtMiddleware.Key)
+	tokenClaims["exp"] = time.Now().Add(app.jwtConfig.Timeout).Unix()
+	tokenString, err := token.SignedString(app.jwtConfig.Key)
 
 	if err != nil {
 		log.Println("WARNING: error signing implicit access token for service / user / scopes(" + req.Service + " / " + caller + " / " + req.Scopes + ")")
-		utils.RestErrorWrapper(w, "error signing implicit access token for service / user / scopes("+req.Service+" / "+caller+" / "+req.Scopes+")", http.StatusUnauthorized)
-		return
+		return echoutil.RestErrorWrapper(c, "error signing implicit access token for service / user / scopes("+req.Service+" / "+caller+" / "+req.Scopes+")", http.StatusUnauthorized)
 	}
 
 	tokenStore := authmodels.TokenStore{
@@ -138,30 +135,28 @@ func (app *App) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Request)
 	collection := app.mongoClient.Database(utils.MongoDb).Collection("pantahub_oauth_accesstokens")
 
 	if collection == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 	// XXX: prototype: for production we need to prevent posting twice!!
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	_, err = collection.InsertOne(
 		ctx,
 		tokenStore,
 	)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error inserting oauth token into database "+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error inserting oauth token into database "+err.Error(), http.StatusInternalServerError)
 	}
 
 	params := url.Values{}
 	params.Add("token_type", "bearer")
 	params.Add("access_token", tokenString)
-	params.Add("expires_in", fmt.Sprintf("%d", app.jwtMiddleware.Timeout/time.Second))
+	params.Add("expires_in", fmt.Sprintf("%d", app.jwtConfig.Timeout/time.Second))
 	params.Add("scope", req.Scopes)
 	params.Add("state", req.State)
 
-	pkceAuthCode := utils.GetCookie(r, "pkce_auth_code")
-	pkceRedirectURI := utils.GetCookie(r, "pkce_redirect_uri")
+	pkceAuthCode := utils.GetCookie(c.Request(), "pkce_auth_code")
+	pkceRedirectURI := utils.GetCookie(c.Request(), "pkce_redirect_uri")
 
 	if req.AuthCode != "" {
 		pkceAuthCode = req.AuthCode
@@ -169,12 +164,12 @@ func (app *App) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Request)
 	}
 
 	if pkceRedirectURI != "" && pkceAuthCode != "" && isValidCallbackURL(pkceRedirectURI) {
-		utils.DeleteCookie(w, r, "pkce_redirect_uri")
-		utils.DeleteCookie(w, r, "pkce_auth_code")
+		utils.DeleteCookie(c.Response(), c.Request(), "pkce_redirect_uri")
+		utils.DeleteCookie(c.Response(), c.Request(), "pkce_auth_code")
 
-		pks, found := pkceservice.GetPKCEState(r.Context(), pkceAuthCode)
+		pks, found := pkceservice.GetPKCEState(c.Request().Context(), pkceAuthCode)
 		if found {
-			pkceservice.UpdatePKCEStateUserID(r.Context(), pks.AuthCode, caller)
+			pkceservice.UpdatePKCEStateUserID(c.Request().Context(), pks.AuthCode, caller)
 		}
 	}
 
@@ -185,7 +180,7 @@ func (app *App) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Request)
 		Scopes:      req.Scopes,
 	}
 
-	w.WriteJson(response)
+	return echoutil.WriteJSON(c, http.StatusOK, response)
 }
 
 // handlePostCode Gets authentication code using OAuth 2.0
@@ -203,33 +198,35 @@ func (app *App) handlePostAuthorizeToken(w rest.ResponseWriter, r *rest.Request)
 // @Failure 400 {object} utils.RError "Invalid payload"
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /auth/code [post]
-func (app *App) handlePostCode(w rest.ResponseWriter, r *rest.Request) {
+func (app *App) handlePostCode(c *echo.Context) error {
 	var err error
 
 	// this is the claim of the service authenticating itself
-	caller := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"].(string)
-	callerType := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"].(string)
+	caller := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"].(string)
+	callerType := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["type"].(string)
 
 	if caller == "" {
-		utils.RestErrorWrapper(w, "must be authenticated as user", http.StatusUnauthorized)
-		return
+		return echoutil.RestErrorWrapper(c, "must be authenticated as user", http.StatusUnauthorized)
 	}
 
 	if callerType != "USER" {
-		utils.RestErrorWrapper(w, "only USER's can request access codes", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "only USER's can request access codes", http.StatusForbidden)
 	}
 
 	req := codeRequest{}
-	err = r.DecodeJsonPayload(&req)
+	err = echoutil.DecodeJsonPayload(c, &req)
 	if err != nil {
-		utils.RestErrorWrapper(w, err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, err.Error(), http.StatusInternalServerError)
 	}
-	errCode, err := app.validateScopesAndURIs(r.Context(), "", req.Service, req.Scopes, req.RedirectURI)
+	// A client that identifies itself with a URL has no application record for
+	// the checks below to run against; its consent is completed separately.
+	if handled, err := app.completeURLClientConsent(c, caller, &req); handled {
+		return err
+	}
+
+	errCode, err := app.validateScopesAndURIs(c.Request().Context(), "", req.Service, req.Scopes, req.RedirectURI, auditContext(c.Request(), "authorization_code"))
 	if err != nil {
-		utils.RestErrorWrapper(w, err.Error(), errCode)
-		return
+		return echoutil.RestErrorWrapper(c, err.Error(), errCode)
 	}
 
 	var mapClaim jwtgo.MapClaims
@@ -237,7 +234,7 @@ func (app *App) handlePostCode(w rest.ResponseWriter, r *rest.Request) {
 	if mapClaim == nil {
 		userAccountPayload := app.getAccountPayload(caller)
 		mapClaim, err = apps.AccessCodePayload(
-			r.Context(),
+			c.Request().Context(),
 			"",
 			req.Service,
 			req.ResponseType,
@@ -245,26 +242,24 @@ func (app *App) handlePostCode(w rest.ResponseWriter, r *rest.Request) {
 			userAccountPayload,
 			app.mongoClient.Database(utils.MongoDb))
 		if err != nil {
-			utils.RestError(w, nil, err.Error(), http.StatusBadRequest)
-			return
+			return echoutil.RestError(c, nil, err.Error(), http.StatusBadRequest)
 		}
 	}
 
-	mapClaim["exp"] = time.Now().Add(time.Minute * 5)
+	mapClaim["exp"] = time.Now().Add(time.Minute * 5).Unix()
 
 	response := codeResponse{}
-	code := jwtgo.New(jwtgo.GetSigningMethod(app.jwtMiddleware.SigningAlgorithm))
+	code := jwtgo.New(jwtgo.GetSigningMethod(app.jwtConfig.SigningAlgorithm))
 	code.Claims = mapClaim
 
-	response.Code, err = code.SignedString(app.jwtMiddleware.Key)
+	response.Code, err = code.SignedString(app.jwtConfig.Key)
 	if err != nil {
-		utils.RestErrorWrapper(w, err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, err.Error(), http.StatusInternalServerError)
 	}
 	response.Scopes = req.Scopes
 
-	pkceAuthCode := utils.GetCookie(r, "pkce_auth_code")
-	pkceRedirectURI := utils.GetCookie(r, "pkce_redirect_uri")
+	pkceAuthCode := utils.GetCookie(c.Request(), "pkce_auth_code")
+	pkceRedirectURI := utils.GetCookie(c.Request(), "pkce_redirect_uri")
 
 	if req.AuthCode != "" {
 		pkceAuthCode = req.AuthCode
@@ -272,13 +267,19 @@ func (app *App) handlePostCode(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if pkceRedirectURI != "" && pkceAuthCode != "" && isValidCallbackURL(pkceRedirectURI) {
-		utils.DeleteCookie(w, r, "pkce_redirect_uri")
-		utils.DeleteCookie(w, r, "pkce_auth_code")
+		utils.DeleteCookie(c.Response(), c.Request(), "pkce_redirect_uri")
+		utils.DeleteCookie(c.Response(), c.Request(), "pkce_auth_code")
 
-		pks, found := pkceservice.GetPKCEState(r.Context(), pkceAuthCode)
-		if found {
-			pkceservice.UpdatePKCEStateUserID(r.Context(), pks.AuthCode, caller)
-			response.Code = pks.AuthCode
+		// Bind only the authorization this consent is about, and hand out a
+		// fresh code: the one in the consent URL was seen by whoever started
+		// the flow.
+		pks, found := pkceservice.GetPKCEState(c.Request().Context(), pkceAuthCode)
+		if found && pks.ClientID == req.Service && pks.RedirectURI == pkceRedirectURI {
+			approved, ok := pkceservice.ApprovePKCEState(c.Request().Context(), pks.AuthCode, caller)
+			if !ok {
+				return echoutil.RestErrorWrapperUser(c, "invalid_grant", "The authorization request was already approved or has expired", http.StatusBadRequest)
+			}
+			response.Code = approved.AuthCode
 		}
 	}
 
@@ -286,19 +287,10 @@ func (app *App) handlePostCode(w rest.ResponseWriter, r *rest.Request) {
 	params.Add("code", response.Code)
 	params.Add("state", req.State)
 	response.RedirectURI = req.RedirectURI + "?" + params.Encode()
-	w.WriteJson(response)
+	return echoutil.WriteJSON(c, http.StatusOK, response)
 }
 
-func containsStringWithPrefix(slice []string, prefix string) bool {
-	for _, v := range slice {
-		if strings.HasPrefix(prefix, v) {
-			return true
-		}
-	}
-	return false
-}
-
-func (app *App) validateScopesAndURIs(ctx context.Context, caller, reqService, reqScopes, reqRedirectURI string) (int, error) {
+func (app *App) validateScopesAndURIs(ctx context.Context, caller, reqService, reqScopes, reqRedirectURI string, audit redirecturi.AuditContext) (int, error) {
 	defaultAccount := false
 	service, _, err := apps.SearchApp(ctx, caller, reqService, app.mongoClient.Database(utils.MongoDb))
 	if err != nil {
@@ -320,6 +312,12 @@ func (app *App) validateScopesAndURIs(ctx context.Context, caller, reqService, r
 		defaultAccount = true
 	}
 
+	// A self-registered client only gets resource-bound tokens, which these
+	// flows do not issue.
+	if service.Dynamic {
+		return http.StatusBadRequest, errors.New("error access token failed, this client has to use the oauth authorization code flow with a resource")
+	}
+
 	// Validate scope only when the app comes from database
 	if !defaultAccount {
 		scopes := strings.Fields(reqScopes)
@@ -329,9 +327,13 @@ func (app *App) validateScopesAndURIs(ctx context.Context, caller, reqService, r
 		}
 	}
 
+	// The redirect target must sit on a callback URL registered on the service.
+	// An app with no registered callbacks fails closed rather than skipping the
+	// check.
 	if reqRedirectURI != "" {
-		if service.RedirectURIs != nil && !containsStringWithPrefix(service.RedirectURIs, reqRedirectURI) {
-			return http.StatusBadRequest, errors.New("error implicit access token failed; redirect URL does not match registered service")
+		audit.ClientID = reqService
+		if err := redirecturi.Validate(service.RedirectURIs, reqRedirectURI, audit); err != nil {
+			return http.StatusBadRequest, err
 		}
 	}
 

@@ -1,5 +1,5 @@
 //
-// Copyright 2019  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,10 +20,12 @@ import (
 	"context"
 	"crypto/sha256"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -108,7 +110,11 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	objClaims := tok.Token.Claims.(*objects.ObjectAccessClaims)
-	storageID := objClaims.Audience
+	storageID, ok := objClaims.StorageID()
+	if !ok {
+		utils.HttpErrorWrapper(w, "ERROR: token does not carry exactly one audience", http.StatusForbidden)
+		return
+	}
 	p, _ := url.Parse(path.Join(dirName, storageID))
 	r.URL = r.URL.ResolveReference(p)
 	defer r.Body.Close()
@@ -130,7 +136,31 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		w.Header().Add("Content-Disposition", "attachment; filename=\""+objClaims.DispositionName+"\"")
-		w.Header().Add("Content-Length", fmt.Sprintf("%d", objClaims.Size))
+		w.Header().Add("Accept-Ranges", "bytes")
+
+		// forward the client's Range header (if any) to S3 so that partial
+		// downloads can be resumed by the client after a network disruption
+		rangeHeader := r.Header.Get("Range")
+
+		// The url is always one this service just minted: every caller passes a
+		// presigned URL from provider.DownloadURL, whose host and scheme come
+		// from the configured S3 endpoint. The only caller-influenced part is
+		// the object key, which arrives in a claim of a token this service
+		// signed, is narrowed by MakeLocalS3PathForName and then reduced to a
+		// single path segment by path.Base -- so the request cannot be aimed
+		// at an arbitrary host.
+		requestObject := func(url string) (*http.Response, error) {
+			//#nosec G704 -- presigned URL from the configured S3 endpoint, host not caller-controlled
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+			if err != nil {
+				return nil, err
+			}
+			if rangeHeader != "" {
+				req.Header.Set("Range", rangeHeader)
+			}
+			//#nosec G704 -- see above: the URL is server-generated
+			return http.DefaultClient.Do(req)
+		}
 
 		var s3resp *http.Response
 		downloadUrl := ""
@@ -145,7 +175,7 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			s3resp, err = http.Get(downloadUrl)
+			s3resp, err = requestObject(downloadUrl)
 			if err != nil {
 				msg := fmt.Sprintf("ERROR: requesting download file, %v\n", err)
 				utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
@@ -164,7 +194,7 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 
-				s3resp, err = http.Get(downloadUrl)
+				s3resp, err = requestObject(downloadUrl)
 				if err != nil {
 					msg := fmt.Sprintf("ERROR: requesting download file, %v\n", err)
 					utils.HttpErrorWrapper(w, msg, http.StatusInternalServerError)
@@ -177,18 +207,42 @@ func (s *S3FileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				} else {
 					msg := fmt.Sprintf("ERROR: unexpected response from s3 server, status code %v\n", s3resp.StatusCode)
 					utils.LogError(msg, downloadUrl, s3resp.StatusCode)
+					_ = s3resp.Body.Close()
 				}
 			}
 		}
 
-		if s3resp.StatusCode != http.StatusOK {
+		if s3resp.StatusCode != http.StatusOK && s3resp.StatusCode != http.StatusPartialContent {
 			msg := fmt.Sprintf("ERROR: unexpected response from s3 server, status code %v\ndownloadUrl: %s\n", s3resp.StatusCode, downloadUrl)
 			utils.HttpErrorWrapper(w, msg, s3resp.StatusCode)
+			_ = s3resp.Body.Close()
 			return
 		}
+		defer s3resp.Body.Close()
 
 		w.Header().Add("PantahubCallTraceRegion", fmt.Sprintf("api=%s; data:%s", apiRegion, region))
-		io.CopyN(w, s3resp.Body, objClaims.Size)
+
+		// propagate the range response from S3 so the client knows it got
+		// a partial response and can resume from where it left off
+		if cr := s3resp.Header.Get("Content-Range"); cr != "" {
+			w.Header().Set("Content-Range", cr)
+		}
+
+		contentLength := s3resp.ContentLength
+		if contentLength < 0 {
+			contentLength = objClaims.Size
+		}
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", contentLength))
+
+		if s3resp.StatusCode == http.StatusPartialContent {
+			w.WriteHeader(http.StatusPartialContent)
+		}
+
+		// The response is already committed, so a short copy cannot be turned
+		// into an error status; log it so a truncated download is visible.
+		if _, err := io.Copy(w, s3resp.Body); err != nil {
+			log.Printf("WARNING: streaming object to client failed: %v", err)
+		}
 		return
 	}
 
@@ -366,8 +420,16 @@ func parseS3ConfigFromK8s() error {
 
 	response := map[string]interface{}{}
 
+	caCert, err := os.ReadFile("/run/secrets/kubernetes.io/serviceaccount/ca.crt")
+	if err != nil {
+		return fmt.Errorf("k8s CA file can't be read: %s", err)
+	}
+	caPool := x509.NewCertPool()
+	if !caPool.AppendCertsFromPEM(caCert) {
+		return fmt.Errorf("failed to parse k8s CA certificate")
+	}
 	client := resty.New()
-	client.SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	client.SetTLSClientConfig(&tls.Config{RootCAs: caPool})
 	res, err := client.R().
 		SetHeader("Authorization", "Bearer "+string(token)).
 		Get(fmt.Sprintf("%s/api/v1/nodes/%s", utils.GetEnv(utils.EnvK8sApiUrl), utils.GetEnv(utils.EnvK8sNodeName)))

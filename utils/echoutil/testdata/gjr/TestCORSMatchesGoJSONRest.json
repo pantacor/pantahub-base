@@ -1,0 +1,164 @@
+{
+  "TestCORSMatchesGoJSONRest/CORS_Origin_null|gjr": {
+    "Status": 200,
+    "Body": "{\"ok\":\"yes\"}",
+    "Headers": {
+      "Access-Control-Allow-Credentials": [
+        "true"
+      ],
+      "Access-Control-Allow-Origin": [
+        "null"
+      ],
+      "Access-Control-Expose-Headers": [
+        "X-Custom-Exposed"
+      ],
+      "Content-Type": [
+        "application/json; charset=utf-8"
+      ]
+    }
+  },
+  "TestCORSMatchesGoJSONRest/CORS_simple_GET|gjr": {
+    "Status": 200,
+    "Body": "{\"ok\":\"yes\"}",
+    "Headers": {
+      "Access-Control-Allow-Credentials": [
+        "true"
+      ],
+      "Access-Control-Allow-Origin": [
+        "https://hub.example.com"
+      ],
+      "Access-Control-Expose-Headers": [
+        "X-Custom-Exposed"
+      ],
+      "Content-Type": [
+        "application/json; charset=utf-8"
+      ]
+    }
+  },
+  "TestCORSMatchesGoJSONRest/OPTIONS_without_request_method_is_not_a_preflight|gjr": {
+    "Status": 405,
+    "Body": "{\"Error\":\"Method not allowed\"}",
+    "Headers": {
+      "Access-Control-Allow-Credentials": [
+        "true"
+      ],
+      "Access-Control-Allow-Origin": [
+        "https://hub.example.com"
+      ],
+      "Access-Control-Expose-Headers": [
+        "X-Custom-Exposed"
+      ],
+      "Content-Type": [
+        "application/json; charset=utf-8"
+      ]
+    }
+  },
+  "TestCORSMatchesGoJSONRest/not_CORS:_Origin_on_the_same_host|gjr": {
+    "Status": 200,
+    "Body": "{\"ok\":\"yes\"}",
+    "Headers": {
+      "Content-Type": [
+        "application/json; charset=utf-8"
+      ]
+    }
+  },
+  "TestCORSMatchesGoJSONRest/not_CORS:_no_Origin|gjr": {
+    "Status": 200,
+    "Body": "{\"ok\":\"yes\"}",
+    "Headers": {
+      "Content-Type": [
+        "application/json; charset=utf-8"
+      ]
+    }
+  },
+  "TestCORSMatchesGoJSONRest/preflight_allowed|gjr": {
+    "Status": 200,
+    "Body": "",
+    "Headers": {
+      "Access-Control-Allow-Credentials": [
+        "true"
+      ],
+      "Access-Control-Allow-Headers": [
+        "Accept,Content-Type,Authorization,X-Request-Id"
+      ],
+      "Access-Control-Allow-Methods": [
+        "GET,POST,OPTIONS"
+      ],
+      "Access-Control-Allow-Origin": [
+        "https://hub.example.com"
+      ],
+      "Access-Control-Max-Age": [
+        "3600"
+      ],
+      "Content-Type": [
+        "application/json; charset=utf-8"
+      ]
+    }
+  },
+  "TestCORSMatchesGoJSONRest/preflight_for_a_GET-only_route_with_PUT|gjr": {
+    "Status": 403,
+    "Body": "{\"Error\":\"Invalid Preflight Request\"}",
+    "Headers": {
+      "Content-Type": [
+        "application/json; charset=utf-8"
+      ]
+    }
+  },
+  "TestCORSMatchesGoJSONRest/preflight_header_outside_the_list_is_rejected|gjr": {
+    "Status": 403,
+    "Body": "{\"Error\":\"Invalid Preflight Request\"}",
+    "Headers": {
+      "Content-Type": [
+        "application/json; charset=utf-8"
+      ]
+    }
+  },
+  "TestCORSMatchesGoJSONRest/preflight_headers_split_across_lines|gjr": {
+    "Status": 200,
+    "Body": "",
+    "Headers": {
+      "Access-Control-Allow-Credentials": [
+        "true"
+      ],
+      "Access-Control-Allow-Headers": [
+        "Accept,Content-Type,Authorization,X-Request-Id"
+      ],
+      "Access-Control-Allow-Methods": [
+        "GET,POST,OPTIONS"
+      ],
+      "Access-Control-Allow-Origin": [
+        "https://hub.example.com"
+      ],
+      "Access-Control-Max-Age": [
+        "3600"
+      ],
+      "Content-Type": [
+        "application/json; charset=utf-8"
+      ]
+    }
+  },
+  "TestCORSMatchesGoJSONRest/preflight_method_normalised|gjr": {
+    "Status": 200,
+    "Body": "",
+    "Headers": {
+      "Access-Control-Allow-Credentials": [
+        "true"
+      ],
+      "Access-Control-Allow-Headers": [
+        "Accept,Content-Type,Authorization,X-Request-Id"
+      ],
+      "Access-Control-Allow-Methods": [
+        "GET,POST,OPTIONS"
+      ],
+      "Access-Control-Allow-Origin": [
+        "https://hub.example.com"
+      ],
+      "Access-Control-Max-Age": [
+        "3600"
+      ],
+      "Content-Type": [
+        "application/json; charset=utf-8"
+      ]
+    }
+  }
+}

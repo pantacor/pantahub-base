@@ -1,3 +1,17 @@
+// Copyright (c) 2017-2026 Pantacor Ltd.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+
 package models
 
 // OVMode specifies the type of verification used for device ownership, it could be claim, via tls, manual
@@ -89,6 +103,20 @@ func ParseStatus(s string) OvModeStatus {
 	default:
 		return Unknown
 	}
+}
+
+// NeedsVerification reports whether an OVMode still gates the device: the
+// mode requires a verification step (TLS handshake or manual owner acceptance)
+// and that step has not completed yet. Devices in this state get restricted
+// credentials until the owner (manual) or the device itself (TLS) verifies.
+func (o *OVModeExtension) NeedsVerification() bool {
+	if o == nil {
+		return false
+	}
+	if !o.Mode.IsTLS() && !o.Mode.IsManual() {
+		return false
+	}
+	return o.Status != Completed && o.Status != ValidationNotNeeded
 }
 
 type OVModeExtension struct {

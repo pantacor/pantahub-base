@@ -1,0 +1,53 @@
+# TLS ingress for the local dev stack (docker compose --profile tls).
+#
+# Ingress-style routing: one HTTPS entrypoint on :443, SNI-routed per
+# hostname to the ui dev server (on the host) and the api container.
+# HUB_TLS_*_HOST values are written into .env.local by
+# ../tls-local.sh (a <lan-ip>.sslip.io name pair, so phones on the same
+# network resolve them too); hub.localhost aliases work on the dev machine
+# itself. The certificate is minted by mkcert (the "local issuer") into
+# ../.certs (this repo's own, mounted at /certs) and covers all five names.
+{
+	admin off
+	auto_https off
+}
+
+https://{$HUB_TLS_UI_HOST}:443, https://hub.localhost:443 {
+	tls /certs/hub.pem /certs/hub-key.pem
+	reverse_proxy host.docker.internal:3000
+}
+
+https://{$HUB_TLS_API_HOST}:443, https://api.hub.localhost:443 {
+	tls /certs/hub.pem /certs/hub-key.pem
+	reverse_proxy base:12365
+}
+
+https://{$HUB_TLS_PVR_HOST}:443, https://pvr.hub.localhost:443 {
+	tls /certs/hub.pem /certs/hub-key.pem
+	reverse_proxy pvr:12367
+}
+
+https://{$HUB_TLS_FLEET_HOST}:443, https://fleet.hub.localhost:443 {
+	tls /certs/hub.pem /certs/hub-key.pem
+	# the fleet app publishes 9090 on the host (separate compose project)
+	reverse_proxy host.docker.internal:9090
+}
+
+https://{$HUB_TLS_MANAGER_HOST}:443, https://manager.hub.localhost:443 {
+	tls /certs/hub.pem /certs/hub-key.pem
+	# hubmanager dev stack (separate compose project): the Go server publishes
+	# HUB_TLS_MANAGER_PORT (default 8091) and the vite dev server
+	# HUB_TLS_MANAGER_VITE_PORT (default 5174) on the host. The Go template loads its
+	# dev assets from this same origin (VITE_DEV_URL), so vite's module paths
+	# and its HMR websocket are split off here; everything else is the app.
+	@vite {
+		path /@vite/* /@react-refresh /@id/* /@fs/* /src/* /node_modules/*
+	}
+	@vitews {
+		header Connection *Upgrade*
+		header Upgrade websocket
+	}
+	reverse_proxy @vite host.docker.internal:{$HUB_TLS_MANAGER_VITE_PORT:5174}
+	reverse_proxy @vitews host.docker.internal:{$HUB_TLS_MANAGER_VITE_PORT:5174}
+	reverse_proxy host.docker.internal:{$HUB_TLS_MANAGER_PORT:8091}
+}

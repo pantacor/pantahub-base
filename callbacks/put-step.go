@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017-2023 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,9 +28,10 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 )
 
 // PublicStep is a structure of a public step
@@ -59,72 +60,64 @@ type PublicStep struct {
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /callbacks/steps/{id} [put]
-func (a *App) handlePutStep(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePutStep(c *echo.Context) error {
 	var step trailmodels.Step
-	stepID := r.PathParam("id")
+	stepID := c.Param("id")
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
 	if collection == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	err := collection.FindOne(ctx,
 		bson.M{
 			"_id": stepID,
 		}).Decode(&step)
 	if err == mongo.ErrNoDocuments {
-		utils.RestErrorWrapper(w, "Not Found", http.StatusNotFound)
-		return
+		return echoutil.RestErrorWrapper(c, "Not Found", http.StatusNotFound)
 	} else if err != nil {
 		log.Print(err.Error())
-		utils.RestErrorWrapper(w, "Internal Error:"+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Internal Error:"+err.Error(), http.StatusInternalServerError)
 	}
 
 	var publicStep PublicStep
 	var hasPublicStep bool
 
-	err = a.FindPublicStep(r.Context(), step.ID, &publicStep)
+	err = a.FindPublicStep(c.Request().Context(), step.ID, &publicStep)
 	if err == nil {
 		hasPublicStep = true
 	} else if err == mongo.ErrNoDocuments {
 		hasPublicStep = false
 	} else if err != nil {
-		utils.RestErrorWrapper(w, err.Error(), http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, err.Error(), http.StatusForbidden)
 	}
 
-	timeModifiedStr, ok := r.URL.Query()["timemodified"]
+	timeModifiedStr, ok := c.Request().URL.Query()["timemodified"]
 	if ok {
 		timeModified, err := time.Parse(time.RFC3339Nano, timeModifiedStr[0])
 		if err != nil {
-			utils.RestErrorWrapper(w, "Error Parsing timemodified:"+err.Error(), http.StatusForbidden)
-			return
+			return echoutil.RestErrorWrapper(c, "Error Parsing timemodified:"+err.Error(), http.StatusForbidden)
 		}
 		if hasPublicStep && publicStep.TimeModified.After(timeModified) {
-			w.WriteHeader(http.StatusNotModified)
-			return
+			return echoutil.WriteHeader(c, http.StatusNotModified)
 		}
 	}
 
-	err = a.SavePublicStep(r.Context(), &step, &publicStep)
+	err = a.SavePublicStep(c.Request().Context(), &step, &publicStep)
 	if err != nil {
-		utils.RestErrorWrapper(w, err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, err.Error(), http.StatusInternalServerError)
 	}
 
 	// Mark the flag "mark_public_processed" as TRUE
-	err = a.MarkStepAsProcessed(r.Context(), step.ID)
+	err = a.MarkStepAsProcessed(c.Request().Context(), step.ID)
 	if err != nil {
-		utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, err.Error(), http.StatusBadRequest)
 	}
 
-	w.WriteJson(publicStep)
+	return echoutil.WriteJSON(c, http.StatusOK, publicStep)
 }
 
 // SavePublicStep is used to save public step

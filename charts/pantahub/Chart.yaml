@@ -1,0 +1,10 @@
+apiVersion: v2
+name: pantahub
+description: >-
+  Pantahub development cluster: pantahub-base API plus its full backing stack
+  (mongo replica set, kafka + connect + schema-registry, elasticsearch,
+  fluentd, gc, pvr, phs, www, localstack). Kubernetes translation of
+  docker-compose.yml, intended for dev/test clusters.
+type: application
+version: 0.1.0
+appVersion: develop

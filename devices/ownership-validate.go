@@ -1,5 +1,5 @@
 //
-// Copyright 2025  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,14 +21,14 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
-	"log"
 	"net/http"
 	"net/url"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"gitlab.com/pantacor/pantahub-base/utils/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -38,48 +38,44 @@ import (
 // handleValidateOwnership validates the ownership of a device based on its OVMode.
 // @Summary Validates device ownership based on OVMode.
 // @Description Validates device ownership based on the configured OVMode (TLS, Manual, etc.).
-// @Description If OVMode is TLS, the client must use the 'root_of_trust' as the client TLS connection.
+// @Description If OVMode is TLS, the device itself must call this endpoint over a client TLS
+// @Description connection whose certificate chains to the token's 'root_of_trust'.
+// @Description If OVMode is manual, the device owner (a USER token) calls this endpoint to
+// @Description accept the device; the device itself may call it to poll its current status.
 // @Accept  json
 // @Produce  json
 // @Security ApiKeyAuth
 // @Tags devices
+// @Param id path string true "Device ID"
 // @Success 200 {object} models.OVModeExtension "Ownership validation successful. Returns OVMode details."
 // @Failure 400 {object} utils.RError "Invalid request or parameters."
+// @Failure 403 {object} utils.RError "Caller is not allowed to verify this device."
 // @Failure 404 {object} utils.RError "Device not found or ownership not verifiable."
 // @Failure 500 {object} utils.RError "Internal server error."
-// @Router /devices/{id}/ownership/validate [get]
-func (a *App) handleValidateOwnership(w rest.ResponseWriter, r *rest.Request) {
-	for name, values := range r.Header {
-		for _, value := range values {
-			log.Printf("%s: %s", name, value)
-		}
-	}
-	id := r.PathParam("id")
-	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
+// @Router /devices/{id}/ownership/validate [post]
+func (a *App) handleValidateOwnership(c *echo.Context) error {
+	id := c.Param("id")
+	jwtPayload, ok := echoutil.Lookup(c, echoutil.KeyJWTPayload)
 	if !ok {
-		utils.RestErrorWrapperUser(w, "JWT Payload is not valid", "JWT Payload is not valid", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapperUser(c, "JWT Payload is not valid", "JWT Payload is not valid", http.StatusBadRequest)
 	}
 
 	if id == "" {
-		utils.RestErrorWrapperUser(w, "Invalid device ID", "Invalid device ID", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapperUser(c, "Invalid device ID", "Invalid device ID", http.StatusBadRequest)
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
-		utils.RestErrorWrapperUser(w, "Error with Database connectivity", "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapperUser(c, "Error with Database connectivity", "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 5*time.Second)
 	defer cancel()
 
 	device := Device{}
 	mDeviceId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		utils.RestErrorWrapperUser(w, "Invalid device ID format", "Invalid device ID format", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapperUser(c, "Invalid device ID format", "Invalid device ID format", http.StatusBadRequest)
 	}
 	err = collection.FindOne(
 		ctx,
@@ -88,54 +84,46 @@ func (a *App) handleValidateOwnership(w rest.ResponseWriter, r *rest.Request) {
 
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			utils.RestErrorWrapperUser(w, "Device not found", "Device not found", http.StatusNotFound)
+			return echoutil.RestErrorWrapperUser(c, "Device not found", "Device not found", http.StatusNotFound)
 		} else {
-			utils.RestErrorWrapperUser(w, err.Error(), "Error finding device: "+err.Error(), http.StatusInternalServerError)
+			return echoutil.RestErrorWrapperUser(c, err.Error(), "Error finding device: "+err.Error(), http.StatusInternalServerError)
 		}
-		return
 	}
 
 	if device.OVMode == nil {
-		a.noOvm(w, r, ctx, &device, jwtPayload)
-		return
+		return a.noOvm(c, ctx, &device, jwtPayload)
 	}
 
 	if device.OVMode.Status == models.ValidationNotNeeded || device.OVMode.Status == models.Completed {
-		w.WriteJson(device.OVMode)
-		return
+		return echoutil.WriteJSON(c, http.StatusOK, device.OVMode)
 	}
 
 	switch device.OVMode.Mode {
 	case models.ManualVerification:
-		a.validateManualOwnership(w, r, ctx, &device, jwtPayload)
-		return
+		return a.validateManualOwnership(c, ctx, &device, jwtPayload)
 	case models.TLSVerification:
-		a.validateTLSOwnership(w, r, ctx, &device, jwtPayload)
-		return
+		return a.validateTLSOwnership(c, ctx, &device, jwtPayload)
 	default:
-		utils.RestErrorWrapperUser(w, "Unsupported OVMode", "Unsupported OVMode", http.StatusBadRequest)
+		return echoutil.RestErrorWrapperUser(c, "Unsupported OVMode", "Unsupported OVMode", http.StatusBadRequest)
 	}
 }
 
-func (a *App) noOvm(w rest.ResponseWriter, r *rest.Request, ctx context.Context, device *Device, jwtPayload any) {
+func (a *App) noOvm(c *echo.Context, ctx context.Context, device *Device, jwtPayload any) error {
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
 	jwtPayloadIface, ok := jwtPayload.(jwtgo.MapClaims)
 	if !ok {
-		utils.RestErrorWrapperUser(w, "JWT Payload is not valid", "JWT Payload is not valid", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapperUser(c, "JWT Payload is not valid", "JWT Payload is not valid", http.StatusBadRequest)
 	}
 
 	authID, ok := jwtPayloadIface["prn"].(string)
 	if !ok {
-		utils.RestErrorWrapper(w, "You need to be logged in.", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in.", http.StatusForbidden)
 	}
 
 	tokenType, ok := jwtPayloadIface["type"].(string)
 	if !ok {
-		utils.RestErrorWrapperUser(w, "JWT Type is not valid", "JWT Type is not valid", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapperUser(c, "JWT Type is not valid", "JWT Type is not valid", http.StatusBadRequest)
 	}
 
 	if device.OVMode == nil && device.Owner != "" && tokenType == "DEVICE" && device.Prn == authID {
@@ -145,26 +133,29 @@ func (a *App) noOvm(w rest.ResponseWriter, r *rest.Request, ctx context.Context,
 		}
 
 		if device.OwnershipUnverify {
-			collection.UpdateOne(
+			// Reporting the new ownership state to the caller while the write
+			// that persists it silently failed would leave the two disagreeing.
+			if _, err := collection.UpdateOne(
 				ctx,
 				bson.M{"prn": device.Prn},
 				bson.M{"$set": bson.M{"ovmode": device.OVMode}},
-			)
+			); err != nil {
+				return echoutil.RestErrorWrapper(c, "Error updating device ownership mode: "+err.Error(), http.StatusInternalServerError)
+			}
 		}
-		w.WriteJson(device.OVMode)
-		return
+		return echoutil.WriteJSON(c, http.StatusOK, device.OVMode)
 	}
 
 	if device.OVMode == nil {
-		utils.RestErrorWrapperUser(w, "Device is not claimed yet", "Device is not claimed yet", http.StatusNotFound)
-		return
+		return echoutil.RestErrorWrapperUser(c, "Device is not claimed yet", "Device is not claimed yet", http.StatusNotFound)
 	}
+
+	return nil
 }
 
-func (a *App) validateTLSOwnership(w rest.ResponseWriter, r *rest.Request, ctx context.Context, device *Device, jwtPayload any) {
+func (a *App) validateTLSOwnership(c *echo.Context, ctx context.Context, device *Device, jwtPayload any) error {
 	if device.OVMode == nil {
-		utils.RestErrorWrapperUser(w, "Device does not have OVMode configured", "Device does not have OVMode configured", http.StatusNotFound)
-		return
+		return echoutil.RestErrorWrapperUser(c, "Device does not have OVMode configured", "Device does not have OVMode configured", http.StatusNotFound)
 	}
 
 	deviceTokensCollection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
@@ -172,60 +163,50 @@ func (a *App) validateTLSOwnership(w rest.ResponseWriter, r *rest.Request, ctx c
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	jwtPayloadIface, ok := jwtPayload.(jwtgo.MapClaims)
 	if !ok {
-		utils.RestErrorWrapperUser(w, "JWT Payload is not valid", "JWT Payload is not valid", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapperUser(c, "JWT Payload is not valid", "JWT Payload is not valid", http.StatusBadRequest)
 	}
 
 	tokenType, ok := jwtPayloadIface["type"].(string)
 	if !ok {
-		utils.RestErrorWrapperUser(w, "JWT Type is not valid", "JWT Type is not valid", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapperUser(c, "JWT Type is not valid", "JWT Type is not valid", http.StatusBadRequest)
 	}
 
 	authID, ok := jwtPayloadIface["prn"].(string)
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in.", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in.", http.StatusForbidden)
 	}
 
 	if tokenType != "DEVICE" {
-		utils.RestErrorWrapperUser(w, "Device can only validate ownership with TLS mode", "Device can only validate ownership with TLS mode", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapperUser(c, "Device can only validate ownership with TLS mode", "Device can only validate ownership with TLS mode", http.StatusBadRequest)
 	}
 
 	if authID != device.Prn {
-		utils.RestErrorWrapperUser(w, "Device can only validate ownership of it self", "Device can only validate ownership of it self", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapperUser(c, "Device can only validate ownership of it self", "Device can only validate ownership of it self", http.StatusBadRequest)
 	}
 
 	if device.OVMode.Mode.IsTLS() && (device.OVMode.TokenID == "" && device.OVMode.RootOfTrust == "") {
-		utils.RestErrorWrapperUser(w, "Root of trust is not configured for TLS OVMode", "Root of trust is not configured for TLS OVMode", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapperUser(c, "Root of trust is not configured for TLS OVMode", "Root of trust is not configured for TLS OVMode", http.StatusInternalServerError)
 	}
 
-	sslClientCert := r.Header.Get("ssl-client-cert")
+	sslClientCert := c.Request().Header.Get("ssl-client-cert")
 	if sslClientCert == "" {
-		utils.RestErrorWrapperUser(w, "ssl-client-cert header is required for TLS OVMode", "ssl-client-cert header is required for TLS OVMode", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapperUser(c, "ssl-client-cert header is required for TLS OVMode", "ssl-client-cert header is required for TLS OVMode", http.StatusBadRequest)
 	}
 
 	decodedCert, err := url.QueryUnescape(sslClientCert)
 	if err != nil {
-		utils.RestErrorWrapperUser(w, err.Error(), "failed to URL decode ssl-client-cert: "+err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapperUser(c, err.Error(), "failed to URL decode ssl-client-cert: "+err.Error(), http.StatusBadRequest)
 	}
 
 	block, _ := pem.Decode([]byte(decodedCert))
 	if block == nil {
-		utils.RestErrorWrapperUser(w, "failed to decode PEM block from ssl-client-cert", "failed to decode PEM block from ssl-client-cert", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapperUser(c, "failed to decode PEM block from ssl-client-cert", "failed to decode PEM block from ssl-client-cert", http.StatusBadRequest)
 	}
 
 	cert, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
-		utils.RestErrorWrapperUser(w, err.Error(), "failed to parse certificate: "+err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapperUser(c, err.Error(), "failed to parse certificate: "+err.Error(), http.StatusBadRequest)
 	}
 
 	rootOfTrust := ""
@@ -234,19 +215,17 @@ func (a *App) validateTLSOwnership(w rest.ResponseWriter, r *rest.Request, ctx c
 	} else {
 		tokenID, err := primitive.ObjectIDFromHex(device.OVMode.TokenID)
 		if err != nil {
-			utils.RestErrorWrapperUser(w, err.Error(), "failed to parse TokenID to ObjectID: "+err.Error(), http.StatusInternalServerError)
-			return
+			return echoutil.RestErrorWrapperUser(c, err.Error(), "failed to parse TokenID to ObjectID: "+err.Error(), http.StatusInternalServerError)
 		}
 		query := map[string]interface{}{"_id": tokenID}
 		deviceToken := utils.PantahubDevicesJoinToken{}
-		err = deviceTokensCollection.FindOne(r.Context(), query).Decode(&deviceToken)
+		err = deviceTokensCollection.FindOne(c.Request().Context(), query).Decode(&deviceToken)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
-				utils.RestErrorWrapperUser(w, "Device token not found", "Device token not found for RootOfTrust", http.StatusNotFound)
+				return echoutil.RestErrorWrapperUser(c, "Device token not found", "Device token not found for RootOfTrust", http.StatusNotFound)
 			} else {
-				utils.RestErrorWrapperUser(w, err.Error(), "Error finding device token for RootOfTrust: "+err.Error(), http.StatusInternalServerError)
+				return echoutil.RestErrorWrapperUser(c, err.Error(), "Error finding device token for RootOfTrust: "+err.Error(), http.StatusInternalServerError)
 			}
-			return
 		}
 		rootOfTrust = deviceToken.OVMode.RootOfTrust
 	}
@@ -254,8 +233,7 @@ func (a *App) validateTLSOwnership(w rest.ResponseWriter, r *rest.Request, ctx c
 	// Load the root certificate (RootOfTrust)
 	decodedRootOfTrustBytes, err := base64.StdEncoding.DecodeString(rootOfTrust)
 	if err != nil {
-		utils.RestErrorWrapperUser(w, err.Error(), "failed to decode RootOfTrust from base64: "+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapperUser(c, err.Error(), "failed to decode RootOfTrust from base64: "+err.Error(), http.StatusInternalServerError)
 	}
 	certPool := x509.NewCertPool()
 
@@ -271,22 +249,19 @@ func (a *App) validateTLSOwnership(w rest.ResponseWriter, r *rest.Request, ctx c
 		if block.Type == "CERTIFICATE" {
 			caCert, err := x509.ParseCertificate(block.Bytes)
 			if err != nil {
-				utils.RestErrorWrapperUser(w, err.Error(), "failed to parse a certificate from CA chain", http.StatusBadRequest)
-				return
+				return echoutil.RestErrorWrapperUser(c, err.Error(), "failed to parse a certificate from CA chain", http.StatusBadRequest)
 			} else {
 				certPool.AddCert(caCert)
 				foundAnyCA = true
 			}
 		} else {
-			utils.RestErrorWrapperUser(w, "invalid root of trust format", "non-certificate PEM block of type '"+block.Type+"' found in CA file.", http.StatusBadRequest)
-			return
+			return echoutil.RestErrorWrapperUser(c, "invalid root of trust format", "non-certificate PEM block of type '"+block.Type+"' found in CA file.", http.StatusBadRequest)
 		}
 		currentPEMBytes = rest
 	}
 
 	if !foundAnyCA {
-		utils.RestErrorWrapperUser(w, "root of trust contains no valid certificates", "failed to find any valid CERTIFICATE PEM block in CA file (RootOfTrust)", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapperUser(c, "root of trust contains no valid certificates", "failed to find any valid CERTIFICATE PEM block in CA file (RootOfTrust)", http.StatusInternalServerError)
 	}
 
 	opts := x509.VerifyOptions{
@@ -294,8 +269,7 @@ func (a *App) validateTLSOwnership(w rest.ResponseWriter, r *rest.Request, ctx c
 	}
 
 	if _, err := cert.Verify(opts); err != nil {
-		utils.RestErrorWrapperUser(w, err.Error(), "failed to verify certificate: "+err.Error(), http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapperUser(c, err.Error(), "failed to verify certificate: "+err.Error(), http.StatusForbidden)
 	}
 
 	device.OVMode.Status = models.Completed
@@ -308,51 +282,68 @@ func (a *App) validateTLSOwnership(w rest.ResponseWriter, r *rest.Request, ctx c
 	)
 
 	if err != nil {
-		utils.RestErrorWrapperUser(w, err.Error(), "failed to update device status: "+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapperUser(c, err.Error(), "failed to update device status: "+err.Error(), http.StatusInternalServerError)
 	}
 
 	device.OVMode.RootOfTrust = ""
 
-	w.WriteJson(device.OVMode)
+	return echoutil.WriteJSON(c, http.StatusOK, device.OVMode)
 }
 
-func (a *App) validateManualOwnership(w rest.ResponseWriter, r *rest.Request, ctx context.Context, device *Device, jwtPayload any) {
+// validateManualOwnership handles the manual OVMode. Only the device owner
+// (a USER token whose prn matches device.Owner) can complete the verification;
+// the device itself may call the endpoint to poll its status, which it needs
+// because its credentials are restricted until the owner accepts it.
+func (a *App) validateManualOwnership(c *echo.Context, ctx context.Context, device *Device, jwtPayload any) error {
 	if device.OVMode == nil {
-		utils.RestErrorWrapperUser(w, "Device does not have OVMode configured", "Device does not have OVMode configured", http.StatusNotFound)
-		return
+		return echoutil.RestErrorWrapperUser(c, "Device does not have OVMode configured", "Device does not have OVMode configured", http.StatusNotFound)
+	}
+
+	claims, ok := jwtPayload.(jwtgo.MapClaims)
+	if !ok {
+		return echoutil.RestErrorWrapperUser(c, "JWT Payload is not valid", "JWT Payload is not valid", http.StatusBadRequest)
+	}
+
+	callerPrn, ok := claims["prn"].(string)
+	if !ok {
+		return echoutil.RestErrorWrapperUser(c, "Caller PRN not found in JWT payload", "Caller PRN not found in JWT payload", http.StatusBadRequest)
+	}
+
+	tokenType, _ := claims["type"].(string)
+
+	// The device polling its own status: report it, never change it.
+	if tokenType == "DEVICE" {
+		if callerPrn != device.Prn {
+			return echoutil.RestErrorWrapperUser(c, "Device can only query ownership of itself", "Device can only query ownership of itself", http.StatusForbidden)
+		}
+		device.OVMode.RootOfTrust = ""
+		return echoutil.WriteJSON(c, http.StatusOK, device.OVMode)
+	}
+
+	if tokenType != "USER" && tokenType != "SESSION" {
+		return echoutil.RestErrorWrapperUser(c, "Only the device owner can accept ownership", "Only the device owner can accept ownership", http.StatusForbidden)
+	}
+
+	if device.Owner == "" || device.Owner != callerPrn {
+		return echoutil.RestErrorWrapperUser(c, "Token PRN does not match device owner", "Token PRN does not match device owner", http.StatusForbidden)
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
-	ownerPrn, ok := jwtPayload.(jwtgo.MapClaims)["prn"].(string)
-
-	if !ok {
-		utils.RestErrorWrapperUser(w, "Owner PRN not found in JWT payload", "Owner PRN not found in JWT payload", http.StatusBadRequest)
-		return
-	}
-
-	if device.Owner != ownerPrn {
-		utils.RestErrorWrapperUser(w, "Token PRN does not match device owner", "Token PRN does not match device owner", http.StatusForbidden)
-		return
+	now := time.Now()
+	_, err := collection.UpdateOne(
+		ctx,
+		bson.M{"_id": device.ID},
+		bson.M{"$set": bson.M{
+			"ovmode.status":        models.Completed,
+			"ownership_unverified": false,
+			"timemodified":         now,
+		}},
+	)
+	if err != nil {
+		return echoutil.RestErrorWrapperUser(c, err.Error(), "failed to update device status: "+err.Error(), http.StatusInternalServerError)
 	}
 
 	device.OVMode.Status = models.Completed
-
-	updateResult, err := collection.UpdateOne(
-		ctx,
-		bson.M{"prn": device.Prn},
-		bson.M{"$set": bson.M{"ovmode.status": models.Completed}},
-	)
-
-	if err != nil {
-		utils.RestErrorWrapperUser(w, err.Error(), "failed to update device status: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if updateResult.ModifiedCount == 0 {
-		utils.RestErrorWrapperUser(w, "failed to update device status: no document updated", "failed to update device status: no document updated", http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteJson(device.OVMode)
+	device.OVMode.RootOfTrust = ""
+	return echoutil.WriteJSON(c, http.StatusOK, device.OVMode)
 }

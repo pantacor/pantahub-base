@@ -1,4 +1,4 @@
-// Copyright 2017  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,17 +22,24 @@
 package logs
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
-	"gitlab.com/pantacor/pantahub-base/utils"
+	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 )
 
 var maxPagination = int64(500)
+
+// cursorTTL is how long a next-cursor token stays usable. The cursor is
+// stateless (it just replays the query with a search_after bound), so this is
+// only a replay window and no longer has to stay under any server-side scroll
+// keep-alive.
+const cursorTTL = 15 * time.Minute
 
 // ## GET /logs/
 //
@@ -79,29 +86,27 @@ var maxPagination = int64(500)
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /logs [get]
-func (a *App) handleGetLogs(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetLogs(c *echo.Context) error {
 
 	var result *Pager
 	var err error
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+	authType, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["type"]
 
 	if authType != "USER" && authType != "SESSION" {
-		utils.RestErrorWrapper(w, "Need to be logged in as USER/SESSION user to get logs", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Need to be logged in as USER/SESSION user to get logs", http.StatusForbidden)
 	}
 
-	own, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	own, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in", http.StatusForbidden)
 	}
 
-	r.ParseForm()
+	_ = c.Request().ParseForm()
 
-	startParam := r.FormValue("start")
-	pageParam := r.FormValue("page")
+	startParam := c.Request().FormValue("start")
+	pageParam := c.Request().FormValue("page")
 
 	startParamInt := int64(0)
 	if startParam != "" {
@@ -110,8 +115,7 @@ func (a *App) handleGetLogs(w rest.ResponseWriter, r *rest.Request) {
 		startParamInt = int64(p)
 	}
 	if err != nil {
-		utils.RestErrorWrapper(w, "Bad 'start' parameter", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Bad 'start' parameter", http.StatusBadRequest)
 	}
 
 	pageParamInt := int64(50)
@@ -125,19 +129,17 @@ func (a *App) handleGetLogs(w rest.ResponseWriter, r *rest.Request) {
 		pageParamInt = maxPagination
 	}
 	if err != nil {
-		utils.RestErrorWrapper(w, "Bad 'page' parameter", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Bad 'page' parameter", http.StatusBadRequest)
 	}
-	revParam := r.FormValue("rev")
-	platParam := r.FormValue("plat")
-	sourceParam := r.FormValue("src")
-	deviceParam := r.FormValue("dev")
-	deviceParam, err = a.ParseDeviceString(r.Context(), own.(string), deviceParam)
+	revParam := c.Request().FormValue("rev")
+	platParam := c.Request().FormValue("plat")
+	sourceParam := c.Request().FormValue("src")
+	deviceParam := c.Request().FormValue("dev")
+	deviceParam, err = a.ParseDeviceString(c.Request().Context(), own.(string), deviceParam)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error Parsing Device nicks:"+err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Error Parsing Device nicks:"+err.Error(), http.StatusBadRequest)
 	}
-	levelParam := r.FormValue("lvl")
+	levelParam := c.Request().FormValue("lvl")
 
 	filter := &Entry{
 		Owner:     own.(string),
@@ -149,7 +151,7 @@ func (a *App) handleGetLogs(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	logsSort := Sorts{}
-	sortParam := r.FormValue("sort")
+	sortParam := c.Request().FormValue("sort")
 
 	sorts := strings.Split(sortParam, ",")
 	for _, v := range sorts {
@@ -176,51 +178,73 @@ func (a *App) handleGetLogs(w rest.ResponseWriter, r *rest.Request) {
 	var before *time.Time
 	var after *time.Time
 
-	beforeParam := r.FormValue("before")
-	afterParam := r.FormValue("after")
+	beforeParam := c.Request().FormValue("before")
+	afterParam := c.Request().FormValue("after")
 
 	if beforeParam != "" {
 		t, err := time.Parse(time.RFC3339, beforeParam)
 		if err != nil {
-			utils.RestErrorWrapper(w, "ERROR: parsing 'before' date "+err.Error(), http.StatusBadRequest)
-			return
+			return echoutil.RestErrorWrapper(c, "ERROR: parsing 'before' date "+err.Error(), http.StatusBadRequest)
 		}
 		before = &t
 	}
 	if afterParam != "" {
 		t, err := time.Parse(time.RFC3339, afterParam)
 		if err != nil {
-			utils.RestErrorWrapper(w, "ERROR: parsing 'before' date "+err.Error(), http.StatusBadRequest)
-			return
+			return echoutil.RestErrorWrapper(c, "ERROR: parsing 'before' date "+err.Error(), http.StatusBadRequest)
 		}
 		after = &t
 	}
 
-	cursor := r.FormValue("cursor") != ""
-	result, err = a.backend.getLogs(r.Context(), startParamInt, pageParamInt, before, after, filter, logsSort, cursor)
+	cursor := c.Request().FormValue("cursor") != ""
+	result, err = a.backend.getLogs(c.Request().Context(), startParamInt, pageParamInt, before, after, filter, logsSort, nil, cursor)
 
 	if err != nil {
-		utils.RestErrorWrapper(w, "ERROR: getting logs failed "+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "ERROR: getting logs failed "+err.Error(), http.StatusInternalServerError)
 	}
 
-	if result.NextCursor != "" {
-		claims := CursorClaim{
-			NextCursor: result.NextCursor,
-			StandardClaims: jwtgo.StandardClaims{
-				ExpiresAt: time.Now().Add(time.Duration(time.Minute * 2)).Unix(),
-				IssuedAt:  time.Now().Unix(),
-				Audience:  own.(string),
-			},
+	// A caller that asked for a cursor always gets one back, even when this
+	// page came up empty. Followers such as `pvr device logs` call the cursor
+	// endpoint with whatever they were last handed, so dropping the cursor on
+	// an empty page left them posting an empty one, which cannot be a valid
+	// token and came back as a 403 that clients read as "log in again". An
+	// empty page simply carries the position forward: re-presenting the cursor
+	// returns whatever has arrived since.
+	if cursor {
+		state := &CursorState{
+			Filter: *filter,
+			Before: before,
+			After:  after,
+			Sort:   logsSort,
+			Page:   pageParamInt,
 		}
-		token := jwtgo.NewWithClaims(jwtgo.GetSigningMethod(a.jwtMiddleware.SigningAlgorithm), claims)
-		ss, err := token.SignedString(a.jwtMiddleware.Key)
+		if result.NextCursor != "" {
+			if err := json.Unmarshal([]byte(result.NextCursor), &state.SearchAfter); err != nil {
+				return echoutil.RestErrorWrapper(c, "ERROR: building next-cursor: "+err.Error(), http.StatusInternalServerError)
+			}
+		}
+		ss, err := a.signCursor(state, own.(string))
 		if err != nil {
-			utils.RestErrorWrapper(w, "ERROR: signing scrollid token: "+err.Error(), http.StatusInternalServerError)
-			return
+			return echoutil.RestErrorWrapper(c, "ERROR: signing next-cursor token: "+err.Error(), http.StatusInternalServerError)
 		}
 		result.NextCursor = ss
 	}
 
-	w.WriteJson(result)
+	return echoutil.WriteJSON(c, http.StatusOK, result)
+}
+
+// signCursor wraps the state needed to fetch the next page in a short-lived
+// token addressed to the calling user, so that a cursor cannot be replayed by
+// anyone else.
+func (a *App) signCursor(state *CursorState, owner string) (string, error) {
+	claims := CursorClaim{
+		State: state,
+		RegisteredClaims: jwtgo.RegisteredClaims{
+			ExpiresAt: jwtgo.NewNumericDate(time.Now().Add(cursorTTL)),
+			IssuedAt:  jwtgo.NewNumericDate(time.Now()),
+			Audience:  jwtgo.ClaimStrings{owner},
+		},
+	}
+	token := jwtgo.NewWithClaims(jwtgo.GetSigningMethod(a.jwtConfig.SigningAlgorithm), claims)
+	return token.SignedString(a.jwtConfig.Key)
 }

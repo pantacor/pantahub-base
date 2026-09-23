@@ -1,4 +1,4 @@
-// Copyright 2017-2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,8 +17,21 @@ package utils
 
 import (
 	"os"
+	"strings"
 )
 
+// Names of the environment variables the service reads. The value of each
+// constant is the variable's NAME, never its contents -- the contents are only
+// ever read at run time through GetEnv.
+//
+// gosec flags several of these as hardcoded credentials because the constant
+// is called something like EnvGithubOAuthClientSecret; what it is looking at
+// is the string "GITHUB_OAUTH_CLIENT_SECRET", which is a lookup key and not a
+// secret.
+//
+// #nosec G101 -- these are environment variable names, not credentials
+//
+//nolint:gosec // G101: env var names, not credentials
 const (
 	// EnvPantahubProductName Pantahub Product Name (branding)
 	EnvPantahubProductName = "PANTAHUB_PRODUCTNAME"
@@ -29,6 +42,34 @@ const (
 
 	// EnvPantahubScryptSecret scrypt secret
 	EnvPantahubScryptSecret = "PANTAHUB_SCRYPT_SECRET"
+
+	// EnvPantahubMfaEnabled master gate for the two-factor authentication and
+	// WebAuthn/passkey endpoints ("true"/"false")
+	// default: true
+	EnvPantahubMfaEnabled = "PANTAHUB_MFA_ENABLED"
+
+	// EnvPantahubMfaEncKey base64 encoded 32 byte AES-256-GCM key used to
+	// encrypt TOTP secrets at rest. MUST BE SET for TOTP enrollment to work.
+	EnvPantahubMfaEncKey = "PANTAHUB_MFA_ENC_KEY"
+
+	// EnvPantahubMfaPendingTimeoutMinutes TTL in minutes of the single-use
+	// MFA-pending token issued between the password step and the second factor
+	// default: 5
+	EnvPantahubMfaPendingTimeoutMinutes = "PANTAHUB_MFA_PENDING_TIMEOUT_MINUTES"
+
+	// EnvPantahubWebauthnRPID WebAuthn Relying Party ID: the registrable
+	// domain credentials are scoped to (e.g. "pantacor.com"). MUST BE SET per
+	// deployment for WebAuthn/passkeys to work.
+	EnvPantahubWebauthnRPID = "PANTAHUB_WEBAUTHN_RP_ID"
+
+	// EnvPantahubWebauthnRPOrigins comma separated list of exact origins
+	// (scheme://host[:port]) trusted for WebAuthn ceremonies. MUST BE SET per
+	// deployment for WebAuthn/passkeys to work.
+	EnvPantahubWebauthnRPOrigins = "PANTAHUB_WEBAUTHN_RP_ORIGINS"
+
+	// EnvPantahubWebauthnRPName WebAuthn Relying Party display name
+	// default: Pantacor Hub
+	EnvPantahubWebauthnRPName = "PANTAHUB_WEBAUTHN_RP_NAME"
 
 	// EnvPantahubJWTAuthPub Pantahub JWT Public Key. Public RSA key in base64 encoded PEM format
 	EnvPantahubJWTAuthPub = "PANTAHUB_JWT_PUB"
@@ -46,7 +87,10 @@ const (
 	// EnvPantahubUseCaptcha Pantahub Use Captcha. Set if captcha will be used by the API.
 	EnvPantahubUseCaptcha = "PANTAHUB_USE_CAPTCHA"
 
-	// EnvPantahubJWTObjectSecret Pantahub JWT Secret. THIS MUST BE SET TO SOMETHING SECRET!!
+	// EnvPantahubJWTObjectSecret HMAC secret for object access tokens.
+	// When unset (or left at the placeholder), a key is derived from the
+	// mandatory PANTAHUB_JWT_SECRET RSA key (see utils.GetObjectTokenSecret).
+	// Set it explicitly to rotate object tokens independently of the JWT key.
 	// default: "THIS MUST BE CHANGED"
 	EnvPantahubJWTObjectSecret = "PANTAHUB_JWT_OBJECT_SECRET"
 
@@ -356,32 +400,63 @@ const (
 	// EnvPantahubDisableEmailPasswordLogin disable email/password login
 	EnvPantahubDisableEmailPasswordLogin = "PANTAHUB_DISABLE_EMAIL_PASSWORD_LOGIN"
 
+	// EnvPantahubOAuthConnectedAccountsEnforce requires OAuth identities to be
+	// explicitly connected before they can sign in to an existing account.
+	// The default is true.
+	EnvPantahubOAuthConnectedAccountsEnforce = "PANTAHUB_OAUTH_CONNECTED_ACCOUNTS_ENFORCE"
+
+	// EnvPantahubPurgePlaintextSecrets removes the legacy plaintext `secret`
+	// field from personal access tokens, OAuth client apps and devices that
+	// already carry a `secret_hash`. Leave it off until every replica runs a
+	// build that verifies secrets by hash; then set it to true for one
+	// rollout to drop the plaintext. The default is false (rollout-compat).
+	EnvPantahubPurgePlaintextSecrets = "PANTAHUB_PURGE_PLAINTEXT_SECRETS"
+
 	// EnvPantahubDisableQuota disable quota enforcement
 	EnvPantahubDisableQuota = "PANTAHUB_DISABLE_QUOTA"
+
+	// Opt-out flag for the webhooks feature: mounted by default; set to a
+	// truthy value (true/1/yes/on) to disable. See utils.FeatureEnabled and
+	// the GET /features endpoint.
+	EnvPantahubDisableWebhooks = "PANTAHUB_DISABLE_WEBHOOKS"
 )
 
+// Fallback values for the variables above. The entries gosec reads as
+// credentials are all the placeholder "YOU MUST CHANGE THIS", which exists
+// precisely so that an unconfigured deployment is obvious.
+//
+// #nosec G101 -- placeholder defaults, deliberately not usable secrets
 var defaultEnvs = map[string]string{
-	EnvPantahubProductName:                  "pantahub-personal",
-	EnvPantahubDemoAccountsPasswordService1: "O9i8HlpSc",
-	EnvGoogleCaptchaSecret:                  "YOU MUST CHANGE THIS",
-	EnvPantahubUseCaptcha:                   "true",
-	EnvPantahubJWTAuthSecret:                "YOU MUST CHANGE THIS",
-	EnvPantahubJWTAuthPub:                   "YOU MUST CHANGE THIS",
-	EnvPantahubJWESecret:                    "YOU MUST CHANGE THIS",
-	EnvPantahubJWEPub:                       "YOU MUST CHANGE THIS",
-	EnvPantahubScryptSecret:                 "YOU MUST CHANGE THIS",
-	EnvPantahubJWTObjectSecret:              "YOU MUST CHANGE THIS",
-	EnvPantahubJWTTimeoutMinutes:            "60",
-	EnvPantahubRecoverJWTTimeoutMinutes:     "60",
-	EnvPantahubJWTMaxRefreshMinutes:         "1440",
-	EnvAnonJWTTimeoutMinutes:                "5",
-	EnvPendingOVModeJWTTimeoutMinutes:       "5",
-	EnvPantahubAuthorizeJWTTimeoutMinutes:   "7200",
-	EnvPantahubDisableSignup:                "false",
-	EnvPantahubAuthAllowedDomains:           "",
-	EnvPantahubDisableForgotPassword:        "false",
-	EnvPantahubDisableEmailPasswordLogin:    "false",
-	EnvPantahubDisableQuota:                 "false",
+	EnvPantahubProductName:                   "pantahub-personal",
+	EnvPantahubDemoAccountsPasswordService1:  "O9i8HlpSc",
+	EnvGoogleCaptchaSecret:                   "YOU MUST CHANGE THIS",
+	EnvPantahubUseCaptcha:                    "true",
+	EnvPantahubJWTAuthSecret:                 "YOU MUST CHANGE THIS",
+	EnvPantahubJWTAuthPub:                    "YOU MUST CHANGE THIS",
+	EnvPantahubJWESecret:                     "YOU MUST CHANGE THIS",
+	EnvPantahubJWEPub:                        "YOU MUST CHANGE THIS",
+	EnvPantahubScryptSecret:                  "YOU MUST CHANGE THIS",
+	EnvPantahubMfaEnabled:                    "true",
+	EnvPantahubMfaEncKey:                     "",
+	EnvPantahubMfaPendingTimeoutMinutes:      "5",
+	EnvPantahubWebauthnRPID:                  "",
+	EnvPantahubWebauthnRPOrigins:             "",
+	EnvPantahubWebauthnRPName:                "Pantacor Hub",
+	EnvPantahubJWTObjectSecret:               "YOU MUST CHANGE THIS",
+	EnvPantahubJWTTimeoutMinutes:             "60",
+	EnvPantahubRecoverJWTTimeoutMinutes:      "60",
+	EnvPantahubJWTMaxRefreshMinutes:          "1440",
+	EnvAnonJWTTimeoutMinutes:                 "5",
+	EnvPendingOVModeJWTTimeoutMinutes:        "5",
+	EnvPantahubAuthorizeJWTTimeoutMinutes:    "7200",
+	EnvPantahubDisableSignup:                 "false",
+	EnvPantahubAuthAllowedDomains:            "",
+	EnvPantahubDisableForgotPassword:         "false",
+	EnvPantahubDisableEmailPasswordLogin:     "false",
+	EnvPantahubOAuthConnectedAccountsEnforce: "true",
+	EnvPantahubPurgePlaintextSecrets:         "false",
+	EnvPantahubDisableQuota:                  "false",
+	EnvPantahubDisableWebhooks:               "false",
 
 	EnvPantahubCaCert:          "",
 	EnvPantahubCaRaUser:        "",
@@ -547,4 +622,15 @@ func GetEnvDefault(key, defaultValue string) string {
 	}
 
 	return v
+}
+
+// FeatureEnabled reports whether an opt-out feature is enabled. Features are
+// on by default; set the given PANTAHUB_DISABLE_* variable to a truthy value
+// (true/1/yes/on, case-insensitive) to turn the feature off.
+func FeatureEnabled(disableEnvVar string) bool {
+	switch strings.ToLower(strings.TrimSpace(GetEnv(disableEnvVar))) {
+	case "true", "1", "yes", "on":
+		return false
+	}
+	return true
 }

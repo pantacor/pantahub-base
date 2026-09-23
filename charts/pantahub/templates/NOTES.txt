@@ -1,0 +1,18 @@
+Pantahub dev cluster deployed to namespace {{ .Release.Namespace }}.
+
+Bring-up takes a few minutes: mongo initializes rs0, kafka creates topics,
+kafka-connect uploads the debezium connectors, then phs starts.
+
+Watch it settle:
+  kubectl -n {{ .Release.Namespace }} get pods -w
+
+Reach the services from your machine:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/base 12365:12365
+  kubectl -n {{ .Release.Namespace }} port-forward svc/www 3000:80
+  kubectl -n {{ .Release.Namespace }} port-forward svc/pvr 12367:12367
+{{- if .Values.kibana.enabled }}
+  kubectl -n {{ .Release.Namespace }} port-forward svc/kibana 5601:5601
+{{- end }}
+
+NOTE: service names are fixed (mongo, kafka, fluentd, ...) — install only one
+release of this chart per namespace.

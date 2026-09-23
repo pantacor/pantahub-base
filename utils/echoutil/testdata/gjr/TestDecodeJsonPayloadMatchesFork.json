@@ -1,0 +1,18 @@
+{
+  "TestDecodeJsonPayloadMatchesFork|gjr-0": {
+    "IsNil": false,
+    "Msg": "JSON payload is empty"
+  },
+  "TestDecodeJsonPayloadMatchesFork|gjr-1": {
+    "IsNil": true,
+    "Msg": ""
+  },
+  "TestDecodeJsonPayloadMatchesFork|gjr-2": {
+    "IsNil": false,
+    "Msg": "invalid character 'b' looking for beginning of object key string"
+  },
+  "TestDecodeJsonPayloadMatchesFork|gjr-3": {
+    "IsNil": false,
+    "Msg": "json: cannot unmarshal array into Go value of type map[string]interface {}"
+  }
+}

@@ -1,4 +1,4 @@
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,9 +25,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 )
 
 const pictureMaxSize = 1000 * 1024
@@ -45,38 +46,35 @@ const pictureMaxSize = 1000 * 1024
 // @Failure 404 {object} utils.RError "Account not found"
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /profiles/ [put]
-func (a *App) handlePostProfile(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePostProfile(c *echo.Context) error {
 	image.RegisterFormat("jpeg", "\xff\xd8", jpeg.Decode, jpeg.DecodeConfig)
 	image.RegisterFormat("png", "\x89\x50\x4E\x47\x0D\x0A\x1A\x0A", png.Decode, png.DecodeConfig)
 
-	accountPrn := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"].(string)
-	content, _ := ioutil.ReadAll(r.Body)
-	r.Body.Close()
+	accountPrn := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"].(string)
+	content, _ := ioutil.ReadAll(c.Request().Body)
+	_ = c.Request().Body.Close()
 
 	payload := &UpdateableProfile{}
 	err := json.Unmarshal(content, payload)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Update: "+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Update: "+err.Error(), http.StatusInternalServerError)
 	}
 
 	valid, errMsg, userMsg, code := validatePicture(payload.Picture)
 	if !valid {
-		utils.RestErrorWrapperUser(w, "Update: "+errMsg, userMsg, code)
-		return
+		return echoutil.RestErrorWrapperUser(c, "Update: "+errMsg, userMsg, code)
 	}
 
 	newProfile := &Profile{
 		UpdateableProfile: payload,
 	}
 
-	profile, err := a.updateProfile(r.Context(), accountPrn, newProfile)
+	profile, err := a.updateProfile(c.Request().Context(), accountPrn, newProfile)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Update: "+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Update: "+err.Error(), http.StatusInternalServerError)
 	}
 
-	w.WriteJson(profile)
+	return echoutil.WriteJSON(c, http.StatusOK, profile)
 }
 
 func validatePicture(picture string) (bool, string, string, int) {

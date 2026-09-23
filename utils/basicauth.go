@@ -1,5 +1,5 @@
 //
-// Copyright 2024  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,8 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -39,7 +38,7 @@ var BasicAuthTokenFactory func(
 	ctx context.Context,
 	username string,
 	password string,
-	jwtMiddleware *jwt.JWTMiddleware,
+	jwtConfig *jwtauth.Config,
 	mongoClient *mongo.Client,
 	ttl time.Duration,
 ) (string, *RError)
@@ -47,47 +46,57 @@ var BasicAuthTokenFactory func(
 // BasicAuthToBearerMiddleware translates Authorization: Basic headers into
 // Authorization: Bearer JWTs using personal access tokens only.
 type BasicAuthToBearerMiddleware struct {
-	JWT   *jwt.JWTMiddleware
+	JWT   *jwtauth.Config
 	Mongo *mongo.Client
 }
 
-func (m *BasicAuthToBearerMiddleware) MiddlewareFunc(h rest.HandlerFunc) rest.HandlerFunc {
-	return func(w rest.ResponseWriter, r *rest.Request) {
-		authz := r.Header.Get("Authorization")
+// BasicAuthChallenge is sent when Basic credentials are rejected.
+const BasicAuthChallenge = `Basic realm="pantahub", Bearer realm="pantahub"`
 
-		// Pass-through: no header, already Bearer, or any other scheme.
-		if !strings.HasPrefix(authz, "Basic ") {
-			h(w, r)
-			return
-		}
+// BasicAuthResult is the outcome of translating a request's Basic credentials.
+type BasicAuthResult int
 
-		user, pass, ok := r.Request.BasicAuth()
-		if !ok || user == "" {
-			// Malformed header: pass through so downstream JWT middleware
-			// produces the canonical 401.
-			h(w, r)
-			return
-		}
+const (
+	// Not Basic, malformed, or no factory: continue, JWT answers the 401.
+	BasicAuthPassThrough BasicAuthResult = iota
+	// BasicAuthRewritten: valid personal-token credentials; the Authorization
+	// header now carries a freshly minted bearer.
+	BasicAuthRewritten
+	// BasicAuthRejected: Basic credentials that failed validation. The caller
+	// must answer 401 with BasicAuthChallenge.
+	BasicAuthRejected
+)
 
-		factory := BasicAuthTokenFactory
-		if factory == nil {
-			h(w, r)
-			return
-		}
+// Translate swaps valid personal-token Basic credentials for a short-lived bearer
+// and returns the user; shared with utils/echoutil.
+func (m *BasicAuthToBearerMiddleware) Translate(r *http.Request) (BasicAuthResult, string) {
+	authz := r.Header.Get("Authorization")
 
-		// Validate username:PERSONAL_TOKEN and mint a short-lived bearer.
-		// Personal tokens only — account passwords are rejected by design.
-		bearer, rerr := factory(r.Context(), user, pass, m.JWT, m.Mongo, BasicAuthBearerTTL)
-		if rerr != nil || bearer == "" {
-			w.Header().Set("WWW-Authenticate", `Basic realm="pantahub", Bearer realm="pantahub"`)
-			RestErrorWrapper(w, "Invalid Basic credentials", http.StatusUnauthorized)
-			return
-		}
-
-		// Rewrite header for downstream middleware.
-		r.Header.Set("Authorization", "Bearer "+bearer)
-		r.Env["PH_BASIC_AUTH_USER"] = user
-
-		h(w, r)
+	// Pass-through: no header, already Bearer, or any other scheme.
+	if !strings.HasPrefix(authz, "Basic ") {
+		return BasicAuthPassThrough, ""
 	}
+
+	user, pass, ok := r.BasicAuth()
+	if !ok || user == "" {
+		// Malformed header: pass through so downstream JWT middleware
+		// produces the canonical 401.
+		return BasicAuthPassThrough, ""
+	}
+
+	factory := BasicAuthTokenFactory
+	if factory == nil {
+		return BasicAuthPassThrough, ""
+	}
+
+	// Validate username:PERSONAL_TOKEN and mint a short-lived bearer.
+	// Personal tokens only — account passwords are rejected by design.
+	bearer, rerr := factory(r.Context(), user, pass, m.JWT, m.Mongo, BasicAuthBearerTTL)
+	if rerr != nil || bearer == "" {
+		return BasicAuthRejected, ""
+	}
+
+	// Rewrite header for downstream middleware.
+	r.Header.Set("Authorization", "Bearer "+bearer)
+	return BasicAuthRewritten, user
 }

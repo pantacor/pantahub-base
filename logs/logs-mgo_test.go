@@ -1,5 +1,5 @@
 //
-// Copyright 2017  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -102,7 +102,7 @@ func testMongoGetLogs(t *testing.T) {
 	sort := Sorts{}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	pager, err := mgoTestLogger.getLogs(ctx, 0, -1, nil, nil, filter, sort, false)
+	pager, err := mgoTestLogger.getLogs(ctx, 0, -1, nil, nil, filter, sort, nil, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
@@ -140,7 +140,7 @@ func testMongoDoGetLogs(t *testing.T) {
 	sort := Sorts{}
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
-	pager, err := mgoTestLogger.getLogs(ctx, 0, 3, nil, nil, filter, sort, false)
+	pager, err := mgoTestLogger.getLogs(ctx, 0, 3, nil, nil, filter, sort, nil, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
@@ -152,23 +152,30 @@ func testMongoDoGetLogs(t *testing.T) {
 
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
-	pager, err = mgoTestLogger.getLogs(ctx, 1, 3, nil, nil, filter, sort, false)
+	pager, err = mgoTestLogger.getLogs(ctx, 1, 3, nil, nil, filter, sort, nil, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
 		t.Fail()
-	} else if pager.Count != 2 {
-		t.Errorf("pager.Count should be 2, not %d", pager.Count)
+	} else if pager.Count != 3 {
+		// Count is total matches, not page size.
+		t.Errorf("pager.Count should be 3 (total matches), not %d", pager.Count)
+		t.Fail()
+	} else if len(pager.Entries) != 2 {
+		t.Errorf("expected 2 entries from offset 1, got %d", len(pager.Entries))
 		t.Fail()
 	}
 
-	pager, err = mgoTestLogger.getLogs(ctx, 1, 1, nil, nil, filter, sort, false)
+	pager, err = mgoTestLogger.getLogs(ctx, 1, 1, nil, nil, filter, sort, nil, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
 		t.Fail()
-	} else if pager.Count != 1 {
-		t.Errorf("pager.Count should be 1, not %d", pager.Count)
+	} else if pager.Count != 3 {
+		t.Errorf("pager.Count should be 3 (total matches), not %d", pager.Count)
+		t.Fail()
+	} else if len(pager.Entries) != 1 {
+		t.Errorf("expected 1 entry for a page size of 1, got %d", len(pager.Entries))
 		t.Fail()
 	}
 }
@@ -199,7 +206,7 @@ func testMongoDoGetLogsAfter(t *testing.T) {
 
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
-	pager, err := mgoTestLogger.getLogs(ctx, 0, 3, &timeBase, nil, filter, sort, false)
+	pager, err := mgoTestLogger.getLogs(ctx, 0, 3, &timeBase, nil, filter, sort, nil, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())
@@ -211,7 +218,7 @@ func testMongoDoGetLogsAfter(t *testing.T) {
 
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
-	pager, err = mgoTestLogger.getLogs(ctx, 1, 3, &timeBase, nil, filter, sort, false)
+	pager, err = mgoTestLogger.getLogs(ctx, 1, 3, &timeBase, nil, filter, sort, nil, false)
 
 	if err != nil {
 		t.Errorf("do Log fails: %s", err.Error())

@@ -1,4 +1,4 @@
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,11 +18,9 @@ package utils
 
 import (
 	"fmt"
-	"net/http"
 	"reflect"
 	"strings"
 
-	"github.com/ant0ine/go-json-rest/rest"
 	"github.com/gosimple/slug"
 )
 
@@ -72,6 +70,11 @@ type IScopes struct {
 	ReadMetrics     Scope
 	WriteMetrics    Scope
 	UpdateMetrics   Scope
+	Webhooks        Scope
+	ReadWebhooks    Scope
+	WriteWebhooks   Scope
+	ReadApps        Scope
+	WriteApps       Scope
 }
 
 // Scopes variable with all the posible scopes
@@ -191,6 +194,34 @@ var Scopes = &IScopes{
 		Service:     PantahubServiceID,
 		Description: "Update metrics",
 	},
+	Webhooks: Scope{
+		ID:          "webhooks",
+		Service:     PantahubServiceID,
+		Description: "Read/Write webhooks",
+	},
+	ReadWebhooks: Scope{
+		ID:          "webhooks.readonly",
+		Service:     PantahubServiceID,
+		Description: "Read only webhooks",
+	},
+	WriteWebhooks: Scope{
+		ID:          "webhooks.write",
+		Service:     PantahubServiceID,
+		Description: "Write only webhooks",
+	},
+	// The third party applications an account registered (/apps). Managing
+	// them is its own grant: an integration allowed to look after a user's
+	// devices has no business editing where that user's OAuth clients redirect.
+	ReadApps: Scope{
+		ID:          "apps.readonly",
+		Service:     PantahubServiceID,
+		Description: "Read only your registered applications",
+	},
+	WriteApps: Scope{
+		ID:          "apps.write",
+		Service:     PantahubServiceID,
+		Description: "Update your registered applications",
+	},
 }
 
 // PhScopeNames List of pantahub base scope names
@@ -214,42 +245,17 @@ func InitScopes() {
 	}
 }
 
-type ScopeFilterMiddleware struct {
-	filterTypes []Scope
-}
-
-func (m *ScopeFilterMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.HandlerFunc {
-	return ScopeFilter(m.filterTypes, handler)
-}
-
-func InitScopeFilterMiddleware(filterTypes []Scope) *ScopeFilterMiddleware {
-	return &ScopeFilterMiddleware{
-		filterTypes,
-	}
-}
-
-// ScopeFilter :  Scope Filter for end points
-func ScopeFilter(filterScopes []Scope, handler rest.HandlerFunc) rest.HandlerFunc {
-	parsedFilterScopes := MarshalScopes(filterScopes)
-
-	return func(w rest.ResponseWriter, r *rest.Request) {
-		authInfo := GetAuthInfo(r)
-		if authInfo != nil && len(parsedFilterScopes) > 0 {
-			if !MatchScope(parsedFilterScopes, authInfo.Scopes) {
-				phAuth := GetEnv(EnvPantahubAuth)
-				w.Header().Set("WWW-Authenticate", `Bearer Realm="pantahub services",
-								ph-aeps="`+phAuth+`",
-								scope="`+strings.Join(parsedFilterScopes, " ")+`",
+// ScopeChallenge is the WWW-Authenticate value for insufficient scopes; shared
+// with utils/echoutil so both frameworks send the same bytes.
+func ScopeChallenge(parsedFilterScopes []string) string {
+	phAuth := GetEnv(EnvPantahubAuth)
+	return `Bearer Realm="pantahub services",
+								ph-aeps="` + phAuth + `",
+								scope="` + strings.Join(parsedFilterScopes, " ") + `",
 								error="insufficient_scope",
 								error_description="The request requires higher privileges than provided by the
 				     access token"
-								`)
-				RestErrorWrapper(w, "InSufficient Scopes", http.StatusForbidden)
-				return
-			}
-		}
-		handler(w, r)
-	}
+								`
 }
 
 // MatchScope serch one scope in all the available scopes
@@ -294,9 +300,18 @@ func MarshalScopes(scopes []Scope) []string {
 
 func ParseScopes(scopes []string) []Scope {
 	parsedScopes := []Scope{}
+	prefix := PantahubServiceID + "/"
 	for _, s := range scopes {
-		id := strings.Split(s, PantahubServiceID+"/")[1]
-		parsedScopes = append(parsedScopes, PhScopesMap[id])
+		parts := strings.Split(s, prefix)
+		var id string
+		if len(parts) < 2 {
+			id = s
+		} else {
+			id = parts[1]
+		}
+		if scope, ok := PhScopesMap[id]; ok {
+			parsedScopes = append(parsedScopes, scope)
+		}
 	}
 	return parsedScopes
 }

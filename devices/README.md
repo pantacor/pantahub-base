@@ -32,7 +32,6 @@ HTTP/1.1 200 OK
 Content-Length: 331
 Content-Type: application/json; charset=utf-8
 Date: Wed, 12 Jul 2017 21:13:08 GMT
-X-Powered-By: go-json-rest
 
 {
     "challenge": "likely-creative-troll",
@@ -68,7 +67,6 @@ HTTP/1.1 200 OK
 Content-Length: 286
 Content-Type: application/json; charset=utf-8
 Date: Wed, 12 Jul 2017 21:14:34 GMT
-X-Powered-By: go-json-rest
 
 {
     "challenge": "duly-helped-bat",
@@ -100,7 +98,6 @@ HTTP/1.1 200 OK
 Content-Length: 309
 Content-Type: application/json; charset=utf-8
 Date: Wed, 12 Jul 2017 21:15:49 GMT
-X-Powered-By: go-json-rest
 
 {
     "challenge": "",
@@ -128,7 +125,6 @@ HTTP/1.1 200 OK
 Content-Length: 345
 Content-Type: application/json; charset=utf-8
 Date: Tue, 04 Oct 2016 20:43:25 GMT
-X-Powered-By: go-json-rest
 
 [
     {
@@ -161,7 +157,6 @@ HTTP/1.1 200 OK
 Content-Length: 324
 Content-Type: application/json; charset=utf-8
 Date: Wed, 12 Jul 2017 21:16:58 GMT
-X-Powered-By: go-json-rest
 
 {
     "challenge": "",
@@ -190,7 +185,6 @@ HTTP/1.1 200 OK
 Content-Length: 35
 Content-Type: application/json; charset=utf-8
 Date: Wed, 12 Jul 2017 21:21:18 GMT
-X-Powered-By: go-json-rest
 
 {
     "meta": "datafields",
@@ -206,7 +200,6 @@ HTTP/1.1 200 OK
 Content-Length: 351
 Content-Type: application/json; charset=utf-8
 Date: Wed, 12 Jul 2017 21:21:47 GMT
-X-Powered-By: go-json-rest
 
 {
     "challenge": "",
@@ -242,7 +235,6 @@ HTTP/1.1 200 OK
 Content-Length: 50
 Content-Type: application/json; charset=utf-8
 Date: Wed, 12 Jul 2017 21:26:49 GMT
-X-Powered-By: go-json-rest
 
 {
     "meta": "datafields",
@@ -264,7 +256,6 @@ HTTP/1.1 200 OK
 Content-Length: 329
 Content-Type: application/json; charset=utf-8
 Date: Wed, 18 Oct 2017 20:09:55 GMT
-X-Powered-By: go-json-rest
 
 {
 ...
@@ -283,7 +274,6 @@ HTTP/1.1 200 OK
 Content-Length: 330
 Content-Type: application/json; charset=utf-8
 Date: Wed, 18 Oct 2017 20:09:52 GMT
-X-Powered-By: go-json-rest
 
 {
 ...
@@ -303,7 +293,6 @@ HTTP/1.1 200 OK
 Content-Length: 273
 Content-Type: application/json; charset=utf-8
 Date: Wed, 23 May 2018 20:43:10 GMT
-X-Powered-By: go-json-rest
 X-Runtime: 0.000977
 
 {
@@ -327,7 +316,6 @@ HTTP/1.1 409 Conflict
 Content-Length: 45
 Content-Type: application/json; charset=utf-8
 Date: Wed, 23 May 2018 20:40:07 GMT
-X-Powered-By: go-json-rest
 X-Runtime: 0.001955
 
 {
@@ -369,7 +357,6 @@ HTTP/1.1 200 OK
 Content-Length: 370
 Content-Type: application/json; charset=utf-8
 Date: Mon, 10 Dec 2018 15:46:39 GMT
-X-Powered-By: go-json-rest
 X-Runtime: 0.000635
 
 {
@@ -410,7 +397,6 @@ HTTP/1.1 200 OK
 Content-Length: 353
 Content-Type: application/json; charset=utf-8
 Date: Mon, 10 Dec 2018 16:03:35 GMT
-X-Powered-By: go-json-rest
 X-Runtime: 0.000788
 
 {
@@ -449,7 +435,6 @@ HTTP/1.1 200 OK
 Content-Length: 1256
 Content-Type: application/json; charset=utf-8
 Date: Mon, 10 Dec 2018 15:48:14 GMT
-X-Powered-By: go-json-rest
 X-Runtime: 0.000664
 
 [
@@ -525,7 +510,6 @@ HTTP/1.1 200 OK
 Content-Length: 15
 Content-Type: application/json; charset=utf-8
 Date: Mon, 10 Dec 2018 15:52:19 GMT
-X-Powered-By: go-json-rest
 X-Runtime: 0.000664
 
 {
@@ -554,7 +538,6 @@ HTTP/1.1 200 OK
 Content-Length: 1256
 Content-Type: application/json; charset=utf-8
 Date: Mon, 10 Dec 2018 15:48:14 GMT
-X-Powered-By: go-json-rest
 X-Runtime: 0.000664
 
 [
@@ -616,7 +599,6 @@ HTTP/1.1 200 OK
 Content-Length: 1256
 Content-Type: application/json; charset=utf-8
 Date: Mon, 10 Dec 2018 15:48:14 GMT
-X-Powered-By: go-json-rest
 X-Runtime: 0.000664
 
 [

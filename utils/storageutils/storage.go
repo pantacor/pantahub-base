@@ -1,4 +1,4 @@
-// Copyright 2025  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -158,7 +158,7 @@ func GetMongoClient() (*mongo.Client, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	log.Println("Will connect to mongodb with: " + mongoConnect)
+	log.Printf("Connecting to storage database at host %s:%s", host, port)
 	client, err := mongo.Connect(ctx, clientOptions)
 	return client, err
 }

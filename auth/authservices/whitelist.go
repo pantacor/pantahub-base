@@ -1,4 +1,4 @@
-// Copyright 2017-2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,7 +29,12 @@ func IsEmailDomainAllowed(email string) bool {
 	}
 
 	domains := strings.Split(allowedDomains, ",")
-	emailDomain := strings.Split(email, "@")[1]
+	at := strings.LastIndex(email, "@")
+	if at < 0 || at == len(email)-1 {
+		// malformed address: cannot belong to any allowed domain
+		return false
+	}
+	emailDomain := email[at+1:]
 
 	for _, domain := range domains {
 		if strings.TrimSpace(domain) == emailDomain {

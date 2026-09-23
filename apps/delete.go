@@ -1,4 +1,4 @@
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,9 +20,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 )
 
 // handleDeleteApp delete an oauth client
@@ -38,33 +39,30 @@ import (
 // @Failure 404 {object} utils.RError "App not found"
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /apps/{id} [delete]
-func (app *App) handleDeleteApp(w rest.ResponseWriter, r *rest.Request) {
-	id := r.PathParam("id")
+func (app *App) handleDeleteApp(c *echo.Context) error {
+	id := c.Param("id")
 
 	var owner string
-	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
+	jwtPayload, ok := echoutil.Lookup(c, echoutil.KeyJWTPayload)
 	if ok {
 		owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"].(string)
 	} else {
-		utils.RestErrorWrapper(w, "Owner can't be defined", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Owner can't be defined", http.StatusInternalServerError)
 	}
 
 	database := app.mongoClient.Database(utils.MongoDb)
-	tpApp, httpCode, err := SearchApp(r.Context(), owner, id, database)
+	tpApp, httpCode, err := SearchApp(c.Request().Context(), owner, id, database)
 	if err != nil {
-		utils.RestErrorWrapper(w, err.Error(), httpCode)
-		return
+		return echoutil.RestErrorWrapper(c, err.Error(), httpCode)
 	}
 
 	now := time.Now()
 	tpApp.DeletedAt = &now
 	tpApp.TimeModified = time.Now()
-	_, err = CreateOrUpdateApp(r.Context(), tpApp, database)
+	_, err = CreateOrUpdateApp(c.Request().Context(), tpApp, database)
 	if err != nil {
-		utils.RestErrorWrapper(w, err.Error(), httpCode)
-		return
+		return echoutil.RestErrorWrapper(c, err.Error(), httpCode)
 	}
 
-	w.WriteJson(tpApp)
+	return echoutil.WriteJSON(c, http.StatusOK, tpApp)
 }

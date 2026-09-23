@@ -1,18 +1,31 @@
+// Copyright (c) 2017-2026 Pantacor Ltd.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+
 package authservices
 
 import (
 	"context"
-	"crypto/subtle"
 	"encoding/base64"
 	"errors"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
-	jwtgo "github.com/dgrijalva/jwt-go"
-	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
+	jwtgo "github.com/golang-jwt/jwt/v5"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/accounts/accountsdata"
 	"gitlab.com/pantacor/pantahub-base/apps"
@@ -22,19 +35,19 @@ import (
 	"gitlab.com/pantacor/pantahub-base/tokens/tokenrepo"
 	"gitlab.com/pantacor/pantahub-base/tokens/tokenservice"
 	"gitlab.com/pantacor/pantahub-base/utils"
-	"gitlab.com/pantacor/pantahub-base/utils/models"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gopkg.in/mgo.v2/bson"
 )
 
-func CreateAnonToken(jwtMiddleware *jwt.JWTMiddleware) string {
+func CreateAnonToken(jwtConfig *jwtauth.Config) string {
 	payload := &authmodels.LoginRequestPayload{
 		Username: accountsdata.AnonAccountDefaultUsername,
 		Scope:    "prn:pantahub.com:apis:/base/all.readonly",
 	}
 
-	tokenString, err := CreateUserToken(payload, jwtMiddleware, nil)
+	tokenString, err := CreateUserToken(payload, jwtConfig, nil)
 	if err != nil {
 		return ""
 	}
@@ -42,7 +55,7 @@ func CreateAnonToken(jwtMiddleware *jwt.JWTMiddleware) string {
 	return tokenString
 }
 
-func CreateUserToken(payload *authmodels.LoginRequestPayload, jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) (tokenString string, rerr *utils.RError) {
+func CreateUserToken(payload *authmodels.LoginRequestPayload, jwtConfig *jwtauth.Config, mongoClient *mongo.Client) (tokenString string, rerr *utils.RError) {
 	var err error
 	var scopes []string
 
@@ -52,7 +65,7 @@ func CreateUserToken(payload *authmodels.LoginRequestPayload, jwtMiddleware *jwt
 		scopes = utils.ScopeStringFilterBy(strings.Fields(payload.Scope), "", "")
 	}
 
-	if payload.Username != accountsdata.AnonAccountDefaultUsername && !jwtMiddleware.Authenticator(payload.Username, payload.Password) {
+	if payload.Username != accountsdata.AnonAccountDefaultUsername && !jwtConfig.Authenticator(payload.Username, payload.Password) {
 		rerr = &utils.RError{
 			Msg:   "Authentication Failed",
 			Error: "Authentication Failed",
@@ -61,12 +74,22 @@ func CreateUserToken(payload *authmodels.LoginRequestPayload, jwtMiddleware *jwt
 		return tokenString, rerr
 	}
 
-	token := jwtgo.New(jwtgo.GetSigningMethod(jwtMiddleware.SigningAlgorithm))
+	token := jwtgo.New(jwtgo.GetSigningMethod(jwtConfig.SigningAlgorithm))
 	claims := token.Claims.(jwtgo.MapClaims)
 
-	accExpires := time.Now().Add(jwtMiddleware.Timeout).Unix()
-	if jwtMiddleware.PayloadFunc != nil {
-		acc := jwtMiddleware.PayloadFunc(payload.Username)
+	accExpires := time.Now().Add(jwtConfig.Timeout).Unix()
+	if jwtConfig.PayloadFunc != nil {
+		acc := jwtConfig.PayloadFunc(payload.Username)
+		if acc == nil {
+			// no resolvable principal (e.g. an admin call-as of an unknown
+			// user): never mint a token that carries no identity claims
+			rerr = &utils.RError{
+				Msg:   "Authentication Failed",
+				Error: "Authentication Failed",
+				Code:  http.StatusUnauthorized,
+			}
+			return tokenString, rerr
+		}
 		for key, value := range acc {
 			if key == "exp" {
 				accExpires = value.(int64)
@@ -97,9 +120,11 @@ func CreateUserToken(payload *authmodels.LoginRequestPayload, jwtMiddleware *jwt
 		}
 	}
 
-	if authToken != nil && !authToken.Deleted && authToken.ExpireAt.Unix() > time.Now().Unix() {
+	if authToken != nil && !authToken.Deleted && authToken.ExpireAt.Unix() > time.Now().Unix() &&
+		authToken.SecretMatches(payload.Password) {
 		scopes = authToken.Scopes
-		claims["id"] = payload.Username
+		// identity is the token owner, never the supplied login string
+		claims["id"] = authToken.Owner
 		claims["nick"] = authToken.Name
 		claims["prn"] = authToken.Owner
 		claims["roles"] = strings.ToLower(string(authToken.Type))
@@ -127,11 +152,11 @@ func CreateUserToken(payload *authmodels.LoginRequestPayload, jwtMiddleware *jwt
 		claims["exp"] = time.Now().Add(time.Minute * time.Duration(timeout)).Unix()
 	}
 
-	if jwtMiddleware.MaxRefresh != 0 {
+	if jwtConfig.MaxRefresh != 0 {
 		claims["orig_iat"] = time.Now().Unix()
 	}
 
-	tokenString, err = token.SignedString(jwtMiddleware.Key)
+	tokenString, err = token.SignedString(jwtConfig.Key)
 	if err != nil {
 		rerr = &utils.RError{
 			Msg:   "Error signing new token",
@@ -142,6 +167,71 @@ func CreateUserToken(payload *authmodels.LoginRequestPayload, jwtMiddleware *jwt
 	}
 
 	return tokenString, rerr
+}
+
+// MintAuthenticatedUserToken builds a session token for a user whose
+// identity was already proven (password + second factor, or a passkey
+// assertion). It mirrors the claim shape of CreateUserToken but never calls
+// the Authenticator: the caller is responsible for having authenticated the
+// user. extraClaims (e.g. "amr", "auth_time") are overlaid last but cannot
+// override identity or expiry claims.
+func MintAuthenticatedUserToken(payload *authmodels.LoginRequestPayload, extraClaims map[string]interface{}, jwtConfig *jwtauth.Config, mongoClient *mongo.Client) (tokenString string, rerr *utils.RError) {
+	scopes := utils.ScopeStringFilterBy(strings.Fields(payload.Scope), "", "")
+
+	token := jwtgo.New(jwtgo.GetSigningMethod(jwtConfig.SigningAlgorithm))
+	claims := token.Claims.(jwtgo.MapClaims)
+
+	protected := map[string]bool{
+		"id": true, "prn": true, "nick": true, "roles": true, "type": true,
+		"exp": true, "orig_iat": true, "scopes": true,
+	}
+	for key, value := range extraClaims {
+		if !protected[key] {
+			claims[key] = value
+		}
+	}
+
+	accExpires := time.Now().Add(jwtConfig.Timeout).Unix()
+	if jwtConfig.PayloadFunc != nil {
+		acc := jwtConfig.PayloadFunc(payload.Username)
+		if acc == nil {
+			rerr = &utils.RError{
+				Msg:   "Authentication Failed",
+				Error: "Authentication Failed",
+				Code:  http.StatusUnauthorized,
+			}
+			return "", rerr
+		}
+		for key, value := range acc {
+			if key == "exp" {
+				accExpires = value.(int64)
+			}
+			claims[key] = value
+		}
+	}
+
+	claims["id"] = payload.Username
+	claims["exp"] = accExpires
+
+	if len(scopes) > 0 {
+		claims["scopes"] = strings.Join(scopes, " ")
+	}
+
+	if jwtConfig.MaxRefresh != 0 {
+		claims["orig_iat"] = time.Now().Unix()
+	}
+
+	tokenString, err := token.SignedString(jwtConfig.Key)
+	if err != nil {
+		rerr = &utils.RError{
+			Msg:   "Error signing new token",
+			Error: "Error signing new token",
+			Code:  http.StatusInternalServerError,
+		}
+		return "", rerr
+	}
+
+	return tokenString, nil
 }
 
 // CreateBearerFromPersonalToken mints a short-lived JWT iff the supplied
@@ -155,11 +245,11 @@ func CreateBearerFromPersonalToken(
 	ctx context.Context,
 	username string,
 	personalToken string,
-	jwtMiddleware *jwt.JWTMiddleware,
+	jwtConfig *jwtauth.Config,
 	mongoClient *mongo.Client,
 	ttl time.Duration,
 ) (tokenString string, rerr *utils.RError) {
-	if jwtMiddleware == nil || mongoClient == nil {
+	if jwtConfig == nil || mongoClient == nil {
 		rerr = &utils.RError{
 			Msg:   "Invalid personal token",
 			Error: "Invalid personal token",
@@ -196,7 +286,7 @@ func CreateBearerFromPersonalToken(
 	}
 
 	tokenid := parts[0]
-	_ = parts[1] // secret is verified indirectly through authToken.Secret comparison
+	_ = parts[1] // secret is verified below via authToken.SecretMatches
 
 	repo := tokenrepo.New(mongoClient)
 	service := tokenservice.New(repo)
@@ -239,9 +329,9 @@ func CreateBearerFromPersonalToken(
 		return "", rerr
 	}
 
-	// Secret check: the personalToken is the composite base64 string that
-	// must match authToken.Secret verbatim.
-	if subtle.ConstantTimeCompare([]byte(authToken.Secret), []byte(personalToken)) != 1 {
+	// Secret check: the personalToken is the composite base64 string whose
+	// SHA-256 must match the stored digest.
+	if !authToken.SecretMatches(personalToken) {
 		rerr = &utils.RError{
 			Msg:   "Invalid personal token",
 			Error: "Invalid personal token",
@@ -251,10 +341,10 @@ func CreateBearerFromPersonalToken(
 	}
 
 	// Build JWT.
-	token := jwtgo.New(jwtgo.GetSigningMethod(jwtMiddleware.SigningAlgorithm))
+	token := jwtgo.New(jwtgo.GetSigningMethod(jwtConfig.SigningAlgorithm))
 	claims := token.Claims.(jwtgo.MapClaims)
 
-	claims["id"] = username
+	claims["id"] = authToken.Owner
 	claims["nick"] = authToken.Name
 	claims["prn"] = authToken.Owner
 	claims["roles"] = strings.ToLower(string(authToken.Type))
@@ -266,7 +356,7 @@ func CreateBearerFromPersonalToken(
 		claims["scopes"] = strings.Join(authToken.Scopes, " ")
 	}
 
-	tokenString, err = token.SignedString(jwtMiddleware.Key)
+	tokenString, err = token.SignedString(jwtConfig.Key)
 	if err != nil {
 		rerr = &utils.RError{
 			Msg:   "Error signing new token",
@@ -277,6 +367,47 @@ func CreateBearerFromPersonalToken(
 	}
 
 	return tokenString, nil
+}
+
+// IsValidPersonalToken tells whether secret is a valid personal access token
+// (PAT) usable to log in as the given account. PATs are the machine channel
+// and stay exempt from the two-factor step-up; this check is cheap (no
+// password hash comparison) so the login gate can classify the credential
+// before deciding whether to demand a second factor.
+func IsValidPersonalToken(ctx context.Context, username string, accountPrn string, secret string, mongoClient *mongo.Client) bool {
+	if mongoClient == nil || secret == "" {
+		return false
+	}
+
+	decoded, err := base64.RawStdEncoding.DecodeString(secret)
+	if err != nil {
+		return false
+	}
+
+	splitPassword := strings.Split(string(decoded), ":")
+	if len(splitPassword) < 2 {
+		return false
+	}
+
+	repo := tokenrepo.New(mongoClient)
+	service := tokenservice.New(repo)
+	authToken, err := service.GetToken(ctx, splitPassword[0], "")
+	if err != nil || authToken == nil {
+		return false
+	}
+
+	if authToken.Deleted || authToken.ExpireAt.Unix() <= time.Now().Unix() {
+		return false
+	}
+
+	if !authToken.SecretMatches(secret) {
+		return false
+	}
+
+	// bind strictly to ownership: a PAT authorizes only its owner's account,
+	// never an account whose login identifier merely equals the PAT's
+	// user-chosen Name
+	return authToken.Owner == accountPrn
 }
 
 func AuthWithUserPassFactory(mongoClient *mongo.Client) func(string, string) bool {
@@ -301,7 +432,10 @@ func AuthWithUserPassFactory(mongoClient *mongo.Client) func(string, string) boo
 
 		if strings.HasPrefix(loginUser, utils.BaseServiceID) {
 			tpApp, err := apps.LoginAsApp(loginUser, password, mongoClient.Database(utils.MongoDb))
-			if err != nil || tpApp == nil {
+			if err != nil || tpApp == nil || tpApp.Prn == "" {
+				return false
+			}
+			if tpApp.Type != apps.AppTypeConfidential {
 				return false
 			}
 			return true
@@ -320,7 +454,7 @@ func AuthWithUserPassFactory(mongoClient *mongo.Client) func(string, string) boo
 	}
 }
 
-func AuthenticatePayloadFactory(mongoClient *mongo.Client, jwtMiddleware *jwt.JWTMiddleware) func(string) map[string]interface{} {
+func AuthenticatePayloadFactory(mongoClient *mongo.Client, jwtConfig *jwtauth.Config) func(string) map[string]interface{} {
 	return func(userId string) map[string]interface{} {
 		var loginUser, callUser string
 		var payload map[string]interface{}
@@ -360,7 +494,12 @@ func AuthenticatePayloadFactory(mongoClient *mongo.Client, jwtMiddleware *jwt.JW
 		}
 
 		if callUser != "" && payload["roles"] == "admin" {
-			callPayload := jwtMiddleware.PayloadFunc(callUser)
+			callPayload := jwtConfig.PayloadFunc(callUser)
+			if callPayload == nil {
+				// unknown call-as target: refuse the whole login rather than
+				// panic on the nil map
+				return nil
+			}
 			callPayload["id"] = payload["id"].(string) + "==>" + callPayload["id"].(string)
 			payload["call-as"] = callPayload
 		}
@@ -427,15 +566,10 @@ func AccountAuth(idEmailNick string, secret string, mongoClient *mongo.Client) b
 			repo := tokenrepo.New(mongoClient)
 			service := tokenservice.New(repo)
 			authToken, err = service.GetToken(context.Background(), tokenid, account.Prn)
-			if err == nil && authToken != nil && !authToken.Deleted && authToken.Secret == secret && authToken.ExpireAt.Unix() > time.Now().Unix() {
+			if err == nil && authToken != nil && !authToken.Deleted && authToken.SecretMatches(secret) && authToken.ExpireAt.Unix() > time.Now().Unix() {
 				authTokenValid = true
 			}
 		}
-	}
-
-	// if token is valid and the username for login is the token name login true
-	if authToken != nil && authTokenValid && authToken.Name == idEmailNick {
-		return true
 	}
 
 	if utils.GetEnv(utils.EnvPantahubDisableEmailPasswordLogin) == "true" {
@@ -501,7 +635,12 @@ func DeviceAuth(deviceID string, secret string, mongoClient *mongo.Client) bool 
 		return false
 	}
 
-	device := devices.Device{}
+	// read both the hashed secret and, for rows the background migration
+	// has not reached yet, the legacy plaintext one
+	var stored struct {
+		Secret     string `bson:"secret"`
+		SecretHash string `bson:"secret_hash"`
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	deviceObjectID, err := primitive.ObjectIDFromHex(mgoID.Hex())
@@ -511,14 +650,20 @@ func DeviceAuth(deviceID string, secret string, mongoClient *mongo.Client) bool 
 	err = c.FindOne(ctx, bson.M{
 		"_id":     deviceObjectID,
 		"garbage": bson.M{"$ne": true},
-	}).Decode(&device)
+	}, options.FindOne().SetProjection(bson.M{"secret": 1, "secret_hash": 1})).Decode(&stored)
 	if err != nil {
 		return false
 	}
-	if secret == device.Secret {
-		return true
+
+	ok, upgrade := utils.VerifyStoredSecret(stored.SecretHash, stored.Secret, secret)
+	if ok && upgrade != "" {
+		// legacy plaintext matched: upgrade the row in place so it no longer
+		// depends on the background migration (plaintext stays until purge)
+		_, _ = c.UpdateOne(ctx,
+			bson.M{"_id": deviceObjectID, utils.SecretHashField: bson.M{"$exists": false}},
+			bson.M{"$set": bson.M{utils.SecretHashField: upgrade}})
 	}
-	return false
+	return ok
 }
 
 func DevicePayload(deviceID string, mongoClient *mongo.Client) map[string]interface{} {
@@ -556,7 +701,7 @@ func DevicePayload(deviceID string, mongoClient *mongo.Client) map[string]interf
 		"scopes": utils.Scopes.API.String(),
 	}
 
-	if device.OVMode != nil && device.OVMode.Mode == models.TLSVerification && device.OVMode.Status != models.Completed {
+	if device.OVMode.NeedsVerification() {
 		val["scopes"] = utils.Scopes.APIReadOnly.String() + " " + utils.Scopes.ValidateDevices.String()
 		timeoutStr := utils.GetEnv(utils.EnvPendingOVModeJWTTimeoutMinutes)
 		timeout, err := strconv.Atoi(timeoutStr)

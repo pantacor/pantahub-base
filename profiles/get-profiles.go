@@ -1,5 +1,5 @@
 //
-// Copyright 2021  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,15 +18,16 @@ package profiles
 
 import (
 	"context"
+	jwtgo "github.com/golang-jwt/jwt/v5"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"gopkg.in/mgo.v2/bson"
@@ -53,23 +54,20 @@ type ModelError struct {
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /profiles/ [get]
-func (a *App) handleGetProfiles(w rest.ResponseWriter, r *rest.Request) {
-	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+func (a *App) handleGetProfiles(c *echo.Context) error {
+	owner, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"]
 	if !ok {
 		err := ModelError{}
 		err.Code = http.StatusInternalServerError
 		err.Message = "You need to be logged in as a USER"
 
-		w.WriteHeader(int(err.Code))
-		w.WriteJson(err)
-		return
+		return echoutil.WriteJSON(c, int(err.Code), err)
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_accounts")
 
 	if collection == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
 	profiles := make([]*Profile, 0)
@@ -82,7 +80,7 @@ func (a *App) handleGetProfiles(w rest.ResponseWriter, r *rest.Request) {
 	limit := int64(20) //Default page size=20
 	skip := int64(0)
 
-	value, ok := r.URL.Query()["limit"]
+	value, ok := c.Request().URL.Query()["limit"]
 	if ok {
 		var err error
 		limit, err = strconv.ParseInt(value[0], 10, 64)
@@ -90,7 +88,7 @@ func (a *App) handleGetProfiles(w rest.ResponseWriter, r *rest.Request) {
 			panic(err)
 		}
 	}
-	value, ok = r.URL.Query()["page"]
+	value, ok = c.Request().URL.Query()["page"]
 	if ok {
 		page, err := strconv.ParseInt(value[0], 10, 64)
 		if err != nil {
@@ -102,7 +100,7 @@ func (a *App) handleGetProfiles(w rest.ResponseWriter, r *rest.Request) {
 	findOptions.SetLimit(limit)
 	findOptions.SetSkip(skip)
 
-	for k, v := range r.URL.Query() {
+	for k, v := range c.Request().URL.Query() {
 		if k == "page" || k == "limit" {
 			continue
 		}
@@ -119,34 +117,31 @@ func (a *App) handleGetProfiles(w rest.ResponseWriter, r *rest.Request) {
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	cur, err := collection.Find(ctx, query, findOptions)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error on fetching accounts:"+err.Error(), http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Error on fetching accounts:"+err.Error(), http.StatusForbidden)
 	}
 	defer cur.Close(ctx)
 	for cur.Next(ctx) {
 		result := accounts.Account{}
 		err := cur.Decode(&result)
 		if err != nil {
-			utils.RestErrorWrapper(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
-			return
+			return echoutil.RestErrorWrapper(c, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
 		}
 
-		havePublicDevices, err := a.HavePublicDevices(r.Context(), result.Prn)
+		havePublicDevices, err := a.HavePublicDevices(c.Request().Context(), result.Prn)
 		if err != nil {
-			utils.RestErrorWrapper(w, err.Error(), http.StatusForbidden)
-			return
+			return echoutil.RestErrorWrapper(c, err.Error(), http.StatusForbidden)
 		}
 
-		profile, _ := a.getProfile(r.Context(), result.Prn, nil)
+		profile, _ := a.getProfile(c.Request().Context(), result.Prn, nil)
 		if (havePublicDevices || result.Prn == owner.(string)) && result.Nick != "" {
 			profile.Nick = result.Nick
 			profiles = append(profiles, profile)
 		}
 	}
 
-	w.WriteJson(profiles)
+	return echoutil.WriteJSON(c, http.StatusOK, profiles)
 }

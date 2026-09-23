@@ -1,5 +1,5 @@
 //
-// Copyright 2025  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,19 +17,15 @@
 package devices
 
 import (
-	"context"
+	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
-	"gitlab.com/pantacor/pantahub-base/utils"
+	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"gitlab.com/pantacor/pantahub-base/utils/models"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // patchDeviceTokenRequest defines the fields that can be updated for a device token.
@@ -53,98 +49,64 @@ type patchDeviceTokenRequest struct {
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /devices/tokens/{id} [patch]
-func (a *App) handlePatchTokens(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePatchTokens(c *echo.Context) error {
 
-	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
+	jwtPayload, ok := echoutil.Lookup(c, echoutil.KeyJWTPayload)
 	if !ok {
-		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Missing JWT_PAYLOAD", http.StatusBadRequest)
 	}
 
 	var caller interface{}
 	caller, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
 	if !ok {
-		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
 	}
 
 	var authType interface{}
 	authType, ok = jwtPayload.(jwtgo.MapClaims)["type"]
 	if !ok {
-		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
 	}
 
 	if authType != "USER" && authType != "SESSION" {
-		utils.RestErrorWrapper(w, "Can not be updated by Device", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Can not be updated by Device", http.StatusBadRequest)
 	}
 
-	tokenID := r.PathParam("id")
+	tokenID := c.Param("id")
 	tokenIDBson, err := primitive.ObjectIDFromHex(tokenID)
 	if err != nil {
 		message := fmt.Sprintf("Invalid token ID format: %s", err.Error())
-		utils.RestErrorWrapper(w, message, http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, message, http.StatusBadRequest)
 	}
 
 	// Parse request body
 	patchReq := patchDeviceTokenRequest{}
-	err = r.DecodeJsonPayload(&patchReq)
+	err = echoutil.DecodeJsonPayload(c, &patchReq)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error parsing request body: "+err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Error parsing request body: "+err.Error(), http.StatusBadRequest)
 	}
 
-	updateFields := bson.M{}
+	patch := JoinTokenPatch{OVMode: patchReq.OVMode}
 	if patchReq.Nick != "" {
-		updateFields["nick"] = patchReq.Nick
-	}
-	if patchReq.OVMode != nil {
-		updateFields["ovmode"] = patchReq.OVMode
+		patch.Nick = &patchReq.Nick
 	}
 	if patchReq.DefaultUserMeta != nil {
-		update := map[string]interface{}{}
+		patch.DefaultUserMeta = map[string]interface{}{}
 		for key, val := range patchReq.DefaultUserMeta {
-			update[key] = val
+			patch.DefaultUserMeta[key] = val
 		}
-		updateFields["defaultusermeta"] = update
+	}
+	if patch.Nick == nil && patch.OVMode == nil && patch.DefaultUserMeta == nil {
+		return echoutil.RestErrorWrapper(c, "No updatable fields provided in request body (nick or ovmode)", http.StatusBadRequest)
 	}
 
-	if len(updateFields) == 0 {
-		utils.RestErrorWrapper(w, "No updatable fields provided in request body (nick or ovmode)", http.StatusBadRequest)
-		return
+	updatedToken, err := PatchJoinToken(c.Request().Context(), a.mongoClient, caller.(string), tokenIDBson, patch)
+	if errors.Is(err, ErrJoinTokenNotFound) {
+		return echoutil.RestErrorWrapper(c, "Device token not found or not owned by caller", http.StatusNotFound)
 	}
-
-	updateFields["time-modified"] = time.Now()
-
-	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-	defer cancel()
-
-	filter := bson.M{
-		"_id":   tokenIDBson,
-		"owner": caller.(string),
-	}
-
-	update := bson.M{"$set": updateFields}
-
-	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
-
-	var updatedToken utils.PantahubDevicesJoinToken
-	err = collection.FindOneAndUpdate(ctx, filter, update, opts).Decode(&updatedToken)
-
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			utils.RestErrorWrapper(w, "Device token not found or not owned by caller", http.StatusNotFound)
-		} else {
-			utils.RestErrorWrapper(w, "Error updating device token: "+err.Error(), http.StatusInternalServerError)
-		}
-		return
+		return echoutil.RestErrorWrapper(c, "Error updating device token: "+err.Error(), http.StatusInternalServerError)
 	}
 
-	updatedToken.Token = ""
-	updatedToken.TokenSha = []byte("")
-
-	w.WriteJson(updatedToken)
+	return echoutil.WriteJSON(c, http.StatusOK, updatedToken)
 }

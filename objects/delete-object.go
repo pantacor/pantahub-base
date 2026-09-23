@@ -1,4 +1,4 @@
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,10 +20,11 @@ import (
 	"net/http"
 	"time"
 
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
 
-	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -40,67 +41,60 @@ import (
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /objects/{id} [delete]
-func (a *App) handleDeleteObject(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleDeleteObject(c *echo.Context) error {
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	owner, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in as a USER", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in as a USER", http.StatusForbidden)
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 
 	if collection == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
 	ownerStr, ok := owner.(string)
 
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "Invalid Access", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Invalid Access", http.StatusForbidden)
 	}
 
-	delID := r.PathParam("id")
+	delID := c.Param("id")
 	sha, err := utils.DecodeSha256HexString(delID)
 
 	if err != nil {
-		utils.RestErrorWrapper(w, "Post New Object sha must be a valid sha256", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Post New Object sha must be a valid sha256", http.StatusBadRequest)
 	}
 	storageID := MakeStorageID(ownerStr, sha)
 
 	newObject := Object{}
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	err = collection.FindOne(ctx, bson.M{
 		"_id":     storageID,
 		"garbage": bson.M{"$ne": true},
 	}).Decode(&newObject)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Not Accessible Resource Id", http.StatusForbidden)
 	}
 
 	if newObject.Owner == owner {
-		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 		defer cancel()
 		deleteResult, err := collection.DeleteOne(ctx, bson.M{
 			"_id":     storageID,
 			"garbage": bson.M{"$ne": true},
 		})
 		if err != nil {
-			utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
-			return
+			return echoutil.RestErrorWrapper(c, "Not Accessible Resource Id", http.StatusForbidden)
 		}
 		if deleteResult.DeletedCount == 0 {
-			utils.RestErrorWrapper(w, "Object not deleted", http.StatusForbidden)
-			return
+			return echoutil.RestErrorWrapper(c, "Object not deleted", http.StatusForbidden)
 		}
 	}
 
-	w.WriteJson(newObject)
+	return echoutil.WriteJSON(c, http.StatusOK, newObject)
 }

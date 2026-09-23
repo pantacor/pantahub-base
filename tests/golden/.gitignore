@@ -1,0 +1,4 @@
+# Captured trees hold real data from the target environment (device PRNs, object
+# hashes, log lines). Regenerate them with capture.sh instead of committing.
+baseline/
+candidate/

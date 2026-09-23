@@ -1,4 +1,4 @@
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,9 +30,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
-	"gitlab.com/pantacor/pantahub-base/utils"
+	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"gitlab.com/pantacor/pantahub-base/utils/tracer"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"gopkg.in/mgo.v2/bson"
@@ -53,36 +53,31 @@ import (
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /logs [post]
-func (a *App) handlePostLogs(w rest.ResponseWriter, r *rest.Request) {
-	ctx := context.WithoutCancel(r.Context())
-	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+func (a *App) handlePostLogs(c *echo.Context) error {
+	ctx := context.WithoutCancel(c.Request().Context())
+	authType, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["type"]
 	if !ok {
-		utils.RestErrorWrapper(w, "can't read token type", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "can't read token type", http.StatusForbidden)
 	}
 	if authType != "DEVICE" {
-		utils.RestErrorWrapper(w, "Need to be logged in as DEVICE to post logs", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Need to be logged in as DEVICE to post logs", http.StatusForbidden)
 	}
 
-	device, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	device, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in", http.StatusForbidden)
 	}
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["owner"]
+	owner, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["owner"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in as device with owner", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in as device with owner", http.StatusForbidden)
 	}
 
-	entries, err := readLogsBody(ctx, r.Body)
+	entries, err := readLogsBody(ctx, c.Request().Body)
 	if err != nil {
-		utils.RestErrorWrapper(w, err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, err.Error(), http.StatusBadRequest)
 	}
 
 	newEntries := []Entry{}
@@ -91,8 +86,7 @@ func (a *App) handlePostLogs(w rest.ResponseWriter, r *rest.Request) {
 	for _, v := range entries {
 		v.ID, err = primitive.ObjectIDFromHex(bson.NewObjectId().Hex())
 		if err != nil {
-			utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
-			return
+			return echoutil.RestErrorWrapper(c, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 		}
 		v.Device = device.(string)
 		v.Owner = owner.(string)
@@ -105,13 +99,12 @@ func (a *App) handlePostLogs(w rest.ResponseWriter, r *rest.Request) {
 
 	err = a.backend.postLogs(ctx, newEntries, debug)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error posting logs "+err.Error(), http.StatusInternalServerError)
 		log.Println("ERROR: Error posting logs " + err.Error())
-		return
+		return echoutil.RestErrorWrapper(c, "Error posting logs "+err.Error(), http.StatusInternalServerError)
 	}
 
 	response := map[string]string{"status": "ok"}
-	w.WriteJson(response)
+	return echoutil.WriteJSON(c, http.StatusOK, response)
 }
 
 func readLogsBody(ctx context.Context, buff io.ReadCloser) ([]Entry, error) {

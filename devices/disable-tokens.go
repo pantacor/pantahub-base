@@ -1,5 +1,5 @@
 //
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,9 +22,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -42,44 +43,39 @@ import (
 // @Failure 400 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /devices/tokens/{id} [delete]
-func (a *App) handleDisableTokens(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleDisableTokens(c *echo.Context) error {
 
-	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
+	jwtPayload, ok := echoutil.Lookup(c, echoutil.KeyJWTPayload)
 	if !ok {
-		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Missing JWT_PAYLOAD", http.StatusBadRequest)
 	}
 
 	var caller interface{}
 	caller, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
 	if !ok {
-		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
 	}
 
 	var authType interface{}
 	authType, ok = jwtPayload.(jwtgo.MapClaims)["type"]
 	if !ok {
-		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
 	}
 
 	if authType != "USER" && authType != "SESSION" {
-		utils.RestErrorWrapper(w, "Can not be updated by Device: handle_posttoken", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Can not be updated by Device: handle_posttoken", http.StatusBadRequest)
 	}
 
-	r.ParseForm()
-	tokenID := r.PathParam("id")
+	_ = c.Request().ParseForm()
+	tokenID := c.Param("id")
 	tokenIDBson, err := primitive.ObjectIDFromHex(tokenID)
 	if err != nil {
 		message := fmt.Sprintf("error decoding id to ObjectID: %s -- %s", tokenID, err.Error())
-		utils.RestErrorWrapper(w, message, http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, message, http.StatusInternalServerError)
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
 	updateOptions := options.Update()
@@ -95,9 +91,8 @@ func (a *App) handleDisableTokens(w rest.ResponseWriter, r *rest.Request) {
 	)
 
 	if err != nil {
-		utils.RestErrorWrapper(w, "error inserting device token into database: "+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "error inserting device token into database: "+err.Error(), http.StatusInternalServerError)
 	}
 
-	w.WriteJson(bson.M{"status": "OK"})
+	return echoutil.WriteJSON(c, http.StatusOK, bson.M{"status": "OK"})
 }

@@ -1,0 +1,7 @@
+{
+  "TestRestErrorWrapperUserMatches|gjr": {
+    "Status": 401,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"error\":\"REST-ERR-ID-N\",\"msg\":\"Authentication Failed\",\"code\":401}"
+  }
+}

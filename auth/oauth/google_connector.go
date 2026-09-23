@@ -1,4 +1,4 @@
-// Copyright 2016-2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,13 +21,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"gitlab.com/pantacor/pantahub-base/utils"
 	"io"
-	"math/rand"
 	"net/http"
 	"regexp"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	"gitlab.com/pantacor/pantahub-base/utils"
+	"github.com/labstack/echo/v5"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
@@ -43,6 +42,7 @@ var (
 const oauthGoogleURLAPI = "https://www.googleapis.com/oauth2/v2/userinfo?access_token="
 
 type googlePayload struct {
+	ID            string `json:"id"`
 	Email         string `json:"email"`
 	VerifiedEmail bool   `json:"verified_email"`
 }
@@ -71,12 +71,13 @@ func GetGoogleConfig() *oauth2.Config {
 }
 
 // GoogleAuthorize use google to authorize user
-func GoogleAuthorize(redirectURI string, config *oauth2.Config, w rest.ResponseWriter, r *rest.Request) {
+func GoogleAuthorize(redirectURI string, config *oauth2.Config, c *echo.Context) error {
 	// Create oauthState cookie
-	oauthState := generateStateOauthCookie(redirectURI, w)
+	oauthState := generateStateOauthCookie(redirectURI, c.Response())
 
 	u := config.AuthCodeURL(oauthState)
-	http.Redirect(w, r.Request, u, http.StatusTemporaryRedirect)
+	http.Redirect(c.Response(), c.Request(), u, http.StatusTemporaryRedirect)
+	return nil
 }
 
 // GoogleCb use code to retrive service user data
@@ -94,17 +95,21 @@ func GoogleCb(ctx context.Context, config *oauth2.Config, code string) (payload 
 	if !googlePayload.VerifiedEmail {
 		return &ResponsePayload{RedirectTo: ""}, errors.New("users email is not verified")
 	}
+	if googlePayload.ID == "" {
+		return &ResponsePayload{RedirectTo: ""}, errors.New("google user ID is missing")
+	}
 
 	re := regexp.MustCompile(`@.*`)
 	nick := fmt.Sprintf(
 		"%s%d",
 		re.ReplaceAllString(googlePayload.Email, ""),
-		rand.Intn(100),
+		utils.RandIntn(100),
 	)
 	return &ResponsePayload{
-		Email: googlePayload.Email,
-		Nick:  nick,
-		Raw:   string(data),
+		Email:      googlePayload.Email,
+		Nick:       nick,
+		ProviderID: googlePayload.ID,
+		Raw:        string(data),
 	}, nil
 }
 

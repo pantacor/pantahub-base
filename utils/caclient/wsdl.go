@@ -1,4 +1,5 @@
-// Copyright (c) 2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
+
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -81,9 +82,8 @@ func WSDL(URL string) (*WsdlTP, error) {
 	httpClient := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				RootCAs:            pool,
-				Certificates:       []tls.Certificate{clientCert},
-				InsecureSkipVerify: true,
+				RootCAs:      pool,
+				Certificates: []tls.Certificate{clientCert},
 			},
 		},
 	}

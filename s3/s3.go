@@ -1,5 +1,5 @@
 //
-// Copyright 2020 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -70,7 +71,12 @@ func (s *s3impl) Rename(ctx context.Context, oldKey, newKey string) error {
 		return err
 	}
 
-	s.Delete(ctx, oldKey)
+	// The copy succeeded, so the rename has effectively happened; a failed
+	// delete only leaves the old object orphaned, which should not fail the
+	// operation but must not vanish either.
+	if err := s.Delete(ctx, oldKey); err != nil {
+		log.Printf("WARNING: removing %q after copy failed, object orphaned: %v", oldKey, err)
+	}
 	return nil
 }
 

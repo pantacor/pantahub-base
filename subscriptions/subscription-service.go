@@ -1,4 +1,4 @@
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,10 +21,10 @@ import (
 	"time"
 
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/x/bsonx"
-	"gopkg.in/mgo.v2/bson"
+	mgo "gopkg.in/mgo.v2/bson"
 )
 
 // SubscriptionPage pagination for subscription
@@ -79,7 +79,7 @@ type subscriptionService struct {
 }
 
 var (
-	defaultSubscriptionID = bson.NewObjectId().Hex()
+	defaultSubscriptionID = mgo.NewObjectId().Hex()
 	defaultSubscription   = SubscriptionMgo{
 		ID:         defaultSubscriptionID,
 		Prn:        utils.Prn("prn::subscriptions:/" + defaultSubscriptionID),
@@ -101,7 +101,7 @@ func (i subscriptionService) New(
 
 	// create subscription object
 	s := SubscriptionMgo{}
-	s.ID = bson.NewObjectId().Hex()
+	s.ID = mgo.NewObjectId().Hex()
 	s.Prn = utils.Prn("prn::subscriptions:/" + s.ID)
 	s.service = i
 	s.Subject = subject
@@ -192,11 +192,14 @@ func (i subscriptionService) LoadBySubject(pctx context.Context, subject utils.P
 }
 
 func (i subscriptionService) GetDefaultSubscription(subject utils.Prn) Subscription {
+	// copy the template and mutate only the copy: the package-global template
+	// must stay immutable — concurrent callers were racing on it and the
+	// returned copy carried the previous caller's Subject
 	sub := defaultSubscription
 	sub.service = i
-	defaultSubscription.LastModified = i.Now()
-	defaultSubscription.TimeCreated = defaultSubscription.LastModified
-	defaultSubscription.Subject = subject
+	sub.LastModified = i.Now()
+	sub.TimeCreated = sub.LastModified
+	sub.Subject = subject
 	return sub
 }
 
@@ -309,9 +312,9 @@ func (i subscriptionService) ensureIndices() error {
 	indexOptions.SetUnique(true)
 
 	index := mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "service", Value: bsonx.Int32(1)},
-			{Key: "subject", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "service", Value: int32(1)},
+			{Key: "subject", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -338,6 +341,8 @@ func NewService(
 	sub.admins = admins
 	sub.types = typeDefs
 
-	sub.ensureIndices()
+	if err := sub.ensureIndices(); err != nil {
+		log.Printf("WARNING: creating subscription indices failed: %v", err)
+	}
 	return sub
 }

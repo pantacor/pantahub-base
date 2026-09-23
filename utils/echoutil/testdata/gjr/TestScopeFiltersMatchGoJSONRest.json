@@ -1,0 +1,58 @@
+{
+  "TestScopeFiltersMatchGoJSONRest/insufficient_scope|gjr": {
+    "Res": {
+      "Status": 403,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "{\"error\":\"REST-ERR-ID-N\",\"code\":403}"
+    },
+    "WWW": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/devices.readonly\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t"
+  },
+  "TestScopeFiltersMatchGoJSONRest/no_resolved_caller|gjr": {
+    "Res": {
+      "Status": 401,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "{\"error\":\"REST-ERR-ID-N\",\"code\":401}"
+    },
+    "WWW": ""
+  },
+  "TestScopeFiltersMatchGoJSONRest/no_scopes_claim|gjr": {
+    "Res": {
+      "Status": 403,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "{\"error\":\"REST-ERR-ID-N\",\"code\":403}"
+    },
+    "WWW": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/devices.readonly\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t"
+  },
+  "TestScopeFiltersMatchGoJSONRest/optional:_anonymous_passes|gjr": {
+    "Res": {
+      "Status": 200,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "\"ok\""
+    },
+    "WWW": ""
+  },
+  "TestScopeFiltersMatchGoJSONRest/optional:_insufficient_scope|gjr": {
+    "Res": {
+      "Status": 403,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "{\"error\":\"REST-ERR-ID-N\",\"code\":403}"
+    },
+    "WWW": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/devices.readonly\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t"
+  },
+  "TestScopeFiltersMatchGoJSONRest/required_scope_present|gjr": {
+    "Res": {
+      "Status": 200,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "\"ok\""
+    },
+    "WWW": ""
+  },
+  "TestScopeFiltersMatchGoJSONRest/umbrella_scope|gjr": {
+    "Res": {
+      "Status": 403,
+      "ContentType": "application/json; charset=utf-8",
+      "Body": "{\"error\":\"REST-ERR-ID-N\",\"code\":403}"
+    },
+    "WWW": "Bearer Realm=\"pantahub services\",\n\t\t\t\t\t\t\t\tph-aeps=\"http://localhost:12365/auth\",\n\t\t\t\t\t\t\t\tscope=\"prn:pantahub.com:apis:/base/devices.readonly\",\n\t\t\t\t\t\t\t\terror=\"insufficient_scope\",\n\t\t\t\t\t\t\t\terror_description=\"The request requires higher privileges than provided by the\n\t\t\t\t     access token\"\n\t\t\t\t\t\t\t\t"
+  }
+}

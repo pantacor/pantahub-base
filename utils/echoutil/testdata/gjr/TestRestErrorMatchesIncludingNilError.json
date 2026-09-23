@@ -1,0 +1,12 @@
+{
+  "TestRestErrorMatchesIncludingNilError/nil|gjr": {
+    "Status": 500,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"error\":\"REST-ERR-ID-N\",\"code\":500}"
+  },
+  "TestRestErrorMatchesIncludingNilError/non-nil|gjr": {
+    "Status": 500,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"error\":\"REST-ERR-ID-N\",\"code\":500}"
+  }
+}

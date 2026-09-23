@@ -1,0 +1,7 @@
+{
+  "TestNotFoundMatchesRestNotFound|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"Error\":\"Resource not found\"}"
+  }
+}

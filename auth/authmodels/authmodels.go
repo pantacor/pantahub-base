@@ -1,9 +1,23 @@
+// Copyright (c) 2017-2026 Pantacor Ltd.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+
 package authmodels
 
 import (
 	"time"
 
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -18,6 +32,13 @@ type TokenResponse struct {
 	TokenType   string `json:"token_type,omitempty"`
 	Scopes      string `json:"scopes,omitempty"`
 	ExpiresIn   int    `json:"expires_in,omitempty"`
+
+	// AccessToken repeats Token under the name OAuth gives it (RFC 6749
+	// section 5.1). Token stays because the clients written against this API
+	// read that; standard OAuth clients only look for access_token.
+	AccessToken  string `json:"access_token,omitempty"`
+	RefreshToken string `json:"refresh_token,omitempty"`
+	Scope        string `json:"scope,omitempty"`
 }
 
 type PasswordResetRequest struct {
@@ -43,7 +64,7 @@ type PasswordReset struct {
 type ResetPasswordClaims struct {
 	Email        string    `json:"email"`
 	TimeModified time.Time `json:"time-modified"`
-	jwtgo.StandardClaims
+	jwtgo.RegisteredClaims
 }
 
 // this requests to swap access code with accesstoken

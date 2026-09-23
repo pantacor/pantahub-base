@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017-2023 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,28 +19,32 @@ package exports
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
-	"gitlab.com/pantacor/pantahub-base/auth/authservices"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/utils"
-	"gitlab.com/pantacor/pantahub-base/utils/tracer"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // PantahubDevicesAutoTokenV1 device auto token name
+//
+// #nosec G101 -- the name of an HTTP header, not a token value
 const PantahubDevicesAutoTokenV1 = "Pantahub-Devices-Auto-Token-V1"
 const CreateIndexTimeout = 600 * time.Second
 
 // App Web app structure
 type App struct {
-	jwtMiddleware *jwt.JWTMiddleware
-	API           *rest.Api
-	mongoClient   *mongo.Client
+	jwtConfig   *jwtauth.Config
+	anonToken   func() string
+	mongoClient *mongo.Client
+	// objectServer stores object content; see SetObjectServer.
+	objectServer http.Handler
 }
 
 // Build factory a new Device App only with mongoClient
@@ -50,70 +54,53 @@ func Build(mongoClient *mongo.Client) *App {
 	}
 }
 
-// New create exports app
-func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
-	app := new(App)
-	app.jwtMiddleware = jwtMiddleware
-	app.mongoClient = mongoClient
-	app.API = rest.NewApi()
+// New create exports app. anonToken mints the token used for requests
+// without credentials.
+func New(jwtConfig *jwtauth.Config, anonToken func() string, mongoClient *mongo.Client) *App {
+	return &App{jwtConfig: jwtConfig, anonToken: anonToken, mongoClient: mongoClient}
+}
 
-	// we dont use default stack because we dont want content type enforcement
-	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
-		"/exports:", log.Lshortfile)})
-	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "exports"})
-	app.API.Use(&rest.StatusMiddleware{})
-	app.API.Use(&rest.TimerMiddleware{})
-	app.API.Use(&metrics.Middleware{})
+// Mount registers exports on echo with its previous middleware stack.
+func (app *App) Mount(s *echoutil.Server) {
+	const prefix = "/exports"
 
-	app.API.Use(rest.DefaultCommonStack...)
-	app.API.Use(&rest.CorsMiddleware{
-		RejectNonCorsRequests: false,
-		OriginValidator: func(origin string, request *rest.Request) bool {
-			return true
-		},
-		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{
-			"Accept",
-			"Content-Type",
-			"Content-Length",
-			"X-Custom-Header",
-			"Origin",
-			"Authorization",
-			"X-Trace-ID",
-			"Trace-Id",
-			"x-request-id",
-			"X-Request-ID",
-			"TraceID",
-			"ParentID",
-			"Uber-Trace-ID",
-			"uber-trace-id",
-			"traceparent",
-			"tracestate",
-		},
-		AccessControlAllowCredentials: true,
-		AccessControlMaxAge:           3600,
-	})
-
-	app.API.Use(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtMiddleware, Mongo: app.mongoClient})
-	app.API.Use(&rest.IfMiddleware{
-		Condition: func(request *rest.Request) bool {
-			// if call is coming with authorization attempt, ensure JWT middleware
-			// is used... otherwise let through anonymous POST for registration
-			auth := request.Header.Get("Authorization")
-			if auth != "" && strings.HasPrefix(strings.ToLower(strings.TrimSpace(auth)), "bearer ") {
-				return true
-			}
-
-			if auth == "" {
-				token := authservices.CreateAnonToken(app.jwtMiddleware)
-				request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-				return true
-			}
-
-			return false
-		},
-		IfTrue: app.jwtMiddleware,
-	})
+	g := s.Mount(prefix,
+		echoutil.AccessLogJSON(log.New(os.Stdout, "/exports:", log.Lshortfile), prefix),
+		echoutil.AccessLogFluent(&utils.AccessLogFluentMiddleware{Prefix: "exports"}, prefix),
+		metrics.EchoMiddleware(prefix),
+		echoutil.Instrument(),
+		echoutil.Recover(),
+		echoutil.CORS(echoutil.CORSConfig{
+			RejectNonCorsRequests: false,
+			OriginValidator:       echoutil.AllowAllOrigins,
+			AllowedMethods:        []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+			AllowedHeaders: []string{
+				"Accept",
+				"Content-Type",
+				"Content-Length",
+				"X-Custom-Header",
+				"Origin",
+				"Authorization",
+				"X-Trace-ID",
+				"Trace-Id",
+				"x-request-id",
+				"X-Request-ID",
+				"TraceID",
+				"ParentID",
+				"Uber-Trace-ID",
+				"uber-trace-id",
+				"traceparent",
+				"tracestate",
+			},
+			AccessControlAllowCredentials: true,
+			AccessControlMaxAge:           3600,
+		}),
+		echoutil.BasicAuthToBearer(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtConfig, Mongo: app.mongoClient}),
+		bearerOrAnon(echoutil.JWT(app.jwtConfig), app.anonToken),
+		// Auth resolves the caller ScopeFilter checks; without it every
+		// export of an authenticated user answers 401.
+		echoutil.Auth(),
+	)
 
 	readDevicesScopes := []utils.Scope{
 		utils.Scopes.API,
@@ -121,17 +108,28 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		utils.Scopes.ReadDevices,
 	}
 
-	// /auth_status endpoints
-	apiRouter, _ := rest.MakeRouter(
-		rest.Get("/#owner/#nick/#rev/#filename", utils.ScopeFilter(readDevicesScopes, app.handleGetExport)),
-	)
+	// A link is its own credential; see links.go.
+	g.GET("/links/:token/:filename", app.handleGetExportLink)
+	g.PUT("/uploads/:token", app.handlePutExportUpload)
+	g.GET("/:owner/:nick/:rev/:filename", echoutil.ScopeFilter(readDevicesScopes, app.handleGetExport))
+}
 
-	app.API.Use(&tracer.OtelMiddleware{
-		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
-		Router:      apiRouter,
-	})
-
-	app.API.SetApp(apiRouter)
-
-	return app
+// bearerOrAnon runs jwt for bearer requests and for requests without
+// credentials, which get an anonymous token first. Other schemes pass through.
+func bearerOrAnon(jwt echo.MiddlewareFunc, anonToken func() string) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		withJWT := jwt(next)
+		return func(c *echo.Context) error {
+			h := c.Request().Header
+			auth := h.Get("Authorization")
+			if auth == "" {
+				h.Set("Authorization", fmt.Sprintf("Bearer %s", anonToken()))
+				return withJWT(c)
+			}
+			if strings.HasPrefix(strings.ToLower(strings.TrimSpace(auth)), "bearer ") {
+				return withJWT(c)
+			}
+			return next(c)
+		}
+	}
 }

@@ -1,5 +1,5 @@
 //
-// Copyright 2017, 2018  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,10 +24,9 @@ import (
 	"time"
 
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/x/bsonx"
-	"gopkg.in/mgo.v2/bson"
 )
 
 type mgoLogger struct {
@@ -48,8 +47,8 @@ func (s *mgoLogger) register() error {
 	indexOptions.SetBackground(true)
 
 	index := mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "own", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "own", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -71,8 +70,8 @@ func (s *mgoLogger) register() error {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "dev", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "dev", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -94,8 +93,8 @@ func (s *mgoLogger) register() error {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "time-created", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "time-created", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -117,9 +116,9 @@ func (s *mgoLogger) register() error {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "tsec", Value: bsonx.Int32(1)},
-			{Key: "tnano", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "tsec", Value: int32(1)},
+			{Key: "tnano", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -140,8 +139,8 @@ func (s *mgoLogger) register() error {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "lvl", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "lvl", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -162,10 +161,10 @@ func (s *mgoLogger) register() error {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "dev", Value: bsonx.Int32(1)},
-			{Key: "own", Value: bsonx.Int32(1)},
-			{Key: "time-created", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "dev", Value: int32(1)},
+			{Key: "own", Value: int32(1)},
+			{Key: "time-created", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -191,15 +190,17 @@ func (s *mgoLogger) unregister(delete bool) error {
 }
 
 func (s *mgoLogger) getLogs(parentCtx context.Context, start int64, page int64, before *time.Time,
-	after *time.Time, query Filters, sort Sorts, cursor bool) (*Pager, error) {
+	after *time.Time, query Filters, sort Sorts, searchAfter []interface{}, cursor bool) (*Pager, error) {
 	var result Pager
 	var err error
 
-	if cursor {
-		return nil, ErrCursorNotImplemented
-	}
+	// This backend does not do keyset pagination; it simply never hands back a
+	// NextCursor. Failing the whole request instead (as it used to) made every
+	// log query 500 on an Elastic-less deployment, because the web UI always
+	// asks for a cursor.
+	_ = searchAfter
+	_ = cursor
 
-	sortStr := strings.Join(sort, ",")
 	collLogs := s.mongoClient.Database(utils.MongoDb).Collection(s.mgoCollection)
 
 	if collLogs == nil {
@@ -238,21 +239,18 @@ func (s *mgoLogger) getLogs(parentCtx context.Context, start int64, page int64, 
 		}
 	}
 
-	if before != nil {
-		findFilter["time-created"] = bson.M{
-			"$lt": before,
+	// Both bounds live under the same key, so they have to share one
+	// expression; assigning them separately made `after` overwrite `before`
+	// and silently drop the upper bound of a time range.
+	if before != nil || after != nil {
+		timeRange := bson.M{}
+		if before != nil {
+			timeRange["$lt"] = before
 		}
-	}
-	if after != nil {
-		findFilter["time-created"] = bson.M{
-			"$gt": after,
+		if after != nil {
+			timeRange["$gt"] = after
 		}
-	}
-
-	// default sort by reverse time
-	if sortStr == "" {
-		sortStr =
-			"-time-created"
+		findFilter["time-created"] = timeRange
 	}
 
 	findOptions := options.Find()
@@ -264,19 +262,29 @@ func (s *mgoLogger) getLogs(parentCtx context.Context, start int64, page int64, 
 		findOptions.SetLimit(page)
 	}
 
-	sortFields := bson.M{}
+	// bson.D, not bson.M: a sort needs its keys in a defined order, and Go map
+	// iteration is randomised, so a multi-field sort used to pick its key
+	// precedence differently on every request.
+	sortFields := bson.D{}
 	for _, v := range sort {
-		if v[0:0] == "-" {
-			sortFields[v] = -1
-		} else {
-			sortFields[v] = 1
+		// v[0:0] is the empty string and never equals "-", so descending was
+		// unreachable and, worse, the "-" was never stripped: the sort key
+		// became a literal "-time-created" field that does not exist, leaving
+		// every explicitly sorted query effectively unordered.
+		order := 1
+		if strings.HasPrefix(v, "-") {
+			order = -1
 		}
+		sortFields = append(sortFields, bson.E{
+			Key:   strings.TrimPrefix(strings.TrimPrefix(v, "-"), "+"),
+			Value: order,
+		})
 	}
-	if len(sortFields) > 0 {
-		findOptions.SetSort(sortFields)
-	} else {
-		findOptions.SetSort(bson.M{"time-created": -1})
+	if len(sortFields) == 0 {
+		// default sort by reverse time
+		sortFields = bson.D{{Key: "time-created", Value: -1}}
 	}
+	findOptions.SetSort(sortFields)
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 	cur, err := collLogs.Find(ctx, findFilter, findOptions)

@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017-2023 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,19 +25,18 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
-	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
+	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
-	"gitlab.com/pantacor/pantahub-base/utils/tracer"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/x/bsonx"
-	"gopkg.in/mgo.v2/bson"
 )
 
 const createIndexTimeout = 3000 * time.Second
@@ -47,8 +46,7 @@ const trailsLastModifiedKeyConst = "last-touched"
 
 // App Web app structure
 type App struct {
-	jwtMiddleware    *jwt.JWTMiddleware
-	API              *rest.Api
+	jwtConfig        *jwtauth.Config
 	mongoClient      *mongo.Client
 	deviceCollection *mongo.Collection
 	stepCollection   *mongo.Collection
@@ -148,8 +146,8 @@ func timeModifiedTrail(proto interface{}) (*time.Time, error) {
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /changes/devices [get]
-func (a *App) handleGetChangesDevices(w rest.ResponseWriter, r *rest.Request) {
-	a.handleGetChangesGeneric(w, r, "/changes/devices", a.deviceCollection, findProtoDevices,
+func (a *App) handleGetChangesDevices(c *echo.Context) error {
+	return a.handleGetChangesGeneric(c, "/changes/devices", a.deviceCollection, findProtoDevices,
 		devicesLastModifiedKeyConst, timeModifiedDevice)
 }
 
@@ -166,8 +164,8 @@ func (a *App) handleGetChangesDevices(w rest.ResponseWriter, r *rest.Request) {
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /changes/steps [get]
-func (a *App) handleGetChangesSteps(w rest.ResponseWriter, r *rest.Request) {
-	a.handleGetChangesGeneric(w, r, "/changes/steps", a.stepCollection, findProtoSteps,
+func (a *App) handleGetChangesSteps(c *echo.Context) error {
+	return a.handleGetChangesGeneric(c, "/changes/steps", a.stepCollection, findProtoSteps,
 		stepsLastModifiedKeyConst, timeModifiedStep)
 }
 
@@ -186,55 +184,50 @@ func (a *App) handleGetChangesSteps(w rest.ResponseWriter, r *rest.Request) {
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /changes/trails [get]
-func (a *App) handleGetChangesTrail(w rest.ResponseWriter, r *rest.Request) {
-	a.handleGetChangesGeneric(w, r, "/changes/trails", a.trailCollection, findProtoTrails, trailsLastModifiedKeyConst, timeModifiedTrail)
+func (a *App) handleGetChangesTrail(c *echo.Context) error {
+	return a.handleGetChangesGeneric(c, "/changes/trails", a.trailCollection, findProtoTrails, trailsLastModifiedKeyConst, timeModifiedTrail)
 }
 
-func (a *App) handleGetChangesGeneric(w rest.ResponseWriter, r *rest.Request, basePath string,
-	col *mongo.Collection, findProtoFunc FindPrototypeFunc, timeModifiedKey string, timeModifiedFunc TimeModfiedFunc) {
+func (a *App) handleGetChangesGeneric(c *echo.Context, basePath string,
+	col *mongo.Collection, findProtoFunc FindPrototypeFunc, timeModifiedKey string, timeModifiedFunc TimeModfiedFunc) error {
 
-	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
+	jwtPayload, ok := echoutil.Lookup(c, echoutil.KeyJWTPayload)
 	if !ok {
-		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Missing JWT_PAYLOAD", http.StatusBadRequest)
 	}
 
 	var caller interface{}
 	caller, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
 	if !ok {
-		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Missing JWT_PAYLOAD item 'prn'", http.StatusBadRequest)
 	}
 
 	var authType interface{}
 	authType, ok = jwtPayload.(jwtgo.MapClaims)["type"]
 	if !ok {
-		utils.RestErrorWrapper(w, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Missing JWT_PAYLOAD item 'type'", http.StatusBadRequest)
 	}
 
 	if authType != "USER" && authType != "SESSION" {
-		utils.RestErrorWrapper(w, "Can only be updated by Device: handle_posttoken", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Can only be updated by Device: handle_posttoken", http.StatusBadRequest)
 	}
 
 	collection := col
 	res := ChangePage{}
 
-	pageSizeS := r.URL.Query().Get("page[size]")
-	pageAfter := r.URL.Query().Get("page[after]")
-	pageBefore := r.URL.Query().Get("page[before]")
+	pageSizeS := c.Request().URL.Query().Get("page[size]")
+	pageAfter := c.Request().URL.Query().Get("page[after]")
+	pageBefore := c.Request().URL.Query().Get("page[before]")
 
 	if pageSizeS == "" {
 		pageSizeS = "50"
-		return
+		return nil
 	}
 
 	pageSize, err := strconv.ParseInt(pageSizeS, 10, 64)
 
 	if err != nil {
-		utils.RestErrorUser(w, err, "page[size] must be valid integer", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorUser(c, err, "page[size] must be valid integer", http.StatusBadRequest)
 	}
 
 	if pageSize > 250 {
@@ -262,8 +255,7 @@ func (a *App) handleGetChangesGeneric(w rest.ResponseWriter, r *rest.Request, ba
 	} else {
 		pageTime, err = time.Parse(time.RFC3339Nano, pageTimeS)
 		if err != nil {
-			utils.RestErrorUser(w, err, "Error parsing time format", http.StatusBadRequest)
-			return
+			return echoutil.RestErrorUser(c, err, "Error parsing time format", http.StatusBadRequest)
 		}
 	}
 
@@ -284,11 +276,10 @@ func (a *App) handleGetChangesGeneric(w rest.ResponseWriter, r *rest.Request, ba
 		findOptions = findOptions.SetSort(bson.M{timeModifiedKey: -1})
 	}
 
-	cur, err := collection.Find(r.Context(), q, findOptions)
+	cur, err := collection.Find(c.Request().Context(), q, findOptions)
 
 	if err != nil {
-		utils.RestErrorWrapper(w, "error getting changes for user:"+err.Error(), http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "error getting changes for user:"+err.Error(), http.StatusForbidden)
 	}
 
 	var links ChangePageCursor
@@ -302,19 +293,17 @@ func (a *App) handleGetChangesGeneric(w rest.ResponseWriter, r *rest.Request, ba
 	var result interface{}
 	var tm *time.Time
 
-	defer cur.Close(r.Context())
-	for cur.Next(r.Context()) {
+	defer cur.Close(c.Request().Context())
+	for cur.Next(c.Request().Context()) {
 		result = findProtoFunc()
 		err := cur.Decode(result)
 		if err != nil {
-			utils.RestErrorWrapper(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
-			return
+			return echoutil.RestErrorWrapper(c, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
 		}
 		if !firstDone {
 			tm, err = timeModifiedFunc(result)
 			if err != nil {
-				utils.RestErrorWrapper(w, "Internal error extracting time modifed: "+err.Error(), http.StatusForbidden)
-				return
+				return echoutil.RestErrorWrapper(c, "Internal error extracting time modifed: "+err.Error(), http.StatusForbidden)
 			}
 			if isAfter {
 				links.Prev = utils.GetAPIEndpoint(linkBase + "page[before]=" + tm.Format(time.RFC3339Nano))
@@ -336,8 +325,7 @@ func (a *App) handleGetChangesGeneric(w rest.ResponseWriter, r *rest.Request, ba
 	if result != nil {
 		tm, err = timeModifiedFunc(result)
 		if err != nil {
-			utils.RestErrorWrapper(w, "Internal error extracting time modifed: "+err.Error(), http.StatusForbidden)
-			return
+			return echoutil.RestErrorWrapper(c, "Internal error extracting time modifed: "+err.Error(), http.StatusForbidden)
 		}
 	}
 
@@ -367,13 +355,13 @@ func (a *App) handleGetChangesGeneric(w rest.ResponseWriter, r *rest.Request, ba
 	res.Links = &links
 	res.Data = data
 
-	w.WriteJson(res)
+	return echoutil.WriteJSON(c, http.StatusOK, res)
 }
 
 // New create devices web app
-func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
+func New(jwtConfig *jwtauth.Config, mongoClient *mongo.Client) *App {
 	app := new(App)
-	app.jwtMiddleware = jwtMiddleware
+	app.jwtConfig = jwtConfig
 	app.mongoClient = mongoClient
 
 	app.deviceCollection = app.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
@@ -392,9 +380,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	indexOptionsTrails := indexOptionDevices
 
 	index1 := mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "owner", Value: bsonx.Int32(1)},
-			{Key: devicesLastModifiedKeyConst, Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "owner", Value: int32(1)},
+			{Key: devicesLastModifiedKeyConst, Value: int32(1)},
 		},
 		Options: &indexOptionDevices,
 	}
@@ -405,9 +393,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	}
 
 	index2 := mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "owner", Value: bsonx.Int32(1)},
-			{Key: stepsLastModifiedKeyConst, Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "owner", Value: int32(1)},
+			{Key: stepsLastModifiedKeyConst, Value: int32(1)},
 		},
 		Options: &indexOptionsSteps,
 	}
@@ -419,9 +407,9 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	}
 
 	index3 := mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "owner", Value: bsonx.Int32(1)},
-			{Key: trailsLastModifiedKeyConst, Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "owner", Value: int32(1)},
+			{Key: trailsLastModifiedKeyConst, Value: int32(1)},
 		},
 		Options: &indexOptionsTrails,
 	}
@@ -432,40 +420,12 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		return nil
 	}
 
-	app.API = rest.NewApi()
-	// we dont use default stack because we dont want content type enforcement
-	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
-		"/changes:", log.Lshortfile)})
-	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "changes"})
-	app.API.Use(&rest.StatusMiddleware{})
-	app.API.Use(&rest.TimerMiddleware{})
-	app.API.Use(&metrics.Middleware{})
+	return app
+}
 
-	app.API.Use(rest.DefaultCommonStack...)
-	app.API.Use(&rest.CorsMiddleware{
-		RejectNonCorsRequests: false,
-		OriginValidator: func(origin string, request *rest.Request) bool {
-			return true
-		},
-		AllowedMethods:                []string{"GET"},
-		AllowedHeaders:                []string{"*"},
-		AccessControlAllowCredentials: true,
-		AccessControlMaxAge:           3600,
-	})
-
-	app.API.Use(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtMiddleware, Mongo: app.mongoClient})
-	app.API.Use(&rest.IfMiddleware{
-		Condition: func(request *rest.Request) bool {
-			return true
-		},
-		IfTrue: app.jwtMiddleware,
-	})
-	app.API.Use(&rest.IfMiddleware{
-		Condition: func(request *rest.Request) bool {
-			return true
-		},
-		IfTrue: &utils.AuthMiddleware{},
-	})
+// Mount registers changes on the echo server.
+func (app *App) Mount(s *echoutil.Server) {
+	const prefix = "/changes"
 
 	readDevicesScopes := []utils.Scope{
 		utils.Scopes.API,
@@ -484,18 +444,26 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		utils.Scopes.ReadTrails,
 	}
 
-	// /auth_status endpoints
-	apiRouter, _ := rest.MakeRouter(
-		// TPM auto enroll register
-		rest.Get("/devices", utils.ScopeFilter(readDevicesScopes, app.handleGetChangesDevices)),
-		rest.Get("/steps", utils.ScopeFilter(readStepsScopes, app.handleGetChangesSteps)),
-		rest.Get("/trails", utils.ScopeFilter(readTrailsScopes, app.handleGetChangesTrail)),
+	g := s.Mount(prefix,
+		echoutil.AccessLogJSON(log.New(os.Stdout, "/changes:", log.Lshortfile), prefix),
+		echoutil.AccessLogFluent(&utils.AccessLogFluentMiddleware{Prefix: "changes"}, prefix),
+		metrics.EchoMiddleware(prefix),
+		echoutil.Instrument(),
+		echoutil.Recover(),
+		echoutil.CORS(echoutil.CORSConfig{
+			RejectNonCorsRequests:         false,
+			OriginValidator:               echoutil.AllowAllOrigins,
+			AllowedMethods:                []string{"GET"},
+			AllowedHeaders:                []string{"*"},
+			AccessControlAllowCredentials: true,
+			AccessControlMaxAge:           3600,
+		}),
+		echoutil.BasicAuthToBearer(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtConfig, Mongo: app.mongoClient}),
+		echoutil.JWT(app.jwtConfig),
+		echoutil.Auth(),
 	)
-	app.API.Use(&tracer.OtelMiddleware{
-		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
-		Router:      apiRouter,
-	})
-	app.API.SetApp(apiRouter)
 
-	return app
+	g.GET("/devices", echoutil.ScopeFilter(readDevicesScopes, app.handleGetChangesDevices))
+	g.GET("/steps", echoutil.ScopeFilter(readStepsScopes, app.handleGetChangesSteps))
+	g.GET("/trails", echoutil.ScopeFilter(readTrailsScopes, app.handleGetChangesTrail))
 }

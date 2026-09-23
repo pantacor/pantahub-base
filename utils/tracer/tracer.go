@@ -1,4 +1,5 @@
-// Copyright (c) 2022  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
+
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,6 +31,9 @@ import (
 	oteltrace "go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc/credentials"
 )
+
+// tracerName is the instrumentation name for function spans.
+const tracerName = "gitlab.com/pantacor/pantahub-base/base/utils/tracer"
 
 type OtelTracer struct {
 	tracer  oteltrace.Tracer

@@ -1,4 +1,4 @@
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,23 +25,26 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/accounts/accountsdata"
 	"gitlab.com/pantacor/pantahub-base/auth/authmodels"
 	"gitlab.com/pantacor/pantahub-base/auth/authservices"
+	"gitlab.com/pantacor/pantahub-base/auth/cimd"
+	"gitlab.com/pantacor/pantahub-base/auth/storage"
 	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/utils"
-	"gitlab.com/pantacor/pantahub-base/utils/tracer"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/x/bsonx"
 )
 
 const (
-	exchangeTokenRequiredErr    = "Exchange token is needed"
-	passwordIsNeededErr         = "New password is needed"
+	exchangeTokenRequiredErr = "Exchange token is needed"
+	passwordIsNeededErr      = "New password is needed"
+	//#nosec G101 -- an error message shown to the caller, not a token
 	tokenInvalidOrExpiredErr    = "Invalid or expired token"
 	emailRequiredForPasswordErr = "Email is required"
 	dbConnectionErr             = "Error with Database connectivity"
@@ -53,17 +56,43 @@ const (
 
 // App define auth rest application
 type App struct {
-	jwtMiddleware *jwt.JWTMiddleware
-	API           *rest.Api
-	mongoClient   *mongo.Client
+	jwtConfig    *jwtauth.Config
+	mongoClient  *mongo.Client
+	mfaRepo      *storage.MFARepo
+	webauthnRepo *storage.WebauthnRepo
+
+	// oauthResources are the protected resources tokens can be bound to, and
+	// clientMetadata resolves clients that identify themselves with a URL. See
+	// oauth_server.go.
+	oauthResources map[string]OAuthResource
+	clientMetadata *cimd.Resolver
+}
+
+// demoAccountsEnabled tells whether the built-in demo accounts (admin:admin,
+// user1:user1, ...) run with their code-default passwords, given the value of
+// PANTAHUB_PRODUCTION. Fail closed: only an explicit "false"-like value
+// enables them; unset (not configured) is treated as production, so a
+// deployment that forgets the variable never ships admin:admin.
+func demoAccountsEnabled(production string) bool {
+	switch strings.ToLower(strings.TrimSpace(production)) {
+	case "false", "0", "no", "off":
+		return true
+	}
+	return false
 }
 
 func init() {
-	// if in production we disable all fixed accounts
-	if os.Getenv("PANTAHUB_PRODUCTION") == "" {
+	production := os.Getenv("PANTAHUB_PRODUCTION")
+	if demoAccountsEnabled(production) {
+		//#nosec G706 -- PANTAHUB_PRODUCTION is set by the operator, not a caller
+		log.Println("PANTAHUB_PRODUCTION=" + production + ": development mode, built-in demo accounts enabled with default passwords")
 		return
 	}
+	if strings.TrimSpace(production) == "" {
+		log.Println("WARNING: PANTAHUB_PRODUCTION is not set; assuming production. Built-in demo accounts are disabled unless PANTAHUB_DEMOACCOUNTS_PASSWORD_<nick> is set. Set PANTAHUB_PRODUCTION=false for a development instance")
+	}
 
+	// production: keep only the demo accounts that have an explicit password
 	for k, v := range accountsdata.DefaultAccounts {
 		passwordOverwrite := os.Getenv("PANTAHUB_DEMOACCOUNTS_PASSWORD_" + v.Nick)
 		if passwordOverwrite == "" {
@@ -76,38 +105,43 @@ func init() {
 	}
 }
 
-// safeRefreshHandler wraps jwtMiddleware.RefreshHandler to recover from panics
-// caused by tokens missing the "orig_iat" claim (e.g. from x509, third-party,
-// or implicit auth flows). The upstream RefreshHandler has an unchecked type
-// assertion on orig_iat that panics when the claim is nil.
-func (app *App) safeRefreshHandler(w rest.ResponseWriter, r *rest.Request) {
-	defer func() {
-		if rec := recover(); rec != nil {
-			log.Printf("WARN: RefreshHandler recovered from panic: %v", rec)
-			w.Header().Set("WWW-Authenticate", "JWT realm="+app.jwtMiddleware.Realm)
-			rest.Error(w, "Token is not refreshable", http.StatusUnauthorized)
-		}
-	}()
-
-	originalTimeout := app.jwtMiddleware.Timeout
+// safeRefreshHandler refreshes the bearer token with the authorize timeout.
+// Tokens without orig_iat (x509, third-party, implicit flows) answer "Token is
+// not refreshable". The timeout is passed per call: mutating the shared
+// config raced with concurrent logins.
+func (app *App) safeRefreshHandler(c *echo.Context) error {
 	timeoutStr := utils.GetEnv(utils.EnvPantahubAuthorizeJWTTimeoutMinutes)
 	authorizeTimeout, err := strconv.Atoi(timeoutStr)
 	if err != nil {
 		authorizeTimeout = 1920
 	}
-	app.jwtMiddleware.Timeout = time.Minute * time.Duration(authorizeTimeout)
-	defer func() {
-		app.jwtMiddleware.Timeout = originalTimeout
-	}()
 
-	app.jwtMiddleware.RefreshHandler(w, r)
+	token, err := app.jwtConfig.Refresh(c.Request().Header.Get("Authorization"), time.Minute*time.Duration(authorizeTimeout))
+	if err != nil {
+		c.Response().Header().Set("WWW-Authenticate", app.jwtConfig.WWWAuthenticate())
+		if err == jwtauth.ErrNotRefreshable {
+			log.Printf("WARN: refresh of a token without orig_iat")
+			return echoutil.Error(c, "Token is not refreshable", http.StatusUnauthorized)
+		}
+		return echoutil.Error(c, "Not Authorized", http.StatusUnauthorized)
+	}
+	return echoutil.WriteJSON(c, http.StatusOK, map[string]string{"token": token})
 }
 
 // New create a new auth rest application
-func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
+func New(jwtConfig *jwtauth.Config, mongoClient *mongo.Client) *App {
 	app := new(App)
-	app.jwtMiddleware = jwtMiddleware
+	app.jwtConfig = jwtConfig
 	app.mongoClient = mongoClient
+	app.clientMetadata = cimd.NewResolver()
+
+	migrateCtx, cancelMigrate := context.WithTimeout(context.Background(), time.Minute)
+	if n, err := markLegacyDynamicClients(migrateCtx, mongoClient.Database(utils.MongoDb)); err != nil {
+		log.Fatalln("can't mark dynamically registered oauth clients: " + err.Error())
+	} else if n > 0 {
+		log.Printf("auth: marked %d dynamically registered oauth clients", n)
+	}
+	cancelMigrate()
 
 	//key := flag.String("nick", "", "The field you'd like to place an index on")
 	//unique := flag.Bool("unique", true, "Would you like the index to be unique?")
@@ -121,8 +155,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	indexOptions.SetBackground(true)
 
 	index := mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "nick", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "nick", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -142,8 +176,8 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "prn", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "prn", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -163,8 +197,29 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "email", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "connected_providers.service", Value: int32(1)},
+			{Key: "connected_providers.provider_id", Value: int32(1)},
+		},
+		Options: &indexOptions,
+	}
+	_, err = collection.Indexes().CreateOne(context.Background(), index, &CreateIndexesOptions)
+	if err != nil {
+		log.Fatalln("Error setting up connected provider index for pantahub_accounts: " + err.Error())
+		return nil
+	}
+
+	CreateIndexesOptions = options.CreateIndexesOptions{}
+	CreateIndexesOptions.SetMaxTime(10 * time.Second)
+
+	indexOptions = options.IndexOptions{}
+	indexOptions.SetUnique(true)
+	indexOptions.SetSparse(true)
+	indexOptions.SetBackground(true)
+
+	index = mongo.IndexModel{
+		Keys: bson.D{
+			{Key: "email", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -176,89 +231,112 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 	}
 
 	// Set Authenticate with user password and generate payload
-	jwtMiddleware.Authenticator = authservices.AuthWithUserPassFactory(mongoClient)
-	jwtMiddleware.PayloadFunc = authservices.AuthenticatePayloadFactory(mongoClient, jwtMiddleware)
+	jwtConfig.Authenticator = authservices.AuthWithUserPassFactory(mongoClient)
+	jwtConfig.PayloadFunc = authservices.AuthenticatePayloadFactory(mongoClient, jwtConfig)
 
-	app.API = rest.NewApi()
-	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
-		"/auth:", log.Lshortfile)})
-	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "auth"})
-	app.API.Use(&rest.StatusMiddleware{})
-	app.API.Use(&rest.TimerMiddleware{})
-	app.API.Use(&metrics.Middleware{})
-	app.API.Use(rest.DefaultDevStack...)
-	app.API.Use(&rest.CorsMiddleware{
-		RejectNonCorsRequests: false,
-		OriginValidator: func(origin string, request *rest.Request) bool {
-			return true
-		},
-		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{
-			"Accept",
-			"Content-Type",
-			"Content-Length",
-			"X-Custom-Header",
-			"Origin",
-			"Authorization",
-			"X-Trace-ID",
-			"Trace-Id",
-			"x-request-id",
-			"X-Request-ID",
-			"TraceID",
-			"ParentID",
-			"Uber-Trace-ID",
-			"uber-trace-id",
-			"traceparent",
-			"tracestate",
-		},
-		AccessControlAllowCredentials: true,
-		AccessControlMaxAge:           3600,
-	})
+	app.mfaRepo = storage.NewMFARepo(mongoClient)
+	if err := app.mfaRepo.SetIndexes(context.Background()); err != nil {
+		log.Fatalln("Error setting up indexes for mfa collections: " + err.Error())
+		return nil
+	}
 
-	// no authentication needed for
-	app.API.Use(&rest.IfMiddleware{
-		Condition: isWhiteListedForAuthentication,
-		IfTrue:    app.jwtMiddleware,
-	})
-
-	// no authentication needed for
-	app.API.Use(&rest.IfMiddleware{
-		Condition: isWhiteListedForAuthentication,
-		IfTrue:    &utils.AuthMiddleware{},
-	})
-
-	// /login /auth_status and /refresh_token endpoints
-	apiRouter, _ := rest.MakeRouter(
-		rest.Get("/", app.handleGetProfile),
-		rest.Post("/login", app.getTokenUsingPassword),
-		rest.Post("/token", app.handlePostToken),
-		rest.Post("/token/refresh", app.handlePostTokenRefresh),
-		rest.Get("/auth_status", handleAuthStatus),
-		rest.Get("/login", app.safeRefreshHandler),
-		rest.Get("/accounts", app.handleGetAccounts),
-		rest.Post("/accounts", app.handlePostAccount),
-		rest.Post("/sessions", app.handlePostSession),
-		rest.Get("/verify", app.handleVerify),
-		rest.Post("/recover", app.handlePasswordRecovery),
-		rest.Post("/password", app.handlePasswordReset),
-		rest.Post("/authorize", app.handlePostAuthorizeToken),
-		rest.Post("/code", app.handlePostCode),
-		rest.Post("/signature/verify", app.verifyToken),
-		rest.Post("/x509/login", app.handleAuthUsingDeviceCert),
-		rest.Get("/oauth/login/#service", app.HandleGetThirdPartyLogin),
-		rest.Get("/oauth/callback/#service", app.HandleGetThirdPartyCallback),
-		rest.Post("/oauth/token", app.HandlePKCEToken),
-		rest.Get("/oauth/authorize", app.HandlePKCEAuthorize),
-		rest.Post("/oauth/authorize", app.HandlePostPKCEAuthorize),
-		rest.Post("/oauth/pkce/init", app.HandlePostPKCEInit),
-	)
-	app.API.Use(&tracer.OtelMiddleware{
-		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
-		Router:      apiRouter,
-	})
-	app.API.SetApp(apiRouter)
+	app.webauthnRepo = storage.NewWebauthnRepo(mongoClient)
+	if err := app.webauthnRepo.SetIndexes(context.Background()); err != nil {
+		log.Fatalln("Error setting up indexes for webauthn collections: " + err.Error())
+		return nil
+	}
 
 	return app
+}
+
+// Mount registers auth on echo with its previous middleware stack.
+func (app *App) Mount(s *echoutil.Server) {
+	const prefix = "/auth"
+
+	g := s.Mount(prefix,
+		echoutil.AccessLogJSON(log.New(os.Stdout, "/auth:", log.Lshortfile), prefix),
+		echoutil.AccessLogFluent(&utils.AccessLogFluentMiddleware{Prefix: "auth"}, prefix),
+		metrics.EchoMiddleware(prefix),
+		echoutil.Instrument(),
+		echoutil.Recover(),
+		echoutil.CORS(echoutil.CORSConfig{
+			RejectNonCorsRequests: false,
+			OriginValidator:       echoutil.AllowAllOrigins,
+			AllowedMethods:        []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+			AllowedHeaders: []string{
+				"Accept",
+				"Content-Type",
+				"Content-Length",
+				"X-Custom-Header",
+				"Origin",
+				"Authorization",
+				"X-Trace-ID",
+				"Trace-Id",
+				"x-request-id",
+				"X-Request-ID",
+				"TraceID",
+				"ParentID",
+				"Uber-Trace-ID",
+				"uber-trace-id",
+				"traceparent",
+				"tracestate",
+			},
+			AccessControlAllowCredentials: true,
+			AccessControlMaxAge:           3600,
+		}),
+		// isWhiteListedForAuthentication returns false for routes without auth
+		echoutil.If(prefix, isWhiteListedForAuthentication, echoutil.JWT(app.jwtConfig)),
+		echoutil.If(prefix, isWhiteListedForAuthentication, echoutil.Auth()),
+	)
+
+	g.GET("/", app.handleGetProfile)
+	g.POST("/login", app.getTokenUsingPassword)
+	g.POST("/login/mfa/totp", app.handlePostLoginMFATOTP)
+	g.POST("/login/mfa/recovery", app.handlePostLoginMFARecovery)
+	g.POST("/login/mfa/webauthn", app.handlePostLoginMFAWebauthn)
+	g.POST("/login/mfa/webauthn/finish", app.handlePostLoginMFAWebauthnFinish)
+	g.POST("/login/webauthn/begin", app.handlePostPasskeyLoginBegin)
+	g.POST("/login/webauthn/finish", app.handlePostPasskeyLoginFinish)
+	g.GET("/mfa", app.handleGetMFAStatus)
+	g.POST("/mfa/totp", app.handlePostTOTPEnroll)
+	g.POST("/mfa/totp/confirm", app.handlePostTOTPConfirm)
+	g.DELETE("/mfa/totp", app.handleDeleteTOTP)
+	g.POST("/mfa/recovery/regenerate", app.handlePostRecoveryRegenerate)
+	g.POST("/mfa/reauth/totp", app.handlePostReauthTOTP)
+	g.POST("/mfa/reauth/recovery", app.handlePostReauthRecovery)
+	g.POST("/mfa/reauth/webauthn", app.handlePostReauthWebauthn)
+	g.POST("/mfa/reauth/webauthn/finish", app.handlePostReauthWebauthnFinish)
+	g.POST("/mfa/webauthn/register", app.handlePostWebauthnRegister)
+	g.POST("/mfa/webauthn/register/finish", app.handlePostWebauthnRegisterFinish)
+	g.PATCH("/mfa/webauthn/credentials/:id", app.handlePatchWebauthnCredential)
+	g.DELETE("/mfa/webauthn/credentials/:id", app.handleDeleteWebauthnCredential)
+	g.GET("/connected-providers", app.handleGetConnectedProviders)
+	g.POST("/connected-providers", app.handlePostConnectedProvider)
+	g.DELETE("/connected-providers", app.handleDeleteConnectedProvider)
+	g.POST("/token", app.handlePostToken)
+	g.POST("/token/refresh", app.handlePostTokenRefresh)
+	g.GET("/auth_status", handleAuthStatus)
+	g.GET("/login", app.safeRefreshHandler)
+	g.GET("/accounts", app.handleGetAccounts)
+	g.POST("/accounts", app.handlePostAccount)
+	g.POST("/sessions", app.handlePostSession)
+	g.GET("/verify", app.handleVerify)
+	g.POST("/recover", app.handlePasswordRecovery)
+	g.POST("/password", app.handlePasswordReset)
+	g.POST("/authorize", app.handlePostAuthorizeToken)
+	g.POST("/code", app.handlePostCode)
+	g.POST("/signature/verify", app.verifyToken)
+	g.POST("/x509/login", app.handleAuthUsingDeviceCert)
+	g.GET("/oauth/login/:service", app.HandleGetThirdPartyLogin)
+	g.GET("/oauth/callback/:service", app.HandleGetThirdPartyCallback)
+	g.POST("/oauth/token", app.HandlePKCEToken)
+	g.POST("/oauth/register", app.HandleOAuthRegister)
+	g.GET("/oauth/authorize", app.HandlePKCEAuthorize)
+	g.POST("/oauth/authorize", app.HandlePostPKCEAuthorize)
+	g.POST("/oauth/pkce/init", app.HandlePostPKCEInit)
+	g.GET("/oauth/client", app.HandleGetOAuthClient)
+	g.GET("/oauth/connections", app.HandleListOAuthConnections)
+	g.DELETE("/oauth/connections/:id", app.HandleDeleteOAuthConnection)
 }
 
 func handleGetEncryptedAccount(accountData *authmodels.AccountCreationPayload) (*authmodels.EncryptedAccountToken, error) {
@@ -335,7 +413,7 @@ func (a *App) accessCodePayload(userIDEmailNick string, serviceIDEmailNick strin
 
 	return accessCodePayload
 }
-func isWhiteListedForAuthentication(request *rest.Request) bool {
+func isWhiteListedForAuthentication(request *http.Request) bool {
 	// This function determines if authentication middleware should be applied.
 	// It returns `true` if authentication is REQUIRED for the request.
 	// It returns `false` if authentication is NOT REQUIRED (i.e., the path is whitelisted for skipping authentication).
@@ -343,8 +421,19 @@ func isWhiteListedForAuthentication(request *rest.Request) bool {
 	// List of conditions where authentication is NOT required (i.e., the path is whitelisted).
 	// If any of these conditions are met, we return false, indicating no authentication is needed.
 
-	// Exact path and method matches
-	if request.URL.Path == "/login" {
+	// Exact path and method matches. Method-gated so a future route added
+	// under /login cannot silently inherit the auth-skip: only password
+	// login (POST) and the refresh handler (GET) are exempt today.
+	if request.URL.Path == "/login" && (request.Method == "POST" || request.Method == "GET") {
+		return false
+	}
+	// second step of a two-factor login: authenticated by the single-use
+	// MFA-pending token carried in the body, not by a session JWT
+	if strings.HasPrefix(request.URL.Path, "/login/mfa/") && request.Method == "POST" {
+		return false
+	}
+	// usernameless passkey sign-in: authenticated by the WebAuthn assertion
+	if strings.HasPrefix(request.URL.Path, "/login/webauthn/") && request.Method == "POST" {
 		return false
 	}
 	if request.URL.Path == "/accounts" && request.Method == "POST" {
@@ -371,6 +460,9 @@ func isWhiteListedForAuthentication(request *rest.Request) bool {
 
 	// Path prefix and method matches for OAuth endpoints
 	if strings.HasPrefix(request.URL.Path, "/oauth/token") && request.Method == "POST" {
+		return false
+	}
+	if strings.HasPrefix(request.URL.Path, "/oauth/register") && request.Method == "POST" {
 		return false
 	}
 	if strings.HasPrefix(request.URL.Path, "/oauth/pkce/init") && request.Method == "POST" {

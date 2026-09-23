@@ -1,20 +1,22 @@
-// Copyright 2026  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 
 package auth
 
 import (
 	"errors"
+	"gitlab.com/pantacor/pantahub-base/auth/authservices"
 	"log"
 	"net/http"
 	"strconv"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/accounts"
 	"gitlab.com/pantacor/pantahub-base/auth/authmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -39,26 +41,22 @@ import (
 // @Failure 401 {object} utils.RError "Unauthorized"
 // @Failure 500 {object} utils.RError "Error processing request"
 // @Router /auth/token/refresh [post]
-func (a *App) handlePostTokenRefresh(writer rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePostTokenRefresh(c *echo.Context) error {
 	req := authmodels.TokenRefreshRequest{}
-	if err := r.DecodeJsonPayload(&req); err != nil {
-		utils.RestErrorWrapper(writer, "Failed to decode refresh request", http.StatusBadRequest)
-		return
+	if err := echoutil.DecodeJsonPayload(c, &req); err != nil {
+		return echoutil.RestErrorWrapper(c, "Failed to decode refresh request", http.StatusBadRequest)
 	}
 	if req.Token == "" {
-		utils.RestErrorWrapper(writer, "Missing token in refresh request", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Missing token in refresh request", http.StatusBadRequest)
 	}
 
-	callerClaims, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)
+	callerClaims, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)
 	if !ok {
-		utils.RestErrorWrapper(writer, "Caller has no JWT payload", http.StatusUnauthorized)
-		return
+		return echoutil.RestErrorWrapper(c, "Caller has no JWT payload", http.StatusUnauthorized)
 	}
 	caller, _ := callerClaims["prn"].(string)
 	if caller == "" {
-		utils.RestErrorWrapper(writer, "Caller has no prn", http.StatusUnauthorized)
-		return
+		return echoutil.RestErrorWrapper(c, "Caller has no prn", http.StatusUnauthorized)
 	}
 	// Only service identities can refresh service-issued tokens. The token
 	// minted by /auth/token carries the user's identity (type=USER) but its
@@ -68,45 +66,51 @@ func (a *App) handlePostTokenRefresh(writer rest.ResponseWriter, r *rest.Request
 	callerType, _ := callerClaims["type"].(string)
 	if callerType != string(accounts.AccountTypeService) {
 		log.Printf("WARNING: non-service caller %q (type=%q) tried to refresh a service token", caller, callerType)
-		utils.RestErrorWrapper(writer, "Only service callers may refresh service tokens", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Only service callers may refresh service tokens", http.StatusForbidden)
 	}
 
-	// Parse with signature verification but skip claim (exp/nbf/iat)
-	// validation so that a recently-expired token can still be refreshed by
-	// an active service.
-	parser := &jwtgo.Parser{SkipClaimsValidation: true}
+	// Verify the signature but skip exp/nbf/iat, so a recently expired service token
+	// can still be refreshed.
+	parser := jwtgo.NewParser(jwtgo.WithoutClaimsValidation())
 	tok, err := parser.Parse(req.Token, func(t *jwtgo.Token) (interface{}, error) {
-		if jwtgo.GetSigningMethod(a.jwtMiddleware.SigningAlgorithm) != t.Method {
+		if jwtgo.GetSigningMethod(a.jwtConfig.SigningAlgorithm) != t.Method {
 			return nil, errors.New("invalid signing algorithm")
 		}
-		return a.jwtMiddleware.Pub, nil
+		return a.jwtConfig.Pub, nil
 	})
 	if err != nil || tok == nil || !tok.Valid {
 		log.Println("DEBUG: refresh-token parse error:", err)
-		utils.RestErrorWrapper(writer, "Invalid token", http.StatusUnauthorized)
-		return
+		return echoutil.RestErrorWrapper(c, "Invalid token", http.StatusUnauthorized)
 	}
 
 	oldClaims, ok := tok.Claims.(jwtgo.MapClaims)
 	if !ok {
-		utils.RestErrorWrapper(writer, "Invalid token claims", http.StatusUnauthorized)
-		return
+		return echoutil.RestErrorWrapper(c, "Invalid token claims", http.StatusUnauthorized)
 	}
 
 	aud, _ := oldClaims["aud"].(string)
 	if aud == "" {
-		utils.RestErrorWrapper(writer, "Token has no aud — not refreshable", http.StatusUnauthorized)
-		return
+		return echoutil.RestErrorWrapper(c, "Token has no aud — not refreshable", http.StatusUnauthorized)
 	}
 	if aud != caller {
 		log.Printf("WARNING: caller %q tried to refresh a token issued for %q", caller, aud)
-		utils.RestErrorWrapper(writer, "Caller is not the audience of this token", http.StatusUnauthorized)
-		return
+		return echoutil.RestErrorWrapper(c, "Caller is not the audience of this token", http.StatusUnauthorized)
+	}
+
+	// The subject must still exist and be active: a token for a deleted or
+	// never-activated account must not be renewable indefinitely.
+	subject, _ := oldClaims["prn"].(string)
+	if subject == "" {
+		return echoutil.RestErrorWrapper(c, "Token has no subject — not refreshable", http.StatusUnauthorized)
+	}
+	account, err := authservices.GetAccount(subject, a.mongoClient)
+	if err != nil || account.Prn != subject || account.Challenge != "" {
+		log.Printf("WARNING: refusing to refresh token for inactive or missing account %q", subject)
+		return echoutil.RestErrorWrapper(c, "Account is not active", http.StatusUnauthorized)
 	}
 
 	// Mint a new token preserving identity claims.
-	newToken := jwtgo.New(jwtgo.GetSigningMethod(a.jwtMiddleware.SigningAlgorithm))
+	newToken := jwtgo.New(jwtgo.GetSigningMethod(a.jwtConfig.SigningAlgorithm))
 	newClaims := newToken.Claims.(jwtgo.MapClaims)
 	for k, v := range oldClaims {
 		newClaims[k] = v
@@ -122,14 +126,13 @@ func (a *App) handlePostTokenRefresh(writer rest.ResponseWriter, r *rest.Request
 	newClaims["orig_iat"] = now.Unix()
 	newClaims["token_id"] = primitive.NewObjectID()
 
-	tokenString, err := newToken.SignedString(a.jwtMiddleware.Key)
+	tokenString, err := newToken.SignedString(a.jwtConfig.Key)
 	if err != nil {
-		utils.RestErrorWrapper(writer, "Error signing refreshed token", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error signing refreshed token", http.StatusInternalServerError)
 	}
 
 	scopes, _ := newClaims["scopes"].(string)
-	writer.WriteJson(authmodels.TokenResponse{
+	return echoutil.WriteJSON(c, http.StatusOK, authmodels.TokenResponse{
 		Token:     tokenString,
 		TokenType: "bearer",
 		Scopes:    scopes,

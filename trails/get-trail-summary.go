@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017-2023 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,10 +25,10 @@ import (
 
 	"context"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
-	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -51,34 +51,30 @@ import (
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /trails/{id}/summary [get]
-func (a *App) handleGetTrailStepSummary(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleGetTrailStepSummary(c *echo.Context) error {
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	owner, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in", http.StatusForbidden)
 	}
 
 	summaryCol := a.mongoClient.Database("pantabase_devicesummary").Collection("device_summary_short_new_v2")
 
 	if summaryCol == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+	authType, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["type"]
 
 	if authType != "USER" && authType != "SESSION" {
-		utils.RestErrorWrapper(w, "Need to be logged in as USER/SESSION user to get trail summary", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Need to be logged in as USER/SESSION user to get trail summary", http.StatusForbidden)
 	}
 
-	trailID := r.PathParam("id")
+	trailID := c.Param("id")
 
 	if trailID == "" {
-		utils.RestErrorWrapper(w, "need to specify a device id", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "need to specify a device id", http.StatusForbidden)
 	}
 
 	query := bson.M{
@@ -91,14 +87,15 @@ func (a *App) handleGetTrailStepSummary(w rest.ResponseWriter, r *rest.Request) 
 	}
 
 	summary := trailmodels.TrailSummary{}
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	err := summaryCol.FindOne(ctx, query).Decode(&summary)
 
 	if err != nil {
-		utils.RestErrorWrapper(w, "error finding new trailId", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "error finding new trailId", http.StatusForbidden)
 	}
+
+	summary.FillLastSeen()
 
 	if owner != summary.Owner {
 		summary.FleetGroup = ""
@@ -107,5 +104,5 @@ func (a *App) handleGetTrailStepSummary(w rest.ResponseWriter, r *rest.Request) 
 		summary.FleetRev = ""
 		summary.RealIP = ""
 	}
-	w.WriteJson(summary)
+	return echoutil.WriteJSON(c, http.StatusOK, summary)
 }

@@ -1,4 +1,4 @@
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,18 +20,18 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
 	"gitlab.com/pantacor/pantahub-base/metrics"
 	"gitlab.com/pantacor/pantahub-base/utils"
-	"gitlab.com/pantacor/pantahub-base/utils/tracer"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/x/bsonx"
 )
 
 const (
@@ -53,35 +53,40 @@ const (
 
 // TPApp OAuth App Type
 type TPApp struct {
-	ID                  primitive.ObjectID `json:"id" bson:"_id"`
-	Name                string             `json:"name" bson:"name"`
-	Logo                string             `json:"logo" bson:"logo"`
-	Type                string             `json:"type" bson:"type"`
-	Nick                string             `json:"nick" bson:"nick"`
-	Prn                 string             `json:"prn" bson:"prn"`
-	Owner               string             `json:"owner"`
-	OwnerNick           string             `json:"owner-nick,omitempty" bson:"owner-nick,omitempty"`
-	Secret              string             `json:"secret,omitempty" bson:"secret"`
-	RedirectURIs        []string           `json:"redirect_uris,omitempty" bson:"redirect_uris,omitempty"`
-	Scopes              []utils.Scope      `json:"scopes,omitempty" bson:"scopes,omitempty"`
-	ExposedScopes       []utils.Scope      `json:"exposed_scopes,omitempty" bson:"exposed_scopes,omitempty"`
-	ExposedScopesLength int                `bson:"exposed_scopes_length,omit"`
-	TimeCreated         time.Time          `json:"time-created" bson:"time-created"`
-	TimeModified        time.Time          `json:"time-modified" bson:"time-modified"`
-	DeletedAt           *time.Time         `json:"deleted-at,omitempty" bson:"deleted-at,omitempty"`
+	ID        primitive.ObjectID `json:"id" bson:"_id"`
+	Name      string             `json:"name" bson:"name"`
+	Logo      string             `json:"logo" bson:"logo"`
+	Type      string             `json:"type" bson:"type"`
+	Nick      string             `json:"nick" bson:"nick"`
+	Prn       string             `json:"prn" bson:"prn"`
+	Owner     string             `json:"owner"`
+	OwnerNick string             `json:"owner-nick,omitempty" bson:"owner-nick,omitempty"`
+	// Secret is the client secret, returned only when it is (re)generated;
+	// SecretHash (sha256) is what is stored at rest.
+	Secret              string        `json:"secret,omitempty" bson:"-"`
+	SecretHash          string        `json:"-" bson:"secret_hash,omitempty"`
+	RedirectURIs        []string      `json:"redirect_uris,omitempty" bson:"redirect_uris,omitempty"`
+	Scopes              []utils.Scope `json:"scopes,omitempty" bson:"scopes,omitempty"`
+	ExposedScopes       []utils.Scope `json:"exposed_scopes,omitempty" bson:"exposed_scopes,omitempty"`
+	ExposedScopesLength int           `bson:"exposed_scopes_length,omit"`
+	// Dynamic marks a client that registered itself (RFC 7591): nobody here
+	// vouches for it, so it only gets resource-bound tokens.
+	Dynamic      bool       `json:"-" bson:"dynamic,omitempty"`
+	TimeCreated  time.Time  `json:"time-created" bson:"time-created"`
+	TimeModified time.Time  `json:"time-modified" bson:"time-modified"`
+	DeletedAt    *time.Time `json:"deleted-at,omitempty" bson:"deleted-at,omitempty"`
 }
 
 // App thirdparty application manager
 type App struct {
-	API           *rest.Api
-	jwtMiddleware *jwt.JWTMiddleware
-	mongoClient   *mongo.Client
+	jwtConfig   *jwtauth.Config
+	mongoClient *mongo.Client
 }
 
 // New create a new thirparty apps manager api
-func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
+func New(jwtConfig *jwtauth.Config, mongoClient *mongo.Client) *App {
 	app := new(App)
-	app.jwtMiddleware = jwtMiddleware
+	app.jwtConfig = jwtConfig
 	app.mongoClient = mongoClient
 
 	err := app.setIndexes()
@@ -90,77 +95,78 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 		return nil
 	}
 
-	app.setupAPI()
-
-	// Define router or service
-	apiRouter, _ := rest.MakeRouter(
-		rest.Get("/scopes", app.handleGetPhScopes),
-		rest.Post("/", app.handleCreateApp),
-		rest.Get("/", app.handleGetApps),
-		rest.Get("/#id", app.handleGetApp),
-		rest.Put("/#id", app.handleUpdateApp),
-		rest.Delete("/#id", app.handleDeleteApp),
-	)
-	app.API.Use(&tracer.OtelMiddleware{
-		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
-		Router:      apiRouter,
-	})
-	app.API.SetApp(apiRouter)
+	// idempotent: hash any client secret still stored in plaintext (kept
+	// until PANTAHUB_PURGE_PLAINTEXT_SECRETS drops it after the rollout)
+	migrateCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	if n, err := MigratePlaintextSecrets(migrateCtx, mongoClient.Database(utils.MongoDb)); err != nil {
+		log.Fatalln("can't migrate plaintext app secrets: " + err.Error())
+		return nil
+	} else if n > 0 {
+		log.Printf("apps: hashed %d plaintext client secrets", n)
+	}
+	if utils.GetEnv(utils.EnvPantahubPurgePlaintextSecrets) == "true" {
+		if n, err := PurgePlaintextSecrets(migrateCtx, mongoClient.Database(utils.MongoDb)); err != nil {
+			log.Fatalln("can't purge plaintext app secrets: " + err.Error())
+			return nil
+		} else if n > 0 {
+			log.Printf("apps: purged %d plaintext client secrets", n)
+		}
+	}
 
 	return app
 }
 
-func needsAuth(request *rest.Request) bool {
+func needsAuth(request *http.Request) bool {
 	return request.URL.Path != "/scopes"
 }
 
-func (app *App) setupAPI() {
-	app.API = rest.NewApi()
+// Mount registers apps on echo with its previous middleware stack.
+func (app *App) Mount(s *echoutil.Server) {
+	const prefix = "/apps"
 
-	// we dont use default stack because we dont want content type enforcement
-	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
-		"/apps:", log.Lshortfile)})
-	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "apps"})
-	app.API.Use(&rest.StatusMiddleware{})
-	app.API.Use(&rest.TimerMiddleware{})
-	app.API.Use(&metrics.Middleware{})
-	app.API.Use(rest.DefaultCommonStack...)
-	app.API.Use(&rest.CorsMiddleware{
-		RejectNonCorsRequests: false,
-		OriginValidator: func(origin string, request *rest.Request) bool {
-			return true
-		},
-		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{
-			"Accept",
-			"Content-Type",
-			"Content-Length",
-			"X-Custom-Header",
-			"Origin",
-			"Authorization",
-			"X-Trace-ID",
-			"Trace-Id",
-			"x-request-id",
-			"X-Request-ID",
-			"TraceID",
-			"ParentID",
-			"Uber-Trace-ID",
-			"uber-trace-id",
-			"traceparent",
-			"tracestate",
-		},
-		AccessControlAllowCredentials: true,
-		AccessControlMaxAge:           3600,
-	})
-	app.API.Use(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtMiddleware, Mongo: app.mongoClient})
-	app.API.Use(&rest.IfMiddleware{
-		Condition: needsAuth,
-		IfTrue:    app.jwtMiddleware,
-	})
-	app.API.Use(&rest.IfMiddleware{
-		Condition: needsAuth,
-		IfTrue:    &utils.AuthMiddleware{},
-	})
+	g := s.Mount(prefix,
+		echoutil.AccessLogJSON(log.New(os.Stdout, "/apps:", log.Lshortfile), prefix),
+		echoutil.AccessLogFluent(&utils.AccessLogFluentMiddleware{Prefix: "apps"}, prefix),
+		metrics.EchoMiddleware(prefix),
+		echoutil.Instrument(),
+		echoutil.Recover(),
+		echoutil.CORS(echoutil.CORSConfig{
+			RejectNonCorsRequests: false,
+			OriginValidator:       echoutil.AllowAllOrigins,
+			AllowedMethods:        []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+			AllowedHeaders: []string{
+				"Accept",
+				"Content-Type",
+				"Content-Length",
+				"X-Custom-Header",
+				"Origin",
+				"Authorization",
+				"X-Trace-ID",
+				"Trace-Id",
+				"x-request-id",
+				"X-Request-ID",
+				"TraceID",
+				"ParentID",
+				"Uber-Trace-ID",
+				"uber-trace-id",
+				"traceparent",
+				"tracestate",
+			},
+			AccessControlAllowCredentials: true,
+			AccessControlMaxAge:           3600,
+		}),
+		echoutil.BasicAuthToBearer(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtConfig, Mongo: app.mongoClient}),
+		echoutil.If(prefix, needsAuth, echoutil.JWT(app.jwtConfig)),
+		echoutil.If(prefix, needsAuth, echoutil.Auth()),
+	)
+
+	g.GET("/scopes", app.handleGetPhScopes)
+	g.POST("/", app.handleCreateApp)
+	g.GET("/", app.handleGetApps)
+	g.GET("/:id", app.handleGetApp)
+	g.PUT("/:id", app.handleUpdateApp)
+	g.DELETE("/:id", app.handleDeleteApp)
 }
 
 func (app *App) setIndexes() error {
@@ -173,8 +179,8 @@ func (app *App) setIndexes() error {
 	indexOptions.SetBackground(true)
 
 	index := mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "nick", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "nick", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -193,8 +199,8 @@ func (app *App) setIndexes() error {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "prn", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "prn", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}

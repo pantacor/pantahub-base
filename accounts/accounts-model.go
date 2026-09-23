@@ -1,5 +1,5 @@
 //
-// Copyright 2018  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -58,9 +58,13 @@ type Account struct {
 	Nick  string      `json:"nick" bson:"nick"`
 	Prn   string      `json:"prn" bson:"prn"`
 
+	// Password stays JSON-decodable: the account-creation payload embeds this
+	// struct and reads it from the request (handlers scrub it before replies).
+	// The hashes are never legitimate JSON input or output — account documents
+	// are written to responses in several handlers and the hashes were leaking.
 	Password       string `json:"password,omitempty" bson:"password"`
-	PasswordBcrypt string `json:"password_bcrypt,omitempty" bson:"password_bcrypt"`
-	PasswordScrypt string `json:"password_scrypt,omitempty" bson:"password_scrypt"`
+	PasswordBcrypt string `json:"-" bson:"password_bcrypt"`
+	PasswordScrypt string `json:"-" bson:"password_scrypt"`
 	Challenge      string `json:"challenge,omitempty" bson:"challenge"`
 
 	TimeCreated  time.Time `json:"time-created" bson:"time-created"`
@@ -68,6 +72,20 @@ type Account struct {
 
 	// Oauth2RedirectURIs is limiting the prefix available for redirecting users with oauth code and accesstoken to
 	Oauth2RedirectURIs []string `json:"redirect_uris,omitempty" bson:"redirect_uris,omitempty"`
+
+	// ConnectedProviders contains the stable identities that may authenticate
+	// this account through an external OAuth provider. Provider IDs are scoped by
+	// service; the same ID from two different services is not the same identity.
+	ConnectedProviders []ConnectedProvider `json:"connected_providers,omitempty" bson:"connected_providers,omitempty"`
+}
+
+// ConnectedProvider is an external OAuth identity connected to an account.
+// ProviderID is the provider's stable, non-email user identifier.
+type ConnectedProvider struct {
+	Service     string    `json:"service" bson:"service"`
+	ProviderID  string    `json:"provider_id" bson:"provider_id"`
+	Email       string    `json:"email,omitempty" bson:"email,omitempty"`
+	ConnectedAt time.Time `json:"connected_at,omitempty" bson:"connected_at,omitempty"`
 }
 
 // AccountPublic Public information for one account

@@ -8,8 +8,8 @@ services:
             context: .
             dockerfile: Dockerfile.development
         volumes:
-            - ${PWD}:/go/src/gitlab.com/pantacor/pantahub-base
-            - ${PWD}/.data/local-s3/:/local-s3/
+            - .:/go/src/gitlab.com/pantacor/pantahub-base
+            - ./.data/local-s3/:/local-s3/
         links:
             - pvr
         depends_on:
@@ -29,6 +29,34 @@ services:
         environment:
             - PANTAHUB_STORAGE_DRIVER=local
             - PANTAHUB_S3PATH=/local-s3
+
+    # TLS ingress for local development (opt-in: --profile tls). Terminates
+    # HTTPS on :443 for the dev stack, kubernetes-ingress style: the
+    # Caddyfile (entrypoints/Caddyfile) is the routing resource and the
+    # mkcert root CA is the local issuer. Certificates and hostnames are
+    # provisioned by ../tls-local.sh, which also flips the WebAuthn RP and
+    # ui API-URL env vars to match.
+    proxy:
+        networks:
+            - base
+            - external
+        image: caddy:2-alpine
+        container_name: hub-tls-proxy
+        profiles:
+            - tls
+        ports:
+            - 443:443
+        extra_hosts:
+            # the ui dev server (vite) runs on the host, not in compose
+            - host.docker.internal:host-gateway
+        env_file:
+            - ./env.default
+            - ./.env.local
+        volumes:
+            - ./entrypoints/Caddyfile:/etc/caddy/Caddyfile:ro
+            # In-repo so a standalone pantahub-base checkout can run the tls
+            # profile. tls-local.sh mints hub.pem/hub-key.pem in here.
+            - ./.certs:/certs:ro
 
     gc:
         networks:
@@ -95,9 +123,9 @@ services:
     phs:
         networks:
             - base
-        image: registry.gitlab.com/pantacor/pantahub-streams-devicesummary:X64-develop
+        image: registry.gitlab.com/pantacor/pantahub-streams-devicesummary:develop-fdd2771b
         volumes:
-            - ${PWD}/entrypoints/phs-entrypoint:/docker-entrypoint
+            - ./entrypoints/phs-entrypoint:/docker-entrypoint
         environment:
             - JAVA_OPTS=-XX:-UseContainerSupport
             - PANTAHUB_KAFKA_HOSTPORT=kafka:9092
@@ -117,7 +145,7 @@ services:
                 condition: service_started
             kafka-connect:
                 condition: service_healthy
-        restart: on-failure
+        restart: "no"
         command: /docker-entrypoint
 
     fluentd:
@@ -162,7 +190,7 @@ services:
         mem_limit: 1g
         cap_add:
             - IPC_LOCK
-        restart: always
+        restart: "no"
         volumes:
             - elastic-data:/usr/share/elasticsearch/data
 
@@ -188,7 +216,7 @@ services:
             memlock:
                 soft: -1
                 hard: -1
-        restart: always
+        restart: "no"
         depends_on:
             - elasticsearch
         ports:
@@ -208,51 +236,19 @@ services:
             MONGO_RS: rs0
             MONGO_PORT: 27017
         volumes:
-            - ${PWD}/entrypoints/mongo-cluster-entrypoint:/docker-entrypoint
-            - ${PWD}/.data/mongo-1:/data/db
-            - ${PWD}/entrypoints/mongokey.yaml:/keys/mongokey.yaml
+            - ./entrypoints/mongo-cluster-entrypoint:/docker-entrypoint
+            - ./.data/mongo-1:/data/db
+            - ./entrypoints/mongokey.yaml:/keys/mongokey.yaml
         command: /docker-entrypoint
         ports:
             - 27017:27017
-        links:
-            - mongo2
-            - mongo3
 
-    mongo2:
-        networks:
-            - base
-        image: mongo:4.4.3
-        container_name: mongo2
-        environment:
-            MONGO_INITDB_ROOT_USERNAME: admin
-            MONGO_INITDB_ROOT_PASSWORD: admin
-            MONGO_RS: rs0
-            MONGO_PORT: 30002
-        command: ["/docker-entrypoint"]
-        volumes:
-            - ${PWD}/entrypoints/mongo-cluster-secondary-entrypoint:/docker-entrypoint
-            - ${PWD}/.data/mongo-2:/data/db
-            - ${PWD}/entrypoints/mongokey.yaml:/keys/mongokey.yaml
-        ports:
-            - 30002:30002
-
-    mongo3:
-        networks:
-            - base
-        image: mongo:4.4.3
-        container_name: mongo3
-        environment:
-            MONGO_INITDB_ROOT_USERNAME: admin
-            MONGO_INITDB_ROOT_PASSWORD: admin
-            MONGO_RS: rs0
-            MONGO_PORT: 30003
-        command: ["/docker-entrypoint"]
-        volumes:
-            - ${PWD}/entrypoints/mongo-cluster-secondary-entrypoint:/docker-entrypoint
-            - ${PWD}/.data/mongo-3:/data/db
-            - ${PWD}/entrypoints/mongokey.yaml:/keys/mongokey.yaml
-        ports:
-            - 30003:30003
+    # mongo2 / mongo3 were the other two members of rs0. The local stack now runs a single-node
+    # replica set (rs0 with just `mongo`): change streams still work for Kafka Connect, and the
+    # data dir is a third of the size. Existing dev machines need one force reconfig:
+    #   docker exec mongo mongo -u admin -p admin --eval \
+    #     'rs.reconfig({_id: "rs0", members: [{_id: 0, host: "mongo:27017"}]}, {force: true})'
+    # then remove the mongo2/mongo3 containers and their .data/mongo-{2,3} dirs.
 
     zookeeper:
         networks:
@@ -274,8 +270,8 @@ services:
             - base
         image: confluentinc/cp-kafka:5.4.3
         volumes:
-            - ${PWD}/entrypoints/kafka-entrypoint:/docker-entrypoint
-            - ${PWD}/.data/kafka-data:/var/lib/kafka/data
+            - ./entrypoints/kafka-entrypoint:/docker-entrypoint
+            - ./.data/kafka-data:/var/lib/kafka/data
         command: /docker-entrypoint
         ulimits:
             nofile:
@@ -363,8 +359,8 @@ services:
             - kafka-rest
             - mongo
         volumes:
-            - ${PWD}/kafka/connect-configs:/opt/kafka-connect-configs:ro
-            - ${PWD}/entrypoints/kafka-connect-entrypoint:/docker-entrypoint
+            - ./kafka/connect-configs:/opt/kafka-connect-configs:ro
+            - ./entrypoints/kafka-connect-entrypoint:/docker-entrypoint
         command: /docker-entrypoint
 
     kafka-rest:
@@ -412,7 +408,7 @@ services:
             - "4599:4599"
         volumes:
             - "/var/run/docker.sock:/var/run/docker.sock"
-            - ${PWD}/.data/localstack:/tmp/localstack/data
+            - ./.data/localstack:/tmp/localstack/data
 
     cronjobs:
         networks:
@@ -424,13 +420,13 @@ services:
             - base
             - gc
         volumes:
-            - ${PWD}/entrypoints/cronjobs-entrypoint:/entrypoint:ro
+            - ./entrypoints/cronjobs-entrypoint:/entrypoint:ro
         env_file:
             - ./env.default
             - ./.env.local
         environment:
             - PANTAHUB_GC_API=http://gc:2000
-        restart: unless-stopped
+        restart: "no"
 
     nginx:
         image: nginx:alpine
@@ -454,5 +450,8 @@ volumes:
     elastic-data:
         driver_opts:
             type: none
+            # driver_opts.device is passed verbatim to the local driver and
+            # must be absolute, so ${PWD} stays — run compose from this
+            # directory (hub.sh does; it also reconciles a stale device path).
             device: ${PWD}/.data/elasticsearch
             o: bind

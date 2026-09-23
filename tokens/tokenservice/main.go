@@ -1,4 +1,4 @@
-// Copyright 2024  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,6 +28,11 @@ import (
 	"gitlab.com/pantacor/pantahub-base/utils/querymongo"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
+
+// ErrInvalidTokenType reports a token create request whose type is not a
+// valid account type; endpoints map it to 400 (a caller error, not a
+// service failure).
+var ErrInvalidTokenType = errors.New("invalid token type")
 
 type ListOfToken struct {
 	querymongo.Pagination `json:",inline"`
@@ -132,6 +137,9 @@ func (s *Service) CreateToken(ctx context.Context, payload *AuthTokenReqPayload,
 	token.Name = payload.Name
 	if payload.Type != "" {
 		token.Type = payload.Type
+		if !token.ValidType() {
+			return nil, ErrInvalidTokenType
+		}
 	} else {
 		token.Type = accounts.AccountTypeSessionUser
 	}
@@ -154,7 +162,9 @@ func (s *Service) CreateToken(ctx context.Context, payload *AuthTokenReqPayload,
 	}
 	secretBytes := []byte(token.ID.Hex() + ":" + base64.RawURLEncoding.EncodeToString(randBytes))
 	secret64 := base64.RawURLEncoding.EncodeToString(secretBytes)
+	// the plaintext goes back to the caller exactly once; only its hash is stored
 	token.Secret = secret64
+	token.SecretHash = tokenmodels.HashSecret(secret64)
 	token.SetCreatedAt()
 	token.SetUpdatedAt()
 

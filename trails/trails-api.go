@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017-2023 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -55,13 +55,14 @@ import (
 
 	"context"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
-	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
+	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/objects"
 	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
+	jwtauth "gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -70,14 +71,13 @@ import (
 
 // App trails rest application
 type App struct {
-	jwtMiddleware *jwt.JWTMiddleware
-	API           *rest.Api
-	mongoClient   *mongo.Client
+	jwtConfig   *jwtauth.Config
+	mongoClient *mongo.Client
 }
 
-func handleAuth(w rest.ResponseWriter, r *rest.Request) {
-	jwtClaims := r.Env["JWT_PAYLOAD"]
-	w.WriteJson(jwtClaims)
+func handleAuth(c *echo.Context) error {
+	jwtClaims := c.Get(echoutil.KeyJWTPayload)
+	return echoutil.WriteJSON(c, http.StatusOK, jwtClaims)
 }
 
 // XXX: no product without fixing this to only parse ids that belong to this
@@ -122,71 +122,63 @@ func (a *App) getLatestStepRev(pctx context.Context, trailID primitive.ObjectID)
 	return steps[0].Rev, err
 }
 
-func (a *App) handlePutStepsObject(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePutStepsObject(c *echo.Context) error {
 
-	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	owner, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in", http.StatusForbidden)
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+	authType, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["type"]
 
 	coll := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_steps")
 
 	if coll == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
 	step := trailmodels.Step{}
-	trailID := r.PathParam("id")
-	rev := r.PathParam("rev")
-	putID := r.PathParam("obj")
+	trailID := c.Param("id")
+	rev := c.Param("rev")
+	putID := c.Param("obj")
 
 	if authType != "DEVICE" && authType != "USER" && authType != "SESSION" {
-		utils.RestErrorWrapper(w, "Unknown AuthType", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Unknown AuthType", http.StatusBadRequest)
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	err := coll.FindOne(ctx, bson.M{
 		"_id":     trailID + "-" + rev,
 		"garbage": bson.M{"$ne": true},
 	}).Decode(&step)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Not Accessible Resource Id", http.StatusForbidden)
 	}
 
 	if authType == "DEVICE" && step.Device != owner {
-		utils.RestErrorWrapper(w, "No access for device", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "No access for device", http.StatusForbidden)
 	} else if (authType == "USER" || authType == "SESSION") && step.Owner != owner {
-		utils.RestErrorWrapper(w, "No access for user/session", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "No access for user/session", http.StatusForbidden)
 	}
 
 	newObject := objects.Object{}
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 
 	if collection == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
 	sha, err := utils.DecodeSha256HexString(putID)
 
 	if err != nil {
-		utils.RestErrorWrapper(w, "Put Trails Steps Object id must be a valid sha256", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Put Trails Steps Object id must be a valid sha256", http.StatusBadRequest)
 	}
 
 	storageID := objects.MakeStorageID(step.Owner, sha)
 
-	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel = context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	err = collection.FindOne(ctx, bson.M{
 		"_id":     storageID,
@@ -194,59 +186,54 @@ func (a *App) handlePutStepsObject(w rest.ResponseWriter, r *rest.Request) {
 	}).Decode(&newObject)
 
 	if err != nil {
-		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Not Accessible Resource Id", http.StatusForbidden)
 	}
 
 	if newObject.Owner != step.Owner {
-		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Not Accessible Resource Id", http.StatusForbidden)
 	}
 
 	nID := newObject.ID
 	nOwner := newObject.Owner
 	nStorageID := newObject.StorageID
-	r.DecodeJsonPayload(&newObject)
+	if err := echoutil.DecodeJsonPayload(c, &newObject); err != nil {
+		return echoutil.RestErrorWrapper(c, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
+	}
 
 	if newObject.ID != nID {
-		utils.RestErrorWrapper(w, "Illegal Call Parameter Id", http.StatusConflict)
-		return
+		return echoutil.RestErrorWrapper(c, "Illegal Call Parameter Id", http.StatusConflict)
 	}
 	if newObject.Owner != nOwner {
-		utils.RestErrorWrapper(w, "Illegal Call Parameter Owner", http.StatusConflict)
-		return
+		return echoutil.RestErrorWrapper(c, "Illegal Call Parameter Owner", http.StatusConflict)
 	}
 	if newObject.StorageID != nStorageID {
-		utils.RestErrorWrapper(w, "Illegal Call Parameter StorageId", http.StatusConflict)
-		return
+		return echoutil.RestErrorWrapper(c, "Illegal Call Parameter StorageId", http.StatusConflict)
 	}
 
 	objects.SyncObjectSizes(&newObject)
-	result, err := objects.CalcUsageAfterPut(r.Context(), newObject.Owner, a.mongoClient, newObject.ID, newObject.SizeInt)
+	result, err := objects.CalcUsageAfterPut(c.Request().Context(), newObject.Owner, a.mongoClient, newObject.ID, newObject.SizeInt)
 
 	if err != nil {
 		log.Println("Error to calc diskquota: " + err.Error())
-		utils.RestErrorWrapper(w, "Error posting object", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error posting object", http.StatusInternalServerError)
 	}
 
-	quota, err := objects.GetDiskQuota(r.Context(), newObject.Owner)
+	quota, err := objects.GetDiskQuota(c.Request().Context(), newObject.Owner)
 
 	if err != nil {
 		log.Println("Error get diskquota setting: " + err.Error())
-		utils.RestErrorWrapper(w, "Error to calc quota", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error to calc quota", http.StatusInternalServerError)
 	}
 
 	if result.Total > quota {
-		utils.RestErrorWrapperUser(
-			w,
-			err.Error(),
+		return echoutil.RestErrorWrapperUser(
+			c,
+			"quota exceeded",
 			"Quota exceeded; delete some objects or request a quota bump from team@pantahub.com",
 			http.StatusPreconditionFailed)
 	}
 
-	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel = context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
 	updateOptions := options.Update()
@@ -258,17 +245,17 @@ func (a *App) handlePutStepsObject(w rest.ResponseWriter, r *rest.Request) {
 		updateOptions,
 	)
 	if err != nil {
-		w.WriteHeader(http.StatusConflict)
-		w.Header().Add("X-PH-Error", "Error inserting object into database "+err.Error())
+		c.Response().Header().Add("X-PH-Error", "Error inserting object into database "+err.Error())
+		return echoutil.WriteHeader(c, http.StatusConflict)
 	}
-	if updateResult.MatchedCount == 0 {
-		w.WriteHeader(http.StatusConflict)
-		w.Header().Add("X-PH-Error", "Error inserting object into database ")
+	if updateResult.MatchedCount == 0 && updateResult.UpsertedCount == 0 {
+		c.Response().Header().Add("X-PH-Error", "Error inserting object into database ")
+		return echoutil.WriteHeader(c, http.StatusConflict)
 	}
 
 	issuerURL := utils.GetAPIEndpoint("/trails")
 	newObjectWithAccess := objects.MakeObjAccessible(issuerURL, newObject.Owner, newObject, storageID)
-	w.WriteJson(newObjectWithAccess)
+	return echoutil.WriteJSON(c, http.StatusOK, newObjectWithAccess)
 }
 
 // ProcessObjectsInState :
@@ -349,7 +336,30 @@ func GetStateObjects(
 		object, err := objectsApp.ResolveObjectWithLinks(ctx, owner, sha, autoLink)
 
 		if err != nil {
-			return nil, err
+			// A state routinely holds hundreds of objects, so returning the
+			// bare sentinel leaves no way to tell which one failed. Name the
+			// part and sha, and say what the condition actually means:
+			// ErrNoLinkTargetAvail describes the failed public-object
+			// fallback, not the real problem, which is that this owner has no
+			// usable copy of the object.
+			switch {
+			case errors.Is(err, objects.ErrNoLinkTargetAvail):
+				return nil, fmt.Errorf(
+					"state_object: no stored object for part %q (sha %s) under owner %s, and no public object available to link to: %w",
+					key, sha, owner, err)
+			case errors.Is(err, objects.ErrNoBackingFile):
+				return nil, fmt.Errorf(
+					"state_object: part %q (sha %s) is registered for owner %s but its content is missing from storage: %w",
+					key, sha, owner, err)
+			case errors.Is(err, mongo.ErrNoDocuments):
+				return nil, fmt.Errorf(
+					"state_object: no object registered for part %q (sha %s) under owner %s: %w",
+					key, sha, owner, err)
+			default:
+				return nil, fmt.Errorf(
+					"state_object: could not resolve part %q (sha %s) for owner %s: %w",
+					key, sha, owner, err)
+			}
 		}
 
 		// Save object

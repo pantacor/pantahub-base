@@ -1,4 +1,4 @@
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,20 +19,19 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
-	"gitlab.com/pantacor/pantahub-base/utils/tracer"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gopkg.in/mgo.v2/bson"
 )
 
 // App subscription rest application
 type App struct {
-	jwtMiddleware *jwt.JWTMiddleware
-	API           *rest.Api
-	service       SubscriptionService
-	mongoClient   *mongo.Client
+	jwtConfig   *jwtauth.Config
+	service     SubscriptionService
+	mongoClient *mongo.Client
 }
 
 // SubscriptionReq subscription request
@@ -54,26 +53,24 @@ type SubscriptionReq struct {
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /subscriptions [get]
-func (s *App) get(w rest.ResponseWriter, r *rest.Request) {
+func (s *App) get(c *echo.Context) error {
 
-	authInfo := utils.GetAuthInfo(r)
+	authInfo := echoutil.AuthInfo(c)
 
 	if authInfo == nil {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in", http.StatusForbidden)
 	}
 
-	err := r.ParseForm()
+	err := c.Request().ParseForm()
 	if err != nil {
 		errID := bson.NewObjectId()
 		log.Printf("ERROR (%s): processing list subscription request for user %s: %s\n",
 			errID.Hex(), authInfo.Caller, err.Error())
-		utils.RestErrorWrapper(w, "Error processing request ("+errID.Hex()+")", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error processing request ("+errID.Hex()+")", http.StatusInternalServerError)
 	}
 
-	start := r.PathParam("start")
+	start := c.Param("start")
 	var startInt int
 	if start != "" {
 		startInt, _ = strconv.Atoi(start)
@@ -81,7 +78,7 @@ func (s *App) get(w rest.ResponseWriter, r *rest.Request) {
 		startInt = 0
 	}
 
-	page := r.PathParam("page")
+	page := c.Param("page")
 	var pageInt int
 	if page != "" {
 		pageInt, _ = strconv.Atoi(page)
@@ -90,24 +87,22 @@ func (s *App) get(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if authInfo.CallerType == "USER" {
-		subs, err := s.service.List(r.Context(), utils.Prn(authInfo.Caller), startInt, pageInt)
+		subs, err := s.service.List(c.Request().Context(), utils.Prn(authInfo.Caller), startInt, pageInt)
 
 		if err != nil {
 			errID := bson.NewObjectId()
 			log.Printf("ERROR (%s): processing list subscription request for user %s: %s\n",
 				errID.Hex(), authInfo.Caller, err.Error())
-			utils.RestErrorWrapper(w, "Error processing request ("+errID.Hex()+")", http.StatusInternalServerError)
-			return
+			return echoutil.RestErrorWrapper(c, "Error processing request ("+errID.Hex()+")", http.StatusInternalServerError)
 		}
 
-		err = w.WriteJson(subs)
+		err = echoutil.WriteJSON(c, http.StatusOK, subs)
 		if err != nil {
 			errID := bson.NewObjectId()
 			log.Printf("ERROR (%s): writing JSON response: %s ", errID.Hex(), err.Error())
-			utils.RestErrorWrapper(w, "Error processing request ("+errID.Hex()+")", http.StatusInternalServerError)
-			return
+			return echoutil.RestErrorWrapper(c, "Error processing request ("+errID.Hex()+")", http.StatusInternalServerError)
 		}
-		return
+		return nil
 	}
 
 	// XXX: right now not implemented
@@ -117,7 +112,7 @@ func (s *App) get(w rest.ResponseWriter, r *rest.Request) {
 		errID.Hex(),
 		authInfo.Caller)
 
-	utils.RestErrorWrapper(w, "NOT IMPLEMENTED ("+errID.Hex()+")", http.StatusNotImplemented)
+	return echoutil.RestErrorWrapper(c, "NOT IMPLEMENTED ("+errID.Hex()+")", http.StatusNotImplemented)
 }
 
 // put Add a new subscription as a admin
@@ -133,59 +128,54 @@ func (s *App) get(w rest.ResponseWriter, r *rest.Request) {
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /subscriptions [get]
-func (s *App) put(w rest.ResponseWriter, r *rest.Request) {
+func (s *App) put(c *echo.Context) error {
 
-	authInfo := utils.GetAuthInfo(r)
+	authInfo := echoutil.AuthInfo(c)
 
 	if authInfo == nil {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in", http.StatusForbidden)
 	}
 
 	if !s.service.IsAdmin(authInfo) {
-		utils.RestErrorWrapper(w, "You need to have admin role for subscriptin service", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to have admin role for subscriptin service", http.StatusForbidden)
 	}
 
-	err := r.ParseForm()
+	err := c.Request().ParseForm()
 
 	if err != nil {
 		// XXX: right now not implemented
 		errID := bson.NewObjectId()
 		log.Printf("ERROR (%s): error parsing form 'post subscriptions' by user %s: %s'\n",
 			errID.Hex(), authInfo.Caller, err.Error())
-		utils.RestErrorWrapper(w, "NOT IMPLEMENTED ("+errID.Hex()+")", http.StatusNotImplemented)
-		return
+		return echoutil.RestErrorWrapper(c, "NOT IMPLEMENTED ("+errID.Hex()+")", http.StatusNotImplemented)
 	}
 
 	req := SubscriptionReq{}
-	err = r.DecodeJsonPayload(&req)
+	err = echoutil.DecodeJsonPayload(c, &req)
 
 	if err != nil {
 		// XXX: right now not implemented
 		errID := bson.NewObjectId()
 		log.Printf("WARNING (%s): error parsing body as json in 'post subscriptions' by user %s: %s'\n",
 			errID.Hex(), authInfo.Caller, err.Error())
-		utils.RestErrorWrapper(w, "BAD REQUEST RECEIVED ("+errID.Hex()+")", http.StatusPreconditionFailed)
-		return
+		return echoutil.RestErrorWrapper(c, "BAD REQUEST RECEIVED ("+errID.Hex()+")", http.StatusPreconditionFailed)
 	}
 
-	sub, err := s.service.LoadBySubject(r.Context(), req.Subject)
+	sub, err := s.service.LoadBySubject(c.Request().Context(), req.Subject)
 
 	if err != nil && err != mongo.ErrNoDocuments {
 		// XXX: right now not implemented
 		errID := bson.NewObjectId()
 		log.Printf("ERROR (%s): error using database in 'post subscriptions' by user %s: %s'\n",
 			errID.Hex(), authInfo.Caller, err.Error())
-		utils.RestErrorWrapper(w, "INTERNAL ERROR ("+errID.Hex()+")", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "INTERNAL ERROR ("+errID.Hex()+")", http.StatusInternalServerError)
 	}
 
 	if sub == nil {
-		sub, err = s.service.New(r.Context(), req.Subject, authInfo.Caller, req.Plan, req.Attrs)
+		sub, err = s.service.New(c.Request().Context(), req.Subject, authInfo.Caller, req.Plan, req.Attrs)
 	} else {
-		err = sub.UpdatePlan(r.Context(), authInfo.Caller, req.Plan, req.Attrs)
+		err = sub.UpdatePlan(c.Request().Context(), authInfo.Caller, req.Plan, req.Attrs)
 	}
 
 	if err != nil {
@@ -193,84 +183,58 @@ func (s *App) put(w rest.ResponseWriter, r *rest.Request) {
 		errID := bson.NewObjectId()
 		log.Printf("ERROR (%s): error updating plan and attrs in 'post subscriptions' by user %s: %s'\n",
 			errID.Hex(), authInfo.Caller, err.Error())
-		utils.RestErrorWrapper(w, "INTERNAL ERROR ("+errID.Hex()+")", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "INTERNAL ERROR ("+errID.Hex()+")", http.StatusInternalServerError)
 	}
 
-	w.WriteJson(sub)
-}
-
-// MakeHandler make the api handler
-func (s *App) MakeHandler() http.Handler {
-	return s.API.MakeHandler()
+	return echoutil.WriteJSON(c, http.StatusOK, sub)
 }
 
 // New create a new subscription rest application
-func New(jwtMiddleware *jwt.JWTMiddleware, subscriptionService SubscriptionService, mongoClient *mongo.Client) *App {
+func New(jwtConfig *jwtauth.Config, subscriptionService SubscriptionService, mongoClient *mongo.Client) *App {
+	return &App{jwtConfig: jwtConfig, service: subscriptionService, mongoClient: mongoClient}
+}
 
-	app := new(App)
-	app.jwtMiddleware = jwtMiddleware
-	app.service = subscriptionService
-	app.mongoClient = mongoClient
-	app.API = rest.NewApi()
+// Mount registers subscriptions on echo with its previous middleware stack.
+func (s *App) Mount(srv *echoutil.Server) {
+	const prefix = "/subscriptions"
 
-	// we dont use default stack because we dont want content type enforcement
-	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
-		"/subscriptions:", log.Lshortfile)})
-	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "subscription"})
-	app.API.Use(rest.DefaultCommonStack...)
-	app.API.Use(&rest.CorsMiddleware{
-		RejectNonCorsRequests: false,
-		OriginValidator: func(origin string, request *rest.Request) bool {
-			return true
-		},
-		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{
-			"Accept",
-			"Content-Type",
-			"Content-Length",
-			"X-Custom-Header",
-			"Origin",
-			"Authorization",
-			"X-Trace-ID",
-			"Trace-Id",
-			"x-request-id",
-			"X-Request-ID",
-			"TraceID",
-			"ParentID",
-			"Uber-Trace-ID",
-			"uber-trace-id",
-			"traceparent",
-			"tracestate",
-		},
-		AccessControlAllowCredentials: true,
-		AccessControlMaxAge:           3600,
-	})
-	app.API.Use(&utils.URLCleanMiddleware{})
-
-	app.API.Use(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtMiddleware, Mongo: app.mongoClient})
-	// no authentication ngeeded for /login
-	app.API.Use(&rest.IfMiddleware{
-		Condition: func(request *rest.Request) bool {
-			return true
-		},
-		IfTrue: app.jwtMiddleware,
-	})
-
-	app.API.Use(&utils.AuthMiddleware{})
-
-	// /auth_status endpoints
-	// XXX: this is all needs to be done so that paths that do not trail with /
-	//      get a MOVED PERMANTENTLY error with the redir path with / like the main
-	//      API routers (bad rest.MakeRouter I suspect)
-	apiRouter, _ := rest.MakeRouter(
-		rest.Get("/", app.get),
-		rest.Put("/admin/subscription", app.put),
+	g := srv.Mount(prefix,
+		echoutil.AccessLogJSON(log.New(os.Stdout, "/subscriptions:", log.Lshortfile), prefix),
+		echoutil.AccessLogFluent(&utils.AccessLogFluentMiddleware{Prefix: "subscription"}, prefix),
+		echoutil.Instrument(),
+		echoutil.Recover(),
+		echoutil.CORS(echoutil.CORSConfig{
+			RejectNonCorsRequests: false,
+			OriginValidator:       echoutil.AllowAllOrigins,
+			AllowedMethods:        []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+			AllowedHeaders: []string{
+				"Accept",
+				"Content-Type",
+				"Content-Length",
+				"X-Custom-Header",
+				"Origin",
+				"Authorization",
+				"X-Trace-ID",
+				"Trace-Id",
+				"x-request-id",
+				"X-Request-ID",
+				"TraceID",
+				"ParentID",
+				"Uber-Trace-ID",
+				"uber-trace-id",
+				"traceparent",
+				"tracestate",
+			},
+			AccessControlAllowCredentials: true,
+			AccessControlMaxAge:           3600,
+		}),
+		echoutil.URLClean(),
+		echoutil.BasicAuthToBearer(&utils.BasicAuthToBearerMiddleware{JWT: s.jwtConfig, Mongo: s.mongoClient}),
+		echoutil.JWT(s.jwtConfig),
+		echoutil.Auth(),
 	)
-	app.API.Use(&tracer.OtelMiddleware{
-		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
-		Router:      apiRouter,
-	})
-	app.API.SetApp(apiRouter)
-	return app
+
+	// URLClean strips the trailing "/", so the root is the bare prefix.
+	g.GET("", s.get)
+	g.PUT("/admin/subscription", s.put)
 }

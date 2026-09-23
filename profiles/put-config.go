@@ -1,4 +1,4 @@
-// Copyright 2021  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,9 +18,10 @@ package profiles
 import (
 	"net/http"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 )
 
 // handlePutGlobalMeta Get user profile global meta
@@ -36,55 +37,50 @@ import (
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /profiles/metas [put]
-func (a *App) handlePutGlobalMeta(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePutGlobalMeta(c *echo.Context) error {
 	metas := map[string]interface{}{}
-	r.DecodeJsonPayload(&metas)
+	if err := echoutil.DecodeJsonPayload(c, &metas); err != nil {
+		return echoutil.RestErrorWrapper(c, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
+	}
 	globalMeta := utils.BsonQuoteMap(&metas)
 
-	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
+	jwtPayload, ok := echoutil.Lookup(c, echoutil.KeyJWTPayload)
 	if !ok {
-		utils.RestErrorWrapper(w, "Token owner can't be defined", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Token owner can't be defined", http.StatusInternalServerError)
 	}
 	tokenOwner, ok := jwtPayload.(jwtgo.MapClaims)["prn"].(string)
 	if !ok {
-		utils.RestErrorWrapper(w, "Token owner can't be defined", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Token owner can't be defined", http.StatusInternalServerError)
 	}
 
-	account, err := a.getUserAccount(r.Context(), tokenOwner, "prn")
+	account, err := a.getUserAccount(c.Request().Context(), tokenOwner, "prn")
 	if err != nil {
 		switch err.(type) {
 		default:
-			utils.RestErrorWrapper(w, "Account "+err.Error(), http.StatusInternalServerError)
-			return
+			return echoutil.RestErrorWrapper(c, "Account "+err.Error(), http.StatusInternalServerError)
 		}
 	}
 
-	haveProfile, err := a.ExistsInProfiles(r.Context(), account.ID)
+	haveProfile, err := a.ExistsInProfiles(c.Request().Context(), account.ID)
 	if err != nil {
-		utils.RestErrorWrapper(w, err.Error(), http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, err.Error(), http.StatusForbidden)
 	}
 
 	if !haveProfile {
-		_, err := a.MakeUserProfile(r.Context(), account, nil)
+		_, err := a.MakeUserProfile(c.Request().Context(), account, nil)
 		if err != nil {
-			utils.RestErrorWrapper(w, err.Error(), http.StatusForbidden)
-			return
+			return echoutil.RestErrorWrapper(c, err.Error(), http.StatusForbidden)
 		}
 	}
 
 	if account.Prn != tokenOwner {
-		utils.RestErrorWrapperUser(w, err.Error(), "Only owners can write profile", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapperUser(c, "not the profile owner", "Only owners can write profile", http.StatusForbidden)
 	}
 
-	profile, err := a.updateProfileMeta(r.Context(), account.Prn, globalMeta)
+	profile, err := a.updateProfileMeta(c.Request().Context(), account.Prn, globalMeta)
 	if err != nil {
-		utils.RestErrorWrapper(w, "No Access", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "No Access", http.StatusForbidden)
 	}
 
-	w.WriteJson(utils.BsonUnquoteMap(&profile.Meta))
+	return echoutil.WriteJSON(c, http.StatusOK, utils.BsonUnquoteMap(&profile.Meta))
 }

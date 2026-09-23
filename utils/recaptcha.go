@@ -1,5 +1,5 @@
 //
-// Copyright 2019  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package utils
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -52,7 +53,12 @@ func VerifyReCaptchaToken(token string) (bool, error) {
 
 	var data verifyResponse
 
-	json.Unmarshal(body, &data)
+	// An unreadable response used to leave data zero-valued, which reads as an
+	// ordinary "captcha not solved" and hid the fact that the verification
+	// service answered with something unexpected.
+	if err := json.Unmarshal(body, &data); err != nil {
+		return false, fmt.Errorf("captcha verification returned an unreadable response: %w", err)
+	}
 	if len(data.ErrorCodes) > 0 {
 		return false, errors.New(strings.Join(data.ErrorCodes, ", "))
 	}

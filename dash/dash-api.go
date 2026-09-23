@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017-2023 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,13 +21,14 @@ import (
 	"net/http"
 	"time"
 
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/alecthomas/units"
-	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -53,9 +54,9 @@ type accountClaims struct {
 // @Failure 400 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /dash/auth_status [get]
-func handleAuth(w rest.ResponseWriter, r *rest.Request) {
-	jwtClaims := r.Env["JWT_PAYLOAD"]
-	w.WriteJson(jwtClaims)
+func handleAuth(c *echo.Context) error {
+	jwtClaims := c.Get(echoutil.KeyJWTPayload)
+	return echoutil.WriteJSON(c, http.StatusOK, jwtClaims)
 }
 
 // handleGetSummary get account summary
@@ -71,34 +72,29 @@ func handleAuth(w rest.ResponseWriter, r *rest.Request) {
 // @Failure 400 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /dash/ [get]
-func (a *App) handleGetSummary(w rest.ResponseWriter, r *rest.Request) {
-	owner, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+func (a *App) handleGetSummary(c *echo.Context) error {
+	owner, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"]
 	if !ok {
 		err := ModelError{}
 		err.Code = http.StatusInternalServerError
 		err.Message = "You need to be logged in as a USER"
 
-		w.WriteHeader(int(err.Code))
-		w.WriteJson(err)
-		return
+		return echoutil.WriteJSON(c, int(err.Code), err)
 	}
 
 	summaryCol := a.mongoClient.Database("pantabase_devicesummary").Collection("device_summary_short_new_v2")
 	if summaryCol == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity (summaryCol)", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity (summaryCol)", http.StatusInternalServerError)
 	}
 
 	dCol := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if dCol == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
 	oCol := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_objects")
 	if oCol == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
 	summary := Summary{}
@@ -108,30 +104,27 @@ func (a *App) handleGetSummary(w rest.ResponseWriter, r *rest.Request) {
 	findOptions.SetSort(bson.M{"timestamp": -1})
 	findOptions.SetLimit(5)
 	findOptions.SetNoCursorTimeout(true)
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	cur, err := summaryCol.Find(ctx, bson.M{
 		"owner":   owner,
 		"garbage": bson.M{"$ne": true},
 	}, findOptions)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error on fetching devices:"+err.Error(), http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Error on fetching devices:"+err.Error(), http.StatusForbidden)
 	}
 	defer cur.Close(ctx)
 	for cur.Next(ctx) {
 		result := trailmodels.TrailSummary{}
 		err := cur.Decode(&result)
 		if err != nil {
-			utils.RestErrorWrapper(w, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
-			return
+			return echoutil.RestErrorWrapper(c, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
 		}
 		mostRecentDeviceTrails = append(mostRecentDeviceTrails, result)
 	}
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error finding devices for summary "+err.Error(),
+		return echoutil.RestErrorWrapper(c, "Error finding devices for summary "+err.Error(),
 			http.StatusInternalServerError)
-		return
 	}
 
 	summary.TopDevices = make([]DeviceInfo, 0)
@@ -144,14 +137,15 @@ func (a *App) handleGetSummary(w rest.ResponseWriter, r *rest.Request) {
 		dInfo.Nick = v.DeviceNick
 		dInfo.DeviceID = v.DeviceID
 		dInfo.Status = v.Status
-		dInfo.LastActivity = v.Timestamp
+		v.FillLastSeen()
+		dInfo.LastActivity = v.LastSeen
 		summary.TopDevices = append(summary.TopDevices, dInfo)
 	}
 
 	summary.Prn = owner.(string)
-	summary.Nick = r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["nick"].(string)
+	summary.Nick = c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["nick"].(string)
 
-	sub, err := a.subService.LoadBySubject(r.Context(), utils.Prn(owner.(string)))
+	sub, err := a.subService.LoadBySubject(c.Request().Context(), utils.Prn(owner.(string)))
 	if err != nil {
 		sub = a.subService.GetDefaultSubscription(utils.Prn(owner.(string)))
 	}
@@ -159,9 +153,8 @@ func (a *App) handleGetSummary(w rest.ResponseWriter, r *rest.Request) {
 	plan := sub.GetPlan()
 	prnInfo, err := plan.GetInfo()
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error parsing plan "+err.Error(),
+		return echoutil.RestErrorWrapper(c, "Error parsing plan "+err.Error(),
 			http.StatusInternalServerError)
-		return
 	}
 
 	summary.Sub = SubscriptionInfo{
@@ -170,7 +163,7 @@ func (a *App) handleGetSummary(w rest.ResponseWriter, r *rest.Request) {
 		QuotaStats: copySubToDashMap(sub),
 	}
 
-	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel = context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	deviceCount, err := dCol.CountDocuments(ctx,
 		bson.M{
@@ -179,9 +172,8 @@ func (a *App) handleGetSummary(w rest.ResponseWriter, r *rest.Request) {
 		},
 	)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error finding devices for summary "+err.Error(),
+		return echoutil.RestErrorWrapper(c, "Error finding devices for summary "+err.Error(),
 			http.StatusInternalServerError)
-		return
 	}
 
 	quota := summary.Sub.QuotaStats[QuotaDevices]
@@ -190,7 +182,7 @@ func (a *App) handleGetSummary(w rest.ResponseWriter, r *rest.Request) {
 
 	// quota on disk
 	resp := DiskQuotaUsageResult{}
-	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel = context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	pipeline := []bson.M{
 		{"$match": bson.M{
@@ -206,21 +198,18 @@ func (a *App) handleGetSummary(w rest.ResponseWriter, r *rest.Request) {
 	}
 	//pipelineData, err := bson.Marshal(pipeline)
 	if err != nil {
-		utils.RestErrorWrapper(w, "ERROR Marshalling pipeline: "+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "ERROR Marshalling pipeline: "+err.Error(), http.StatusInternalServerError)
 	}
 	cur, err = oCol.Aggregate(ctx, pipeline)
 	if err != nil {
-		utils.RestErrorWrapper(w, "ERROR Aggregate pipeline data: "+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "ERROR Aggregate pipeline data: "+err.Error(), http.StatusInternalServerError)
 	}
 	defer cur.Close(ctx)
 	for cur.Next(ctx) {
 		result := DiskQuotaUsageResult{}
 		err := cur.Decode(&result)
 		if err != nil {
-			utils.RestErrorWrapper(w, "ERROR Decoding Document: "+err.Error(), http.StatusInternalServerError)
-			return
+			return echoutil.RestErrorWrapper(c, "ERROR Decoding Document: "+err.Error(), http.StatusInternalServerError)
 		}
 		resp = result
 		break
@@ -230,17 +219,15 @@ func (a *App) handleGetSummary(w rest.ResponseWriter, r *rest.Request) {
 		quotaObjects := summary.Sub.QuotaStats[QuotaObjects]
 		uM, err := units.ParseStrictBytes("1" + quotaObjects.Unit)
 		if err != nil {
-			utils.RestErrorWrapper(w, "ERROR Quota Unit: "+err.Error(), http.StatusInternalServerError)
-			return
+			return echoutil.RestErrorWrapper(c, "ERROR Quota Unit: "+err.Error(), http.StatusInternalServerError)
 		}
 		fRound := float64(int64(float64(resp.Total)/float64(uM)*100)) / 100
 		quotaObjects.Actual = fRound
 		summary.Sub.QuotaStats[QuotaObjects] = quotaObjects
 	} else if err != nil {
-		utils.RestErrorWrapper(w, "Error finding quota usage of disk: "+err.Error(),
+		return echoutil.RestErrorWrapper(c, "Error finding quota usage of disk: "+err.Error(),
 			http.StatusInternalServerError)
-		return
 	}
 
-	w.WriteJson(summary)
+	return echoutil.WriteJSON(c, http.StatusOK, summary)
 }

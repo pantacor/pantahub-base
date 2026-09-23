@@ -1,5 +1,5 @@
 //
-// Copyright 2017  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -34,23 +34,22 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
-	jwt "github.com/pantacor/go-json-rest-middleware-jwt"
+	jwtgo "github.com/golang-jwt/jwt/v5"
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/utils"
-	"gitlab.com/pantacor/pantahub-base/utils/tracer"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
+	"gitlab.com/pantacor/pantahub-base/utils/jwtauth"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/mgo.v2/bson"
 )
 
 // App logs rest application
 type App struct {
-	jwtMiddleware *jwt.JWTMiddleware
-	API           *rest.Api
-	mongoClient   *mongo.Client
-	backend       Backend
+	jwtConfig   *jwtauth.Config
+	mongoClient *mongo.Client
+	backend     Backend
 }
 
 // Filters uses a prototype Entry instance to filter
@@ -89,9 +88,14 @@ type Pager struct {
 
 // Backend logs interface
 type Backend interface {
+	// getLogs runs one page of a log query. searchAfter, when non-empty,
+	// carries the sort values of the last entry of the previous page and
+	// continues from just after it (keyset pagination); it is mutually
+	// exclusive with a non-zero start. When cursor is true the backend fills
+	// Pager.NextCursor with the sort values needed to fetch the next page,
+	// or leaves it empty when the backend cannot paginate that way.
 	getLogs(ctx context.Context, start int64, page int64, before *time.Time, after *time.Time,
-		query Filters, sort Sorts, cursor bool) (*Pager, error)
-	getLogsByCursor(ctx context.Context, nextCursor string) (*Pager, error)
+		query Filters, sort Sorts, searchAfter []interface{}, cursor bool) (*Pager, error)
 	postLogs(parentCtx context.Context, e []Entry, debug bool) error
 	register() error
 	unregister(deleteIndices bool) error
@@ -103,14 +107,36 @@ var ErrCursorTimedOut error = errors.New("cursor Invalid or expired")
 // ErrCursorNotImplemented cursor not implemented
 var ErrCursorNotImplemented error = errors.New("cursor not supported by backend")
 
+// CursorState is everything needed to continue a log query, so that paging
+// holds no server-side state at all. Previously the cursor was an
+// Elasticsearch scroll id, which pinned a scroll context on the cluster for
+// every request that asked for one and was never released; callers that only
+// ever fetch the first page (the UI's poller did exactly this) leaked one
+// context per poll. Carrying the query plus the previous page's sort values
+// instead lets the next page be re-issued as a plain search_after query.
+type CursorState struct {
+	Filter      Entry         `json:"f"`
+	Before      *time.Time    `json:"b,omitempty"`
+	After       *time.Time    `json:"a,omitempty"`
+	Sort        Sorts         `json:"s,omitempty"`
+	Page        int64         `json:"p,omitempty"`
+	SearchAfter []interface{} `json:"sa,omitempty"`
+}
+
 // CursorClaim claim log cursor
 type CursorClaim struct {
-	NextCursor string `json:"next-cursor"`
-	jwtgo.StandardClaims
+	State *CursorState `json:"state,omitempty"`
+	jwtgo.RegisteredClaims
 }
 
 // ParseDeviceString : Parse Device Nicks & Device Id's from a string and replace them with device Prn
 func (a *App) ParseDeviceString(parentCtx context.Context, owner string, devicesString string) (string, error) {
+	// No device filter asked for: nothing to resolve, and no reason to spend a
+	// round trip on the devices collection.
+	if strings.TrimSpace(devicesString) == "" {
+		return "", nil
+	}
+
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
@@ -122,42 +148,151 @@ func (a *App) ParseDeviceString(parentCtx context.Context, owner string, devices
 	components := strings.Split(devicesString, ",")
 	deviceObject := devices.Device{}
 	for _, device := range components {
+		device = strings.TrimSpace(device)
+		if device == "" {
+			continue
+		}
+
 		hasPrefix, _ := regexp.MatchString("^prn:(.*):devices:/(.+)$", device)
 		if hasPrefix {
 			devicePrns = append(devicePrns, device)
 			continue
 		}
-		deviceNick := ""
-		deviceObjectID, err := primitive.ObjectIDFromHex(device)
-		if err != nil {
-			deviceNick = device
+
+		query := bson.M{
+			"owner":   owner,
+			"garbage": bson.M{"$ne": true},
 		}
-		if deviceNick != "" {
-			err = collection.FindOne(ctx,
-				bson.M{
-					"owner":   owner,
-					"nick":    deviceNick,
-					"garbage": bson.M{"$ne": true},
-				}).
-				Decode(&deviceObject)
+
+		isPrefix := false
+		if deviceObjectID, err := primitive.ObjectIDFromHex(device); err == nil {
+			query["_id"] = deviceObjectID
+		} else if low, high, ok := objectIDPrefixRange(device); ok {
+			// A shortened id, as `pvr device logs 648b56a6` passes. An ObjectID
+			// hex prefix denotes a contiguous range of ids, so this stays an
+			// indexed lookup rather than a scan.
+			query["_id"] = bson.M{"$gte": low, "$lte": high}
+			isPrefix = true
 		} else {
-			err = collection.FindOne(ctx,
-				bson.M{
-					"_id":     deviceObjectID,
-					"owner":   owner,
-					"garbage": bson.M{"$ne": true},
-				}).
-				Decode(&deviceObject)
+			query["nick"] = device
 		}
+
+		if isPrefix {
+			// The leading bytes of an ObjectID are a timestamp, so a short
+			// prefix can name several devices registered in the same second.
+			// Picking one of them arbitrarily would show the wrong device's
+			// logs without saying so.
+			prn, err := resolveUniqueDevice(ctx, collection, query)
+			if err == nil {
+				devicePrns = append(devicePrns, prn)
+				continue
+			}
+			if !errors.Is(err, errNoSuchDevice) {
+				return "", fmt.Errorf("device %q: %w", device, err)
+			}
+
+			// Nothing has an id starting that way, but a nick can be valid hex
+			// too, so fall through and try it as one before giving up.
+			delete(query, "_id")
+			query["nick"] = device
+		}
+
+		err := collection.FindOne(ctx, query).Decode(&deviceObject)
 		if err != nil {
-			fmt.Print("Error finding device:" + device + ",err:" + err.Error())
-			continue
+			// Returning nothing for an unresolved device used to leave the
+			// filter empty, and an empty filter means "every device" -- so
+			// asking for one device you could not name quietly returned all of
+			// them. Say so instead.
+			return "", fmt.Errorf("no device matching %q", device)
 		}
-		if deviceObject.Nick != "" {
+
+		if deviceObject.Prn != "" {
 			devicePrns = append(devicePrns, deviceObject.Prn)
 		}
 	}
+
+	if len(devicePrns) == 0 {
+		return "", errors.New("no devices matched the requested filter")
+	}
+
 	return strings.Join(devicePrns, ","), nil
+}
+
+// errNoSuchDevice reports that a query matched nothing, so a caller can decide
+// whether another interpretation of the name is worth trying.
+var errNoSuchDevice = errors.New("no such device")
+
+// resolveUniqueDevice returns the PRN of the single device matching query, and
+// refuses when the match is ambiguous rather than picking one arbitrarily. It
+// reads two documents so that "more than one" costs no more than "exactly one".
+func resolveUniqueDevice(ctx context.Context, collection *mongo.Collection, query bson.M) (string, error) {
+	cursor, err := collection.Find(ctx, query, options.Find().SetLimit(2))
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+
+	matches := []devices.Device{}
+	for cursor.Next(ctx) {
+		match := devices.Device{}
+		if err := cursor.Decode(&match); err != nil {
+			return "", err
+		}
+		matches = append(matches, match)
+	}
+	if err := cursor.Err(); err != nil {
+		return "", err
+	}
+
+	switch len(matches) {
+	case 0:
+		return "", errNoSuchDevice
+	case 1:
+		if matches[0].Prn == "" {
+			return "", errors.New("device has no prn")
+		}
+		return matches[0].Prn, nil
+	default:
+		return "", errors.New("matches more than one device; use the full id")
+	}
+}
+
+// objectIDPrefixRange turns a partial ObjectID hex string into the inclusive
+// range of ids that begin with it.
+//
+// An ObjectID is 12 bytes rendered as 24 hex characters, so any prefix of
+// those characters describes a contiguous span: pad it with zeroes for the low
+// end and with fs for the high end. That keeps a lookup by shortened id on the
+// _id index instead of forcing a collection scan with a regex over $toString.
+//
+// Reports false when the string is not a usable prefix, so the caller can fall
+// back to treating it as a nick.
+func objectIDPrefixRange(prefix string) (primitive.ObjectID, primitive.ObjectID, bool) {
+	var low, high primitive.ObjectID
+
+	// A full-length id is handled by the exact-match path, and an odd number of
+	// characters would not land on a byte boundary when padded.
+	if len(prefix) == 0 || len(prefix) >= 24 || len(prefix)%2 != 0 {
+		return low, high, false
+	}
+
+	for _, r := range prefix {
+		if !strings.ContainsRune("0123456789abcdefABCDEF", r) {
+			return low, high, false
+		}
+	}
+
+	padding := 24 - len(prefix)
+	low, err := primitive.ObjectIDFromHex(prefix + strings.Repeat("0", padding))
+	if err != nil {
+		return low, high, false
+	}
+	high, err = primitive.ObjectIDFromHex(prefix + strings.Repeat("f", padding))
+	if err != nil {
+		return low, high, false
+	}
+
+	return low, high, true
 }
 
 func unmarshalBody(body []byte) ([]Entry, error) {
@@ -179,10 +314,10 @@ func unmarshalBody(body []byte) ([]Entry, error) {
 }
 
 // New create a new logs rest application
-func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
+func New(jwtConfig *jwtauth.Config, mongoClient *mongo.Client) *App {
 	var err error
 	app := new(App)
-	app.jwtMiddleware = jwtMiddleware
+	app.jwtConfig = jwtConfig
 	app.mongoClient = mongoClient
 
 	loggerType := "elastic"
@@ -210,73 +345,51 @@ func New(jwtMiddleware *jwt.JWTMiddleware, mongoClient *mongo.Client) *App {
 
 	log.Printf("INFO: %s Logger started\n", loggerType)
 
-	app.API = rest.NewApi()
-
-	// we dont use default stack because we dont want content type enforcement
-	app.API.Use(&rest.AccessLogJsonMiddleware{Logger: log.New(os.Stdout,
-		"/logs:", log.Lshortfile)})
-	app.API.Use(&utils.AccessLogFluentMiddleware{Prefix: "logs"})
-
-	app.API.Use(rest.DefaultCommonStack...)
-
-	// we allow calls from other domains to allow webapps; XXX: review
-	app.API.Use(&rest.CorsMiddleware{
-		RejectNonCorsRequests: false,
-		OriginValidator: func(origin string, request *rest.Request) bool {
-			return true
-		},
-		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{
-			"Accept",
-			"Content-Type",
-			"Content-Length",
-			"X-Custom-Header",
-			"Origin",
-			"Authorization",
-			"X-Trace-ID",
-			"Trace-Id",
-			"x-request-id",
-			"X-Request-ID",
-			"TraceID",
-			"ParentID",
-			"Uber-Trace-ID",
-			"uber-trace-id",
-			"traceparent",
-			"tracestate",
-		},
-		AccessControlAllowCredentials: true,
-		AccessControlMaxAge:           3600,
-	})
-
-	app.API.Use(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtMiddleware, Mongo: app.mongoClient})
-	app.API.Use(&rest.IfMiddleware{
-		Condition: func(request *rest.Request) bool {
-			return true
-		},
-		IfTrue: app.jwtMiddleware,
-	})
-
-	app.API.Use(&rest.IfMiddleware{
-		Condition: func(request *rest.Request) bool {
-			return true
-		},
-		IfTrue: &utils.AuthMiddleware{},
-	})
-
-	// XXX: this is all needs to be done so that paths that do not trail with /
-	//      get a MOVED PERMANTENTLY error with the redir path with / like the main
-	//      API routers (bad rest.MakeRouter I suspect)
-	apiRouter, _ := rest.MakeRouter(
-		rest.Get("/", app.handleGetLogs),
-		rest.Get("/cursor", app.handleGetLogsCursor),
-		rest.Post("/cursor", app.handleGetLogsCursor),
-		rest.Post("/", app.handlePostLogs),
-	)
-	app.API.Use(&tracer.OtelMiddleware{
-		ServiceName: os.Getenv("OTEL_SERVICE_NAME"),
-		Router:      apiRouter,
-	})
-	app.API.SetApp(apiRouter)
-
 	return app
+}
+
+// Mount registers logs on echo with its previous middleware stack.
+func (app *App) Mount(s *echoutil.Server) {
+	const prefix = "/logs"
+
+	g := s.Mount(prefix,
+		echoutil.AccessLogJSON(log.New(os.Stdout, "/logs:", log.Lshortfile), prefix),
+		echoutil.AccessLogFluent(&utils.AccessLogFluentMiddleware{Prefix: "logs"}, prefix),
+		echoutil.Instrument(),
+		echoutil.Recover(),
+		// we allow calls from other domains to allow webapps; XXX: review
+		echoutil.CORS(echoutil.CORSConfig{
+			RejectNonCorsRequests: false,
+			OriginValidator:       echoutil.AllowAllOrigins,
+			AllowedMethods:        []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+			AllowedHeaders: []string{
+				"Accept",
+				"Content-Type",
+				"Content-Length",
+				"X-Custom-Header",
+				"Origin",
+				"Authorization",
+				"X-Trace-ID",
+				"Trace-Id",
+				"x-request-id",
+				"X-Request-ID",
+				"TraceID",
+				"ParentID",
+				"Uber-Trace-ID",
+				"uber-trace-id",
+				"traceparent",
+				"tracestate",
+			},
+			AccessControlAllowCredentials: true,
+			AccessControlMaxAge:           3600,
+		}),
+		echoutil.BasicAuthToBearer(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtConfig, Mongo: app.mongoClient}),
+		echoutil.JWT(app.jwtConfig),
+		echoutil.Auth(),
+	)
+
+	g.GET("/", app.handleGetLogs)
+	g.GET("/cursor", app.handleGetLogsCursor)
+	g.POST("/cursor", app.handleGetLogsCursor)
+	g.POST("/", app.handlePostLogs)
 }

@@ -1,4 +1,4 @@
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -40,9 +40,13 @@ func CreateOrUpdateApp(ctx context.Context, tpApp *TPApp, database *mongo.Databa
 		tpApp.Nick = slug.Make(tpApp.Nick)
 	}
 
+	update := bson.M{"$set": tpApp}
 	if tpApp.Type != AppTypeConfidential {
 		tpApp.ExposedScopes = []utils.Scope{}
 		tpApp.Secret = ""
+		tpApp.SecretHash = ""
+		// public clients carry no secret at all (omitempty would keep a stale one)
+		update["$unset"] = bson.M{"secret": "", "secret_hash": ""}
 	}
 
 	collection := database.Collection(DBCollection)
@@ -61,11 +65,23 @@ func CreateOrUpdateApp(ctx context.Context, tpApp *TPApp, database *mongo.Databa
 	_, err := collection.UpdateOne(
 		ctxC,
 		bson.M{"_id": tpApp.ID},
-		bson.M{"$set": tpApp},
+		update,
 		updateOptions,
 	)
 
 	return tpApp, err
+}
+
+// MigratePlaintextSecrets hashes any client secret still stored in plaintext,
+// keeping the plaintext until PurgePlaintextSecrets runs. See utils.MigrateSecrets.
+func MigratePlaintextSecrets(ctx context.Context, database *mongo.Database) (int64, error) {
+	return utils.MigrateSecrets(ctx, database.Collection(DBCollection), 0)
+}
+
+// PurgePlaintextSecrets drops the legacy plaintext secret from apps that
+// already carry a hash. See utils.PurgeSecrets.
+func PurgePlaintextSecrets(ctx context.Context, database *mongo.Database) (int64, error) {
+	return utils.PurgeSecrets(ctx, database.Collection(DBCollection), 0)
 }
 
 // LoginAsApp using and application id and secret
@@ -78,23 +94,35 @@ func LoginAsApp(serviceID, secret string, database *mongo.Database) (*TPApp, err
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	if secret == "" {
+		return nil, nil
+	}
+
+	// secrets are stored hashed; the plaintext clause only matches rows not
+	// yet migrated (it disappears once PANTAHUB_PURGE_PLAINTEXT_SECRETS ran)
 	findQuery := bson.M{
-		"secret":     secret,
 		"deleted-at": nil,
+		"$or": []bson.M{
+			{"secret_hash": utils.HashSecret(secret)},
+			{"secret": secret},
+		},
 	}
 
 	if serviceID != "" {
 		ObjectID, _ := primitive.ObjectIDFromHex(serviceID)
-		findQuery["$or"] = []bson.M{
+		findQuery["$and"] = []bson.M{{"$or": []bson.M{
 			{"_id": ObjectID},
 			{"prn": serviceID},
-		}
+		}}}
 	}
 
 	tpApp := &TPApp{}
-	dbResult := collection.FindOne(ctx, findQuery)
-
-	dbResult.Decode(tpApp)
+	if err := collection.FindOne(ctx, findQuery).Decode(tpApp); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, nil
+		}
+		return nil, err
+	}
 	return tpApp, nil
 }
 
@@ -106,12 +134,57 @@ func SearchApp(ctx context.Context, owner string, id string, database *mongo.Dat
 	}
 
 	if len(apps) != 1 {
+		// A client lookup (no owner) that finds no stored application falls
+		// back to the built-in one. A stored application with that nick,
+		// created before it was built in, keeps precedence.
+		if builtin := builtinApp(id); owner == "" && len(apps) == 0 && builtin != nil {
+			return builtin, 0, nil
+		}
 		return nil, http.StatusNotFound, errors.New("App not found (id " + id + ")")
 	}
 
 	tpApp := apps[0]
 
 	return &tpApp, 0, nil
+}
+
+// UpdateApp sets fields on one of owner's applications, named by id, prn or
+// nick as in SearchApp, and returns it as stored afterwards. Only those fields
+// and time-modified change. Built-in clients and applications without an owner
+// are never found, so they cannot be changed through it.
+func UpdateApp(ctx context.Context, owner, id string, fields map[string]interface{}, database *mongo.Database) (*TPApp, int, error) {
+	if owner == "" {
+		return nil, http.StatusNotFound, errors.New("App not found (id " + id + ")")
+	}
+	if len(fields) == 0 {
+		return nil, http.StatusBadRequest, errors.New("nothing to update")
+	}
+
+	app, httpCode, err := SearchApp(ctx, owner, id, database)
+	if err != nil {
+		return nil, httpCode, err
+	}
+
+	set := bson.M{"time-modified": time.Now()}
+	for key, value := range fields {
+		set[key] = value
+	}
+
+	ctxC, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	updated := &TPApp{}
+	err = database.Collection(DBCollection).FindOneAndUpdate(ctxC,
+		bson.M{"_id": app.ID, "owner": owner, "deleted-at": nil},
+		bson.M{"$set": set},
+		options.FindOneAndUpdate().SetReturnDocument(options.After)).Decode(updated)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, http.StatusNotFound, errors.New("App not found (id " + id + ")")
+	}
+	if err != nil {
+		return nil, http.StatusInternalServerError, errors.New("error updating third party application " + err.Error())
+	}
+	return updated, 0, nil
 }
 
 // SearchApps search all third party app by id or prn

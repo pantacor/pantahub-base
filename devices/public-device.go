@@ -1,5 +1,5 @@
 //
-// Copyright 2020  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,9 +21,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
+	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"gopkg.in/mgo.v2/bson"
@@ -42,42 +43,37 @@ import (
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /devices/{id}/public [put]
-func (a *App) handlePutPublic(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePutPublic(c *echo.Context) error {
 	newDevice := Device{}
-	putID := r.PathParam("id")
+	putID := c.Param("id")
 
-	authID, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	authID, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in.", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in.", http.StatusForbidden)
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+	authType, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["type"]
 
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in with a known authentication type.", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in with a known authentication type.", http.StatusForbidden)
 	}
 
 	if authType == "DEVICE" {
-		utils.RestErrorWrapper(w, "Devices cannot change their own public state.", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Devices cannot change their own public state.", http.StatusForbidden)
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 
 	if collection == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	deviceObjectID, err := primitive.ObjectIDFromHex(putID)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 	}
 	err = collection.FindOne(ctx, bson.M{
 		"_id":     deviceObjectID,
@@ -85,38 +81,41 @@ func (a *App) handlePutPublic(w rest.ResponseWriter, r *rest.Request) {
 	}).Decode(&newDevice)
 
 	if err != nil && mongoutils.IsNotFound(err) {
-		utils.RestErrorWrapper(w, "Device not found", http.StatusNotFound)
-		return
+		return echoutil.RestErrorWrapper(c, "Device not found", http.StatusNotFound)
 	}
 	if err != nil {
-		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Not Accessible Resource Id", http.StatusForbidden)
 	}
 
 	if newDevice.Owner != "" && newDevice.Owner != authID {
-		utils.RestErrorWrapper(w, "Not User Accessible Resource Id", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Not User Accessible Resource Id", http.StatusForbidden)
 	}
 
+	wasPublic := newDevice.IsPublic
 	newDevice.IsPublic = true
 	newDevice.TimeModified = time.Now()
 
-	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
+	setFields := bson.M{
+		"ispublic":     newDevice.IsPublic,
+		"timemodified": newDevice.TimeModified,
+	}
+	if !wasPublic {
+		// clear the flag so the kafka listener re-syncs steps
+		setFields["mark_public_processed"] = false
+	}
+
+	ctx, cancel = context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	_, err = collection.UpdateOne(
 		ctx,
 		bson.M{"_id": newDevice.ID},
-		bson.M{"$set": bson.M{
-			"ispublic":     newDevice.IsPublic,
-			"timemodified": newDevice.TimeModified,
-		}},
+		bson.M{"$set": setFields},
 	)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error updating device public state", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Error updating device public state", http.StatusForbidden)
 	}
 
-	w.WriteJson(newDevice)
+	return echoutil.WriteJSON(c, http.StatusOK, newDevice)
 }
 
 // handleDeletePublic Make a device private
@@ -132,42 +131,37 @@ func (a *App) handlePutPublic(w rest.ResponseWriter, r *rest.Request) {
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /devices/{id}/public [delete]
-func (a *App) handleDeletePublic(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handleDeletePublic(c *echo.Context) error {
 	newDevice := Device{}
-	putID := r.PathParam("id")
+	putID := c.Param("id")
 
-	authID, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["prn"]
+	authID, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["prn"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in.", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in.", http.StatusForbidden)
 	}
 
-	authType, ok := r.Env["JWT_PAYLOAD"].(jwtgo.MapClaims)["type"]
+	authType, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)["type"]
 	if !ok {
 		// XXX: find right error
-		utils.RestErrorWrapper(w, "You need to be logged in with a known authentication type.", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "You need to be logged in with a known authentication type.", http.StatusForbidden)
 	}
 
 	if authType == "DEVICE" {
-		utils.RestErrorWrapper(w, "Devices cannot change their own public state.", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Devices cannot change their own public state.", http.StatusForbidden)
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
 	deviceObjectID, err := primitive.ObjectIDFromHex(putID)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 	}
 
 	err = collection.FindOne(ctx, bson.M{
@@ -175,36 +169,39 @@ func (a *App) handleDeletePublic(w rest.ResponseWriter, r *rest.Request) {
 		"garbage": bson.M{"$ne": true},
 	}).Decode(&newDevice)
 	if err != nil && mongoutils.IsNotFound(err) {
-		utils.RestErrorWrapper(w, "Device not found", http.StatusNotFound)
-		return
+		return echoutil.RestErrorWrapper(c, "Device not found", http.StatusNotFound)
 	}
 	if err != nil {
-		utils.RestErrorWrapper(w, "Not Accessible Resource Id", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Not Accessible Resource Id", http.StatusForbidden)
 	}
 
 	if newDevice.Owner != "" && newDevice.Owner != authID {
-		utils.RestErrorWrapper(w, "Not User Accessible Resource Id", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Not User Accessible Resource Id", http.StatusForbidden)
 	}
 
+	wasPublic := newDevice.IsPublic
 	newDevice.IsPublic = false
 	newDevice.TimeModified = time.Now()
 
-	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
+	setFields := bson.M{
+		"ispublic":     newDevice.IsPublic,
+		"timemodified": newDevice.TimeModified,
+	}
+	if wasPublic {
+		// clear the flag so the kafka listener re-syncs steps
+		setFields["mark_public_processed"] = false
+	}
+
+	ctx, cancel = context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 	_, err = collection.UpdateOne(
 		ctx,
 		bson.M{"_id": newDevice.ID},
-		bson.M{"$set": bson.M{
-			"ispublic":     newDevice.IsPublic,
-			"timemodified": newDevice.TimeModified,
-		}},
+		bson.M{"$set": setFields},
 	)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error updating device public state", http.StatusForbidden)
-		return
+		return echoutil.RestErrorWrapper(c, "Error updating device public state", http.StatusForbidden)
 	}
 
-	w.WriteJson(newDevice)
+	return echoutil.WriteJSON(c, http.StatusOK, newDevice)
 }

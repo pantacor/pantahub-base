@@ -1,4 +1,4 @@
-// Copyright 2024  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,7 +27,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/x/bsonx"
 )
 
 const (
@@ -77,8 +76,8 @@ func (r *Repo) SetIndexes() error {
 	indexOptions.SetBackground(true)
 
 	index := mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "nick", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "nick", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -97,8 +96,8 @@ func (r *Repo) SetIndexes() error {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "prn", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "prn", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -117,8 +116,8 @@ func (r *Repo) SetIndexes() error {
 	indexOptions.SetBackground(true)
 
 	index = mongo.IndexModel{
-		Keys: bsonx.Doc{
-			{Key: "owner", Value: bsonx.Int32(1)},
+		Keys: bson.D{
+			{Key: "owner", Value: int32(1)},
 		},
 		Options: &indexOptions,
 	}
@@ -365,4 +364,16 @@ func (r *Repo) GetPagination(ctx context.Context, ownerID string, filters bson.M
 		total = int64(lastElement)
 	}
 	return querymongo.GetPaginationWithLink(*aspUrl, total, &elements[lastIndex], &elements[0])
+}
+
+// MigratePlaintextSecrets hashes any token secret still stored in plaintext,
+// keeping the plaintext until PurgePlaintextSecrets runs. See utils.MigrateSecrets.
+func (r *Repo) MigratePlaintextSecrets(ctx context.Context) (int64, error) {
+	return utils.MigrateSecrets(ctx, r.col, 0)
+}
+
+// PurgePlaintextSecrets drops the legacy plaintext secret from tokens that
+// already carry a hash. See utils.PurgeSecrets.
+func (r *Repo) PurgePlaintextSecrets(ctx context.Context) (int64, error) {
+	return utils.PurgeSecrets(ctx, r.col, 0)
 }

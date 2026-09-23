@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Tests for BsonQuoteMap / BsonUnquoteMap. The invariants we care about:
 //
@@ -272,10 +272,10 @@ func TestBsonUnquoteMap_ValueSide(t *testing.T) {
 	// unchanged — the runtime unquoter doesn't get to guess.
 	// `.` in a value never gets touched either direction.
 	in := map[string]interface{}{
-		"clean":            "￠{VAR}",                   // canonical: ￠ in value, reversed
-		"opaque_n":         "pvwificonnect/srcＮjson",   // Ｎ in value: legitimate, preserved
+		"clean":            "￠{VAR}",                  // canonical: ￠ in value, reversed
+		"opaque_n":         "pvwificonnect/srcＮjson",  // Ｎ in value: legitimate, preserved
 		"mixed":            "￠cmd with Ｎdot and ￠ref", // ￠ reversed, Ｎ preserved
-		"dotted.preserved": "a.b.c",                    // `.` untouched in value
+		"dotted.preserved": "a.b.c",                   // `.` untouched in value
 	}
 	got := BsonUnquoteMap(&in)
 

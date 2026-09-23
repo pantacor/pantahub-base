@@ -1,5 +1,5 @@
 //
-// Copyright 2025  Pantacor Ltd.
+// Copyright (c) 2017-2026 Pantacor Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,10 +23,11 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/ant0ine/go-json-rest/rest"
-	jwtgo "github.com/dgrijalva/jwt-go"
 	petname "github.com/dustinkirkland/golang-petname"
+	jwtgo "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
 	"gitlab.com/pantacor/pantahub-base/utils/models"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -48,15 +49,18 @@ import (
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /devices [post]
-func (a *App) handlePostDevice(w rest.ResponseWriter, r *rest.Request) {
+func (a *App) handlePostDevice(c *echo.Context) error {
 	newDevice := Device{}
-	r.DecodeJsonPayload(&newDevice)
+	// Pantavisor registers and pvr claims with a body-less request, so an
+	// empty payload is the same as "{}"; only malformed JSON is rejected.
+	if err := echoutil.DecodeJsonPayload(c, &newDevice); err != nil && err != echoutil.ErrJsonPayloadEmpty {
+		return echoutil.RestErrorWrapper(c, "Error decoding json payload: "+err.Error(), http.StatusBadRequest)
+	}
 
 	mgoid := bson.NewObjectId()
 	ObjectID, err := primitive.ObjectIDFromHex(mgoid.Hex())
 	if err != nil {
-		utils.RestErrorWrapper(w, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Invalid Hex:"+err.Error(), http.StatusInternalServerError)
 	}
 	newDevice.ID = ObjectID
 	newDevice.Prn = "prn:::devices:/" + newDevice.ID.Hex()
@@ -66,13 +70,12 @@ func (a *App) handlePostDevice(w rest.ResponseWriter, r *rest.Request) {
 		var err error
 		newDevice.Secret, err = utils.GenerateSecret(15)
 		if err != nil {
-			utils.RestErrorWrapper(w, "Error generating secret", http.StatusInternalServerError)
-			return
+			return echoutil.RestErrorWrapper(c, "Error generating secret", http.StatusInternalServerError)
 		}
 	}
 
 	var owner interface{}
-	jwtPayload, ok := r.Env["JWT_PAYLOAD"]
+	jwtPayload, ok := echoutil.Lookup(c, echoutil.KeyJWTPayload)
 	if ok {
 		owner, ok = jwtPayload.(jwtgo.MapClaims)["prn"]
 	}
@@ -82,16 +85,14 @@ func (a *App) handlePostDevice(w rest.ResponseWriter, r *rest.Request) {
 		newDevice.Owner = owner.(string)
 
 		// Check device quota before creating device
-		quotaResult, err := CheckDeviceQuota(r.Context(), newDevice.Owner, a.mongoClient, a.subService)
+		quotaResult, err := CheckDeviceQuota(c.Request().Context(), newDevice.Owner, a.mongoClient, a.subService)
 		if err != nil {
-			utils.RestErrorWrapper(w, "Error checking device quota: "+err.Error(), http.StatusInternalServerError)
-			return
+			return echoutil.RestErrorWrapper(c, "Error checking device quota: "+err.Error(), http.StatusInternalServerError)
 		}
 		if quotaResult.Exceeded {
-			utils.RestErrorWrapperUser(w, "device quota exceeded",
+			return echoutil.RestErrorWrapperUser(c, "device quota exceeded",
 				"Device quota exceeded; delete some devices or request a quota bump from team@pantahub.com",
 				http.StatusForbidden)
-			return
 		}
 
 		newDevice.UserMeta = utils.BsonQuoteMap(&newDevice.UserMeta)
@@ -104,14 +105,13 @@ func (a *App) handlePostDevice(w rest.ResponseWriter, r *rest.Request) {
 		newDevice.DeviceMeta = utils.BsonQuoteMap(&newDevice.DeviceMeta)
 
 		// lets see if we have an auto assign candidate
-		autoAuthToken := r.Header.Get(PantahubDevicesAutoTokenV1)
+		autoAuthToken := c.Request().Header.Get(PantahubDevicesAutoTokenV1)
 
 		if autoAuthToken != "" {
 
-			autoInfo, err := a.getBase64AutoTokenInfo(r.Context(), autoAuthToken)
+			autoInfo, err := a.getBase64AutoTokenInfo(c.Request().Context(), autoAuthToken)
 			if err != nil {
-				utils.RestErrorWrapper(w, "Error using AutoAuthToken "+err.Error(), http.StatusBadRequest)
-				return
+				return echoutil.RestErrorWrapper(c, "Error using AutoAuthToken "+err.Error(), http.StatusBadRequest)
 			}
 
 			// update owner and usermeta
@@ -121,19 +121,20 @@ func (a *App) handlePostDevice(w rest.ResponseWriter, r *rest.Request) {
 			}
 
 			// Check device quota for auto-token owner
-			quotaResult, err := CheckDeviceQuota(r.Context(), newDevice.Owner, a.mongoClient, a.subService)
+			quotaResult, err := CheckDeviceQuota(c.Request().Context(), newDevice.Owner, a.mongoClient, a.subService)
 			if err != nil {
-				utils.RestErrorWrapper(w, "Error checking device quota: "+err.Error(), http.StatusInternalServerError)
-				return
+				return echoutil.RestErrorWrapper(c, "Error checking device quota: "+err.Error(), http.StatusInternalServerError)
 			}
 			if quotaResult.Exceeded {
-				utils.RestErrorWrapperUser(w, "device quota exceeded",
+				return echoutil.RestErrorWrapperUser(c, "device quota exceeded",
 					"Device quota exceeded; delete some devices or request a quota bump from team@pantahub.com",
 					http.StatusForbidden)
-				return
 			}
 
-			if autoInfo.OVMode != nil && autoInfo.OVMode.Mode.IsTLS() {
+			// TLS and manual modes gate the device until verified: TLS by
+			// the device presenting a cert chained to the token's root of
+			// trust, manual by the owner accepting the device explicitly.
+			if autoInfo.OVMode != nil && (autoInfo.OVMode.Mode.IsTLS() || autoInfo.OVMode.Mode.IsManual()) {
 				newDevice.OVMode = &models.OVModeExtension{
 					TokenID: autoInfo.TokenID,
 					Mode:    autoInfo.OVMode.Mode,
@@ -165,23 +166,22 @@ func (a *App) handlePostDevice(w rest.ResponseWriter, r *rest.Request) {
 
 	isValidNick, err := regexp.MatchString(DeviceNickRule, newDevice.Nick)
 	if err != nil {
-		utils.RestErrorWrapper(w, "Error Validating Device nick "+err.Error(), http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Error Validating Device nick "+err.Error(), http.StatusBadRequest)
 	}
 	if !isValidNick {
-		utils.RestErrorWrapper(w, "Invalid Device Nick (Only allowed characters:[A-Za-z0-9-_+%])", http.StatusBadRequest)
-		return
+		return echoutil.RestErrorWrapper(c, "Invalid Device Nick (Only allowed characters:[A-Za-z0-9-_+%])", http.StatusBadRequest)
 	}
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
 	if collection == nil {
-		utils.RestErrorWrapper(w, "Error with Database connectivity", http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error with Database connectivity", http.StatusInternalServerError)
 	}
+
+	newDevice.SecretHash = utils.HashSecret(newDevice.Secret)
 
 	const maxNickRetries = 5
 	for attempt := 0; ; attempt++ {
-		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 		defer cancel()
 		updateOptions := options.Update()
 		updateOptions.SetUpsert(true)
@@ -208,17 +208,15 @@ func (a *App) handlePostDevice(w rest.ResponseWriter, r *rest.Request) {
 			continue
 		}
 
-		log.Print(newDevice)
+		log.Printf("Error saving device %s (nick %s): %s", newDevice.Prn, newDevice.Nick, err.Error())
 		if mongo.IsDuplicateKeyError(err) {
 			userMessage := "device already exists"
-			utils.RestErrorWrapperUser(w, err.Error(), userMessage, http.StatusConflict)
-			return
+			return echoutil.RestErrorWrapperUser(c, err.Error(), userMessage, http.StatusConflict)
 		}
 
-		utils.RestErrorWrapper(w, "Error creating device "+err.Error(), http.StatusInternalServerError)
-		return
+		return echoutil.RestErrorWrapper(c, "Error creating device "+err.Error(), http.StatusInternalServerError)
 	}
 
 	newDevice.UserMeta = utils.BsonUnquoteMap(&newDevice.UserMeta)
-	w.WriteJson(newDevice)
+	return echoutil.WriteJSON(c, http.StatusOK, newDevice)
 }

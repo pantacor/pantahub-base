@@ -1,0 +1,7 @@
+{
+  "TestRestErrorWrapperMatches|gjr": {
+    "Status": 404,
+    "ContentType": "application/json; charset=utf-8",
+    "Body": "{\"error\":\"REST-ERR-ID-N\",\"code\":404}"
+  }
+}
