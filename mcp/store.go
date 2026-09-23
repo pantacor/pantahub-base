@@ -42,13 +42,8 @@ const (
 	// handlers bound theirs.
 	queryTimeout = 10 * time.Second
 
-	devicePrnPrefix = "prn:::devices:/"
-
 	// statusDone is the progress status of a revision the device runs.
 	statusDone = "DONE"
-
-	// maxListedTokens bounds a token listing. Accounts hold a handful.
-	maxListedTokens = 200
 )
 
 // errNotFound covers both "does not exist" and "is not yours": a tool must not
@@ -115,6 +110,30 @@ func (s *store) listDevices(ctx context.Context, owner, nickPrefix, after string
 
 // resolveDevice finds one of the owner's devices by id, PRN or nick.
 func (s *store) resolveDevice(ctx context.Context, owner, ref string) (*devices.Device, error) {
+	device, err := s.findDevice(ctx, owner, ref)
+	if err != nil {
+		return nil, err
+	}
+	device.UserMeta = utils.BsonUnquoteMap(&device.UserMeta)
+	device.DeviceMeta = utils.BsonUnquoteMap(&device.DeviceMeta)
+	return device, nil
+}
+
+// getDevice is resolveDevice with user-meta as GET /devices/:id serves it,
+// the owner's global profile meta included.
+func (s *store) getDevice(ctx context.Context, owner, ref string) (*devices.Device, error) {
+	device, err := s.findDevice(ctx, owner, ref)
+	if err != nil {
+		return nil, err
+	}
+	device.UserMeta = devices.EffectiveUserMeta(ctx, s.mongoClient, device.Owner, device.UserMeta)
+	device.UserMeta = utils.BsonUnquoteMap(&device.UserMeta)
+	device.DeviceMeta = utils.BsonUnquoteMap(&device.DeviceMeta)
+	return device, nil
+}
+
+// findDevice returns the device document as stored, its maps still quoted.
+func (s *store) findDevice(ctx context.Context, owner, ref string) (*devices.Device, error) {
 	ref = strings.TrimSpace(ref)
 	if ref == "" {
 		return nil, errors.New("device is required")
@@ -127,7 +146,7 @@ func (s *store) resolveDevice(ctx context.Context, owner, ref string) (*devices.
 		"owner":   owner,
 		"garbage": bson.M{"$ne": true},
 	}
-	if id, err := primitive.ObjectIDFromHex(strings.TrimPrefix(ref, devicePrnPrefix)); err == nil {
+	if id, ok := devices.ParseDeviceRef(ref); ok {
 		query["_id"] = id
 	} else {
 		query["nick"] = ref
@@ -141,9 +160,6 @@ func (s *store) resolveDevice(ctx context.Context, owner, ref string) (*devices.
 	if err != nil {
 		return nil, err
 	}
-
-	device.UserMeta = utils.BsonUnquoteMap(&device.UserMeta)
-	device.DeviceMeta = utils.BsonUnquoteMap(&device.DeviceMeta)
 	return device, nil
 }
 
@@ -166,7 +182,7 @@ func (s *store) listSteps(ctx context.Context, owner string, deviceID primitive.
 	findOptions := options.Find().
 		SetSort(bson.D{{Key: "rev", Value: -1}}).
 		SetLimit(limit + 1).
-		SetProjection(bson.M{"state": 0, "meta": 0, "used_objects": 0, "progress.logs": 0})
+		SetProjection(bson.M{"state": 0, "meta": 0, "used_objects": 0, "progress.logs": 0, trailmodels.ProgressLogField: 0})
 
 	cur, err := s.collection(stepsCollection).Find(ctx, query, findOptions)
 	if err != nil {
@@ -228,9 +244,6 @@ func (s *store) getLogs(ctx context.Context, q logs.Query) (*logs.Pager, error) 
 	return s.logsApp.GetLogs(ctx, q)
 }
 
-// #nosec G101 -- a mongo collection name, not a credential
-const deviceTokensCollection = "pantahub_devices_tokens"
-
 // patchUserMeta merges data into the configuration of one of the owner's
 // devices. It goes through devices.PatchUserMeta, the implementation behind the
 // REST endpoint, so both change a device in exactly the same way.
@@ -242,35 +255,14 @@ func (s *store) patchUserMeta(ctx context.Context, owner string, deviceID primit
 	return err
 }
 
-// deviceTokenProjection leaves the hash of the token secret in the database.
-// The secret itself is never stored, and nothing here can create one.
-var deviceTokenProjection = bson.M{"tokensha": 0, "token": 0}
+// maxListedTokens bounds a token listing, so a tool answer stays small.
+// Accounts hold a handful.
+const maxListedTokens = 200
 
 // listDeviceTokens returns the owner's active device join tokens, like
 // GET /devices/tokens does.
 func (s *store) listDeviceTokens(ctx context.Context, owner string) ([]utils.PantahubDevicesJoinToken, error) {
-	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
-	defer cancel()
-
-	cur, err := s.collection(deviceTokensCollection).Find(ctx,
-		bson.M{"owner": owner, "disabled": false},
-		options.Find().
-			SetSort(bson.D{{Key: "_id", Value: 1}}).
-			SetLimit(maxListedTokens).
-			SetProjection(deviceTokenProjection))
-	if err != nil {
-		return nil, err
-	}
-	defer cur.Close(ctx)
-
-	result := []utils.PantahubDevicesJoinToken{}
-	if err := cur.All(ctx, &result); err != nil {
-		return nil, err
-	}
-	for i := range result {
-		result[i].DefaultUserMeta = utils.BsonUnquoteMap(&result[i].DefaultUserMeta)
-	}
-	return result, nil
+	return devices.ListJoinTokens(ctx, s.mongoClient, owner, maxListedTokens)
 }
 
 func deviceTokenID(ref string) (primitive.ObjectID, error) {
@@ -289,72 +281,26 @@ func (s *store) getDeviceToken(ctx context.Context, owner, ref string) (*utils.P
 	if err != nil {
 		return nil, err
 	}
-
-	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
-	defer cancel()
-
-	token := &utils.PantahubDevicesJoinToken{}
-	err = s.collection(deviceTokensCollection).
-		FindOne(ctx, bson.M{"_id": id, "owner": owner, "disabled": false},
-			options.FindOne().SetProjection(deviceTokenProjection)).
-		Decode(token)
-	if errors.Is(err, mongo.ErrNoDocuments) {
-		return nil, errNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	token.DefaultUserMeta = utils.BsonUnquoteMap(&token.DefaultUserMeta)
-	return token, nil
+	return joinTokenResult(devices.GetJoinToken(ctx, s.mongoClient, owner, id))
 }
 
 // updateDeviceToken renames one of the owner's active device join tokens and
-// or replaces the configuration devices enrolled with it start out with. A nil
-// argument leaves that field alone. The token secret is not involved.
+// or replaces the configuration devices enrolled with it start out with,
+// through the same code as PATCH /devices/tokens/:id.
 func (s *store) updateDeviceToken(ctx context.Context, owner, ref string, nick *string, defaultUserMeta map[string]interface{}) (*utils.PantahubDevicesJoinToken, error) {
 	id, err := deviceTokenID(ref)
 	if err != nil {
 		return nil, err
 	}
+	return joinTokenResult(devices.PatchJoinToken(ctx, s.mongoClient, owner, id,
+		devices.JoinTokenPatch{Nick: nick, DefaultUserMeta: defaultUserMeta}))
+}
 
-	set := bson.M{}
-	if nick != nil {
-		set["nick"] = *nick
-	}
-	if defaultUserMeta != nil {
-		// Quoted like at creation: a key with a dot would otherwise be read by
-		// Mongo as a path.
-		set["defaultusermeta"] = utils.BsonQuoteMap(&defaultUserMeta)
-	}
-	if len(set) == 0 {
-		return nil, errors.New("nothing to update")
-	}
-	// The model carries no bson tags, so the driver stores TimeModified under
-	// its lowercased name.
-	set["timemodified"] = time.Now()
-
-	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
-	defer cancel()
-
-	token := &utils.PantahubDevicesJoinToken{}
-	err = s.collection(deviceTokensCollection).
-		FindOneAndUpdate(ctx,
-			bson.M{"_id": id, "owner": owner, "disabled": false},
-			bson.M{"$set": set},
-			options.FindOneAndUpdate().
-				SetReturnDocument(options.After).
-				SetProjection(deviceTokenProjection)).
-		Decode(token)
-	if errors.Is(err, mongo.ErrNoDocuments) {
+func joinTokenResult(token *utils.PantahubDevicesJoinToken, err error) (*utils.PantahubDevicesJoinToken, error) {
+	if errors.Is(err, devices.ErrJoinTokenNotFound) {
 		return nil, errNotFound
 	}
-	if err != nil {
-		return nil, err
-	}
-
-	token.DefaultUserMeta = utils.BsonUnquoteMap(&token.DefaultUserMeta)
-	return token, nil
+	return token, err
 }
 
 // listApps returns the OAuth applications the owner registered.

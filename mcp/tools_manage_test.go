@@ -33,6 +33,9 @@ import (
 
 const secretMarker = "never-returned"
 
+// #nosec G101 -- a mongo collection name, not a credential
+const deviceTokensCollection = "pantahub_devices_tokens"
+
 // manageFixture adds, to the device fixture, a join token and an application
 // for each of the two accounts. Everything secret carries secretMarker.
 type manageFixture struct {
@@ -146,6 +149,35 @@ func TestUpdateUserMetaMergesAndNeverTouchesDeviceMeta(t *testing.T) {
 	var device getDeviceOutput
 	require.Empty(t, f.call(t, toolGetDevice, map[string]interface{}{"device": "alpha_one"}, &device))
 	assert.Equal(t, map[string]interface{}{"pantavisor.version": "019"}, device.DeviceMeta, "device-meta is the device's to write")
+}
+
+func TestUserMetaIncludesTheAccountGlobalMeta(t *testing.T) {
+	f := newManageFixture(t)
+	_, err := f.service.store.collection("pantahub_profiles").InsertMany(context.Background(), []interface{}{
+		bson.M{"prn": ownerPrn, "meta": quoted(map[string]interface{}{"pvr-sdk.authorized_keys": "ssh-ed25519 AAAA", "site": "global", "region": "eu"})},
+		bson.M{"prn": strangerPrn, "meta": quoted(map[string]interface{}{"theirs": "hidden"})},
+	})
+	require.NoError(t, err)
+
+	var device getDeviceOutput
+	require.Empty(t, f.call(t, toolGetDevice, map[string]interface{}{"device": "alpha_one"}, &device))
+	assert.Equal(t, map[string]interface{}{"pvr-sdk.authorized_keys": "ssh-ed25519 AAAA", "site": "lab", "region": "eu"},
+		device.UserMeta, "as GET /devices/:id serves it: the owner's global meta, the device's own keys winning")
+
+	var out updateUserMetaOutput
+	problem, _ := f.callAs(t, everyManageScope(), toolUpdateUserMeta, map[string]interface{}{
+		"device": "alpha_one", "set": map[string]interface{}{"region": "us"},
+	}, &out)
+	require.Empty(t, problem)
+	assert.Equal(t, map[string]interface{}{"pvr-sdk.authorized_keys": "ssh-ed25519 AAAA", "site": "lab", "region": "us"},
+		out.UserMeta, "a device key overrides the global one")
+
+	var after updateUserMetaOutput
+	problem, _ = f.callAs(t, everyManageScope(), toolUpdateUserMeta, map[string]interface{}{
+		"device": "alpha_one", "remove": []string{"region"},
+	}, &after)
+	require.Empty(t, problem)
+	assert.Equal(t, "eu", after.UserMeta["region"], "removing the override falls back to the global value")
 }
 
 func TestUpdateUserMetaCannotReachSomebodyElsesDevice(t *testing.T) {

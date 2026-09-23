@@ -17,17 +17,11 @@
 package devices
 
 import (
-	"context"
 	"net/http"
-	"time"
 
 	jwtgo "github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v5"
-	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
-	"go.mongodb.org/mongo-driver/mongo/options"
-
-	"gopkg.in/mgo.v2/bson"
 )
 
 // handleGetTokens Get all device tokens
@@ -65,31 +59,9 @@ func (a *App) handleGetTokens(c *echo.Context) error {
 		return echoutil.RestErrorWrapper(c, "Can only be updated by Device: handle_posttoken", http.StatusBadRequest)
 	}
 
-	res := []utils.PantahubDevicesJoinToken{}
-	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
-	findOptions := options.Find()
-	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
-	defer cancel()
-	cur, err := collection.Find(ctx, bson.M{
-		"owner":    caller.(string),
-		"disabled": false,
-	}, findOptions)
-
+	res, err := ListJoinTokens(c.Request().Context(), a.mongoClient, caller.(string), 0)
 	if err != nil {
 		return echoutil.RestErrorWrapper(c, "error getting device tokens for user:"+err.Error(), http.StatusForbidden)
-	}
-
-	defer cur.Close(ctx)
-	for cur.Next(ctx) {
-		result := utils.PantahubDevicesJoinToken{}
-		err := cur.Decode(&result)
-		if err != nil {
-			return echoutil.RestErrorWrapper(c, "Cursor Decode Error:"+err.Error(), http.StatusForbidden)
-		}
-		// lets not reveal details about token when collection gets queried
-		result.TokenSha = nil
-		result.Token = ""
-		res = append(res, result)
 	}
 
 	return echoutil.WriteJSON(c, http.StatusOK, res)

@@ -17,17 +17,13 @@
 package devices
 
 import (
-	"context"
+	"errors"
 	"net/http"
-	"time"
 
 	jwtgo "github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v5"
-	"gitlab.com/pantacor/pantahub-base/utils"
 	"gitlab.com/pantacor/pantahub-base/utils/echoutil"
-	"gitlab.com/pantacor/pantahub-base/utils/mongoutils"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"gopkg.in/mgo.v2/bson"
 )
 
 // handleGetToken Get a device token by ID
@@ -72,26 +68,13 @@ func (a *App) handleGetToken(c *echo.Context) error {
 		return echoutil.RestErrorWrapper(c, "Invalid token ID format: "+err.Error(), http.StatusBadRequest)
 	}
 
-	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices_tokens")
-	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
-	defer cancel()
-
-	var result utils.PantahubDevicesJoinToken
-	err = collection.FindOne(ctx, bson.M{
-		"_id":   tokenIDBson,
-		"owner": caller.(string),
-	}).Decode(&result)
-
+	result, err := GetJoinToken(c.Request().Context(), a.mongoClient, caller.(string), tokenIDBson)
+	if errors.Is(err, ErrJoinTokenNotFound) {
+		return echoutil.RestErrorWrapper(c, "Device token not found", http.StatusNotFound)
+	}
 	if err != nil {
-		if mongoutils.IsNotFound(err) {
-			return echoutil.RestErrorWrapper(c, "Device token not found", http.StatusNotFound)
-		}
 		return echoutil.RestErrorWrapper(c, "Error getting device token: "+err.Error(), http.StatusInternalServerError)
 	}
-
-	// lets not reveal details about token when collection gets queried
-	result.TokenSha = nil
-	result.Token = ""
 
 	return echoutil.WriteJSON(c, http.StatusOK, result)
 }

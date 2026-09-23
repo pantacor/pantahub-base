@@ -27,6 +27,7 @@ import (
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"gitlab.com/pantacor/pantahub-base/apps"
 	"gitlab.com/pantacor/pantahub-base/utils"
+	"gitlab.com/pantacor/pantahub-base/utils/models"
 )
 
 // The tools in this file manage what already exists: a device's configuration,
@@ -83,7 +84,9 @@ func (s *Service) registerManagementTools(server *sdk.Server) {
 		Title: "Update device configuration",
 		Description: "Change the user-meta of a device, the configuration its owner sets. " +
 			"Keys in set are added or overwritten, keys in remove are deleted, every other key is kept. " +
-			"The device picks the change up on its own. device-meta cannot be changed: only the device reports it.",
+			"The device picks the change up on its own. device-meta cannot be changed: only the device reports it. " +
+			"Keys from the account's global meta apply to every device: setting one here overrides it for this device only, " +
+			"and removing it here does not remove the global value.",
 		Annotations: changes("Update device configuration"),
 	}, s.updateUserMeta)
 
@@ -170,7 +173,7 @@ type updateUserMetaInput struct {
 
 type updateUserMetaOutput struct {
 	Device   deviceSummary          `json:"device"`
-	UserMeta map[string]interface{} `json:"user_meta" jsonschema:"the whole configuration after the change"`
+	UserMeta map[string]interface{} `json:"user_meta" jsonschema:"the whole configuration after the change, the account's global meta included"`
 }
 
 // userMetaPatch builds the merge document devices.PatchUserMeta takes, where a
@@ -238,7 +241,7 @@ func (s *Service) updateUserMeta(ctx context.Context, req *sdk.CallToolRequest, 
 	log.Printf("INFO: mcp change tool=%s user=%s device=%s set=%d remove=%d",
 		toolUpdateUserMeta, caller.Prn, device.ID.Hex(), len(in.Set), len(in.Remove))
 
-	updated, err := s.store.resolveDevice(ctx, caller.Prn, device.ID.Hex())
+	updated, err := s.store.getDevice(ctx, caller.Prn, device.ID.Hex())
 	if err != nil {
 		return nil, out, manageError(toolUpdateUserMeta, err)
 	}
@@ -250,11 +253,12 @@ func (s *Service) updateUserMeta(ctx context.Context, req *sdk.CallToolRequest, 
 // device join tokens
 
 type deviceTokenSummary struct {
-	ID              string                 `json:"id"`
-	Nick            string                 `json:"nick"`
-	DefaultUserMeta map[string]interface{} `json:"default_user_meta" jsonschema:"configuration a device enrolled with this token starts out with"`
-	TimeCreated     string                 `json:"time_created,omitempty"`
-	TimeModified    string                 `json:"time_modified,omitempty"`
+	ID              string                  `json:"id"`
+	Nick            string                  `json:"nick"`
+	DefaultUserMeta map[string]interface{}  `json:"default_user_meta" jsonschema:"configuration a device enrolled with this token starts out with"`
+	OVMode          *models.OVModeExtension `json:"ovmode,omitempty" jsonschema:"how devices enrolled with this token prove who owns them; changed in the web app"`
+	TimeCreated     string                  `json:"time_created,omitempty"`
+	TimeModified    string                  `json:"time_modified,omitempty"`
 }
 
 // summarizeDeviceToken copies the presentable fields one by one. The model also
@@ -262,6 +266,7 @@ type deviceTokenSummary struct {
 // keeps a field added to the model later from leaking by default.
 func summarizeDeviceToken(token *utils.PantahubDevicesJoinToken) deviceTokenSummary {
 	return deviceTokenSummary{
+		OVMode:          token.OVMode,
 		ID:              token.ID.Hex(),
 		Nick:            token.Nick,
 		DefaultUserMeta: nonNil(token.DefaultUserMeta),

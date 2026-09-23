@@ -23,6 +23,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v5"
@@ -159,10 +160,17 @@ func handleAuth(c *echo.Context) error {
 	return echoutil.WriteJSON(c, http.StatusOK, jwtClaims)
 }
 
-// ResolveDeviceIDOrNick : Parse DeviceID Or Nick from the given string and return device objectID
+// ParseDeviceRef reads how callers name a device: its id, its PRN or, when it
+// is neither, its nick. ok is false for a nick.
+func ParseDeviceRef(ref string) (id primitive.ObjectID, ok bool) {
+	id, err := primitive.ObjectIDFromHex(strings.TrimPrefix(strings.TrimSpace(ref), "prn:::devices:/"))
+	return id, err == nil
+}
+
+// ResolveDeviceIDOrNick : Parse DeviceID, PRN Or Nick from the given string and return device objectID
 func (a *App) ResolveDeviceIDOrNick(ctx context.Context, owner string, param string) (*primitive.ObjectID, error) {
-	mgoid, err := primitive.ObjectIDFromHex(param)
-	if err != nil {
+	mgoid, ok := ParseDeviceRef(param)
+	if !ok {
 		return a.LookupDeviceNick(ctx, owner, param)
 	}
 	return &mgoid, nil

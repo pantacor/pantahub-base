@@ -52,6 +52,8 @@ type toolFixture struct {
 	foreign primitive.ObjectID
 }
 
+const devicePrnPrefix = "prn:::devices:/"
+
 func newToolFixture(t *testing.T) *toolFixture {
 	t.Helper()
 	uri := os.Getenv(envTestMongo)
@@ -107,7 +109,8 @@ func newToolFixture(t *testing.T) *toolFixture {
 			"state": quoted(map[string]interface{}{
 				"#spec": "pantavisor-service-system@1", "bsp/run.json": map[string]interface{}{},
 			}),
-			"progress": bson.M{"status": status, "statusmsg": status + " message", "progress": 50, "logs": "noisy"},
+			"progress":     bson.M{"status": status, "statusmsg": status + " message", "progress": 50, "logs": "noisy"},
+			"progress-log": []bson.M{{"time": now, "source": "device", "status": status, "progress": 50, "statusmsg": status + " message"}},
 		}
 	}
 	_, err = client.Database(utils.MongoDb).Collection(stepsCollection).InsertMany(ctx, []interface{}{
@@ -265,6 +268,10 @@ func TestGetRevision(t *testing.T) {
 	assert.Equal(t, 2, latest.Revision)
 	assert.Equal(t, []string{"#spec", "bsp/run.json"}, latest.StateFiles)
 	assert.Nil(t, latest.State, "the state document is opt-in")
+	assert.Equal(t, "noisy", latest.ProgressLogs, "what the device said about the failure")
+	require.Len(t, latest.ProgressLog, 1)
+	assert.Equal(t, "device", latest.ProgressLog[0].Source)
+	assert.Equal(t, "ERROR", latest.ProgressLog[0].Status)
 
 	// Revision 0 is a real revision, not "unset".
 	var first getRevisionOutput

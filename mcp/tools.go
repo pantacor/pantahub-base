@@ -297,7 +297,7 @@ func (s *Service) listDevices(ctx context.Context, req *sdk.CallToolRequest, in 
 type getDeviceOutput struct {
 	deviceSummary
 	OwnershipUnverified bool                   `json:"ownership_unverified,omitempty"`
-	UserMeta            map[string]interface{} `json:"user_meta" jsonschema:"configuration set by the owner"`
+	UserMeta            map[string]interface{} `json:"user_meta" jsonschema:"configuration set by the owner: the account's global meta with the device's own keys on top"`
 	DeviceMeta          map[string]interface{} `json:"device_meta" jsonschema:"facts reported by the device, read-only"`
 }
 
@@ -309,7 +309,7 @@ func (s *Service) getDevice(ctx context.Context, req *sdk.CallToolRequest, in de
 		return nil, out, err
 	}
 
-	device, err := s.store.resolveDevice(ctx, caller.Prn, in.Device)
+	device, err := s.store.getDevice(ctx, caller.Prn, in.Device)
 	if err != nil {
 		return nil, out, toolError(toolGetDevice, err)
 	}
@@ -430,11 +430,13 @@ type getRevisionInput struct {
 
 type getRevisionOutput struct {
 	revisionSummary
-	StateSha     string                 `json:"state_sha,omitempty"`
-	StateFiles   []string               `json:"state_files" jsonschema:"paths of the files that make up the state"`
-	State        map[string]interface{} `json:"state,omitempty" jsonschema:"the state document, when asked for and not too large"`
-	StateOmitted string                 `json:"state_omitted,omitempty" jsonschema:"why the state document was left out"`
-	Meta         map[string]interface{} `json:"meta,omitempty"`
+	StateSha     string                         `json:"state_sha,omitempty"`
+	StateFiles   []string                       `json:"state_files" jsonschema:"paths of the files that make up the state"`
+	State        map[string]interface{}         `json:"state,omitempty" jsonschema:"the state document, when asked for and not too large"`
+	StateOmitted string                         `json:"state_omitted,omitempty" jsonschema:"why the state document was left out"`
+	Meta         map[string]interface{}         `json:"meta,omitempty"`
+	ProgressLogs string                         `json:"progress_logs,omitempty" jsonschema:"the log the device attached to its last report; usually says why the revision failed"`
+	ProgressLog  []trailmodels.ProgressLogEntry `json:"progress_log,omitempty" jsonschema:"timeline of the status changes, oldest first, and who reported each"`
 }
 
 func (s *Service) getRevision(ctx context.Context, req *sdk.CallToolRequest, in getRevisionInput) (*sdk.CallToolResult, getRevisionOutput, error) {
@@ -465,6 +467,8 @@ func (s *Service) getRevision(ctx context.Context, req *sdk.CallToolRequest, in 
 	out.revisionSummary = summarizeStep(step)
 	out.StateSha = step.StateSha
 	out.Meta = step.Meta
+	out.ProgressLogs = step.StepProgress.Logs
+	out.ProgressLog = step.ProgressLog
 	for path := range step.State {
 		out.StateFiles = append(out.StateFiles, path)
 	}
