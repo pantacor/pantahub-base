@@ -321,8 +321,7 @@ func (a *App) handleGetUserData(c *echo.Context) error {
 			}
 		}
 
-		profileMeta, _ := a.getProfileMetaData(c.Request().Context(), device.Owner)
-		device.UserMeta = utils.MergeMaps(profileMeta, device.UserMeta)
+		device.UserMeta = EffectiveUserMeta(c.Request().Context(), a.mongoClient, device.Owner, device.UserMeta)
 		device.OwnerNick = ownerAccount.Nick
 	}
 

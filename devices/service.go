@@ -92,6 +92,24 @@ type Device struct {
 	OVMode            *models.OVModeExtension `json:"ovmode,omitempty" bson:"ovmode,omitempty"`
 }
 
+// PublicView is what anybody but the owner and the device itself sees of a
+// public device. Fields are copied by name, so a field added to Device later
+// stays private until it is added here.
+func (d *Device) PublicView() Device {
+	return Device{
+		ID:           d.ID,
+		Prn:          d.Prn,
+		Nick:         d.Nick,
+		Owner:        d.Owner,
+		OwnerNick:    d.OwnerNick,
+		IsPublic:     d.IsPublic,
+		TimeCreated:  d.TimeCreated,
+		TimeModified: d.TimeModified,
+		UserMeta:     map[string]interface{}{},
+		DeviceMeta:   map[string]interface{}{},
+	}
+}
+
 type autoTokenInfo struct {
 	TokenID  string
 	Owner    string

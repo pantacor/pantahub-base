@@ -128,9 +128,17 @@ func (a *App) handleGetDevices(c *echo.Context) error {
 		}
 	}
 
+	othersDevices := query["ispublic"] == true
 	for k, v := range c.Request().URL.Query() {
 		if k == "owner-nick" {
 			continue
+		}
+		if strings.HasPrefix(k, "$") {
+			return echoutil.RestErrorWrapper(c, "Invalid filter: "+k, http.StatusBadRequest)
+		}
+		// Filtering would reveal what the response hides from non-owners.
+		if othersDevices && isOwnerOnlyField(k) {
+			return echoutil.RestErrorWrapper(c, "Invalid filter: "+k, http.StatusBadRequest)
 		}
 		if query[k] == nil {
 			if strings.HasPrefix(v[0], "!") {
@@ -164,15 +172,22 @@ func (a *App) handleGetDevices(c *echo.Context) error {
 		// is not the same as Owner in account token case
 		// or is not the same as Prn in device token case
 		if owner != result.Owner && owner != result.Prn {
-			result.Challenge = ""
-			result.Secret = ""
-			result.UserMeta = map[string]interface{}{}
-			result.DeviceMeta = map[string]interface{}{}
+			result = result.PublicView()
 		}
 		devices = append(devices, result)
 	}
 
 	return echoutil.WriteJSON(c, http.StatusOK, devices)
+}
+
+// isOwnerOnlyField tells whether a device field is withheld from non-owners.
+func isOwnerOnlyField(field string) bool {
+	root := strings.SplitN(field, ".", 2)[0]
+	switch root {
+	case "user-meta", "device-meta", "secret", "secret_hash", "challenge":
+		return true
+	}
+	return false
 }
 
 // handleGetDevice Get a device using the device ID or the PRN or the device Nick
@@ -301,12 +316,10 @@ func (a *App) handleGetDevice(c *echo.Context) error {
 		if callerIsUser && device.Owner != authID {
 			return echoutil.RestErrorWrapper(c, "No Access", http.StatusForbidden)
 		}
-	} else if authID != device.Prn && authID != device.Owner {
-		device.Secret = ""
-		device.Challenge = ""
-		device.UserMeta = map[string]interface{}{}
-		device.DeviceMeta = map[string]interface{}{}
 	}
+
+	// Only the owner and the device itself see more than the public view.
+	canSeeMeta := authID == device.Prn || authID == device.Owner
 
 	if device.Owner != "" {
 		var ownerAccount accounts.Account
@@ -324,9 +337,14 @@ func (a *App) handleGetDevice(c *echo.Context) error {
 			}
 		}
 
-		profileMeta, _ := a.getProfileMetaData(c.Request().Context(), device.Owner)
-		device.UserMeta = utils.MergeMaps(profileMeta, device.UserMeta)
+		if canSeeMeta {
+			device.UserMeta = EffectiveUserMeta(c.Request().Context(), a.mongoClient, device.Owner, device.UserMeta)
+		}
 		device.OwnerNick = ownerAccount.Nick
+	}
+
+	if !canSeeMeta {
+		return echoutil.WriteJSON(c, http.StatusOK, device.PublicView())
 	}
 
 	device.Secret = ""
@@ -357,7 +375,10 @@ func (a *App) GetUserAccountByNick(parentCtx context.Context, nick string) (acco
 	return account, nil
 }
 
-func (a *App) getProfileMetaData(parentCtx context.Context, prn string) (map[string]interface{}, error) {
+// EffectiveUserMeta is the configuration a device of owner runs with: the
+// owner's global profile meta with the device's own user-meta on top. Both are
+// in stored (BSON-quoted) form, so merge before unquoting.
+func EffectiveUserMeta(parentCtx context.Context, mongoClient *mongo.Client, owner string, deviceUserMeta map[string]interface{}) map[string]interface{} {
 	profile := &profiles.Profile{
 		Meta: map[string]interface{}{},
 	}
@@ -366,10 +387,11 @@ func (a *App) getProfileMetaData(parentCtx context.Context, prn string) (map[str
 		"meta": 1,
 	}
 
-	collection := a.mongoClient.Database(utils.MongoDb).Collection("pantahub_profiles")
+	collection := mongoClient.Database(utils.MongoDb).Collection("pantahub_profiles")
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 
-	err := collection.FindOne(ctx, bson.M{"prn": prn}, &queryOptions).Decode(profile)
-	return profile.Meta, err
+	// An account without a profile has no global meta.
+	_ = collection.FindOne(ctx, bson.M{"prn": owner}, &queryOptions).Decode(profile)
+	return utils.MergeMaps(profile.Meta, deviceUserMeta)
 }

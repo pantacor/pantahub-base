@@ -141,11 +141,7 @@ func (a *App) handleGetUserDevice(c *echo.Context) error {
 			return echoutil.RestErrorWrapper(c, "No Access", http.StatusForbidden)
 		}
 	} else if authID != device.Prn && authID != device.Owner {
-		// public device, caller is neither the device nor the owner:
-		// same scrub as handleGetDevice
-		device.Challenge = ""
-		device.UserMeta = map[string]interface{}{}
-		device.DeviceMeta = map[string]interface{}{}
+		return echoutil.WriteJSON(c, http.StatusOK, device.PublicView())
 	}
 
 	// we always hide the secret
