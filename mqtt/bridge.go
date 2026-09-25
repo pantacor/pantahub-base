@@ -180,6 +180,14 @@ func (h *bridgeHook) OnPublish(cl *mochi.Client, pk packets.Packet) (packets.Pac
 // reject here: the packet has already gone out to subscribers, so a malformed
 // will is logged and dropped.
 func (h *bridgeHook) OnWillSent(cl *mochi.Client, pk packets.Packet) {
+	// A session taken over by a new connection with the same client id — a
+	// device that rebooted and reconnected before the broker noticed the old
+	// socket was dead — still has its will sent, right after the new
+	// connection reported itself online. Recording it would mark a connected
+	// device offline until its next status report.
+	if cl != nil && cl.IsTakenOver() {
+		return
+	}
 	if err := h.ingest(cl, pk.TopicName, pk.Payload); err != nil {
 		log.Printf("mqtt: bridge: dropping will on %s: %v", pk.TopicName, err)
 	}
