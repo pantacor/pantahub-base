@@ -76,6 +76,10 @@ const (
 	// oversized body is refused here rather than silently undeliverable.
 	maxCommandMessageLength = 1024
 
+	// maxCommandRequestSize caps the body of POST /devices/{id}/commands,
+	// read before it is parsed: a command and its message fit in far less.
+	maxCommandRequestSize = 8 * 1024
+
 	commandsDefaultLimit = 20
 	commandsMaxLimit     = 100
 
@@ -157,6 +161,34 @@ func StripMqttDeviceMeta(quoted map[string]interface{}) map[string]interface{} {
 		}
 	}
 	return quoted
+}
+
+// ReplaceDeviceMetaUpdate is the update pipeline that sets the fields in set
+// and replaces device-meta with the device-reported deviceMeta (BSON-quoted),
+// keeping the broker's connection keys: they are not the device's to write or
+// to erase, so they are dropped from deviceMeta and carried over from the
+// stored device-meta, in the same atomic update. Every value is taken
+// literally, never as an expression.
+func ReplaceDeviceMetaUpdate(set map[string]interface{}, deviceMeta map[string]interface{}) mongo.Pipeline {
+	stage := bson.M{}
+	for key, value := range set {
+		stage[key] = bson.M{"$literal": value}
+	}
+
+	kept := bson.M{"$arrayToObject": bson.M{"$filter": bson.M{
+		"input": bson.M{"$objectToArray": bson.M{"$ifNull": bson.A{"$device-meta", bson.M{}}}},
+		"as":    "kv",
+		"cond": bson.M{"$eq": bson.A{
+			bson.M{"$indexOfCP": bson.A{"$$kv.k", utils.BsonQuote(DeviceMetaMqttPrefix)}},
+			0,
+		}},
+	}}}
+	stage["device-meta"] = bson.M{"$mergeObjects": bson.A{
+		bson.M{"$literal": StripMqttDeviceMeta(deviceMeta)},
+		kept,
+	}}
+
+	return mongo.Pipeline{{{Key: "$set", Value: stage}}}
 }
 
 // DeviceCommand is a command document as stored in CommandsCollection.
@@ -383,10 +415,17 @@ func unquoteCommandOutput(value interface{}) interface{} {
 // PostCommandScopes may send commands. Commands act on the device itself
 // (reboot, SSH), so the general devices / devices.write scopes an OAuth app
 // may hold do not grant them: it takes the full API scope or the dedicated
-// devices.commands one. Reading command history keeps the device read scopes.
+// devices.commands one.
 var PostCommandScopes = []utils.Scope{
 	utils.Scopes.API,
 	utils.Scopes.DeviceCommands,
+}
+
+// readCommandScopes may read commands: the device read scopes, and
+// devices.commands, so a client allowed to send a command can also read its
+// result.
+func readCommandScopes(readDevicesScopes []utils.Scope) []utils.Scope {
+	return append([]utils.Scope{utils.Scopes.DeviceCommands}, readDevicesScopes...)
 }
 
 // Per-device rate limits on sending commands, over a sliding minute. Kept in
@@ -461,6 +500,13 @@ func (a *App) reserveCommandSlot(ctx context.Context, deviceID primitive.ObjectI
 		}
 	}
 	return errCommandRateLimited
+}
+
+// userError answers with a message meant for the caller: why a command was
+// refused is part of the answer, unlike an internal error, which only gets
+// an incident id.
+func userError(c *echo.Context, message string, code int) error {
+	return echoutil.RestErrorWrapperUser(c, message, message, code)
 }
 
 // callerPrn returns the PRN of the authenticated caller.
@@ -556,6 +602,7 @@ func (a *App) mqttConnected(ctx context.Context, deviceMeta map[string]interface
 // @Failure 400 {object} utils.RError
 // @Failure 404 {object} utils.RError
 // @Failure 409 {object} utils.RError
+// @Failure 413 {object} utils.RError
 // @Failure 429 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /devices/{id}/commands [post]
@@ -570,16 +617,21 @@ func (a *App) handlePostCommand(c *echo.Context) error {
 		return echoutil.RestErrorWrapper(c, "Error loading device: "+err.Error(), http.StatusInternalServerError)
 	}
 	if device == nil {
-		return echoutil.RestErrorWrapper(c, "Device not found", http.StatusNotFound)
+		return userError(c, "Device not found", http.StatusNotFound)
 	}
 
 	req := DeviceCommandRequest{}
+	c.Request().Body = http.MaxBytesReader(nil, c.Request().Body, maxCommandRequestSize)
 	if err := echoutil.DecodeJsonPayload(c, &req); err != nil {
-		return echoutil.RestErrorWrapper(c, "Error parsing command: "+err.Error(), http.StatusBadRequest)
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			return userError(c, "Command request is larger than "+strconv.Itoa(maxCommandRequestSize)+" bytes", http.StatusRequestEntityTooLarge)
+		}
+		return userError(c, "Error parsing command: "+err.Error(), http.StatusBadRequest)
 	}
 	args, err := ValidateCommandRequest(req)
 	if err != nil {
-		return echoutil.RestErrorWrapper(c, err.Error(), http.StatusBadRequest)
+		return userError(c, err.Error(), http.StatusBadRequest)
 	}
 
 	connected, err := a.mqttConnected(c.Request().Context(), device.DeviceMeta)
@@ -587,7 +639,7 @@ func (a *App) handlePostCommand(c *echo.Context) error {
 		return echoutil.RestErrorWrapper(c, "Error checking the MQTT connection: "+err.Error(), http.StatusInternalServerError)
 	}
 	if !connected {
-		return echoutil.RestErrorWrapper(c, "Device is not connected over MQTT", http.StatusConflict)
+		return userError(c, "Device is not connected over MQTT", http.StatusConflict)
 	}
 
 	// Whole seconds: expires_at goes on the wire as RFC 3339 without a
@@ -610,7 +662,7 @@ func (a *App) handlePostCommand(c *echo.Context) error {
 
 	if err := a.reserveCommandSlot(ctx, device.ID, req.Cmd, time.Now()); err != nil {
 		if errors.Is(err, errCommandRateLimited) {
-			return echoutil.RestErrorWrapperUser(c, err.Error(), err.Error(), http.StatusTooManyRequests)
+			return userError(c, err.Error(), http.StatusTooManyRequests)
 		}
 		return echoutil.RestErrorWrapper(c, "Error checking command rate: "+err.Error(), http.StatusInternalServerError)
 	}
@@ -648,7 +700,7 @@ func (a *App) handleGetCommands(c *echo.Context) error {
 
 	limit, err := parseCommandsLimit(c.QueryParam("limit"))
 	if err != nil {
-		return echoutil.RestErrorWrapper(c, err.Error(), http.StatusBadRequest)
+		return userError(c, err.Error(), http.StatusBadRequest)
 	}
 
 	device, err := a.findOwnedDevice(c.Request().Context(), caller, c.Param("id"))
@@ -656,7 +708,7 @@ func (a *App) handleGetCommands(c *echo.Context) error {
 		return echoutil.RestErrorWrapper(c, "Error loading device: "+err.Error(), http.StatusInternalServerError)
 	}
 	if device == nil {
-		return echoutil.RestErrorWrapper(c, "Device not found", http.StatusNotFound)
+		return userError(c, "Device not found", http.StatusNotFound)
 	}
 
 	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
@@ -708,7 +760,7 @@ func (a *App) handleGetCommand(c *echo.Context) error {
 
 	commandID, err := primitive.ObjectIDFromHex(c.Param("cid"))
 	if err != nil {
-		return echoutil.RestErrorWrapper(c, "Invalid command id", http.StatusBadRequest)
+		return userError(c, "Invalid command id", http.StatusBadRequest)
 	}
 
 	device, err := a.findOwnedDevice(c.Request().Context(), caller, c.Param("id"))
@@ -716,7 +768,7 @@ func (a *App) handleGetCommand(c *echo.Context) error {
 		return echoutil.RestErrorWrapper(c, "Error loading device: "+err.Error(), http.StatusInternalServerError)
 	}
 	if device == nil {
-		return echoutil.RestErrorWrapper(c, "Device not found", http.StatusNotFound)
+		return userError(c, "Device not found", http.StatusNotFound)
 	}
 
 	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
@@ -729,7 +781,7 @@ func (a *App) handleGetCommand(c *echo.Context) error {
 		"owner":     caller,
 	}).Decode(&command)
 	if errors.Is(err, mongo.ErrNoDocuments) {
-		return echoutil.RestErrorWrapper(c, "Command not found", http.StatusNotFound)
+		return userError(c, "Command not found", http.StatusNotFound)
 	}
 	if err != nil {
 		return echoutil.RestErrorWrapper(c, "Error loading command: "+err.Error(), http.StatusInternalServerError)

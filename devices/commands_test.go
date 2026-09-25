@@ -234,12 +234,17 @@ func TestPostCommand(t *testing.T) {
 
 	code, _, body = f.post(t, testOwnerPrn, f.connected, `{"cmd":"RUN_SHELL"}`)
 	assert.Equal(t, http.StatusBadRequest, code, body)
+	assert.Contains(t, body, "unknown command: RUN_SHELL", "the reason reaches the caller")
+
+	code, _, body = f.post(t, testOwnerPrn, f.connected, `{"cmd":"REBOOT_DEVICE","args":{"message":"`+strings.Repeat("x", maxCommandRequestSize)+`"}}`)
+	assert.Equal(t, http.StatusRequestEntityTooLarge, code, body)
 
 	code, _, body = f.post(t, testOwnerPrn, f.connected, `not json`)
 	assert.Equal(t, http.StatusBadRequest, code, body)
 
 	code, _, body = f.post(t, testOwnerPrn, f.offline, `{"cmd":"LIST_CONTAINERS"}`)
 	assert.Equal(t, http.StatusConflict, code, body)
+	assert.Contains(t, body, "not connected over MQTT", "the reason reaches the caller")
 
 	code, _, body = f.post(t, testOwnerPrn, f.orphaned, `{"cmd":"LIST_CONTAINERS"}`)
 	assert.Equal(t, http.StatusConflict, code, "connected to a replica without heartbeat: %s", body)
@@ -359,6 +364,18 @@ func TestPostCommandScopes(t *testing.T) {
 		utils.Scopes.Devices.String():      false,
 		utils.Scopes.WriteDevices.String(): false,
 		utils.Scopes.APIReadOnly.String():  false,
+	} {
+		assert.Equal(t, want, utils.MatchScope(scopes, []string{scope}), scope)
+	}
+}
+
+func TestReadCommandScopes(t *testing.T) {
+	scopes := utils.MarshalScopes(readCommandScopes([]utils.Scope{utils.Scopes.API, utils.Scopes.ReadDevices}))
+	for scope, want := range map[string]bool{
+		utils.Scopes.API.String():            true,
+		utils.Scopes.ReadDevices.String():    true,
+		utils.Scopes.DeviceCommands.String(): true, // may read what it sent
+		utils.Scopes.WriteObjects.String():   false,
 	} {
 		assert.Equal(t, want, utils.MatchScope(scopes, []string{scope}), scope)
 	}
@@ -533,4 +550,43 @@ func TestCommandOutputKeepsLargeIntegers(t *testing.T) {
 	assert.Contains(t, string(got), `"neg":-9007199254740993`)
 	assert.Contains(t, string(got), `"ratio":0.25`)
 	assert.Contains(t, string(got), `18446744073709552000`, "beyond int64 is a float, as JSON numbers go")
+}
+
+// A device replacing its device-meta over REST neither writes nor erases the
+// broker's connection keys.
+func TestReplaceDeviceMetaKeepsConnectionKeys(t *testing.T) {
+	f := newCommandFixture(t)
+	devices := f.app.mongoClient.Database(utils.MongoDb).Collection("pantahub_devices")
+	ctx := context.Background()
+
+	reported := map[string]interface{}{
+		"pantavisor.version":      "019",
+		"pantahub.mqtt.connected": false,
+		"pantahub.mqtt.broker":    "forged",
+		"expr":                    "$device-meta",
+	}
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	_, err := devices.UpdateOne(ctx, bson.M{"_id": f.connected},
+		ReplaceDeviceMetaUpdate(map[string]interface{}{"meta-modified": now}, utils.BsonQuoteMap(&reported)))
+	require.NoError(t, err)
+
+	stored := Device{}
+	require.NoError(t, devices.FindOne(ctx, bson.M{"_id": f.connected}).Decode(&stored))
+	meta := utils.BsonUnquoteMap(&stored.DeviceMeta)
+	assert.Equal(t, "019", meta["pantavisor.version"])
+	assert.Equal(t, "$device-meta", meta["expr"], "values are literals, not expressions")
+	assert.Equal(t, true, meta[DeviceMetaMqttConnected], "connection state kept")
+	assert.Equal(t, "live", meta[DeviceMetaMqttBroker], "connection state not forged")
+	assert.Contains(t, meta, DeviceMetaMqttConnection)
+	assert.WithinDuration(t, now, stored.MetaModified, time.Millisecond)
+
+	// A device that never had device-meta.
+	bare := primitive.NewObjectID()
+	_, err = devices.InsertOne(ctx, bson.M{"_id": bare, "owner": testOwnerPrn})
+	require.NoError(t, err)
+	_, err = devices.UpdateOne(ctx, bson.M{"_id": bare}, ReplaceDeviceMetaUpdate(nil, map[string]interface{}{"a": 1}))
+	require.NoError(t, err)
+	stored = Device{}
+	require.NoError(t, devices.FindOne(ctx, bson.M{"_id": bare}).Decode(&stored))
+	assert.EqualValues(t, 1, stored.DeviceMeta["a"])
 }

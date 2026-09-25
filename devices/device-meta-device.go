@@ -93,20 +93,20 @@ func (a *App) handlePutDeviceData(c *echo.Context) error {
 	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
-	// For PUT, we replace the whole metadata object.
-	// To do this atomically without clobbering other fields in the device document,
-	// we still use $set but on the whole "device-meta" field.
+	// For PUT, we replace the whole metadata object, except the broker's
+	// MQTT connection keys, which the device neither writes nor erases.
+	// ReplaceDeviceMetaUpdate does both in one atomic update without
+	// clobbering other fields in the device document.
 	updateResult, err := collection.UpdateOne(
 		ctx,
 		bson.M{
 			"_id": deviceObjectID,
 			"prn": owner.(string),
 		},
-		bson.M{"$set": bson.M{
-			"device-meta":   data,
+		ReplaceDeviceMetaUpdate(map[string]interface{}{
 			"timemodified":  time.Now(),
 			"meta-modified": time.Now(),
-		}},
+		}, data),
 	)
 	if err != nil {
 		return echoutil.RestErrorWrapper(c, "Error updating device metadata: "+err.Error(), http.StatusBadRequest)
@@ -209,8 +209,9 @@ func (a *App) handlePatchDeviceData(c *echo.Context) error {
 			return echoutil.RestErrorWrapper(c, "Error updating device-meta (parsing error log): not found", http.StatusBadRequest)
 		}
 	} else {
-		// 1. Quote the BSON keys first to handle dots in key names (e.g. "lo.ipv4")
-		data = utils.BsonQuoteMap(&data)
+		// 1. Quote the BSON keys first to handle dots in key names (e.g. "lo.ipv4"),
+		// and drop the broker's MQTT connection keys: only the broker writes them.
+		data = StripMqttDeviceMeta(utils.BsonQuoteMap(&data))
 
 		// 2. Deep flatten the quoted data to allow atomic nested updates
 		setFields := bson.M{}

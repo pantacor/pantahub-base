@@ -275,8 +275,8 @@ func (app *App) Mount(s *echoutil.Server) {
 	g.DELETE("/:id", echoutil.ScopeFilter(writeDevicesScopes, app.handleDeleteDevice))
 	// remote commands, delivered over MQTT
 	g.POST("/:id/commands", echoutil.ScopeFilter(PostCommandScopes, app.handlePostCommand))
-	g.GET("/:id/commands", echoutil.ScopeFilter(readDevicesScopes, app.handleGetCommands))
-	g.GET("/:id/commands/:cid", echoutil.ScopeFilter(readDevicesScopes, app.handleGetCommand))
+	g.GET("/:id/commands", echoutil.ScopeFilter(readCommandScopes(readDevicesScopes), app.handleGetCommands))
+	g.GET("/:id/commands/:cid", echoutil.ScopeFilter(readCommandScopes(readDevicesScopes), app.handleGetCommand))
 	// lookup by nick-path (np)
 	g.GET("/np/:usernick/:devicenick", echoutil.ScopeFilter(readDevicesScopes, app.handleGetUserDevice))
 }

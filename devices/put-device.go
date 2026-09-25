@@ -210,9 +210,7 @@ func (a *App) handlePutDevice(c *echo.Context) error {
 	}
 
 	// Only update metadata if we are the authorized party for that metadata
-	if callerIsDevice {
-		updateDoc["$set"].(bson.M)["device-meta"] = newDevice.DeviceMeta
-	} else {
+	if !callerIsDevice {
 		updateDoc["$set"].(bson.M)["user-meta"] = newDevice.UserMeta
 	}
 
@@ -221,10 +219,18 @@ func (a *App) handlePutDevice(c *echo.Context) error {
 		updateDoc["$set"].(bson.M)["mark_public_processed"] = false
 	}
 
+	var update interface{} = updateDoc
+	if callerIsDevice {
+		// A device replaces its device-meta, but not the broker's MQTT
+		// connection keys in it.
+		newDevice.DeviceMeta = utils.BsonQuoteMap(&newDevice.DeviceMeta)
+		update = ReplaceDeviceMetaUpdate(updateDoc["$set"].(bson.M), newDevice.DeviceMeta)
+	}
+
 	_, err = collection.UpdateOne(
 		ctx,
 		bson.M{"_id": newDevice.ID},
-		updateDoc,
+		update,
 	)
 	if err != nil {
 		return echoutil.RestErrorWrapper(c, "error updating device: "+err.Error(), http.StatusBadRequest)
