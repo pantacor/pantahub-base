@@ -229,6 +229,10 @@ func (h *authHook) OnConnectAuthenticate(cl *mochi.Client, pk packets.Packet) bo
 	if pk.Connect.WillFlag && !h.OnACLCheck(cl, pk.Connect.WillTopic, true) {
 		return false
 	}
+	// Nor may a will be retained where a live publish may not be.
+	if pk.Connect.WillFlag && pk.Connect.WillRetain && !mayRetain(cl, pk.Connect.WillTopic) {
+		return false
+	}
 
 	return true
 }

@@ -59,8 +59,8 @@ const (
 	SuffixCommands = "commands"
 
 	// SuffixCommandsResult carries the device's answer to one command on
-	// SuffixCommands. Device-written only: users may send commands but never
-	// forge their results.
+	// SuffixCommands. Device-written only: commands reach the device through
+	// the REST API alone, and users never publish, so never forge a result.
 	SuffixCommandsResult = "commands/result"
 
 	// SuffixStatus carries device liveness. Retained, and also published by

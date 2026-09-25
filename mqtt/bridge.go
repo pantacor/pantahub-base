@@ -176,6 +176,10 @@ func (h *bridgeHook) Stop() error {
 // Command results are the exception: they are written before the broker
 // acknowledges them (see ingest).
 func (h *bridgeHook) OnPublish(cl *mochi.Client, pk packets.Packet) (packets.Packet, error) {
+	if pk.FixedHeader.Retain && !mayRetain(cl, pk.TopicName) {
+		log.Printf("mqtt: bridge: rejecting retained publish on %s", pk.TopicName)
+		return pk, packets.ErrRejectPacket
+	}
 	if err := h.ingest(cl, pk.TopicName, pk.Payload, nil); err != nil {
 		log.Printf("mqtt: bridge: rejecting publish on %s: %v", pk.TopicName, err)
 		return pk, packets.ErrRejectPacket
@@ -319,15 +323,28 @@ func (h *bridgeHook) ingest(cl *mochi.Client, topic string, payload []byte, only
 	return nil
 }
 
+// mayRetain reports whether a publish on topic may be retained by the broker.
+// The Hub's own publishes may. Of what a device reports, only its liveness
+// (SuffixStatus) is state a later subscriber should be handed; anything else
+// retained would be kept in broker memory, per device and replica, and
+// replayed stale to whoever subscribes next.
+func mayRetain(cl *mochi.Client, topic string) bool {
+	if cl != nil && cl.Net.Inline {
+		return true
+	}
+	_, suffix, ok := Parse(topic)
+	return ok && suffix == SuffixStatus
+}
+
 // sessionOwnsDevice reports whether the session that published owns the device
 // namespace the report is written into.
 //
 // The subject comes from the identity the auth hook recorded at CONNECT, which
 // is unforgeable per connection, and the device id comes from the topic. Only a
-// device identity reports about itself: a user session may publish commands to
-// a device it owns, but nothing a user writes is device state. The ACL hook
-// already denies both cases; this is the redundant check that keeps an ACL
-// regression from becoming a cross-device write.
+// device identity reports about itself: user sessions never publish (commands
+// go through the REST API), and nothing a user writes would be device state.
+// The ACL hook already denies both cases; this is the redundant check that
+// keeps an ACL regression from becoming a cross-device write.
 func sessionOwnsDevice(cl *mochi.Client, deviceID string) bool {
 	kind, subject := identity(cl)
 	return kind == kindDevice && subject == deviceID

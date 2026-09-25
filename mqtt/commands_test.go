@@ -19,6 +19,7 @@ package mqtt
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -518,5 +519,34 @@ func TestUnrecordedResultIsNotAcknowledged(t *testing.T) {
 
 	if err := h.ingest(cl, Topic(device.Hex(), SuffixCommandsResult), payload, nil); err == nil {
 		t.Fatal("a result that could not be recorded was accepted")
+	}
+}
+
+// A device may retain its liveness and nothing else it reports.
+func TestDeviceRetainsOnlyStatus(t *testing.T) {
+	deviceID := primitive.NewObjectID().Hex()
+	device := &mochi.Client{}
+	setIdentity(device, kindDevice, deviceID, "")
+	h := newTestBridge()
+
+	publish := func(suffix string, payload string) error {
+		pk := packets.Packet{FixedHeader: packets.FixedHeader{Type: packets.Publish, Retain: true}, TopicName: Topic(deviceID, suffix), Payload: []byte(payload)}
+		_, err := h.OnPublish(device, pk)
+		return err
+	}
+
+	if err := publish(SuffixStatus, `{"online":true}`); err != nil {
+		t.Errorf("retained status refused: %v", err)
+	}
+	for _, suffix := range []string{SuffixCommandsResult, SuffixDeviceMeta, SuffixLogs, SuffixUserMetaGet} {
+		if err := publish(suffix, `{}`); !errors.Is(err, packets.ErrRejectPacket) {
+			t.Errorf("retained %s accepted", suffix)
+		}
+	}
+
+	inline := &mochi.Client{}
+	inline.Net.Inline = true
+	if !mayRetain(inline, Topic(deviceID, SuffixStepsNew)) {
+		t.Error("the Hub's own retained publish refused")
 	}
 }
