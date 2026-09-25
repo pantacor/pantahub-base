@@ -590,3 +590,18 @@ func TestReplaceDeviceMetaKeepsConnectionKeys(t *testing.T) {
 	require.NoError(t, devices.FindOne(ctx, bson.M{"_id": bare}).Decode(&stored))
 	assert.EqualValues(t, 1, stored.DeviceMeta["a"])
 }
+
+// :id may name the device by id, PRN or nick, and only the owner's.
+func TestCommandDeviceReference(t *testing.T) {
+	f := newCommandFixture(t)
+
+	for _, ref := range []string{f.connected.Hex(), "prn:::devices:/" + f.connected.Hex(), "dev_" + f.connected.Hex()} {
+		rec := testRequest(t, f.app.handleGetCommands, testOwnerPrn, http.MethodGet, "/devices/"+ref+"/commands",
+			nil, echo.PathValue{Name: "id", Value: ref})
+		assert.Equal(t, http.StatusOK, rec.Code, ref)
+
+		rec = testRequest(t, f.app.handleGetCommands, testStrangerPrn, http.MethodGet, "/devices/"+ref+"/commands",
+			nil, echo.PathValue{Name: "id", Value: ref})
+		assert.Equal(t, http.StatusNotFound, rec.Code, "stranger, %s", ref)
+	}
+}
