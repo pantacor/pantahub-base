@@ -251,15 +251,22 @@ func TestPostCommand(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, code, body)
 }
 
-func (f *commandFixture) list(t *testing.T, caller string, device primitive.ObjectID, query string) (int, []DeviceCommandView) {
+func (f *commandFixture) list(t *testing.T, caller string, device primitive.ObjectID, query string) (int, []DeviceCommandSummary) {
 	t.Helper()
 	rec := testRequest(t, f.app.handleGetCommands, caller, http.MethodGet, "/devices/"+device.Hex()+"/commands"+query,
 		nil, echo.PathValue{Name: "id", Value: device.Hex()})
-	views := []DeviceCommandView{}
+	summaries := []DeviceCommandSummary{}
 	if rec.Code == http.StatusOK {
-		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &views))
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &summaries))
+		// The output is not listed at all: not even as null, which a
+		// client would take for "no output".
+		items := []map[string]interface{}{}
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &items))
+		for _, item := range items {
+			assert.NotContains(t, item, "output")
+		}
 	}
-	return rec.Code, views
+	return rec.Code, summaries
 }
 
 func TestGetCommands(t *testing.T) {
@@ -292,7 +299,6 @@ func TestGetCommands(t *testing.T) {
 	assert.Equal(t, []string{ids[2].Hex(), ids[1].Hex(), ids[0].Hex()}, []string{views[0].ID, views[1].ID, views[2].ID}, "newest first")
 	assert.Equal(t, "pending", views[0].Status)
 	assert.Equal(t, "ok", views[1].Status)
-	assert.Equal(t, []interface{}{map[string]interface{}{"name": "root"}}, views[1].Output)
 	assert.Equal(t, "timeout", views[2].Status, "pending past the timeout")
 
 	code, views = f.list(t, testOwnerPrn, f.connected, "?limit=2")
@@ -328,6 +334,7 @@ func TestGetCommands(t *testing.T) {
 	require.Equal(t, http.StatusOK, code)
 	assert.Equal(t, 200, view.Code)
 	assert.NotNil(t, view.FinishedAt)
+	assert.Equal(t, []interface{}{map[string]interface{}{"name": "root"}}, view.Output, "one command comes with its output")
 
 	code, _ = get(testOwnerPrn, f.offline, ids[0].Hex())
 	assert.Equal(t, http.StatusNotFound, code, "a command is only found under its device")

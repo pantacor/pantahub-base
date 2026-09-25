@@ -180,20 +180,27 @@ type DeviceCommand struct {
 	FinishedAt *time.Time             `bson:"finished_at,omitempty"`
 }
 
-// DeviceCommandView is a command as the API returns it.
-type DeviceCommandView struct {
+// DeviceCommandSummary is a command as the history lists it: everything but
+// the output, which can be up to 256 KiB per command. The output is only
+// returned for one command at a time (DeviceCommandView).
+type DeviceCommandSummary struct {
 	ID         string                 `json:"id"`
 	DeviceID   string                 `json:"device_id"`
 	Cmd        string                 `json:"cmd"`
 	Args       map[string]interface{} `json:"args"`
 	Status     string                 `json:"status"`
 	Code       int                    `json:"code"`
-	Output     interface{}            `json:"output"`
 	Error      string                 `json:"error"`
 	CreatedAt  time.Time              `json:"created_at"`
 	ExpiresAt  time.Time              `json:"expires_at"`
 	FinishedAt *time.Time             `json:"finished_at"`
 	CreatedBy  string                 `json:"created_by"`
+}
+
+// DeviceCommandView is a command as the API returns it, output included.
+type DeviceCommandView struct {
+	DeviceCommandSummary
+	Output interface{} `json:"output"`
 }
 
 // DeviceCommandRequest is the body of POST /devices/{id}/commands.
@@ -206,19 +213,26 @@ type DeviceCommandRequest struct {
 // pending after CommandTimeout is reported as timed out; the stored status is
 // left alone, so a late result is still recorded.
 func (cmd *DeviceCommand) View(now time.Time) DeviceCommandView {
+	return DeviceCommandView{
+		DeviceCommandSummary: cmd.Summary(now),
+		Output:               DecodeCommandOutput(cmd.Output),
+	}
+}
+
+// Summary renders a stored command for the history, without its output.
+func (cmd *DeviceCommand) Summary(now time.Time) DeviceCommandSummary {
 	args := cmd.Args
 	if args == nil {
 		args = map[string]interface{}{}
 	}
 
-	return DeviceCommandView{
+	return DeviceCommandSummary{
 		ID:         cmd.ID.Hex(),
 		DeviceID:   cmd.DeviceID.Hex(),
 		Cmd:        cmd.Cmd,
 		Args:       args,
 		Status:     EffectiveCommandStatus(cmd.Status, cmd.CreatedAt, now),
 		Code:       cmd.Code,
-		Output:     DecodeCommandOutput(cmd.Output),
 		Error:      cmd.Error,
 		CreatedAt:  cmd.CreatedAt,
 		ExpiresAt:  cmd.ExpiresAt,
@@ -614,13 +628,14 @@ func (a *App) handlePostCommand(c *echo.Context) error {
 // handleGetCommands lists the most recent commands sent to a device
 // @Summary List the most recent commands sent to a device
 // @Description Newest first. A command still pending after 120 seconds is reported with status "timeout".
+// @Description The output of a command is not listed: GET /devices/{id}/commands/{cid} returns it.
 // @Accept  json
 // @Produce  json
 // @Security ApiKeyAuth
 // @Tags devices
 // @Param id path string true "ID|PRN|NICK"
 // @Param limit query int false "Maximum number of commands (default 20, max 100)"
-// @Success 200 {array} DeviceCommandView
+// @Success 200 {array} DeviceCommandSummary
 // @Failure 400 {object} utils.RError
 // @Failure 404 {object} utils.RError
 // @Failure 500 {object} utils.RError
@@ -655,20 +670,20 @@ func (a *App) handleGetCommands(c *echo.Context) error {
 	defer cursor.Close(ctx)
 
 	now := time.Now()
-	views := make([]DeviceCommandView, 0, limit)
+	summaries := make([]DeviceCommandSummary, 0, limit)
 	for cursor.Next(ctx) {
 		command := DeviceCommand{}
 		if err := cursor.Decode(&command); err != nil {
 			log.Println("devices: cannot decode command: " + err.Error())
 			continue
 		}
-		views = append(views, command.View(now))
+		summaries = append(summaries, command.Summary(now))
 	}
 	if err := cursor.Err(); err != nil {
 		return echoutil.RestErrorWrapper(c, "Error listing commands: "+err.Error(), http.StatusInternalServerError)
 	}
 
-	return echoutil.WriteJSON(c, http.StatusOK, views)
+	return echoutil.WriteJSON(c, http.StatusOK, summaries)
 }
 
 // handleGetCommand gets one command sent to a device
@@ -724,13 +739,14 @@ func (a *App) handleGetCommand(c *echo.Context) error {
 }
 
 // commandHistoryQuery is the query behind the command history: the newest
-// commands of one device sent by its owner. It is answered by the
-// commandHistoryIndex alone, reading only the documents it returns.
+// commands of one device sent by its owner, without their output. It is
+// answered through commandHistoryIndex, reading only the documents it returns.
 func commandHistoryQuery(deviceID primitive.ObjectID, owner string, limit int) (bson.M, *options.FindOptions) {
 	return bson.M{"device_id": deviceID, "owner": owner},
 		options.Find().
 			SetSort(bson.D{{Key: "created_at", Value: -1}, {Key: "_id", Value: -1}}).
-			SetLimit(int64(limit))
+			SetLimit(int64(limit)).
+			SetProjection(bson.M{"output": 0})
 }
 
 // commandHistoryIndex matches commandHistoryQuery: equality on the device and
