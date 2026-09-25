@@ -178,7 +178,7 @@ func New(mongoClient *mongo.Client, logsApp *logs.App) (*Service, error) {
 		wsPath:      WsPath(),
 	}
 
-	if err := server.AddHook(&authHook{mongoClient: mongoClient}, nil); err != nil {
+	if err := server.AddHook(&authHook{mongoClient: mongoClient, server: server}, nil); err != nil {
 		return nil, err
 	}
 

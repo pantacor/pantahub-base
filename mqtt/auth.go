@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"errors"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -94,6 +95,12 @@ const (
 	// endless stream of device ids. Beyond the cap lookups still work, they
 	// just stop being cached.
 	maxOwnershipCacheEntries = 64
+
+	// ownershipCacheTTL bounds how long an ownership answer is reused. The
+	// ACL is checked again on every message delivered to a subscriber, so a
+	// device that changes owner stops reaching the previous owner's open
+	// connection within this time.
+	ownershipCacheTTL = time.Minute
 )
 
 var (
@@ -122,6 +129,10 @@ var jwtPublicKey = sync.OnceValues(func() (*rsa.PublicKey, error) {
 type authHook struct {
 	mochi.HookBase
 	mongoClient *mongo.Client
+
+	// server is the broker the hook authenticates for, to look up the
+	// session a CONNECT would take over. Nil in tests that do not need it.
+	server *mochi.Server
 }
 
 // ID identifies the hook to the broker.
@@ -204,6 +215,11 @@ func (h *authHook) OnConnectAuthenticate(cl *mochi.Client, pk packets.Packet) bo
 		return false
 	}
 
+	if !h.mayTakeOverSession(cl) {
+		return false
+	}
+	userSessionsEndOnDisconnect(cl)
+
 	// A Last Will is published and retained by the broker with no ACL check of
 	// its own (mochi's sendLWT bypasses OnACLCheck), so an accepted will lets a
 	// client write any topic the moment it disconnects ungracefully. Gate it
@@ -233,10 +249,47 @@ func mayClaimSession(cl *mochi.Client, clientID string) bool {
 	return err != nil
 }
 
+// mayTakeOverSession reports whether cl may take over the session the broker
+// holds under its client id, if any. A session held by someone else is never
+// taken over: the broker hands the newcomer the session's subscriptions and
+// replays its queued messages without any ACL check, so the id of another
+// user's session would be a way into that user's device traffic (and a way to
+// evict that user over and over).
+func (h *authHook) mayTakeOverSession(cl *mochi.Client) bool {
+	if h.server == nil {
+		return true
+	}
+	existing, ok := h.server.Clients.Get(cl.ID)
+	return !ok || sameIdentity(existing, cl)
+}
+
+// sameIdentity reports whether two clients authenticated as the same subject.
+func sameIdentity(a, b *mochi.Client) bool {
+	kindA, subjectA := identity(a)
+	kindB, subjectB := identity(b)
+	return kindA != "" && kindA == kindB && subjectA == subjectB
+}
+
+// userSessionsEndOnDisconnect makes the session of a user identity end with
+// its connection, whatever the client asked for. Users watch devices live and
+// have no use for queued delivery, and a persistent session would hold up to
+// the broker's inflight maximum of that user's device traffic for the whole
+// session expiry, for whoever presents its client id next.
+func userSessionsEndOnDisconnect(cl *mochi.Client) {
+	if kind, _ := identity(cl); kind != kindUser {
+		return
+	}
+	cl.Lock()
+	defer cl.Unlock()
+	cl.Properties.Clean = true
+	cl.Properties.Props.SessionExpiryInterval = 0
+	cl.Properties.Props.SessionExpiryIntervalFlag = false
+}
+
 // OnACLCheck authorizes a single publish (write) or subscribe (read). It never
-// touches Mongo for a device identity, and at most once per device for a user
-// identity, because the resolved identity and the ownership answers are kept on
-// the client for the life of the connection.
+// touches Mongo for a device identity, and at most once per device and
+// ownershipCacheTTL for a user identity, because the resolved identity and the
+// ownership answers are kept on the client.
 //
 // Topics outside the versioned device namespace are denied, and so are wildcard
 // filters: Parse leaves the wildcard in the device id or the suffix, neither of
@@ -472,30 +525,55 @@ func clientScopes(cl *mochi.Client) []string {
 	return nil
 }
 
-// cachedOwnership returns a previously resolved ownership answer for deviceID.
+// cachedOwnership returns an ownership answer for deviceID resolved less than
+// ownershipCacheTTL ago. Entries are "<1|0>:<unix seconds resolved>".
 func cachedOwnership(cl *mochi.Client, deviceID string) (owns, cached bool) {
+	return cachedOwnershipAt(cl, deviceID, time.Now())
+}
+
+func cachedOwnershipAt(cl *mochi.Client, deviceID string, now time.Time) (owns, cached bool) {
 	cl.RLock()
 	defer cl.RUnlock()
 
 	key := propOwnsPrefix + deviceID
 	for _, prop := range cl.Properties.Props.User {
-		if prop.Key == key {
-			return prop.Val == "1", true
+		if prop.Key != key {
+			continue
 		}
+		answer, at, ok := strings.Cut(prop.Val, ":")
+		if !ok {
+			return false, false
+		}
+		resolved, err := strconv.ParseInt(at, 10, 64)
+		if err != nil || now.Sub(time.Unix(resolved, 0)) >= ownershipCacheTTL {
+			return false, false
+		}
+		return answer == "1", true
 	}
 
 	return false, false
 }
 
-// cacheOwnership records an ownership answer for the life of this connection.
+// cacheOwnership records an ownership answer for ownershipCacheTTL.
 func cacheOwnership(cl *mochi.Client, deviceID string, owns bool) {
+	cacheOwnershipAt(cl, deviceID, owns, time.Now())
+}
+
+func cacheOwnershipAt(cl *mochi.Client, deviceID string, owns bool, now time.Time) {
 	cl.Lock()
 	defer cl.Unlock()
 
+	value := "0:"
+	if owns {
+		value = "1:"
+	}
+	value += strconv.FormatInt(now.Unix(), 10)
+
 	key := propOwnsPrefix + deviceID
 	entries := 0
-	for _, prop := range cl.Properties.Props.User {
+	for i, prop := range cl.Properties.Props.User {
 		if prop.Key == key {
+			cl.Properties.Props.User[i].Val = value
 			return
 		}
 		if strings.HasPrefix(prop.Key, propOwnsPrefix) {
@@ -507,9 +585,5 @@ func cacheOwnership(cl *mochi.Client, deviceID string, owns bool) {
 		return
 	}
 
-	value := "0"
-	if owns {
-		value = "1"
-	}
 	cl.Properties.Props.User = append(cl.Properties.Props.User, packets.UserProperty{Key: key, Val: value})
 }

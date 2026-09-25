@@ -17,7 +17,11 @@
 package mqtt
 
 import (
+	"io"
+	"log/slog"
+	"strings"
 	"testing"
+	"time"
 
 	mochi "github.com/mochi-mqtt/server/v2"
 	"github.com/mochi-mqtt/server/v2/packets"
@@ -29,6 +33,8 @@ const (
 	scopeAll      = "prn:pantahub.com:apis:/base/all"
 	scopeReadOnly = "prn:pantahub.com:apis:/base/all.readonly"
 )
+
+var discardLogger = slog.New(slog.NewTextHandler(io.Discard, nil))
 
 func init() {
 	// mqttReadDeviceScopes / mqttWriteDeviceScopes are marshalled from the
@@ -154,8 +160,9 @@ func TestDeviceCannotClaimAnotherDevicesSession(t *testing.T) {
 }
 
 // TestCommandResultsAreDeviceWrittenOnly pins the command topic split: a user
-// may send commands but never forge a result, and a device may answer but never
-// issue a command to itself. Neither case reaches an ownership lookup.
+// never publishes (commands go through the REST API) and so never forges a
+// result, and a device may answer but never issue a command to itself.
+// Neither case reaches an ownership lookup.
 func TestCommandResultsAreDeviceWrittenOnly(t *testing.T) {
 	h := &authHook{} // no mongo client: userOwns would panic/deny if reached
 	deviceID := "5f0000000000000000000001"
@@ -179,5 +186,98 @@ func TestCommandResultsAreDeviceWrittenOnly(t *testing.T) {
 	}
 	if h.OnACLCheck(dev, Topic("5f0000000000000000000002", SuffixCommandsResult), true) {
 		t.Fatal("a device was allowed to answer for another device")
+	}
+}
+
+// A client id already in use by another identity is refused: taking the
+// session over would hand the newcomer its subscriptions and queued messages.
+func TestSessionOfAnotherIdentityIsNotTakenOver(t *testing.T) {
+	server := mochi.New(&mochi.Options{InlineClient: true, Logger: discardLogger})
+	h := &authHook{server: server}
+
+	alice := server.NewClient(nil, "test", "dashboard", false)
+	setIdentity(alice, kindUser, "prn:pantahub.com:auth:/alice", scopeAll)
+	server.Clients.Add(alice)
+
+	bob := server.NewClient(nil, "test", "dashboard", false)
+	setIdentity(bob, kindUser, "prn:pantahub.com:auth:/bob", scopeAll)
+	if h.mayTakeOverSession(bob) {
+		t.Fatal("bob took over alice's session")
+	}
+
+	aliceAgain := server.NewClient(nil, "test", "dashboard", false)
+	setIdentity(aliceAgain, kindUser, "prn:pantahub.com:auth:/alice", scopeAll)
+	if !h.mayTakeOverSession(aliceAgain) {
+		t.Fatal("alice was refused her own session")
+	}
+
+	fresh := server.NewClient(nil, "test", "dashboard-2", false)
+	setIdentity(fresh, kindUser, "prn:pantahub.com:auth:/bob", scopeAll)
+	if !h.mayTakeOverSession(fresh) {
+		t.Fatal("a free client id was refused")
+	}
+
+	// A device's session is only ever the device's.
+	device := server.NewClient(nil, "test", "5f0000000000000000000001", false)
+	setIdentity(device, kindDevice, "5f0000000000000000000001", "")
+	server.Clients.Add(device)
+	user := server.NewClient(nil, "test", "5f0000000000000000000001", false)
+	setIdentity(user, kindUser, "prn:pantahub.com:auth:/alice", scopeAll)
+	if h.mayTakeOverSession(user) {
+		t.Fatal("a user took over a device's session")
+	}
+}
+
+// User sessions end with their connection, whatever the client asked for;
+// device sessions stay as requested.
+func TestUserSessionsEndOnDisconnect(t *testing.T) {
+	user := &mochi.Client{}
+	user.Properties.Clean = false
+	user.Properties.Props.SessionExpiryInterval = 3600
+	user.Properties.Props.SessionExpiryIntervalFlag = true
+	setIdentity(user, kindUser, "prn:pantahub.com:auth:/alice", scopeAll)
+	userSessionsEndOnDisconnect(user)
+	if !user.Properties.Clean || user.Properties.Props.SessionExpiryInterval != 0 {
+		t.Fatalf("user session kept: clean %v, expiry %d", user.Properties.Clean, user.Properties.Props.SessionExpiryInterval)
+	}
+
+	device := &mochi.Client{}
+	device.Properties.Props.SessionExpiryInterval = 3600
+	setIdentity(device, kindDevice, "5f0000000000000000000001", "")
+	userSessionsEndOnDisconnect(device)
+	if device.Properties.Clean || device.Properties.Props.SessionExpiryInterval != 3600 {
+		t.Fatal("device session changed")
+	}
+}
+
+// Ownership answers expire, so a device that changes owner stops reaching
+// the previous owner's open connection.
+func TestOwnershipCacheExpires(t *testing.T) {
+	cl := &mochi.Client{}
+	setIdentity(cl, kindUser, "prn:pantahub.com:auth:/alice", scopeAll)
+	deviceID := "5f0000000000000000000001"
+	now := time.Now()
+
+	cacheOwnershipAt(cl, deviceID, true, now)
+	if owns, cached := cachedOwnershipAt(cl, deviceID, now.Add(ownershipCacheTTL-time.Second)); !owns || !cached {
+		t.Fatal("fresh answer not cached")
+	}
+	if _, cached := cachedOwnershipAt(cl, deviceID, now.Add(ownershipCacheTTL)); cached {
+		t.Fatal("stale answer reused")
+	}
+
+	// Refreshing replaces the entry rather than adding one.
+	cacheOwnershipAt(cl, deviceID, false, now.Add(ownershipCacheTTL))
+	if owns, cached := cachedOwnershipAt(cl, deviceID, now.Add(ownershipCacheTTL)); owns || !cached {
+		t.Fatal("refreshed answer not used")
+	}
+	entries := 0
+	for _, prop := range cl.Properties.Props.User {
+		if strings.HasPrefix(prop.Key, propOwnsPrefix) {
+			entries++
+		}
+	}
+	if entries != 1 {
+		t.Fatalf("%d cache entries for one device", entries)
 	}
 }
