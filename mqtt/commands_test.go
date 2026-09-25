@@ -382,7 +382,54 @@ func TestNotifierDeliversCommandInserts(t *testing.T) {
 	if pk.FixedHeader.Retain {
 		t.Error("command published retained")
 	}
+	if pk.Properties.MessageExpiryInterval == 0 || pk.Properties.MessageExpiryInterval > uint32(devices.CommandExpiry.Seconds()) || pk.Expiry == 0 {
+		t.Errorf("command expiry interval %d, expiry %d", pk.Properties.MessageExpiryInterval, pk.Expiry)
+	}
 	if _, retained := server.Topics.Retained.Get(pk.TopicName); retained {
 		t.Error("broker retained a command")
+	}
+}
+
+func TestCommandExpiryInterval(t *testing.T) {
+	now := time.Now()
+	for left, want := range map[time.Duration]uint32{
+		60 * time.Second:       60,
+		59*time.Second + 1:     60,
+		500 * time.Millisecond: 1,
+		0:                      1,
+		-10 * time.Second:      1,
+	} {
+		if got := commandExpiryInterval(now.Add(left), now); got != want {
+			t.Errorf("%v left: expiry %d, want %d", left, got, want)
+		}
+	}
+}
+
+// A command queued in the persistent session of a device that is not
+// connected to this replica is dropped by the broker once it expires, instead
+// of being replayed when the device reconnects here.
+func TestQueuedCommandExpires(t *testing.T) {
+	b := newTestBrokerReplica(t, nil, "A")
+	deviceID := primitive.NewObjectID().Hex()
+
+	conn := b.dialDevice(t, deviceID, true)
+	conn.Close()
+	b.waitDisconnect(t)
+
+	notifier := NewNotifier(nil, b.server)
+	notifier.publishCommand(Topic(deviceID, SuffixCommands), []byte(`{}`), 5)
+
+	session, ok := b.server.Clients.Get(deviceID)
+	if !ok {
+		t.Fatal("persistent session not kept")
+	}
+	if session.State.Inflight.Len() != 1 {
+		t.Fatalf("%d commands queued, want 1", session.State.Inflight.Len())
+	}
+	if dropped := session.ClearExpiredInflights(time.Now().Unix()+1, 0); len(dropped) != 0 {
+		t.Fatal("command dropped before it expired")
+	}
+	if dropped := session.ClearExpiredInflights(time.Now().Unix()+6, 0); len(dropped) != 1 {
+		t.Fatal("expired command still queued")
 	}
 }

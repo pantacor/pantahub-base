@@ -26,6 +26,7 @@ import (
 	"time"
 
 	mochi "github.com/mochi-mqtt/server/v2"
+	"github.com/mochi-mqtt/server/v2/packets"
 	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
@@ -93,11 +94,17 @@ var notifierResumeLostCodes = []int{
 // broker at subscribe time, without the Hub having to replay history.
 //
 // Device commands are the exception: they are published live (QoS 1, never
-// retained) when inserted, because a command must not reach a device that
-// connects after the fact.
+// retained, expiring with the command) when inserted, because a command must
+// not reach a device that connects after the fact.
 type Notifier struct {
 	mongoClient *mongo.Client
 	server      *mochi.Server
+
+	// commandClient publishes commands. It is an inline client like the
+	// broker's own, but speaks MQTT 5: mochi only drops an expired message
+	// from a session's queue when the packet was published as MQTT 5, and
+	// the protocol of an injected packet is its publisher's.
+	commandClient *mochi.Client
 
 	// unsupportedOnce keeps the "no change streams here" warning to a single
 	// line per process, however many watchers hit it.
@@ -107,9 +114,13 @@ type Notifier struct {
 // NewNotifier builds a notifier bound to a mongo client and the broker whose
 // inline client is used to publish. It starts nothing; call Run.
 func NewNotifier(mongoClient *mongo.Client, server *mochi.Server) *Notifier {
+	commandClient := server.NewClient(nil, mochi.LocalListener, "pantahub-commands", true)
+	commandClient.Properties.ProtocolVersion = 5
+
 	return &Notifier{
-		mongoClient: mongoClient,
-		server:      server,
+		mongoClient:   mongoClient,
+		server:        server,
+		commandClient: commandClient,
 	}
 }
 
@@ -675,12 +686,50 @@ func (n *Notifier) handleCommandInsert(_ context.Context, event *changeEvent) {
 		return
 	}
 
-	topic, payload, ok := commandMessage(&command, time.Now())
+	now := time.Now()
+	topic, payload, ok := commandMessage(&command, now)
 	if !ok {
 		return
 	}
 
-	n.publishLive(topic, payload)
+	n.publishCommand(topic, payload, commandExpiryInterval(command.ExpiresAt, now))
+}
+
+// commandExpiryInterval is the MQTT message expiry of a command: the whole
+// seconds left until it expires, at least one.
+func commandExpiryInterval(expiresAt, now time.Time) uint32 {
+	left := expiresAt.Sub(now)
+	seconds := int64((left + time.Second - 1) / time.Second)
+	if seconds < 1 {
+		return 1
+	}
+	return uint32(seconds)
+}
+
+// publishCommand sends a command live (QoS 1, never retained) with an MQTT
+// message expiry. Every replica publishes every command, and a replica where
+// the device has a disconnected persistent session queues it there; the
+// expiry makes the broker drop it from the queue once the command expires,
+// rather than replay it on a later reconnect, whatever the device's clock
+// says about expires_at.
+func (n *Notifier) publishCommand(topic string, payload []byte, expiry uint32) {
+	pk := packets.Packet{
+		FixedHeader: packets.FixedHeader{Type: packets.Publish, Qos: notifierQoS},
+		TopicName:   topic,
+		Payload:     payload,
+		// Never processed for an inline publisher, but required to be valid.
+		PacketID:   notifierQoS,
+		Properties: packets.Properties{MessageExpiryInterval: expiry},
+	}
+
+	var err error
+	for attempt := 0; attempt < notifierPublishAttempts; attempt++ {
+		if err = n.server.InjectPacket(n.commandClient, pk); err == nil {
+			return
+		}
+		time.Sleep(notifierPublishRetryDelay)
+	}
+	log.Println("mqtt: notifier could not publish to " + topic + " after retries: " + err.Error())
 }
 
 // commandMessage builds the topic and payload for a stored command. ok is
@@ -724,14 +773,6 @@ func commandMessage(command *devices.DeviceCommand, now time.Time) (topic string
 // token has effectively moved past it.
 func (n *Notifier) publish(topic string, payload []byte) {
 	n.publishWithRetry(topic, payload, true)
-}
-
-// publishLive sends a message that is never retained: it reaches the devices
-// subscribed now (and sessions the broker holds for them) and nobody later.
-// Commands go this way, so a command is never replayed to a device that
-// connects after the fact.
-func (n *Notifier) publishLive(topic string, payload []byte) {
-	n.publishWithRetry(topic, payload, false)
 }
 
 func (n *Notifier) publishWithRetry(topic string, payload []byte, retain bool) {
