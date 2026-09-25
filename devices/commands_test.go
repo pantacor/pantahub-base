@@ -430,3 +430,77 @@ func TestPostCommandRateLimitIsAtomic(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(commandRateLimit), stored)
 }
+
+// The history of a device with a long past reads only the page it returns:
+// no in-memory sort over every command the device was ever sent.
+func TestCommandHistoryUsesItsIndex(t *testing.T) {
+	f := newCommandFixture(t)
+	require.NoError(t, f.app.EnsureCommandIndices())
+	// Idempotent, including dropping the superseded index.
+	require.NoError(t, f.app.EnsureCommandIndices())
+
+	db := f.app.mongoClient.Database(utils.MongoDb)
+	base := time.Now().UTC().Add(-time.Hour)
+	docs := []interface{}{}
+	for i := 0; i < 200; i++ {
+		created := base.Add(time.Duration(i) * time.Second)
+		docs = append(docs, DeviceCommand{
+			ID: primitive.NewObjectID(), DeviceID: f.connected, Owner: testOwnerPrn, CreatedBy: testOwnerPrn,
+			Cmd: "LIST_GROUPS", Args: map[string]interface{}{}, Status: CommandStatusOK,
+			CreatedAt: created, ExpiresAt: created.Add(CommandExpiry),
+		})
+	}
+	_, err := db.Collection(CommandsCollection).InsertMany(context.Background(), docs)
+	require.NoError(t, err)
+
+	filter, opts := commandHistoryQuery(f.connected, testOwnerPrn, commandsDefaultLimit)
+	explain := bson.M{}
+	err = db.RunCommand(context.Background(), bson.D{
+		{Key: "explain", Value: bson.D{
+			{Key: "find", Value: CommandsCollection},
+			{Key: "filter", Value: filter},
+			{Key: "sort", Value: opts.Sort},
+			{Key: "limit", Value: *opts.Limit},
+		}},
+		{Key: "verbosity", Value: "executionStats"},
+	}).Decode(&explain)
+	require.NoError(t, err)
+
+	stats, _ := explain["executionStats"].(bson.M)
+	require.NotNil(t, stats, "%v", explain)
+	assert.EqualValues(t, commandsDefaultLimit, stats["totalDocsExamined"], "documents read for one page")
+
+	indexes, err := db.Collection(CommandsCollection).Indexes().ListSpecifications(context.Background())
+	require.NoError(t, err)
+	names := map[string]*int32{}
+	for _, index := range indexes {
+		names[index.Name] = index.ExpireAfterSeconds
+	}
+	assert.NotContains(t, names, "device_id_1_created_at_-1", "superseded index dropped")
+	require.Contains(t, names, "created_at_1")
+	require.NotNil(t, names["created_at_1"], "retention is a TTL index")
+	assert.EqualValues(t, CommandRetention.Seconds(), *names["created_at_1"])
+}
+
+func TestDeleteDeviceCommands(t *testing.T) {
+	f := newCommandFixture(t)
+
+	code, _, body := f.post(t, testOwnerPrn, f.connected, `{"cmd":"LIST_CONTAINERS"}`)
+	require.Equal(t, http.StatusCreated, code, body)
+	other := DeviceCommand{ID: primitive.NewObjectID(), DeviceID: f.offline, Owner: testOwnerPrn, Status: CommandStatusOK, CreatedAt: time.Now()}
+	db := f.app.mongoClient.Database(utils.MongoDb)
+	_, err := db.Collection(CommandsCollection).InsertOne(context.Background(), other)
+	require.NoError(t, err)
+
+	require.NoError(t, f.app.DeleteDeviceCommands(context.Background(), f.connected))
+
+	left, err := db.Collection(CommandsCollection).CountDocuments(context.Background(), bson.M{"device_id": f.connected})
+	require.NoError(t, err)
+	assert.Zero(t, left)
+	limits, err := db.Collection(CommandLimitsCollection).CountDocuments(context.Background(), bson.M{"_id": f.connected})
+	require.NoError(t, err)
+	assert.Zero(t, limits)
+	others, err := db.Collection(CommandsCollection).CountDocuments(context.Background(), bson.M{"device_id": f.offline})
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, others, "other devices keep theirs")
+}

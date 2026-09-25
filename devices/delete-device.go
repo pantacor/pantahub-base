@@ -102,6 +102,11 @@ func (a *App) handleDeleteDevice(c *echo.Context) error {
 	}
 	if result.Status == 1 {
 		device.Garbage = true
+		// The garbage collector knows nothing of commands; they go with the
+		// device. Best effort: the retention TTL removes any left behind.
+		if err := a.DeleteDeviceCommands(ctx, deviceObjectID); err != nil {
+			log.Printf("Error deleting the commands of device %s: %v", delID, err)
+		}
 	}
 
 	device.Secret = ""

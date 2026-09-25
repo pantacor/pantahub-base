@@ -77,6 +77,11 @@ const (
 
 	commandsDefaultLimit = 20
 	commandsMaxLimit     = 100
+
+	// CommandRetention is how long a command is kept. Past it a TTL index
+	// removes it: commands are an audit trail of recent actions, and each
+	// may carry up to 256 KiB of output.
+	CommandRetention = 30 * 24 * time.Hour
 )
 
 // DeviceCommands is the allowlist of commands a device may be asked to run,
@@ -575,12 +580,8 @@ func (a *App) handleGetCommands(c *echo.Context) error {
 	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
-	cursor, err := a.mongoClient.Database(utils.MongoDb).Collection(CommandsCollection).Find(ctx,
-		bson.M{"device_id": device.ID, "owner": caller},
-		options.Find().
-			SetSort(bson.D{{Key: "created_at", Value: -1}, {Key: "_id", Value: -1}}).
-			SetLimit(int64(limit)),
-	)
+	filter, opts := commandHistoryQuery(device.ID, caller, limit)
+	cursor, err := a.mongoClient.Database(utils.MongoDb).Collection(CommandsCollection).Find(ctx, filter, opts)
 	if err != nil {
 		return echoutil.RestErrorWrapper(c, "Error listing commands: "+err.Error(), http.StatusInternalServerError)
 	}
@@ -655,6 +656,40 @@ func (a *App) handleGetCommand(c *echo.Context) error {
 	return echoutil.WriteJSON(c, http.StatusOK, command.View(time.Now()))
 }
 
+// commandHistoryQuery is the query behind the command history: the newest
+// commands of one device sent by its owner. It is answered by the
+// commandHistoryIndex alone, reading only the documents it returns.
+func commandHistoryQuery(deviceID primitive.ObjectID, owner string, limit int) (bson.M, *options.FindOptions) {
+	return bson.M{"device_id": deviceID, "owner": owner},
+		options.Find().
+			SetSort(bson.D{{Key: "created_at", Value: -1}, {Key: "_id", Value: -1}}).
+			SetLimit(int64(limit))
+}
+
+// commandHistoryIndex matches commandHistoryQuery: equality on the device and
+// its owner, then the sort.
+var commandHistoryIndex = bson.D{
+	{Key: "device_id", Value: int32(1)},
+	{Key: "owner", Value: int32(1)},
+	{Key: "created_at", Value: int32(-1)},
+	{Key: "_id", Value: int32(-1)},
+}
+
+// supersededCommandIndices were created by earlier versions and are covered
+// by commandHistoryIndex.
+var supersededCommandIndices = []string{"device_id_1_created_at_-1"}
+
+// DeleteDeviceCommands removes the commands of a device and its rate-limit
+// state, for a device that is being deleted.
+func (a *App) DeleteDeviceCommands(ctx context.Context, deviceID primitive.ObjectID) error {
+	db := a.mongoClient.Database(utils.MongoDb)
+	if _, err := db.Collection(CommandsCollection).DeleteMany(ctx, bson.M{"device_id": deviceID}); err != nil {
+		return err
+	}
+	_, err := db.Collection(CommandLimitsCollection).DeleteOne(ctx, bson.M{"_id": deviceID})
+	return err
+}
+
 // parseCommandsLimit reads ?limit: absent means the default, anything above
 // the maximum is clamped to it, and a non-positive or non-numeric value is an
 // error.
@@ -672,21 +707,29 @@ func parseCommandsLimit(raw string) (int, error) {
 	return limit, nil
 }
 
-// EnsureCommandIndices creates the index the command history reads use, and
-// the TTL index that drops idle rate-limit state.
+// EnsureCommandIndices creates the index the command history reads use, the
+// TTL index that enforces CommandRetention and the TTL index that drops idle
+// rate-limit state.
 func (a *App) EnsureCommandIndices() error {
 	ctx, cancel := context.WithTimeout(context.Background(), CreateIndexTimeout)
 	defer cancel()
 
 	collection := a.mongoClient.Database(utils.MongoDb).Collection(CommandsCollection)
-	_, err := collection.Indexes().CreateOne(ctx, mongo.IndexModel{
-		Keys: bson.D{
-			{Key: "device_id", Value: int32(1)},
-			{Key: "created_at", Value: int32(-1)},
+	_, err := collection.Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{Keys: commandHistoryIndex},
+		{
+			Keys:    bson.D{{Key: "created_at", Value: int32(1)}},
+			Options: options.Index().SetExpireAfterSeconds(int32(CommandRetention.Seconds())),
 		},
 	}, options.CreateIndexes().SetMaxTime(CreateIndexTimeout))
 	if err != nil {
 		return err
+	}
+	for _, name := range supersededCommandIndices {
+		// Absent is fine: a new deployment never had it.
+		if _, err := collection.Indexes().DropOne(ctx, name); err != nil && !isIndexNotFound(err) {
+			return err
+		}
 	}
 
 	limits := a.mongoClient.Database(utils.MongoDb).Collection(CommandLimitsCollection)
@@ -696,4 +739,11 @@ func (a *App) EnsureCommandIndices() error {
 	}, options.CreateIndexes().SetMaxTime(CreateIndexTimeout))
 
 	return err
+}
+
+// isIndexNotFound reports a dropIndexes error for an index that does not
+// exist (or a collection that does not exist yet).
+func isIndexNotFound(err error) bool {
+	var serverErr mongo.ServerError
+	return errors.As(err, &serverErr) && (serverErr.HasErrorCode(27) || serverErr.HasErrorCode(26))
 }
