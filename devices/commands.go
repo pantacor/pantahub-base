@@ -22,6 +22,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	jwtgo "github.com/golang-jwt/jwt/v5"
@@ -95,9 +96,62 @@ var DeviceCommands = map[string]bool{
 	"GET_XCONNECT_GRAPH": false,
 }
 
-// DeviceMetaMqttConnected is the device-meta key the MQTT bridge keeps true
-// while the device is connected over MQTT. Commands are only accepted then.
-const DeviceMetaMqttConnected = "pantahub.mqtt.connected"
+// Device-meta keys recording the device's MQTT connection. The broker writes
+// them, and only the broker: device-meta a device reports is stripped of every
+// key under DeviceMetaMqttPrefix (StripMqttDeviceMeta).
+const (
+	// DeviceMetaMqttPrefix is the namespace of the broker-written keys.
+	DeviceMetaMqttPrefix = "pantahub.mqtt."
+
+	// DeviceMetaMqttConnected is true while the device holds an MQTT
+	// connection subscribed to its commands topic. Commands are only
+	// accepted then.
+	DeviceMetaMqttConnected = DeviceMetaMqttPrefix + "connected"
+
+	// DeviceMetaMqttConnection identifies the connection that last changed
+	// DeviceMetaMqttConnected. A disconnect only clears the flag while it
+	// still names that connection, so the late disconnect of an older
+	// connection (on this replica or another) cannot mark a reconnected
+	// device offline.
+	DeviceMetaMqttConnection = DeviceMetaMqttPrefix + "connection"
+
+	// DeviceMetaMqttBroker is the broker replica holding that connection. The
+	// flag is only believed while the replica's heartbeat in
+	// MqttBrokersCollection is fresh: a replica killed without a chance to
+	// disconnect its clients leaves the flag behind.
+	DeviceMetaMqttBroker = DeviceMetaMqttPrefix + "broker"
+
+	// DeviceMetaMqttStatusTime is the RFC 3339 UTC time of the last change.
+	DeviceMetaMqttStatusTime = DeviceMetaMqttPrefix + "status-time"
+)
+
+// MqttBrokersCollection holds one heartbeat document per running MQTT broker
+// replica: {_id: <broker id>, heartbeat_at: <time>}.
+const MqttBrokersCollection = "pantahub_mqtt_brokers"
+
+const (
+	// MqttBrokerHeartbeat is how often a broker replica refreshes its
+	// heartbeat.
+	MqttBrokerHeartbeat = 30 * time.Second
+
+	// MqttBrokerLease is how long a heartbeat vouches for the connections of
+	// its replica: three missed beats and they are no longer believed.
+	MqttBrokerLease = 3 * MqttBrokerHeartbeat
+)
+
+// StripMqttDeviceMeta removes the broker-written keys from device-meta a
+// device reports, so that only the broker ever writes them. It takes the
+// BSON-quoted map, as stored: a key spelled with the quoting sentinel instead
+// of dots is caught as well.
+func StripMqttDeviceMeta(quoted map[string]interface{}) map[string]interface{} {
+	prefix := utils.BsonQuote(DeviceMetaMqttPrefix)
+	for key := range quoted {
+		if strings.HasPrefix(key, prefix) {
+			delete(quoted, key)
+		}
+	}
+	return quoted
+}
 
 // DeviceCommand is a command document as stored in CommandsCollection.
 //
@@ -328,12 +382,38 @@ func (a *App) findOwnedDevice(ctx context.Context, owner, ref string) (*Device, 
 	return &device, nil
 }
 
-// mqttConnected reports whether the MQTT bridge last recorded the device as
-// connected. Device-meta keys are stored BSON-quoted, so the dotted key is
-// looked up in its quoted form.
-func mqttConnected(deviceMeta map[string]interface{}) bool {
+// mqttBroker returns the broker replica the device is recorded as connected
+// to, if any. Device-meta keys are stored BSON-quoted, so the dotted keys are
+// looked up in their quoted form.
+func mqttBroker(deviceMeta map[string]interface{}) (string, bool) {
 	connected, _ := deviceMeta[utils.BsonQuote(DeviceMetaMqttConnected)].(bool)
-	return connected
+	broker, _ := deviceMeta[utils.BsonQuote(DeviceMetaMqttBroker)].(string)
+	return broker, connected && broker != ""
+}
+
+// mqttConnected reports whether the device holds an MQTT connection commands
+// can be delivered on: the broker recorded it as connected, and the replica
+// holding the connection is still alive.
+func (a *App) mqttConnected(ctx context.Context, deviceMeta map[string]interface{}) (bool, error) {
+	broker, ok := mqttBroker(deviceMeta)
+	if !ok {
+		return false, nil
+	}
+
+	ctxC, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	err := a.mongoClient.Database(utils.MongoDb).Collection(MqttBrokersCollection).FindOne(ctxC, bson.M{
+		"_id":          broker,
+		"heartbeat_at": bson.M{"$gte": time.Now().Add(-MqttBrokerLease)},
+	}, options.FindOne().SetProjection(bson.M{"_id": 1})).Err()
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // handlePostCommand sends a command to a device connected over MQTT
@@ -380,7 +460,11 @@ func (a *App) handlePostCommand(c *echo.Context) error {
 		return echoutil.RestErrorWrapper(c, err.Error(), http.StatusBadRequest)
 	}
 
-	if !mqttConnected(device.DeviceMeta) {
+	connected, err := a.mqttConnected(c.Request().Context(), device.DeviceMeta)
+	if err != nil {
+		return echoutil.RestErrorWrapper(c, "Error checking the MQTT connection: "+err.Error(), http.StatusInternalServerError)
+	}
+	if !connected {
 		return echoutil.RestErrorWrapper(c, "Device is not connected over MQTT", http.StatusConflict)
 	}
 

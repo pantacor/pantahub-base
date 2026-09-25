@@ -17,13 +17,9 @@
 package mqtt
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"log/slog"
-	"net"
 	"os"
 	"strings"
 	"testing"
@@ -43,7 +39,7 @@ import (
 // The change stream test additionally needs it to be a replica set.
 const envTestMongo = "PANTAHUB_MQTT_TEST_MONGO"
 
-func TestStatusMetaRecordsMqttConnection(t *testing.T) {
+func TestStatusMeta(t *testing.T) {
 	for _, tc := range []struct {
 		payload string
 		want    bool
@@ -55,32 +51,19 @@ func TestStatusMetaRecordsMqttConnection(t *testing.T) {
 	} {
 		meta := statusMeta([]byte(tc.payload))
 
-		if got := meta["pantahub.mqtt.connected"]; got != tc.want {
-			t.Errorf("%s: pantahub.mqtt.connected = %v, want %v", tc.payload, got, tc.want)
-		}
 		if got := meta["pantahub.online"]; got != tc.want {
 			t.Errorf("%s: pantahub.online = %v, want %v", tc.payload, got, tc.want)
 		}
 		if _, ok := meta["pantahub.status"]; !ok {
 			t.Errorf("%s: pantahub.status dropped", tc.payload)
 		}
-
-		statusTime, _ := meta["pantahub.mqtt.status-time"].(string)
-		parsed, err := time.Parse(time.RFC3339, statusTime)
-		if err != nil || !strings.HasSuffix(statusTime, "Z") {
-			t.Errorf("%s: pantahub.mqtt.status-time = %q, want RFC 3339 UTC", tc.payload, statusTime)
-		} else if time.Since(parsed) > time.Minute {
-			t.Errorf("%s: pantahub.mqtt.status-time = %q is not now", tc.payload, statusTime)
+		// The connection keys are the broker's, never derived from what
+		// the device says.
+		for key := range meta {
+			if strings.HasPrefix(key, devices.DeviceMetaMqttPrefix) {
+				t.Errorf("%s: status meta writes %s", tc.payload, key)
+			}
 		}
-	}
-}
-
-// The key the bridge writes must be the key the command endpoint reads.
-func TestStatusMetaKeyMatchesCommandGate(t *testing.T) {
-	meta := statusMeta([]byte(`{"online": true}`))
-	quoted := utils.BsonQuoteMap(&meta)
-	if quoted[utils.BsonQuote(devices.DeviceMetaMqttConnected)] != true {
-		t.Fatalf("quoted status meta %v does not carry %s", quoted, devices.DeviceMetaMqttConnected)
 	}
 }
 
@@ -175,7 +158,7 @@ func TestIngestCommandResult(t *testing.T) {
 	setIdentity(device, kindDevice, deviceID, "")
 
 	h := newTestBridge()
-	if err := h.ingest(device, topic, valid); err != nil {
+	if err := h.ingest(device, topic, valid, nil); err != nil {
 		t.Fatalf("valid result refused: %v", err)
 	}
 	if len(h.jobs) != 1 {
@@ -183,19 +166,19 @@ func TestIngestCommandResult(t *testing.T) {
 	}
 
 	h = newTestBridge()
-	if err := h.ingest(device, topic, []byte(`{"id":"x","status":"ok"}`)); err == nil {
+	if err := h.ingest(device, topic, []byte(`{"id":"x","status":"ok"}`), nil); err == nil {
 		t.Error("malformed result accepted")
 	}
 
 	other := &mochi.Client{}
 	setIdentity(other, kindDevice, primitive.NewObjectID().Hex(), "")
-	if err := h.ingest(other, topic, valid); err == nil {
+	if err := h.ingest(other, topic, valid, nil); err == nil {
 		t.Error("a device completed another device's command")
 	}
 
 	user := &mochi.Client{}
 	setIdentity(user, kindUser, "prn:pantahub.com:auth:/alice", scopeAll)
-	if err := h.ingest(user, topic, valid); err == nil {
+	if err := h.ingest(user, topic, valid, nil); err == nil {
 		t.Error("a user session forged a command result")
 	}
 
@@ -403,93 +386,3 @@ func TestNotifierDeliversCommandInserts(t *testing.T) {
 		t.Error("broker retained a command")
 	}
 }
-
-// A will from a session taken over by a reconnect of the same device must not
-// mark the (now connected) device offline.
-func TestBridgeIgnoresWillOfTakenOverSession(t *testing.T) {
-	server := mochi.New(&mochi.Options{InlineClient: true, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
-	if err := server.AddHook(new(allowAll), nil); err != nil {
-		t.Fatal(err)
-	}
-	h := newTestBridge()
-	deviceID := primitive.NewObjectID().Hex()
-	wills := make(chan bool, 4)
-	if err := server.AddHook(&willRecorder{onWill: func(cl *mochi.Client) {
-		setIdentity(cl, kindDevice, deviceID, "")
-		h.OnWillSent(cl, packets.Packet{TopicName: Topic(deviceID, SuffixStatus), Payload: []byte(`{"online":false,"status":"offline"}`)})
-		wills <- cl.IsTakenOver()
-	}}, nil); err != nil {
-		t.Fatal(err)
-	}
-	if err := server.Serve(); err != nil {
-		t.Fatal(err)
-	}
-	defer server.Close()
-
-	connect := func() net.Conn {
-		srv, cli := net.Pipe()
-		go server.EstablishConnection("test", srv)
-		pk := packets.Packet{
-			FixedHeader:     packets.FixedHeader{Type: packets.Connect},
-			ProtocolVersion: 4,
-			Connect: packets.ConnectParams{
-				ProtocolName:     []byte("MQTT"),
-				Clean:            false,
-				Keepalive:        60,
-				ClientIdentifier: deviceID,
-				WillFlag:         true,
-				WillTopic:        Topic(deviceID, SuffixStatus),
-				WillPayload:      []byte(`{"online":false,"status":"offline"}`),
-				WillRetain:       true,
-			},
-		}
-		var buf bytes.Buffer
-		if err := pk.ConnectEncode(&buf); err != nil {
-			t.Fatal(err)
-		}
-		go cli.Write(buf.Bytes())
-		ack := make([]byte, 4)
-		if _, err := io.ReadFull(cli, ack); err != nil {
-			t.Fatal(err)
-		}
-		go io.Copy(io.Discard, cli)
-		return cli
-	}
-
-	old := connect()
-	defer old.Close()
-	fresh := connect() // the device again: takes the session over
-	defer fresh.Close()
-
-	select {
-	case takenOver := <-wills:
-		if !takenOver {
-			t.Fatal("will came from a session that was not taken over")
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("broker did not send the taken-over session's will")
-	}
-	select {
-	case job := <-h.jobs:
-		t.Fatalf("taken-over will was recorded: %s", job.topic)
-	default:
-	}
-}
-
-type allowAll struct{ mochi.HookBase }
-
-func (h *allowAll) ID() string { return "allow-all" }
-func (h *allowAll) Provides(b byte) bool {
-	return b == mochi.OnConnectAuthenticate || b == mochi.OnACLCheck
-}
-func (h *allowAll) OnConnectAuthenticate(*mochi.Client, packets.Packet) bool { return true }
-func (h *allowAll) OnACLCheck(*mochi.Client, string, bool) bool              { return true }
-
-type willRecorder struct {
-	mochi.HookBase
-	onWill func(*mochi.Client)
-}
-
-func (h *willRecorder) ID() string                                    { return "will-recorder" }
-func (h *willRecorder) Provides(b byte) bool                          { return b == mochi.OnWillSent }
-func (h *willRecorder) OnWillSent(cl *mochi.Client, _ packets.Packet) { h.onWill(cl) }

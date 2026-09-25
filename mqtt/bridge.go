@@ -69,11 +69,6 @@ const (
 	// statusOffline is the only status word that means "not alive"; the
 	// device's last will carries it.
 	statusOffline = "offline"
-
-	// Device-meta keys recording the MQTT connection state, written from the
-	// status topic. metaMqttConnected is what the command endpoints check.
-	metaMqttConnected  = devices.DeviceMetaMqttConnected
-	metaMqttStatusTime = "pantahub.mqtt.status-time"
 )
 
 // bridgeJob is one decoded device report waiting to be written. The payload is
@@ -165,7 +160,7 @@ func (h *bridgeHook) Stop() error {
 // worker pool, which runs after this call returns and therefore after the
 // broker has taken the packet.
 func (h *bridgeHook) OnPublish(cl *mochi.Client, pk packets.Packet) (packets.Packet, error) {
-	if err := h.ingest(cl, pk.TopicName, pk.Payload); err != nil {
+	if err := h.ingest(cl, pk.TopicName, pk.Payload, nil); err != nil {
 		log.Printf("mqtt: bridge: rejecting publish on %s: %v", pk.TopicName, err)
 		return pk, packets.ErrRejectPacket
 	}
@@ -179,16 +174,17 @@ func (h *bridgeHook) OnPublish(cl *mochi.Client, pk packets.Packet) (packets.Pac
 // disconnect — which is precisely when it matters. There is nothing left to
 // reject here: the packet has already gone out to subscribers, so a malformed
 // will is logged and dropped.
+//
+// A will can be stale: the device may already be connected again, here or on
+// another replica, by the time the broker notices the old socket is dead. So
+// it is only recorded while the connection that armed it is still the
+// device's current one (connectionFilter); the will of a session taken over on
+// this replica is not even sent (presenceHook.OnSessionEstablish).
 func (h *bridgeHook) OnWillSent(cl *mochi.Client, pk packets.Packet) {
-	// A session taken over by a new connection with the same client id — a
-	// device that rebooted and reconnected before the broker noticed the old
-	// socket was dead — still has its will sent, right after the new
-	// connection reported itself online. Recording it would mark a connected
-	// device offline until its next status report.
 	if cl != nil && cl.IsTakenOver() {
 		return
 	}
-	if err := h.ingest(cl, pk.TopicName, pk.Payload); err != nil {
+	if err := h.ingest(cl, pk.TopicName, pk.Payload, connectionFilter(cl)); err != nil {
 		log.Printf("mqtt: bridge: dropping will on %s: %v", pk.TopicName, err)
 	}
 }
@@ -199,7 +195,10 @@ func (h *bridgeHook) OnWillSent(cl *mochi.Client, pk packets.Packet) {
 //
 // The payload is decoded here, on the caller's goroutine, so that a bad payload
 // can still be refused and so that the worker only ever sees decoded values.
-func (h *bridgeHook) ingest(cl *mochi.Client, topic string, payload []byte) error {
+//
+// only, when set, narrows the device-meta writes to a device document that
+// still matches it (see connectionFilter).
+func (h *bridgeHook) ingest(cl *mochi.Client, topic string, payload []byte, only bson.M) error {
 	// Hub-originated publishes (retained steps/new, user-meta) travel through
 	// the inline client and are not device reports.
 	if cl == nil || cl.Net.Inline {
@@ -232,7 +231,7 @@ func (h *bridgeHook) ingest(cl *mochi.Client, topic string, payload []byte) erro
 			return fmt.Errorf("malformed device-meta: %w", err)
 		}
 		h.enqueue(topic, func(ctx context.Context) error {
-			return h.patchDeviceMeta(ctx, deviceObjectID, data)
+			return h.patchDeviceMeta(ctx, deviceObjectID, data, only)
 		})
 
 	case SuffixStatus:
@@ -243,7 +242,7 @@ func (h *bridgeHook) ingest(cl *mochi.Client, topic string, payload []byte) erro
 		}
 		data := statusMeta(payload)
 		h.enqueue(topic, func(ctx context.Context) error {
-			return h.patchDeviceMeta(ctx, deviceObjectID, data)
+			return h.patchDeviceMeta(ctx, deviceObjectID, data, only)
 		})
 
 	case SuffixCommandsResult:
@@ -414,9 +413,10 @@ func (h *bridgeHook) putStepProgress(parentCtx context.Context, deviceObjectID p
 // the map is flattened to dot notation so nested updates stay atomic, a null
 // value unsets its key, and meta-modified is bumped. meta-modified is the
 // liveness signal the rest of the Hub reads, so it is written on every patch,
-// including the cheap status ones.
-func (h *bridgeHook) patchDeviceMeta(parentCtx context.Context, deviceObjectID primitive.ObjectID, data map[string]interface{}) error {
-	quoted := utils.BsonQuoteMap(&data)
+// including the cheap status ones. The broker's own connection keys are
+// never taken from a device (devices.StripMqttDeviceMeta).
+func (h *bridgeHook) patchDeviceMeta(parentCtx context.Context, deviceObjectID primitive.ObjectID, data map[string]interface{}, only bson.M) error {
+	quoted := devices.StripMqttDeviceMeta(utils.BsonQuoteMap(&data))
 
 	setFields := bson.M{}
 	unsetFields := bson.M{}
@@ -434,19 +434,24 @@ func (h *bridgeHook) patchDeviceMeta(parentCtx context.Context, deviceObjectID p
 	ctx, cancel := context.WithTimeout(parentCtx, bridgeWriteTimeout)
 	defer cancel()
 
+	filter := bson.M{
+		"_id":     deviceObjectID,
+		"garbage": bson.M{"$ne": true},
+	}
+	for key, value := range only {
+		filter[key] = value
+	}
+
 	collection := h.mongoClient.Database(utils.MongoDb).Collection(devicesCollection)
-	updateResult, err := collection.UpdateOne(
-		ctx,
-		bson.M{
-			"_id":     deviceObjectID,
-			"garbage": bson.M{"$ne": true},
-		},
-		updateDoc,
-	)
+	updateResult, err := collection.UpdateOne(ctx, filter, updateDoc)
 	if err != nil {
 		return fmt.Errorf("cannot update device-meta: %w", err)
 	}
 	if updateResult.MatchedCount == 0 {
+		if len(only) > 0 {
+			// Superseded: the device is connected again.
+			return nil
+		}
 		return fmt.Errorf("cannot update device-meta: device %s not found", deviceObjectID.Hex())
 	}
 
@@ -511,6 +516,10 @@ func unmarshalLogEntries(payload []byte) ([]logs.Entry, error) {
 // "online" boolean. Anything else still counts as alive, because the packet
 // arrived. The result goes through the same quoting and merge path as any
 // other device-meta patch, so the keys read back as "pantahub.online" etc.
+//
+// The MQTT connection keys (devices.DeviceMetaMqttPrefix) are not derived
+// from it: the broker records the connection itself (presenceHook), which a
+// status message racing a reconnect cannot contradict.
 func statusMeta(payload []byte) map[string]interface{} {
 	status := strings.TrimSpace(string(payload))
 	var online *bool
@@ -544,11 +553,6 @@ func statusMeta(payload []byte) map[string]interface{} {
 		"pantahub.online":      *online,
 		"pantahub.status":      status,
 		"pantahub.status-time": now.Format(time.RFC3339),
-		// The MQTT connection state the command endpoints and the UI read.
-		// The bridge is its only writer (the device agent does not forward
-		// pantahub.* keys), so it tracks this connection exactly.
-		metaMqttConnected:  *online,
-		metaMqttStatusTime: now.UTC().Format(time.RFC3339),
 	}
 }
 

@@ -117,31 +117,75 @@ func TestCommandOutputRoundTrip(t *testing.T) {
 	assert.Nil(t, DecodeCommandOutput(bson.RawValue{}), "missing output is null")
 }
 
-func TestMqttConnectedReadsTheQuotedKey(t *testing.T) {
-	assert.True(t, mqttConnected(map[string]interface{}{"pantahubＮmqttＮconnected": true}))
-	assert.False(t, mqttConnected(map[string]interface{}{"pantahubＮmqttＮconnected": false}))
-	assert.False(t, mqttConnected(map[string]interface{}{"pantahubＮmqttＮconnected": "true"}))
-	assert.False(t, mqttConnected(map[string]interface{}{"pantahubＮonline": true}))
-	assert.False(t, mqttConnected(nil))
+func TestMqttBrokerReadsTheQuotedKeys(t *testing.T) {
+	broker, ok := mqttBroker(map[string]interface{}{"pantahubＮmqttＮconnected": true, "pantahubＮmqttＮbroker": "b1"})
+	assert.True(t, ok)
+	assert.Equal(t, "b1", broker)
+
+	for _, meta := range []map[string]interface{}{
+		{"pantahubＮmqttＮconnected": false, "pantahubＮmqttＮbroker": "b1"},
+		{"pantahubＮmqttＮconnected": "true", "pantahubＮmqttＮbroker": "b1"},
+		{"pantahubＮmqttＮconnected": true},
+		{"pantahubＮonline": true},
+		nil,
+	} {
+		_, ok := mqttBroker(meta)
+		assert.False(t, ok, "%v", meta)
+	}
+}
+
+// Devices never write the broker's connection keys, however they spell them.
+func TestStripMqttDeviceMeta(t *testing.T) {
+	meta := map[string]interface{}{
+		"pantahub.mqtt.connected":  true,
+		"pantahubＮmqttＮbroker":     "forged",
+		"pantahub.mqtt.connection": "x",
+		"pantahub.online":          true,
+		"pantavisor.sdk.mode":      "mqtt",
+	}
+	quoted := StripMqttDeviceMeta(utils.BsonQuoteMap(&meta))
+	assert.Equal(t, map[string]interface{}{"pantahubＮonline": true, "pantavisorＮsdkＮmode": "mqtt"}, quoted)
 }
 
 type commandFixture struct {
 	app       *App
 	connected primitive.ObjectID
 	offline   primitive.ObjectID
+	// orphaned is recorded as connected to a broker replica whose heartbeat
+	// stopped: killed before it could record its disconnects.
+	orphaned primitive.ObjectID
 }
 
-// newCommandFixture stores two devices of testOwnerPrn: one the MQTT bridge
-// recorded as connected, one it recorded as disconnected.
+// newCommandFixture stores three devices of testOwnerPrn: one the MQTT broker
+// recorded as connected, one it recorded as disconnected and one recorded as
+// connected to a dead replica.
 func newCommandFixture(t *testing.T) *commandFixture {
 	t.Helper()
 	client := newTestClient(t)
-	f := &commandFixture{app: &App{mongoClient: client}, connected: primitive.NewObjectID(), offline: primitive.NewObjectID()}
+	f := &commandFixture{
+		app:       &App{mongoClient: client},
+		connected: primitive.NewObjectID(), offline: primitive.NewObjectID(), orphaned: primitive.NewObjectID(),
+	}
+	ctx := context.Background()
+
+	brokers := client.Database(utils.MongoDb).Collection(MqttBrokersCollection)
+	_, err := brokers.InsertMany(ctx, []interface{}{
+		bson.M{"_id": "live", "heartbeat_at": time.Now()},
+		bson.M{"_id": "dead", "heartbeat_at": time.Now().Add(-MqttBrokerLease - time.Second)},
+	})
+	require.NoError(t, err)
 
 	devices := client.Database(utils.MongoDb).Collection("pantahub_devices")
-	for id, connected := range map[primitive.ObjectID]bool{f.connected: true, f.offline: false} {
-		meta := map[string]interface{}{DeviceMetaMqttConnected: connected}
-		_, err := devices.InsertOne(context.Background(), bson.M{
+	for id, state := range map[primitive.ObjectID]struct {
+		connected bool
+		broker    string
+	}{f.connected: {true, "live"}, f.offline: {false, "live"}, f.orphaned: {true, "dead"}} {
+		meta := map[string]interface{}{
+			DeviceMetaMqttConnected:  state.connected,
+			DeviceMetaMqttBroker:     state.broker,
+			DeviceMetaMqttConnection: state.broker + "/" + id.Hex(),
+		}
+		_, err := devices.InsertOne(ctx, bson.M{
 			"_id": id, "prn": "prn:::devices:/" + id.Hex(), "nick": "dev_" + id.Hex(), "owner": testOwnerPrn,
 			"device-meta": utils.BsonQuoteMap(&meta),
 		})
@@ -195,6 +239,9 @@ func TestPostCommand(t *testing.T) {
 
 	code, _, body = f.post(t, testOwnerPrn, f.offline, `{"cmd":"LIST_CONTAINERS"}`)
 	assert.Equal(t, http.StatusConflict, code, body)
+
+	code, _, body = f.post(t, testOwnerPrn, f.orphaned, `{"cmd":"LIST_CONTAINERS"}`)
+	assert.Equal(t, http.StatusConflict, code, "connected to a replica without heartbeat: %s", body)
 
 	code, _, body = f.post(t, testStrangerPrn, f.connected, `{"cmd":"LIST_CONTAINERS"}`)
 	assert.Equal(t, http.StatusNotFound, code, body)

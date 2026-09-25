@@ -30,6 +30,7 @@ import (
 
 	mochi "github.com/mochi-mqtt/server/v2"
 	"github.com/mochi-mqtt/server/v2/listeners"
+	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/logs"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -95,6 +96,7 @@ type Service struct {
 	mongoClient *mongo.Client
 	ws          *wsListener
 	notifier    *Notifier
+	presence    *presenceHook
 	tcpAddress  string
 	wsPath      string
 
@@ -102,6 +104,10 @@ type Service struct {
 	// it those goroutines outlive the broker, holding a Mongo cursor open until
 	// the process exits.
 	stop context.CancelFunc
+
+	// heartbeatDone is closed when the heartbeat goroutine has returned, so
+	// Close can remove the heartbeat without a late beat restoring it.
+	heartbeatDone chan struct{}
 }
 
 // Enabled reports whether the message plane should be started at all.
@@ -174,6 +180,16 @@ func New(mongoClient *mongo.Client, logsApp *logs.App) (*Service, error) {
 
 	if err := server.AddHook(&authHook{mongoClient: mongoClient}, nil); err != nil {
 		return nil, err
+	}
+
+	// After the auth hook, whose identity it reads, and before the bridge,
+	// whose will handling relies on the connection id it assigns.
+	service.presence = &presenceHook{mongoClient: mongoClient, server: server, brokerID: newBrokerID()}
+	if err := server.AddHook(service.presence, nil); err != nil {
+		return nil, err
+	}
+	if err := EnsureBrokerIndices(mongoClient); err != nil {
+		log.Println("mqtt: cannot create indices for " + devices.MqttBrokersCollection + ": " + err.Error())
 	}
 
 	if err := server.AddHook(&bridgeHook{mongoClient: mongoClient, logs: logsApp}, nil); err != nil {
@@ -313,15 +329,28 @@ func (s *Service) Start(ctx context.Context) error {
 		}
 	}()
 
+	s.heartbeatDone = make(chan struct{})
+	go func() {
+		defer close(s.heartbeatDone)
+		s.presence.runHeartbeat(runCtx)
+	}()
+
 	return nil
 }
 
 // Close shuts the broker down, cancels the notifier and disconnects every
 // client. The notifier is cancelled first so its change-stream goroutines and
 // their Mongo cursors are released rather than left running past shutdown.
+// The replica's heartbeat is removed as well: the devices connected here are
+// no longer reachable through it, whether or not their disconnects get
+// recorded before the process exits.
 func (s *Service) Close() error {
 	if s.stop != nil {
 		s.stop()
+	}
+	if s.heartbeatDone != nil {
+		<-s.heartbeatDone
+		s.presence.retire()
 	}
 	return s.server.Close()
 }
