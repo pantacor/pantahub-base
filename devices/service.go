@@ -146,6 +146,12 @@ func New(jwtConfig *jwtauth.Config, subService subscriptions.SubscriptionService
 		return nil
 	}
 
+	err = app.EnsureCommandIndices()
+	if err != nil {
+		log.Println("Error creating indices for " + CommandsCollection + ": " + err.Error())
+		return nil
+	}
+
 	// hash legacy plaintext device secrets in small throttled batches in the
 	// background; devices that log in meanwhile upgrade themselves on the way
 	go RunSecretMigration(context.Background(), mongoClient.Database(utils.MongoDb).Collection("pantahub_devices"))
@@ -267,6 +273,10 @@ func (app *App) Mount(s *echoutil.Server) {
 	g.PUT("/:id/device-meta", echoutil.ScopeFilter(writeDevicesScopes, app.handlePutDeviceData))
 	g.PATCH("/:id/device-meta", echoutil.ScopeFilter(writeDevicesScopes, app.handlePatchDeviceData))
 	g.DELETE("/:id", echoutil.ScopeFilter(writeDevicesScopes, app.handleDeleteDevice))
+	// remote commands, delivered over MQTT
+	g.POST("/:id/commands", echoutil.ScopeFilter(writeDevicesScopes, app.handlePostCommand))
+	g.GET("/:id/commands", echoutil.ScopeFilter(readDevicesScopes, app.handleGetCommands))
+	g.GET("/:id/commands/:cid", echoutil.ScopeFilter(readDevicesScopes, app.handleGetCommand))
 	// lookup by nick-path (np)
 	g.GET("/np/:usernick/:devicenick", echoutil.ScopeFilter(readDevicesScopes, app.handleGetUserDevice))
 }

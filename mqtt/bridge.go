@@ -69,6 +69,11 @@ const (
 	// statusOffline is the only status word that means "not alive"; the
 	// device's last will carries it.
 	statusOffline = "offline"
+
+	// Device-meta keys recording the MQTT connection state, written from the
+	// status topic. metaMqttConnected is what the command endpoints check.
+	metaMqttConnected  = devices.DeviceMetaMqttConnected
+	metaMqttStatusTime = "pantahub.mqtt.status-time"
 )
 
 // bridgeJob is one decoded device report waiting to be written. The payload is
@@ -231,6 +236,15 @@ func (h *bridgeHook) ingest(cl *mochi.Client, topic string, payload []byte) erro
 		data := statusMeta(payload)
 		h.enqueue(topic, func(ctx context.Context) error {
 			return h.patchDeviceMeta(ctx, deviceObjectID, data)
+		})
+
+	case SuffixCommandsResult:
+		result, err := decodeCommandResult(payload)
+		if err != nil {
+			return fmt.Errorf("malformed command result: %w", err)
+		}
+		h.enqueue(topic, func(ctx context.Context) error {
+			return h.putCommandResult(ctx, deviceObjectID, result)
 		})
 
 	case SuffixLogs:
@@ -517,11 +531,115 @@ func statusMeta(payload []byte) map[string]interface{} {
 		online = &up
 	}
 
+	now := time.Now()
 	return map[string]interface{}{
 		"pantahub.online":      *online,
 		"pantahub.status":      status,
-		"pantahub.status-time": time.Now().Format(time.RFC3339),
+		"pantahub.status-time": now.Format(time.RFC3339),
+		// The MQTT connection state the command endpoints and the UI read.
+		// The bridge is its only writer (the device agent does not forward
+		// pantahub.* keys), so it tracks this connection exactly.
+		metaMqttConnected:  *online,
+		metaMqttStatusTime: now.UTC().Format(time.RFC3339),
 	}
+}
+
+// commandResult is a device's answer on SuffixCommandsResult, decoded and
+// validated. Output is the decoded JSON value, already BSON-quoted for storage.
+type commandResult struct {
+	id     primitive.ObjectID
+	status string
+	code   int
+	output interface{}
+	error  string
+}
+
+// decodeCommandResult validates a commands/result payload:
+//
+//	{"id": "<hex>", "cmd": "...", "status": "ok|error|rejected",
+//	 "code": 200, "output": <any JSON>, "error": ""}
+//
+// The id must be a command id and the status a final one; anything else is
+// refused, so a device cannot move a command back to pending or invent a
+// status the API does not know. cmd is informational and not trusted: the
+// stored command keeps the cmd the owner sent.
+func decodeCommandResult(payload []byte) (commandResult, error) {
+	var doc struct {
+		ID     string          `json:"id"`
+		Cmd    string          `json:"cmd"`
+		Status string          `json:"status"`
+		Code   int             `json:"code"`
+		Output json.RawMessage `json:"output"`
+		Error  string          `json:"error"`
+	}
+	if err := json.Unmarshal(payload, &doc); err != nil {
+		return commandResult{}, err
+	}
+
+	id, err := primitive.ObjectIDFromHex(doc.ID)
+	if err != nil {
+		return commandResult{}, fmt.Errorf("invalid command id %q", doc.ID)
+	}
+
+	switch doc.Status {
+	case devices.CommandStatusOK, devices.CommandStatusError, devices.CommandStatusRejected:
+	default:
+		return commandResult{}, fmt.Errorf("invalid command status %q", doc.Status)
+	}
+
+	var output interface{}
+	if len(doc.Output) > 0 {
+		if err := json.Unmarshal(doc.Output, &output); err != nil {
+			return commandResult{}, fmt.Errorf("invalid output: %w", err)
+		}
+	}
+
+	return commandResult{
+		id:     id,
+		status: doc.Status,
+		code:   doc.Code,
+		output: devices.EncodeCommandOutput(output),
+		error:  doc.Error,
+	}, nil
+}
+
+// commandResultUpdate builds the filter and update that record a result. The
+// filter pins the command to the publishing device and to the pending state:
+// a device can only complete its own commands, and only once — a QoS 1
+// redelivery or a second answer matches nothing.
+func commandResultUpdate(deviceObjectID primitive.ObjectID, result commandResult, now time.Time) (filter, update bson.M) {
+	filter = bson.M{
+		"_id":       result.id,
+		"device_id": deviceObjectID,
+		"status":    devices.CommandStatusPending,
+	}
+	update = bson.M{"$set": bson.M{
+		"status":      result.status,
+		"code":        result.code,
+		"output":      result.output,
+		"error":       result.error,
+		"finished_at": now,
+	}}
+	return filter, update
+}
+
+// putCommandResult completes a pending command with the device's result.
+func (h *bridgeHook) putCommandResult(parentCtx context.Context, deviceObjectID primitive.ObjectID, result commandResult) error {
+	ctx, cancel := context.WithTimeout(parentCtx, bridgeWriteTimeout)
+	defer cancel()
+
+	filter, update := commandResultUpdate(deviceObjectID, result, time.Now().UTC())
+
+	collection := h.mongoClient.Database(utils.MongoDb).Collection(devices.CommandsCollection)
+	updateResult, err := collection.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return fmt.Errorf("cannot record command result: %w", err)
+	}
+	if updateResult.MatchedCount == 0 {
+		return fmt.Errorf("cannot record command result: no pending command %s for device %s", result.id.Hex(), deviceObjectID.Hex())
+	}
+
+	return nil
 }
 
 // flattenDeviceMeta rewrites a nested map into the dot-notation $set and $unset

@@ -156,3 +156,32 @@ func TestDeviceCannotClaimAnotherDevicesSession(t *testing.T) {
 		t.Fatal("a user identity was denied a free client id")
 	}
 }
+
+// TestCommandResultsAreDeviceWrittenOnly pins the command topic split: a user
+// may send commands but never forge a result, and a device may answer but never
+// issue a command to itself. Neither case reaches an ownership lookup.
+func TestCommandResultsAreDeviceWrittenOnly(t *testing.T) {
+	h := &authHook{} // no mongo client: userOwns would panic/deny if reached
+	deviceID := "5f0000000000000000000001"
+
+	user := &mochi.Client{}
+	setIdentity(user, kindUser, "prn:pantahub.com:auth:/alice", scopeAll)
+	if h.OnACLCheck(user, Topic(deviceID, SuffixCommandsResult), true) {
+		t.Fatal("a user was allowed to publish a command result")
+	}
+
+	dev := &mochi.Client{}
+	setIdentity(dev, kindDevice, deviceID, "")
+	if !h.OnACLCheck(dev, Topic(deviceID, SuffixCommandsResult), true) {
+		t.Fatal("a device was denied publishing its own command result")
+	}
+	if h.OnACLCheck(dev, Topic(deviceID, SuffixCommands), true) {
+		t.Fatal("a device was allowed to publish a command")
+	}
+	if !h.OnACLCheck(dev, Topic(deviceID, SuffixCommands), false) {
+		t.Fatal("a device was denied subscribing to its commands")
+	}
+	if h.OnACLCheck(dev, Topic("5f0000000000000000000002", SuffixCommandsResult), true) {
+		t.Fatal("a device was allowed to answer for another device")
+	}
+}

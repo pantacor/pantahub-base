@@ -26,6 +26,7 @@ import (
 	"time"
 
 	mochi "github.com/mochi-mqtt/server/v2"
+	"gitlab.com/pantacor/pantahub-base/devices"
 	"gitlab.com/pantacor/pantahub-base/trails/trailmodels"
 	"gitlab.com/pantacor/pantahub-base/utils"
 	"go.mongodb.org/mongo-driver/bson"
@@ -90,6 +91,10 @@ var notifierResumeLostCodes = []int{
 // It watches MongoDB change streams and publishes RETAINED messages: a device
 // that reconnects after any amount of downtime is told the current state by the
 // broker at subscribe time, without the Hub having to replay history.
+//
+// Device commands are the exception: they are published live (QoS 1, never
+// retained) when inserted, because a command must not reach a device that
+// connects after the fact.
 type Notifier struct {
 	mongoClient *mongo.Client
 	server      *mochi.Server
@@ -140,6 +145,14 @@ func (n *Notifier) Run(ctx context.Context) error {
 			pipeline:   notifierPipeline("update"),
 			handle:     n.handleDeviceChange,
 			onReady:    n.reconcileUserMeta,
+		},
+		{
+			// Commands are live messages, never state: nothing is rebuilt
+			// at startup, so a command is delivered once, when inserted,
+			// or not at all.
+			collection: devices.CommandsCollection,
+			pipeline:   notifierPipeline("insert"),
+			handle:     n.handleCommandInsert,
 		},
 	}
 
@@ -634,14 +647,97 @@ func changeDeviceID(event *changeEvent) (string, bool) {
 	return "", false
 }
 
+// commandNotice is the payload published on the commands topic:
+//
+//	{"id": "<hex>", "cmd": "LIST_CONTAINERS", "args": {}, "expires_at": "2026-09-25T15:10:00Z"}
+//
+// expires_at is RFC 3339 in UTC without a fraction; the device drops a command
+// received after it.
+type commandNotice struct {
+	ID        string                 `json:"id"`
+	Cmd       string                 `json:"cmd"`
+	Args      map[string]interface{} `json:"args"`
+	ExpiresAt string                 `json:"expires_at"`
+}
+
+// handleCommandInsert publishes a newly inserted command to its device. Every
+// replica does this on its own broker, so the command reaches the device on
+// whichever replica holds its connection (or its persistent session), and is a
+// no-op on the others.
+func (n *Notifier) handleCommandInsert(_ context.Context, event *changeEvent) {
+	if event.OperationType != "insert" {
+		return
+	}
+
+	command := devices.DeviceCommand{}
+	if err := bson.Unmarshal(event.FullDocument, &command); err != nil {
+		log.Println("mqtt: notifier could not decode command: " + err.Error())
+		return
+	}
+
+	topic, payload, ok := commandMessage(&command, time.Now())
+	if !ok {
+		return
+	}
+
+	n.publishLive(topic, payload)
+}
+
+// commandMessage builds the topic and payload for a stored command. ok is
+// false for anything that must not be sent: a command that is no longer
+// pending, one the device would drop as expired anyway (a stream resumed after
+// an outage replays old inserts), or one that is not on the allowlist.
+func commandMessage(command *devices.DeviceCommand, now time.Time) (topic string, payload []byte, ok bool) {
+	if command.ID.IsZero() || command.DeviceID.IsZero() {
+		return "", nil, false
+	}
+	if command.Status != devices.CommandStatusPending || !now.Before(command.ExpiresAt) {
+		return "", nil, false
+	}
+	if _, allowed := devices.DeviceCommands[command.Cmd]; !allowed {
+		log.Println("mqtt: notifier refusing to send unknown command " + command.Cmd + " to device " + command.DeviceID.Hex())
+		return "", nil, false
+	}
+
+	args := command.Args
+	if args == nil {
+		args = map[string]interface{}{}
+	}
+
+	payload, err := json.Marshal(commandNotice{
+		ID:        command.ID.Hex(),
+		Cmd:       command.Cmd,
+		Args:      args,
+		ExpiresAt: command.ExpiresAt.UTC().Format(time.RFC3339),
+	})
+	if err != nil {
+		log.Println("mqtt: notifier could not encode command " + command.ID.Hex() + ": " + err.Error())
+		return "", nil, false
+	}
+
+	return Topic(command.DeviceID.Hex(), SuffixCommands), payload, true
+}
+
 // publish sends a retained notification. A nil or empty payload clears the
 // retained message for the topic. A momentary failure is retried, because the
 // change stream that produced this event will not redeliver it and the resume
 // token has effectively moved past it.
 func (n *Notifier) publish(topic string, payload []byte) {
+	n.publishWithRetry(topic, payload, true)
+}
+
+// publishLive sends a message that is never retained: it reaches the devices
+// subscribed now (and sessions the broker holds for them) and nobody later.
+// Commands go this way, so a command is never replayed to a device that
+// connects after the fact.
+func (n *Notifier) publishLive(topic string, payload []byte) {
+	n.publishWithRetry(topic, payload, false)
+}
+
+func (n *Notifier) publishWithRetry(topic string, payload []byte, retain bool) {
 	var err error
 	for attempt := 0; attempt < notifierPublishAttempts; attempt++ {
-		if err = n.server.Publish(topic, payload, true, notifierQoS); err == nil {
+		if err = n.server.Publish(topic, payload, retain, notifierQoS); err == nil {
 			return
 		}
 		time.Sleep(notifierPublishRetryDelay)

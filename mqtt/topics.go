@@ -53,8 +53,15 @@ const (
 	// SuffixLogs carries a JSON array of log entries.
 	SuffixLogs = "logs"
 
-	// SuffixCommands carries out-of-band instructions to the device.
+	// SuffixCommands carries out-of-band instructions to the device. Never
+	// retained: a command must not be replayed to a device that reconnects
+	// later.
 	SuffixCommands = "commands"
+
+	// SuffixCommandsResult carries the device's answer to one command on
+	// SuffixCommands. Device-written only: users may send commands but never
+	// forge their results.
+	SuffixCommandsResult = "commands/result"
 
 	// SuffixStatus carries device liveness. Retained, and also published by
 	// the broker as the device's last will.
@@ -145,7 +152,8 @@ func ParseProgress(suffix string) (rev int, ok bool) {
 // writable; everything the Hub tells the device is not.
 func DeviceMayPublish(suffix string) bool {
 	switch suffix {
-	case SuffixDeviceMeta, SuffixLogs, SuffixStatus, SuffixUserMetaGet, SuffixStepsGet:
+	case SuffixDeviceMeta, SuffixLogs, SuffixStatus, SuffixUserMetaGet, SuffixStepsGet,
+		SuffixCommandsResult:
 		return true
 	}
 
