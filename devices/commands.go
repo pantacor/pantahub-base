@@ -240,6 +240,53 @@ func DecodeCommandOutput(raw bson.RawValue) interface{} {
 	return utils.BsonUnquoteMap(&wrapped)["v"]
 }
 
+// PostCommandScopes may send commands. Commands act on the device itself
+// (reboot, SSH), so the general devices / devices.write scopes an OAuth app
+// may hold do not grant them: it takes the full API scope or the dedicated
+// devices.commands one. Reading command history keeps the device read scopes.
+var PostCommandScopes = []utils.Scope{
+	utils.Scopes.API,
+	utils.Scopes.DeviceCommands,
+}
+
+// Per-device rate limits on sending commands, counted over the last minute.
+// Counted in Mongo so they hold across API replicas.
+const (
+	commandRateWindow = time.Minute
+	// commandRateLimit caps all commands to one device.
+	commandRateLimit = 10
+	// rebootRateLimit caps reboots: a loop of them would keep the device
+	// down for good.
+	rebootRateLimit = 1
+)
+
+// errCommandRateLimited is answered with 429.
+var errCommandRateLimited = errors.New("too many commands for this device, try again in a minute")
+
+// checkCommandRate refuses a command that would exceed the per-device limits.
+func (a *App) checkCommandRate(ctx context.Context, deviceID primitive.ObjectID, cmd string, now time.Time) error {
+	commands := a.mongoClient.Database(utils.MongoDb).Collection(CommandsCollection)
+	since := bson.M{"$gte": now.Add(-commandRateWindow)}
+
+	total, err := commands.CountDocuments(ctx, bson.M{"device_id": deviceID, "created_at": since})
+	if err != nil {
+		return err
+	}
+	if total >= commandRateLimit {
+		return errCommandRateLimited
+	}
+	if cmd == "REBOOT_DEVICE" {
+		reboots, err := commands.CountDocuments(ctx, bson.M{"device_id": deviceID, "cmd": cmd, "created_at": since})
+		if err != nil {
+			return err
+		}
+		if reboots >= rebootRateLimit {
+			return errCommandRateLimited
+		}
+	}
+	return nil
+}
+
 // callerPrn returns the PRN of the authenticated caller.
 func callerPrn(c *echo.Context) (string, bool) {
 	claims, ok := c.Get(echoutil.KeyJWTPayload).(jwtgo.MapClaims)
@@ -296,6 +343,7 @@ func mqttConnected(deviceMeta map[string]interface{}) bool {
 // @Description LIST_DRIVERS, LIST_WAKELOCKS, GET_XCONNECT_GRAPH) for delivery over MQTT.
 // @Description REBOOT_DEVICE accepts an optional string args.message; other arguments are ignored.
 // @Description Only the device owner may send commands, and only while the device is connected over MQTT.
+// @Description Requires the full API scope or devices.commands. At most 10 commands per device per minute, and 1 REBOOT_DEVICE.
 // @Accept  json
 // @Produce  json
 // @Security ApiKeyAuth
@@ -306,6 +354,7 @@ func mqttConnected(deviceMeta map[string]interface{}) bool {
 // @Failure 400 {object} utils.RError
 // @Failure 404 {object} utils.RError
 // @Failure 409 {object} utils.RError
+// @Failure 429 {object} utils.RError
 // @Failure 500 {object} utils.RError
 // @Router /devices/{id}/commands [post]
 func (a *App) handlePostCommand(c *echo.Context) error {
@@ -352,6 +401,13 @@ func (a *App) handlePostCommand(c *echo.Context) error {
 
 	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
+
+	if err := a.checkCommandRate(ctx, device.ID, req.Cmd, now); err != nil {
+		if errors.Is(err, errCommandRateLimited) {
+			return echoutil.RestErrorWrapperUser(c, err.Error(), err.Error(), http.StatusTooManyRequests)
+		}
+		return echoutil.RestErrorWrapper(c, "Error checking command rate: "+err.Error(), http.StatusInternalServerError)
+	}
 
 	// The insert is the send: the MQTT notifier on every replica watches this
 	// collection and publishes the command to the device.

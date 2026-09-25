@@ -99,35 +99,31 @@ func TestUserWithoutScopeIsDeniedDeviceAccess(t *testing.T) {
 		t.Fatal("read allowed for a token without a device read scope")
 	}
 	if h.OnACLCheck(cl, writeTopic, true) {
-		t.Fatal("command write allowed for a token without a device write scope")
+		t.Fatal("command write allowed to a user")
 	}
 }
 
-// TestReadOnlyScopeCannotWriteCommands checks the read/write split: a read-only
-// token is denied command writes even though it may read.
-func TestReadOnlyScopeCannotWriteCommands(t *testing.T) {
-	h := &authHook{}
-	cl := &mochi.Client{}
-	setIdentity(cl, kindUser, "prn:pantahub.com:auth:/alice", scopeReadOnly)
-
-	if h.OnACLCheck(cl, Topic("5f0000000000000000000001", SuffixCommands), true) {
-		t.Fatal("read-only token was allowed to write commands")
+// TestUsersNeverPublish: commands go through the REST API only, so no user
+// token, whatever its scopes, may publish on the message plane.
+func TestUsersNeverPublish(t *testing.T) {
+	h := &authHook{} // no mongo client: denial must come before userOwns
+	for _, scope := range []string{scopeAll, scopeReadOnly} {
+		cl := &mochi.Client{}
+		setIdentity(cl, kindUser, "prn:pantahub.com:auth:/alice", scope)
+		for _, suffix := range []string{SuffixCommands, SuffixCommandsResult, SuffixDeviceMeta, SuffixStatus} {
+			if h.OnACLCheck(cl, Topic("5f0000000000000000000001", suffix), true) {
+				t.Fatalf("user with %s allowed to publish %s", scope, suffix)
+			}
+		}
 	}
 }
 
-// TestScopeSetsCoverReadAndWrite guards the mirrored scope lists against drift:
-// the API ("all") scope must satisfy both, the read-only scope only reads, and
-// the write scope only writes.
-func TestScopeSetsCoverReadAndWrite(t *testing.T) {
+// TestScopeSetsCoverReads guards the read scope list: the API ("all") and
+// read-only scopes both read.
+func TestScopeSetsCoverReads(t *testing.T) {
 	if !utils.MatchScope(mqttReadDeviceScopes, []string{scopeAll}) ||
-		!utils.MatchScope(mqttWriteDeviceScopes, []string{scopeAll}) {
-		t.Fatal("the API scope must satisfy both read and write device access")
-	}
-	if !utils.MatchScope(mqttReadDeviceScopes, []string{scopeReadOnly}) {
-		t.Fatal("the read-only scope must satisfy device reads")
-	}
-	if utils.MatchScope(mqttWriteDeviceScopes, []string{scopeReadOnly}) {
-		t.Fatal("the read-only scope must not satisfy device writes")
+		!utils.MatchScope(mqttReadDeviceScopes, []string{scopeReadOnly}) {
+		t.Fatal("the API and read-only scopes must satisfy device reads")
 	}
 }
 

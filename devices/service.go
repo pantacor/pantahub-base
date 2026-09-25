@@ -274,7 +274,7 @@ func (app *App) Mount(s *echoutil.Server) {
 	g.PATCH("/:id/device-meta", echoutil.ScopeFilter(writeDevicesScopes, app.handlePatchDeviceData))
 	g.DELETE("/:id", echoutil.ScopeFilter(writeDevicesScopes, app.handleDeleteDevice))
 	// remote commands, delivered over MQTT
-	g.POST("/:id/commands", echoutil.ScopeFilter(writeDevicesScopes, app.handlePostCommand))
+	g.POST("/:id/commands", echoutil.ScopeFilter(PostCommandScopes, app.handlePostCommand))
 	g.GET("/:id/commands", echoutil.ScopeFilter(readDevicesScopes, app.handleGetCommands))
 	g.GET("/:id/commands/:cid", echoutil.ScopeFilter(readDevicesScopes, app.handleGetCommand))
 	// lookup by nick-path (np)

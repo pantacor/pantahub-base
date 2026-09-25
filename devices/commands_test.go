@@ -294,3 +294,40 @@ func TestGetCommands(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, code)
 
 }
+
+func TestPostCommandScopes(t *testing.T) {
+	scopes := utils.MarshalScopes(PostCommandScopes)
+	for scope, want := range map[string]bool{
+		utils.Scopes.API.String():            true,
+		utils.Scopes.DeviceCommands.String(): true,
+		// Device write access alone does not reach the device itself.
+		utils.Scopes.Devices.String():      false,
+		utils.Scopes.WriteDevices.String(): false,
+		utils.Scopes.APIReadOnly.String():  false,
+	} {
+		assert.Equal(t, want, utils.MatchScope(scopes, []string{scope}), scope)
+	}
+}
+
+func TestPostCommandRateLimit(t *testing.T) {
+	f := newCommandFixture(t)
+
+	code, _, body := f.post(t, testOwnerPrn, f.connected, `{"cmd":"REBOOT_DEVICE"}`)
+	require.Equal(t, http.StatusCreated, code, body)
+	code, _, body = f.post(t, testOwnerPrn, f.connected, `{"cmd":"REBOOT_DEVICE"}`)
+	assert.Equal(t, http.StatusTooManyRequests, code, body)
+
+	for i := 0; i < commandRateLimit-1; i++ {
+		code, _, body = f.post(t, testOwnerPrn, f.connected, `{"cmd":"LIST_CONTAINERS"}`)
+		require.Equal(t, http.StatusCreated, code, body)
+	}
+	code, _, body = f.post(t, testOwnerPrn, f.connected, `{"cmd":"LIST_CONTAINERS"}`)
+	assert.Equal(t, http.StatusTooManyRequests, code, body)
+
+	// Older commands no longer count.
+	_, err := f.app.mongoClient.Database(utils.MongoDb).Collection(CommandsCollection).UpdateMany(context.Background(),
+		bson.M{"device_id": f.connected}, bson.M{"$set": bson.M{"created_at": time.Now().Add(-2 * commandRateWindow)}})
+	require.NoError(t, err)
+	code, _, body = f.post(t, testOwnerPrn, f.connected, `{"cmd":"REBOOT_DEVICE"}`)
+	assert.Equal(t, http.StatusCreated, code, body)
+}

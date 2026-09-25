@@ -58,6 +58,7 @@ type IScopes struct {
 	WriteDevices    Scope
 	ValidateDevices Scope
 	UpdateDevices   Scope
+	DeviceCommands  Scope
 	Objects         Scope
 	ReadObjects     Scope
 	WriteObjects    Scope
@@ -123,6 +124,11 @@ var Scopes = &IScopes{
 		ID:          "devices.change",
 		Service:     PantahubServiceID,
 		Description: "Update devices",
+	},
+	DeviceCommands: Scope{
+		ID:          "devices.commands",
+		Service:     PantahubServiceID,
+		Description: "Run remote commands on devices (reboot, SSH, ...)",
 	},
 	ReadUser: Scope{
 		ID:          "user.readonly",

@@ -60,22 +60,15 @@ const (
 
 // Device topic access for a user or session token mirrors the scope filters the
 // REST device endpoints enforce (devices.Service): reading device state needs a
-// read-capable scope, and writing a command needs a write-capable scope. A
-// token minted through /tokens with a narrowed scope set is thereby held to the
-// same privileges on the message plane as on REST, instead of silently gaining
-// full device read and command access. A normal login token carries the API
-// ("all") scope, which is in both lists, so ordinary users are unaffected.
+// read-capable scope. A token minted through /tokens with a narrowed scope set
+// is thereby held to the same privileges on the message plane as on REST. Users
+// never publish (see OnACLCheck).
 var (
 	mqttReadDeviceScopes = utils.MarshalScopes([]utils.Scope{
 		utils.Scopes.API,
 		utils.Scopes.APIReadOnly,
 		utils.Scopes.Devices,
 		utils.Scopes.ReadDevices,
-	})
-	mqttWriteDeviceScopes = utils.MarshalScopes([]utils.Scope{
-		utils.Scopes.API,
-		utils.Scopes.Devices,
-		utils.Scopes.WriteDevices,
 	})
 )
 
@@ -266,17 +259,15 @@ func (h *authHook) OnACLCheck(cl *mochi.Client, topic string, write bool) bool {
 		return DeviceMaySubscribe(suffix)
 
 	case kindUser:
-		// A user reads anything a device it owns exposes, but only ever
-		// writes instructions to it — and only within the scopes the token
-		// carries, mirroring the REST device endpoints.
+		// A user reads anything a device it owns exposes, within the read
+		// scopes the token carries, and never publishes. Commands reach a
+		// device only through POST /devices/{id}/commands, which enforces the
+		// allowlist, the command scope, the rate limits and the audit record;
+		// a direct publish would skip all of them.
 		if write {
-			if suffix != SuffixCommands {
-				return false
-			}
-			if !utils.MatchScope(mqttWriteDeviceScopes, clientScopes(cl)) {
-				return false
-			}
-		} else if !utils.MatchScope(mqttReadDeviceScopes, clientScopes(cl)) {
+			return false
+		}
+		if !utils.MatchScope(mqttReadDeviceScopes, clientScopes(cl)) {
 			return false
 		}
 		return h.userOwns(cl, subject, deviceID)
