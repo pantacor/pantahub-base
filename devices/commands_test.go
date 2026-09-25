@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -363,6 +364,7 @@ func TestPostCommandRateLimit(t *testing.T) {
 	require.Equal(t, http.StatusCreated, code, body)
 	code, _, body = f.post(t, testOwnerPrn, f.connected, `{"cmd":"REBOOT_DEVICE"}`)
 	assert.Equal(t, http.StatusTooManyRequests, code, body)
+	assert.Contains(t, body, "too many commands", "the reason reaches the caller")
 
 	for i := 0; i < commandRateLimit-1; i++ {
 		code, _, body = f.post(t, testOwnerPrn, f.connected, `{"cmd":"LIST_CONTAINERS"}`)
@@ -372,9 +374,59 @@ func TestPostCommandRateLimit(t *testing.T) {
 	assert.Equal(t, http.StatusTooManyRequests, code, body)
 
 	// Older commands no longer count.
-	_, err := f.app.mongoClient.Database(utils.MongoDb).Collection(CommandsCollection).UpdateMany(context.Background(),
-		bson.M{"device_id": f.connected}, bson.M{"$set": bson.M{"created_at": time.Now().Add(-2 * commandRateWindow)}})
+	old := time.Now().Add(-2 * commandRateWindow)
+	sent := bson.A{}
+	for i := 0; i < commandRateLimit; i++ {
+		sent = append(sent, old)
+	}
+	_, err := f.app.mongoClient.Database(utils.MongoDb).Collection(CommandLimitsCollection).UpdateOne(context.Background(),
+		bson.M{"_id": f.connected}, bson.M{"$set": bson.M{"sent": sent, "reboot_at": old}})
 	require.NoError(t, err)
 	code, _, body = f.post(t, testOwnerPrn, f.connected, `{"cmd":"REBOOT_DEVICE"}`)
 	assert.Equal(t, http.StatusCreated, code, body)
+}
+
+// Requests racing each other, as a double click or a retrying script sends
+// them, cannot exceed the limits together.
+func TestPostCommandRateLimitIsAtomic(t *testing.T) {
+	f := newCommandFixture(t)
+
+	race := func(n int, body string) (created, limited int) {
+		codes := make(chan int, n)
+		var wg sync.WaitGroup
+		for i := 0; i < n; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				code, _, _ := f.post(t, testOwnerPrn, f.connected, body)
+				codes <- code
+			}()
+		}
+		wg.Wait()
+		close(codes)
+		for code := range codes {
+			switch code {
+			case http.StatusCreated:
+				created++
+			case http.StatusTooManyRequests:
+				limited++
+			default:
+				t.Errorf("unexpected status %d", code)
+			}
+		}
+		return created, limited
+	}
+
+	created, limited := race(5, `{"cmd":"REBOOT_DEVICE"}`)
+	assert.Equal(t, 1, created, "reboots sent at once")
+	assert.Equal(t, 4, limited)
+
+	created, limited = race(3*commandRateLimit, `{"cmd":"LIST_CONTAINERS"}`)
+	assert.Equal(t, commandRateLimit-1, created, "commands sent at once, after the reboot")
+	assert.Equal(t, 3*commandRateLimit-(commandRateLimit-1), limited)
+
+	stored, err := f.app.mongoClient.Database(utils.MongoDb).Collection(CommandsCollection).
+		CountDocuments(context.Background(), bson.M{"device_id": f.connected})
+	require.NoError(t, err)
+	assert.Equal(t, int64(commandRateLimit), stored)
 }

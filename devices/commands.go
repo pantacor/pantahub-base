@@ -303,42 +303,78 @@ var PostCommandScopes = []utils.Scope{
 	utils.Scopes.DeviceCommands,
 }
 
-// Per-device rate limits on sending commands, counted over the last minute.
-// Counted in Mongo so they hold across API replicas.
+// Per-device rate limits on sending commands, over a sliding minute. Kept in
+// Mongo so they hold across API replicas.
 const (
 	commandRateWindow = time.Minute
 	// commandRateLimit caps all commands to one device.
 	commandRateLimit = 10
-	// rebootRateLimit caps reboots: a loop of them would keep the device
-	// down for good.
-	rebootRateLimit = 1
+	// A device is rebooted at most once per commandRateWindow: a loop of
+	// reboots would keep the device down for good.
+	rebootCommand = "REBOOT_DEVICE"
 )
+
+// CommandLimitsCollection holds the rate-limit state of each device that was
+// sent a command: {_id: <device id>, sent: [<times of the last
+// commandRateLimit commands>], reboot_at: <time of the last reboot>,
+// updated_at}. Documents idle for commandLimitsIdle are dropped by a TTL
+// index; by then they limit nothing.
+const CommandLimitsCollection = "pantahub_device_command_limits"
+
+const commandLimitsIdle = time.Hour
 
 // errCommandRateLimited is answered with 429.
 var errCommandRateLimited = errors.New("too many commands for this device, try again in a minute")
 
-// checkCommandRate refuses a command that would exceed the per-device limits.
-func (a *App) checkCommandRate(ctx context.Context, deviceID primitive.ObjectID, cmd string, now time.Time) error {
-	commands := a.mongoClient.Database(utils.MongoDb).Collection(CommandsCollection)
-	since := bson.M{"$gte": now.Add(-commandRateWindow)}
+// reserveCommandSlot takes one of the device's command slots, or refuses with
+// errCommandRateLimited. Checking and taking the slot is a single conditional
+// upsert, so concurrent requests, on any replica, cannot both take the last
+// slot: the one that finds the limit reached matches nothing, and its upsert
+// then collides with the device's existing document (a duplicate key).
+func (a *App) reserveCommandSlot(ctx context.Context, deviceID primitive.ObjectID, cmd string, now time.Time) error {
+	windowStart := now.Add(-commandRateWindow)
 
-	total, err := commands.CountDocuments(ctx, bson.M{"device_id": deviceID, "created_at": since})
-	if err != nil {
-		return err
+	conditions := bson.A{
+		// Fewer than commandRateLimit commands ever, or the oldest of the
+		// last commandRateLimit is out of the window.
+		bson.M{"$or": bson.A{
+			bson.M{"sent." + strconv.Itoa(commandRateLimit-1): bson.M{"$exists": false}},
+			bson.M{"sent.0": bson.M{"$lt": windowStart}},
+		}},
 	}
-	if total >= commandRateLimit {
-		return errCommandRateLimited
+	set := bson.M{"updated_at": now}
+	if cmd == rebootCommand {
+		conditions = append(conditions, bson.M{"$or": bson.A{
+			bson.M{"reboot_at": bson.M{"$exists": false}},
+			bson.M{"reboot_at": bson.M{"$lt": windowStart}},
+		}})
+		set["reboot_at"] = now
 	}
-	if cmd == "REBOOT_DEVICE" {
-		reboots, err := commands.CountDocuments(ctx, bson.M{"device_id": deviceID, "cmd": cmd, "created_at": since})
-		if err != nil {
+
+	filter := bson.M{"_id": deviceID, "$and": conditions}
+	update := bson.M{
+		"$set": set,
+		"$push": bson.M{"sent": bson.M{
+			"$each":  bson.A{now},
+			"$sort":  1,
+			"$slice": -commandRateLimit,
+		}},
+	}
+
+	limits := a.mongoClient.Database(utils.MongoDb).Collection(CommandLimitsCollection)
+	// A duplicate key on the first attempt may also be two first commands to
+	// the same device racing to create its document; the second attempt
+	// finds the document and answers for real.
+	for attempt := 0; attempt < 2; attempt++ {
+		_, err := limits.UpdateOne(ctx, filter, update, options.Update().SetUpsert(true))
+		if err == nil {
+			return nil
+		}
+		if !mongo.IsDuplicateKeyError(err) {
 			return err
 		}
-		if reboots >= rebootRateLimit {
-			return errCommandRateLimited
-		}
 	}
-	return nil
+	return errCommandRateLimited
 }
 
 // callerPrn returns the PRN of the authenticated caller.
@@ -486,7 +522,7 @@ func (a *App) handlePostCommand(c *echo.Context) error {
 	ctx, cancel := context.WithTimeout(c.Request().Context(), 10*time.Second)
 	defer cancel()
 
-	if err := a.checkCommandRate(ctx, device.ID, req.Cmd, now); err != nil {
+	if err := a.reserveCommandSlot(ctx, device.ID, req.Cmd, time.Now()); err != nil {
 		if errors.Is(err, errCommandRateLimited) {
 			return echoutil.RestErrorWrapperUser(c, err.Error(), err.Error(), http.StatusTooManyRequests)
 		}
@@ -636,7 +672,8 @@ func parseCommandsLimit(raw string) (int, error) {
 	return limit, nil
 }
 
-// EnsureCommandIndices creates the index the command history reads use.
+// EnsureCommandIndices creates the index the command history reads use, and
+// the TTL index that drops idle rate-limit state.
 func (a *App) EnsureCommandIndices() error {
 	ctx, cancel := context.WithTimeout(context.Background(), CreateIndexTimeout)
 	defer cancel()
@@ -647,6 +684,15 @@ func (a *App) EnsureCommandIndices() error {
 			{Key: "device_id", Value: int32(1)},
 			{Key: "created_at", Value: int32(-1)},
 		},
+	}, options.CreateIndexes().SetMaxTime(CreateIndexTimeout))
+	if err != nil {
+		return err
+	}
+
+	limits := a.mongoClient.Database(utils.MongoDb).Collection(CommandLimitsCollection)
+	_, err = limits.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "updated_at", Value: int32(1)}},
+		Options: options.Index().SetExpireAfterSeconds(int32(commandLimitsIdle.Seconds())),
 	}, options.CreateIndexes().SetMaxTime(CreateIndexTimeout))
 
 	return err
