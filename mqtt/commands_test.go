@@ -24,6 +24,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	mochi "github.com/mochi-mqtt/server/v2"
 	"github.com/mochi-mqtt/server/v2/packets"
@@ -149,7 +150,8 @@ func newTestBridge() *bridgeHook {
 	return &bridgeHook{jobs: make(chan bridgeJob, 4), done: make(chan struct{})}
 }
 
-func TestIngestCommandResult(t *testing.T) {
+// Results a device may not report are refused before anything is written.
+func TestIngestCommandResultRefusals(t *testing.T) {
 	deviceID := primitive.NewObjectID().Hex()
 	topic := Topic(deviceID, SuffixCommandsResult)
 	valid := []byte(`{"id":"` + primitive.NewObjectID().Hex() + `","cmd":"RUN_GC","status":"ok","code":200,"output":null,"error":""}`)
@@ -157,15 +159,8 @@ func TestIngestCommandResult(t *testing.T) {
 	device := &mochi.Client{}
 	setIdentity(device, kindDevice, deviceID, "")
 
+	// No mongo client: reaching a write would panic.
 	h := newTestBridge()
-	if err := h.ingest(device, topic, valid, nil); err != nil {
-		t.Fatalf("valid result refused: %v", err)
-	}
-	if len(h.jobs) != 1 {
-		t.Fatalf("valid result queued %d writes, want 1", len(h.jobs))
-	}
-
-	h = newTestBridge()
 	if err := h.ingest(device, topic, []byte(`{"id":"x","status":"ok"}`), nil); err == nil {
 		t.Error("malformed result accepted")
 	}
@@ -181,9 +176,16 @@ func TestIngestCommandResult(t *testing.T) {
 	if err := h.ingest(user, topic, valid, nil); err == nil {
 		t.Error("a user session forged a command result")
 	}
+}
 
-	if len(h.jobs) != 0 {
-		t.Errorf("refused results queued %d writes", len(h.jobs))
+func TestDecodeCommandResultCapsError(t *testing.T) {
+	payload := fmt.Sprintf(`{"id":%q,"status":"error","error":%q}`, primitive.NewObjectID().Hex(), strings.Repeat("é", maxCommandErrorLength))
+	result, err := decodeCommandResult([]byte(payload))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.error) > maxCommandErrorLength || !utf8.ValidString(result.error) {
+		t.Errorf("error of %d bytes kept, valid UTF-8 %v", len(result.error), utf8.ValidString(result.error))
 	}
 }
 
@@ -431,5 +433,90 @@ func TestQueuedCommandExpires(t *testing.T) {
 	}
 	if dropped := session.ClearExpiredInflights(time.Now().Unix()+6, 0); len(dropped) != 1 {
 		t.Fatal("expired command still queued")
+	}
+}
+
+// A result is recorded before the broker acknowledges it: once ingest
+// returns, the command is complete.
+func TestIngestRecordsCommandResult(t *testing.T) {
+	client := newTestMongo(t)
+	h := &bridgeHook{mongoClient: client}
+	device := primitive.NewObjectID()
+	topic := Topic(device.Hex(), SuffixCommandsResult)
+	cl := &mochi.Client{}
+	setIdentity(cl, kindDevice, device.Hex(), "")
+
+	commandID := insertPendingCommand(t, client, device)
+	payload := []byte(`{"id":"` + commandID.Hex() + `","cmd":"LIST_CONTAINERS","status":"ok","code":200,"output":[{"id":9007199254740993}],"error":""}`)
+	if err := h.ingest(cl, topic, payload, nil); err != nil {
+		t.Fatal(err)
+	}
+	got := loadCommand(t, client, commandID)
+	if got.Status != "ok" {
+		t.Fatalf("status = %q right after ingest", got.Status)
+	}
+	outputJSON, _ := json.Marshal(devices.DecodeCommandOutput(got.Output))
+	if string(outputJSON) != `[{"id":9007199254740993}]` {
+		t.Errorf("output = %s", outputJSON)
+	}
+
+	// A redelivery completes nothing, and is still acknowledged.
+	if err := h.ingest(cl, topic, payload, nil); err != nil {
+		t.Errorf("redelivered result refused: %v", err)
+	}
+}
+
+// Output the database cannot store does not leave the command pending: it is
+// stored as text, with the reason.
+func TestUnstorableOutputIsStoredAsText(t *testing.T) {
+	client := newTestMongo(t)
+	h := &bridgeHook{mongoClient: client}
+	device := primitive.NewObjectID()
+	commandID := insertPendingCommand(t, client, device)
+
+	deep := strings.Repeat(`{"a":`, 300) + `1` + strings.Repeat(`}`, 300)
+	payload := []byte(`{"id":"` + commandID.Hex() + `","status":"ok","code":200,"output":` + deep + `,"error":""}`)
+	result, err := decodeCommandResult(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.putCommandResult(context.Background(), device, result); err != nil {
+		t.Fatal(err)
+	}
+
+	got := loadCommand(t, client, commandID)
+	if got.Status != "ok" || got.FinishedAt == nil {
+		t.Fatalf("stored %+v", got)
+	}
+	if text, _ := devices.DecodeCommandOutput(got.Output).(string); text != deep {
+		t.Errorf("output not kept as text: %v", devices.DecodeCommandOutput(got.Output))
+	}
+	if !strings.Contains(got.Error, "output stored as text") {
+		t.Errorf("error = %q", got.Error)
+	}
+}
+
+// When the database cannot be reached the result is refused, so the broker
+// does not acknowledge it and the device sends it again.
+func TestUnrecordedResultIsNotAcknowledged(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://127.0.0.1:1/?connectTimeoutMS=200&serverSelectionTimeoutMS=200"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Disconnect(context.Background())
+	previousDb := utils.MongoDb
+	utils.MongoDb = "unreachable"
+	defer func() { utils.MongoDb = previousDb }()
+
+	h := &bridgeHook{mongoClient: client}
+	device := primitive.NewObjectID()
+	cl := &mochi.Client{}
+	setIdentity(cl, kindDevice, device.Hex(), "")
+	payload := []byte(`{"id":"` + primitive.NewObjectID().Hex() + `","status":"ok","code":200,"output":null,"error":""}`)
+
+	if err := h.ingest(cl, Topic(device.Hex(), SuffixCommandsResult), payload, nil); err == nil {
+		t.Fatal("a result that could not be recorded was accepted")
 	}
 }

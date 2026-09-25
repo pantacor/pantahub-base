@@ -18,6 +18,7 @@ package devices
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -265,16 +266,46 @@ func ValidateCommandRequest(req DeviceCommandRequest) (map[string]interface{}, e
 	return args, nil
 }
 
+// Output quoting sentinels, the ones BsonQuoteMap uses: stored output reads
+// exactly like device-meta.
+const (
+	quotedDot    = "\uFF2E"
+	quotedDollar = "\uFFE0"
+)
+
 // EncodeCommandOutput prepares a device-reported output value for storage.
 // Output is arbitrary JSON, so it is BSON-quoted exactly like device-meta:
 // dots in keys and every '$' are replaced by sentinels, which keeps keys legal
 // field names and operators out of stored documents. nil stays nil.
+//
+// Unlike BsonQuoteMap it does not round-trip through encoding/json, so a
+// json.Number (decode with UseNumber) is stored as an integer when it is one:
+// ids above 2^53 keep every digit.
 func EncodeCommandOutput(output interface{}) interface{} {
-	if output == nil {
-		return nil
+	switch v := output.(type) {
+	case map[string]interface{}:
+		quoted := make(map[string]interface{}, len(v))
+		for key, value := range v {
+			quoted[strings.ReplaceAll(utils.BsonQuote(key), "$", quotedDollar)] = EncodeCommandOutput(value)
+		}
+		return quoted
+	case []interface{}:
+		quoted := make([]interface{}, len(v))
+		for i, value := range v {
+			quoted[i] = EncodeCommandOutput(value)
+		}
+		return quoted
+	case string:
+		return strings.ReplaceAll(v, "$", quotedDollar)
+	case json.Number:
+		if i, err := v.Int64(); err == nil {
+			return i
+		}
+		f, _ := v.Float64()
+		return f
+	default:
+		return v
 	}
-	wrapped := map[string]interface{}{"v": output}
-	return utils.BsonQuoteMap(&wrapped)["v"]
 }
 
 // DecodeCommandOutput is the inverse of EncodeCommandOutput for a stored
@@ -285,18 +316,54 @@ func DecodeCommandOutput(raw bson.RawValue) interface{} {
 		return nil
 	}
 
-	// Decoding through a document lets nested documents come back as maps
-	// rather than ordered key/value slices, which encode to JSON as objects.
-	doc, err := bson.Marshal(bson.D{{Key: "v", Value: raw}})
-	if err != nil {
+	var value interface{}
+	if err := raw.Unmarshal(&value); err != nil {
 		return nil
 	}
-	wrapped := map[string]interface{}{}
-	if err := bson.Unmarshal(doc, &wrapped); err != nil {
-		return nil
+	return unquoteCommandOutput(value)
+}
+
+func unquoteCommandOutput(value interface{}) interface{} {
+	unquoteKey := func(key string) string {
+		return strings.ReplaceAll(strings.ReplaceAll(key, quotedDot, "."), quotedDollar, "$")
 	}
 
-	return utils.BsonUnquoteMap(&wrapped)["v"]
+	switch v := value.(type) {
+	case primitive.D:
+		out := make(map[string]interface{}, len(v))
+		for _, e := range v {
+			out[unquoteKey(e.Key)] = unquoteCommandOutput(e.Value)
+		}
+		return out
+	case primitive.M:
+		out := make(map[string]interface{}, len(v))
+		for key, e := range v {
+			out[unquoteKey(key)] = unquoteCommandOutput(e)
+		}
+		return out
+	case map[string]interface{}:
+		out := make(map[string]interface{}, len(v))
+		for key, e := range v {
+			out[unquoteKey(key)] = unquoteCommandOutput(e)
+		}
+		return out
+	case primitive.A:
+		out := make([]interface{}, len(v))
+		for i, e := range v {
+			out[i] = unquoteCommandOutput(e)
+		}
+		return out
+	case []interface{}:
+		out := make([]interface{}, len(v))
+		for i, e := range v {
+			out[i] = unquoteCommandOutput(e)
+		}
+		return out
+	case string:
+		return strings.ReplaceAll(v, quotedDollar, "$")
+	default:
+		return v
+	}
 }
 
 // PostCommandScopes may send commands. Commands act on the device itself

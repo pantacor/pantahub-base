@@ -17,6 +17,7 @@
 package mqtt
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -69,7 +70,19 @@ const (
 	// statusOffline is the only status word that means "not alive"; the
 	// device's last will carries it.
 	statusOffline = "offline"
+
+	// maxCommandErrorLength caps the error text a device reports with a
+	// command result.
+	maxCommandErrorLength = 1024
+
+	// maxFallbackOutputLength caps the output kept as text when the output a
+	// device reported cannot be stored as JSON.
+	maxFallbackOutputLength = 64 * 1024
 )
+
+// errNoPendingCommand is a command result that completes nothing: an unknown
+// id, another device's command, or one already finished (a QoS 1 redelivery).
+var errNoPendingCommand = errors.New("no pending command")
 
 // bridgeJob is one decoded device report waiting to be written. The payload is
 // already unmarshalled: workers never touch the packet, so nothing broker-owned
@@ -159,6 +172,9 @@ func (h *bridgeHook) Stop() error {
 // a rejected packet is never queued, and the mongo write is handed to the
 // worker pool, which runs after this call returns and therefore after the
 // broker has taken the packet.
+//
+// Command results are the exception: they are written before the broker
+// acknowledges them (see ingest).
 func (h *bridgeHook) OnPublish(cl *mochi.Client, pk packets.Packet) (packets.Packet, error) {
 	if err := h.ingest(cl, pk.TopicName, pk.Payload, nil); err != nil {
 		log.Printf("mqtt: bridge: rejecting publish on %s: %v", pk.TopicName, err)
@@ -250,9 +266,23 @@ func (h *bridgeHook) ingest(cl *mochi.Client, topic string, payload []byte, only
 		if err != nil {
 			return fmt.Errorf("malformed command result: %w", err)
 		}
-		h.enqueue(topic, func(ctx context.Context) error {
-			return h.putCommandResult(ctx, deviceObjectID, result)
-		})
+		// Written here, on the publisher's goroutine, rather than queued: a
+		// queued write can be dropped (full queue, shutdown) after the
+		// device got its PUBACK, and the device never sends a result twice.
+		// If the write fails the packet is refused, which for QoS 1 means no
+		// PUBACK: the device's client sends it again when it reconnects.
+		// Results are rare (the API rate-limits commands), so holding this
+		// one device's read loop for the write costs nothing else.
+		ctx, cancel := context.WithTimeout(context.Background(), bridgeJobTimeout)
+		defer cancel()
+		err = h.putCommandResult(ctx, deviceObjectID, result)
+		if errors.Is(err, errNoPendingCommand) {
+			log.Printf("mqtt: bridge: %s: %v", topic, err)
+			return nil
+		}
+		if err != nil {
+			return err
+		}
 
 	case SuffixLogs:
 		entries, err := unmarshalLogEntries(payload)
@@ -557,13 +587,16 @@ func statusMeta(payload []byte) map[string]interface{} {
 }
 
 // commandResult is a device's answer on SuffixCommandsResult, decoded and
-// validated. Output is the decoded JSON value, already BSON-quoted for storage.
+// validated. Output is the decoded JSON value, already BSON-quoted for
+// storage; rawOutput is the JSON as sent, the fallback when that value cannot
+// be stored.
 type commandResult struct {
-	id     primitive.ObjectID
-	status string
-	code   int
-	output interface{}
-	error  string
+	id        primitive.ObjectID
+	status    string
+	code      int
+	output    interface{}
+	rawOutput []byte
+	error     string
 }
 
 // decodeCommandResult validates a commands/result payload:
@@ -601,18 +634,49 @@ func decodeCommandResult(payload []byte) (commandResult, error) {
 
 	var output interface{}
 	if len(doc.Output) > 0 {
-		if err := json.Unmarshal(doc.Output, &output); err != nil {
+		// Numbers stay json.Number, so integers are stored exactly.
+		decoder := json.NewDecoder(bytes.NewReader(doc.Output))
+		decoder.UseNumber()
+		if err := decoder.Decode(&output); err != nil {
 			return commandResult{}, fmt.Errorf("invalid output: %w", err)
 		}
 	}
 
 	return commandResult{
-		id:     id,
-		status: doc.Status,
-		code:   doc.Code,
-		output: devices.EncodeCommandOutput(output),
-		error:  doc.Error,
+		id:        id,
+		status:    doc.Status,
+		code:      doc.Code,
+		output:    devices.EncodeCommandOutput(output),
+		rawOutput: doc.Output,
+		error:     truncateText(doc.Error, maxCommandErrorLength),
 	}, nil
+}
+
+// truncateText cuts s to at most max bytes without splitting a character.
+func truncateText(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	return strings.ToValidUTF8(s[:max], "")
+}
+
+// withOutputAsText is the result with its output replaced by the JSON text the
+// device sent, capped, and the reason noted in its error. It is what is stored
+// when the output itself cannot be (nested too deeply, too large once
+// quoted), so that the command still completes.
+func (result commandResult) withOutputAsText(cause error) commandResult {
+	text := string(result.rawOutput)
+	if len(text) > maxFallbackOutputLength {
+		text = truncateText(text, maxFallbackOutputLength) + " [truncated]"
+	}
+	result.output = devices.EncodeCommandOutput(text)
+
+	note := "output stored as text: " + cause.Error()
+	if result.error != "" {
+		note = result.error + "; " + note
+	}
+	result.error = truncateText(note, maxCommandErrorLength)
+	return result
 }
 
 // commandResultUpdate builds the filter and update that record a result. The
@@ -635,23 +699,40 @@ func commandResultUpdate(deviceObjectID primitive.ObjectID, result commandResult
 	return filter, update
 }
 
-// putCommandResult completes a pending command with the device's result.
+// putCommandResult completes a pending command with the device's result. When
+// the database refuses the output itself, the result is stored again with the
+// output as text (withOutputAsText), so a device reporting something Mongo
+// cannot hold does not leave its command pending. A command that is not
+// pending for this device is errNoPendingCommand.
 func (h *bridgeHook) putCommandResult(parentCtx context.Context, deviceObjectID primitive.ObjectID, result commandResult) error {
-	ctx, cancel := context.WithTimeout(parentCtx, bridgeWriteTimeout)
-	defer cancel()
-
-	filter, update := commandResultUpdate(deviceObjectID, result, time.Now().UTC())
-
 	collection := h.mongoClient.Database(utils.MongoDb).Collection(devices.CommandsCollection)
-	updateResult, err := collection.UpdateOne(ctx, filter, update)
+	write := func(result commandResult) (*mongo.UpdateResult, error) {
+		ctx, cancel := context.WithTimeout(parentCtx, bridgeWriteTimeout)
+		defer cancel()
+		filter, update := commandResultUpdate(deviceObjectID, result, time.Now().UTC())
+		return collection.UpdateOne(ctx, filter, update)
+	}
+
+	updateResult, err := write(result)
+	if err != nil && !isTransientMongoError(err) && parentCtx.Err() == nil {
+		log.Printf("mqtt: bridge: storing the output of command %s as text: %v", result.id.Hex(), err)
+		updateResult, err = write(result.withOutputAsText(err))
+	}
 	if err != nil {
 		return fmt.Errorf("cannot record command result: %w", err)
 	}
 	if updateResult.MatchedCount == 0 {
-		return fmt.Errorf("cannot record command result: no pending command %s for device %s", result.id.Hex(), deviceObjectID.Hex())
+		return fmt.Errorf("cannot record command result: %w %s for device %s", errNoPendingCommand, result.id.Hex(), deviceObjectID.Hex())
 	}
 
 	return nil
+}
+
+// isTransientMongoError reports an error that says nothing about the document
+// written: the database was unreachable or too slow.
+func isTransientMongoError(err error) bool {
+	return mongo.IsNetworkError(err) || mongo.IsTimeout(err) ||
+		errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)
 }
 
 // flattenDeviceMeta rewrites a nested map into the dot-notation $set and $unset

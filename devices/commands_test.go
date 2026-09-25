@@ -504,3 +504,26 @@ func TestDeleteDeviceCommands(t *testing.T) {
 	require.NoError(t, err)
 	assert.EqualValues(t, 1, others, "other devices keep theirs")
 }
+
+// Integers the device reports keep every digit through storage.
+func TestCommandOutputKeepsLargeIntegers(t *testing.T) {
+	raw := `{"id":9007199254740993,"neg":-9007199254740993,"ratio":0.25,"list":[18446744073709551615,1]}`
+	decoder := json.NewDecoder(strings.NewReader(raw))
+	decoder.UseNumber()
+	var output interface{}
+	require.NoError(t, decoder.Decode(&output))
+
+	doc, err := bson.Marshal(bson.M{"output": EncodeCommandOutput(output)})
+	require.NoError(t, err)
+	stored := struct {
+		Output bson.RawValue `bson:"output"`
+	}{}
+	require.NoError(t, bson.Unmarshal(doc, &stored))
+
+	got, err := json.Marshal(DecodeCommandOutput(stored.Output))
+	require.NoError(t, err)
+	assert.Contains(t, string(got), `"id":9007199254740993`)
+	assert.Contains(t, string(got), `"neg":-9007199254740993`)
+	assert.Contains(t, string(got), `"ratio":0.25`)
+	assert.Contains(t, string(got), `18446744073709552000`, "beyond int64 is a float, as JSON numbers go")
+}
