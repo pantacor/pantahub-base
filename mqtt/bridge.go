@@ -176,6 +176,12 @@ func (h *bridgeHook) Stop() error {
 // Command results are the exception: they are written before the broker
 // acknowledges them (see ingest).
 func (h *bridgeHook) OnPublish(cl *mochi.Client, pk packets.Packet) (packets.Packet, error) {
+	// The ACL already refuses every client here; this keeps an ACL
+	// regression from letting anyone forge a claim.
+	if onlyHubPublishes(cl, pk.TopicName) {
+		log.Printf("mqtt: bridge: rejecting publish on %s: only the Hub publishes there", pk.TopicName)
+		return pk, packets.ErrRejectPacket
+	}
 	if pk.FixedHeader.Retain && !mayRetain(cl, pk.TopicName) {
 		log.Printf("mqtt: bridge: rejecting retained publish on %s", pk.TopicName)
 		return pk, packets.ErrRejectPacket
@@ -328,12 +334,31 @@ func (h *bridgeHook) ingest(cl *mochi.Client, topic string, payload []byte, only
 // (SuffixStatus) is state a later subscriber should be handed; anything else
 // retained would be kept in broker memory, per device and replica, and
 // replayed stale to whoever subscribes next.
+//
+// The claimed topic is never retained, not even by the Hub: the claim is news
+// for the one claim-wait session waiting for it, and a retained copy would be
+// replayed to whatever subscribed to it later. Only a claimed device's own
+// identity retains its status; a claim-wait session publishes nothing at all.
 func mayRetain(cl *mochi.Client, topic string) bool {
-	if cl != nil && cl.Net.Inline {
+	_, suffix, ok := Parse(topic)
+	if ok && suffix == SuffixClaimed {
+		return false
+	}
+	if cl == nil {
+		return false
+	}
+	if cl.Net.Inline {
 		return true
 	}
+	kind, _ := identity(cl)
+	return ok && suffix == SuffixStatus && kind == kindDevice
+}
+
+// onlyHubPublishes reports whether topic is one only the Hub itself may
+// publish on, whoever the ACL let through: the claimed topic.
+func onlyHubPublishes(cl *mochi.Client, topic string) bool {
 	_, suffix, ok := Parse(topic)
-	return ok && suffix == SuffixStatus
+	return ok && suffix == SuffixClaimed && (cl == nil || !cl.Net.Inline)
 }
 
 // sessionOwnsDevice reports whether the session that published owns the device

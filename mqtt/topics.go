@@ -79,6 +79,17 @@ const (
 	// ascending order, so the device catches up on the whole queue of revisions
 	// it missed while offline rather than only the newest one.
 	SuffixStepsGet = "steps/get"
+
+	// SuffixClaimed tells an unclaimed device that it has just been claimed:
+	//
+	//	{"owner": "<owner prn>"}
+	//
+	// Published by the Hub alone (see claim.go), live at QoS 1 and never
+	// retained, to the device's claim-wait session, which the broker closes
+	// once the message is acknowledged. It is the only topic a claim-wait
+	// session may touch, and no other identity may use it at all: claimed
+	// devices neither subscribe nor publish here, and users never do.
+	SuffixClaimed = "claimed"
 )
 
 // progress topics are "steps/<rev>/progress".
@@ -169,4 +180,13 @@ func DeviceMaySubscribe(suffix string) bool {
 		return true
 	}
 	return false
+}
+
+// ClaimWaitMaySubscribe reports whether the claim-wait session of an unclaimed
+// device may subscribe to filter: only to the exact claimed topic of that
+// device. The comparison is on the whole string, so a wildcard, a shared
+// subscription ($share/...), a $SYS topic, another device's claimed topic and
+// the device's own other topics are all refused.
+func ClaimWaitMaySubscribe(deviceID, filter string) bool {
+	return deviceID != "" && filter == Topic(deviceID, SuffixClaimed)
 }

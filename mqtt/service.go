@@ -97,6 +97,7 @@ type Service struct {
 	ws          *wsListener
 	notifier    *Notifier
 	presence    *presenceHook
+	claims      *claimHook
 	tcpAddress  string
 	wsPath      string
 
@@ -178,8 +179,21 @@ func New(mongoClient *mongo.Client, logsApp *logs.App) (*Service, error) {
 		wsPath:      WsPath(),
 	}
 
-	if err := server.AddHook(&authHook{mongoClient: mongoClient, server: server}, nil); err != nil {
+	// Claim-wait sessions of unclaimed devices, capped per replica. A cap of
+	// zero refuses unclaimed devices outright, as before they existed.
+	var claims *claimHook
+	if limit := maxClaimWaitSessions(); limit > 0 {
+		claims = newClaimHook(mongoClient, server, limit)
+	}
+	service.claims = claims
+
+	if err := server.AddHook(&authHook{mongoClient: mongoClient, server: server, claims: claims}, nil); err != nil {
 		return nil, err
+	}
+	if claims != nil {
+		if err := server.AddHook(claims, nil); err != nil {
+			return nil, err
+		}
 	}
 
 	// After the auth hook, whose identity it reads, and before the bridge,
@@ -217,6 +231,7 @@ func New(mongoClient *mongo.Client, logsApp *logs.App) (*Service, error) {
 	}
 
 	service.notifier = NewNotifier(mongoClient, server)
+	service.notifier.claims = claims
 
 	// Answers device pull requests (user-meta/get, steps/get) by replying
 	// through the notifier, so a device seeds itself over the one MQTT socket
@@ -328,6 +343,10 @@ func (s *Service) Start(ctx context.Context) error {
 			log.Println("mqtt: notifier stopped: " + err.Error())
 		}
 	}()
+
+	if s.claims != nil {
+		go s.claims.runSweep(runCtx)
+	}
 
 	s.heartbeatDone = make(chan struct{})
 	go func() {

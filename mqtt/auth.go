@@ -75,9 +75,16 @@ var (
 
 // Identity kinds. A device may only reach its own namespace; a user may reach
 // the namespaces of the devices it owns.
+//
+// An unclaimed device authenticates exactly like a claimed one but gets the
+// claim-wait kind instead, which may do nothing but subscribe to its own
+// claimed topic (see claim.go). The kind is fixed for the life of the
+// connection: a claim never widens an open claim-wait session, the broker
+// closes it instead, and the device's next connection is a device identity.
 const (
-	kindDevice = "device"
-	kindUser   = "user"
+	kindDevice    = "device"
+	kindClaimWait = "device-claim-wait"
+	kindUser      = "user"
 )
 
 const (
@@ -133,6 +140,10 @@ type authHook struct {
 	// server is the broker the hook authenticates for, to look up the
 	// session a CONNECT would take over. Nil in tests that do not need it.
 	server *mochi.Server
+
+	// claims admits and tracks the claim-wait sessions of unclaimed devices.
+	// Nil refuses unclaimed devices, as before claim-wait sessions existed.
+	claims *claimHook
 }
 
 // ID identifies the hook to the broker.
@@ -156,12 +167,17 @@ func (h *authHook) Provides(b byte) bool {
 // or a JWT issued by the REST API, which may be the device's own token or the
 // token of a user or session.
 //
-// A connection is refused when the device does not exist, is garbage collected,
-// or has no owner: unclaimed devices must finish claiming over REST first.
-// It is also refused while owner verification is a TLS challenge that has not
-// completed, because the REST tokens of such a device are deliberately narrowed
-// to ownership validation (see authservices.DevicePayload) and that restriction
-// must hold on the message plane too.
+// A connection is refused when the device does not exist or is garbage
+// collected. It is also refused while owner verification is a TLS challenge
+// that has not completed, because the REST tokens of such a device are
+// deliberately narrowed to ownership validation (see
+// authservices.DevicePayload) and that restriction must hold on the message
+// plane too.
+//
+// A device that has no owner yet authenticates with the same credentials, but
+// only its own device credentials (never a user token), and gets a claim-wait
+// session: no will, a clean session that ends with the connection, and nothing
+// but its claimed topic to subscribe to (admitClaimWait, OnACLCheck).
 func (h *authHook) OnConnectAuthenticate(cl *mochi.Client, pk packets.Packet) bool {
 	if h.mongoClient == nil {
 		return false
@@ -183,10 +199,10 @@ func (h *authHook) OnConnectAuthenticate(cl *mochi.Client, pk packets.Packet) bo
 	if err != nil {
 		return false
 	}
-	if device.Owner == "" {
+	if device.OVMode.NeedsVerification() {
 		return false
 	}
-	if device.OVMode.NeedsVerification() {
+	if device.Owner == "" && h.claims == nil {
 		return false
 	}
 
@@ -201,7 +217,11 @@ func (h *authHook) OnConnectAuthenticate(cl *mochi.Client, pk packets.Packet) bo
 		if !authservices.DeviceAuth(username, password, h.mongoClient) {
 			return false
 		}
-		setIdentity(cl, kindDevice, device.ID.Hex(), "")
+		setIdentity(cl, deviceKind(device), device.ID.Hex(), "")
+	}
+
+	if kind, _ := identity(cl); kind == kindClaimWait && !h.admitClaimWait(cl, pk) {
+		return false
 	}
 
 	// The broker keys sessions by client id and hands a session to whoever
@@ -246,7 +266,7 @@ func (h *authHook) OnConnectAuthenticate(cl *mochi.Client, pk packets.Packet) bo
 // device-shaped id could evict that device's push channel over and over.
 func mayClaimSession(cl *mochi.Client, clientID string) bool {
 	kind, subject := identity(cl)
-	if kind == kindDevice {
+	if isDeviceKind(kind) {
 		return clientID == subject
 	}
 	_, err := primitive.ObjectIDFromHex(clientID)
@@ -268,10 +288,78 @@ func (h *authHook) mayTakeOverSession(cl *mochi.Client) bool {
 }
 
 // sameIdentity reports whether two clients authenticated as the same subject.
+//
+// A device's claim-wait session and its claimed session are the same device,
+// holding the same credentials, so either may take the other over: the
+// device reconnecting right after its claim must not be refused because the
+// broker has not finished tearing its claim-wait session down. Nothing leaks
+// across: a claim-wait session is always clean, so it inherits nothing, and
+// all a device session could inherit from one is the claimed subscription,
+// which the ACL no longer serves a device identity, and at most the device's
+// own claimed message if it was not acknowledged yet.
 func sameIdentity(a, b *mochi.Client) bool {
 	kindA, subjectA := identity(a)
 	kindB, subjectB := identity(b)
+	if isDeviceKind(kindA) && isDeviceKind(kindB) {
+		return subjectA == subjectB
+	}
 	return kindA != "" && kindA == kindB && subjectA == subjectB
+}
+
+// isDeviceKind reports whether kind authenticated with a device's own
+// credentials, claimed or not.
+func isDeviceKind(kind string) bool {
+	return kind == kindDevice || kind == kindClaimWait
+}
+
+// deviceKind is the identity kind a device's own credentials open: a device
+// session once the device is claimed, a claim-wait session until then.
+func deviceKind(device *devices.Device) string {
+	if device.Owner == "" {
+		return kindClaimWait
+	}
+	return kindDevice
+}
+
+// admitClaimWait applies the CONNECT rules of a claim-wait session.
+//
+//   - No will. A will is published by the broker on the client's behalf; a
+//     claim-wait session publishes nothing, and so arms nothing either.
+//   - A clean session, ending with the connection. mochi decides whether a
+//     session is inherited from the CONNECT packet's clean flag, which a hook
+//     cannot rewrite, so a non-clean CONNECT is refused rather than forced:
+//     otherwise it could inherit the subscriptions and queued messages of a
+//     persistent session the device held while it was claimed. The session
+//     expiry is then forced to zero, so nothing outlives the connection.
+//   - A keepalive between 1 and maxClaimWaitKeepalive seconds. The broker
+//     times a connection out at 1.5x its keepalive, and a keepalive of 0 turns
+//     that off: a socket that died silently would then hold its claim-wait
+//     slot, and a slot under the cap, for good.
+//   - Room under the per-replica cap on claim-wait sessions (claimHook).
+func (h *authHook) admitClaimWait(cl *mochi.Client, pk packets.Packet) bool {
+	if h.claims == nil {
+		return false
+	}
+	if pk.Connect.WillFlag || pk.Connect.WillRetain || len(pk.Connect.WillTopic) > 0 {
+		return false
+	}
+	if !pk.Connect.Clean {
+		return false
+	}
+	if pk.Connect.Keepalive == 0 || pk.Connect.Keepalive > maxClaimWaitKeepalive {
+		return false
+	}
+	if !h.claims.hasRoom() {
+		return false
+	}
+
+	cl.Lock()
+	defer cl.Unlock()
+	cl.Properties.Clean = true
+	cl.Properties.Props.SessionExpiryInterval = 0
+	cl.Properties.Props.SessionExpiryIntervalFlag = false
+	cl.Properties.Will = mochi.Will{}
+	return true
 }
 
 // userSessionsEndOnDisconnect makes the session of a user identity end with
@@ -306,6 +394,13 @@ func (h *authHook) OnACLCheck(cl *mochi.Client, topic string, write bool) bool {
 
 	kind, subject := identity(cl)
 	switch kind {
+	case kindClaimWait:
+		// An unclaimed device reads its claimed topic and nothing else, and
+		// never publishes. The check is on the identity alone, never on the
+		// device document: the claim is what this session waits for, and it
+		// ends the session (claim.go) rather than widening it.
+		return !write && ClaimWaitMaySubscribe(subject, topic)
+
 	case kindDevice:
 		if !strings.HasPrefix(topic, DeviceScope(subject)) {
 			return false
@@ -322,6 +417,11 @@ func (h *authHook) OnACLCheck(cl *mochi.Client, topic string, write bool) bool {
 		// allowlist, the command scope, the rate limits and the audit record;
 		// a direct publish would skip all of them.
 		if write {
+			return false
+		}
+		// The claimed topic is the device's own business: it only ever
+		// carries the claim to the claim-wait session of an unclaimed device.
+		if suffix == SuffixClaimed {
 			return false
 		}
 		if !utils.MatchScope(mqttReadDeviceScopes, clientScopes(cl)) {
@@ -352,10 +452,15 @@ func authenticateWithToken(cl *mochi.Client, device *devices.Device, claims jwtg
 		if !strings.HasPrefix(callerPrn, devicePrnPrefix) || utils.PrnGetID(callerPrn) != device.ID.Hex() {
 			return false
 		}
-		setIdentity(cl, kindDevice, device.ID.Hex(), "")
+		setIdentity(cl, deviceKind(device), device.ID.Hex(), "")
 		return true
 
 	case accounts.AccountTypeUser, accounts.AccountTypeSessionUser:
+		// A user reaches devices it owns; an unclaimed device's name opens
+		// nothing for a user, exactly as before claim-wait sessions existed.
+		if device.Owner == "" {
+			return false
+		}
 		// The scopes travel with the identity so the ACL hook can enforce them
 		// per topic without re-parsing the token. An absent claim is no scopes,
 		// which the REST plane also treats as insufficient for device access.

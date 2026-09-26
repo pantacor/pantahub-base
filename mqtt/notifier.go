@@ -106,6 +106,10 @@ type Notifier struct {
 	// the protocol of an injected packet is its publisher's.
 	commandClient *mochi.Client
 
+	// claims ends the claim-wait session of a device this replica holds once
+	// the device is claimed. Nil when claim-wait sessions are not served.
+	claims *claimHook
+
 	// unsupportedOnce keeps the "no change streams here" warning to a single
 	// line per process, however many watchers hit it.
 	unsupportedOnce sync.Once
@@ -575,10 +579,25 @@ func (n *Notifier) publishOldestNewStep(ctx context.Context, trailID primitive.O
 // handleDeviceChange republishes user-meta when, and only when, user-meta was
 // what changed. Every other field of a device document — the shared secret
 // above all — stays on the Hub.
+//
+// It also hands a claim (an update that set the owner) to the claim hook,
+// which tells the device's claim-wait session if this replica holds it. Every
+// replica sees every claim, so the claim reaches the session wherever the
+// REST call that made it was served.
 func (n *Notifier) handleDeviceChange(ctx context.Context, event *changeEvent) {
 	// Only an update carries an update description; a replace or an insert
 	// says nothing about which field moved and must not leak the document.
-	if event.OperationType != "update" || !userMetaChanged(event) {
+	if event.OperationType != "update" {
+		return
+	}
+
+	if owner, ok := claimedOwner(event); ok && n.claims != nil {
+		if deviceID, ok := changeDeviceID(event); ok {
+			n.claims.claimed(deviceID, owner)
+		}
+	}
+
+	if !userMetaChanged(event) {
 		return
 	}
 
