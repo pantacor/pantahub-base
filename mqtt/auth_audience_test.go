@@ -22,6 +22,8 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
+	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -29,24 +31,42 @@ import (
 	"gitlab.com/pantacor/pantahub-base/utils"
 )
 
+// testJWTKey is the key the tests sign tokens with. jwtPublicKey reads the
+// API's key pair from the environment once per process, so every test that
+// parses a token must use this one key.
+var testJWTKey = func() func(t *testing.T) *rsa.PrivateKey {
+	var once sync.Once
+	var key *rsa.PrivateKey
+	var err error
+	return func(t *testing.T) *rsa.PrivateKey {
+		t.Helper()
+		once.Do(func() {
+			key, err = rsa.GenerateKey(rand.Reader, 2048)
+			if err != nil {
+				return
+			}
+			var pub []byte
+			pub, err = x509.MarshalPKIXPublicKey(&key.PublicKey)
+			if err != nil {
+				return
+			}
+			encode := func(blockType string, der []byte) string {
+				return base64.StdEncoding.EncodeToString(pem.EncodeToMemory(&pem.Block{Type: blockType, Bytes: der}))
+			}
+			os.Setenv(utils.EnvPantahubJWTAuthSecret, encode("RSA PRIVATE KEY", x509.MarshalPKCS1PrivateKey(key)))
+			os.Setenv(utils.EnvPantahubJWTAuthPub, encode("PUBLIC KEY", pub))
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return key
+	}
+}()
+
 // A token a user granted to an MCP client is signed with the API's key like any
 // other. It must not open the message plane: its audience says where it is good.
 func TestResourceBoundTokenIsNotAnMQTTCredential(t *testing.T) {
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
-	}
-	pub, err := x509.MarshalPKIXPublicKey(&key.PublicKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	encode := func(blockType string, der []byte) string {
-		return base64.StdEncoding.EncodeToString(pem.EncodeToMemory(&pem.Block{Type: blockType, Bytes: der}))
-	}
-	// jwtPublicKey reads these once per process; no other test in this package
-	// parses a token, so this is the first and only load.
-	t.Setenv(utils.EnvPantahubJWTAuthSecret, encode("RSA PRIVATE KEY", x509.MarshalPKCS1PrivateKey(key)))
-	t.Setenv(utils.EnvPantahubJWTAuthPub, encode("PUBLIC KEY", pub))
+	key := testJWTKey(t)
 
 	sign := func(aud interface{}) string {
 		claims := jwtgo.MapClaims{
