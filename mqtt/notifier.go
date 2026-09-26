@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -721,6 +722,9 @@ func commandExpiryInterval(expiresAt, now time.Time) uint32 {
 	seconds := int64((left + time.Second - 1) / time.Second)
 	if seconds < 1 {
 		return 1
+	}
+	if seconds > math.MaxUint32 {
+		return math.MaxUint32
 	}
 	return uint32(seconds)
 }

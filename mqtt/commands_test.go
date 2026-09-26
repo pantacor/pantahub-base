@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"strings"
 	"testing"
@@ -401,6 +402,8 @@ func TestCommandExpiryInterval(t *testing.T) {
 		500 * time.Millisecond: 1,
 		0:                      1,
 		-10 * time.Second:      1,
+		// Past what the MQTT property holds: clamped, not wrapped.
+		200 * 365 * 24 * time.Hour: math.MaxUint32,
 	} {
 		if got := commandExpiryInterval(now.Add(left), now); got != want {
 			t.Errorf("%v left: expiry %d, want %d", left, got, want)
