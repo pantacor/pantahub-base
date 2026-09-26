@@ -1,16 +1,57 @@
 
+<a name="059"></a>
+## [059](https://gitlab.com/pantacor/pantahub-base/compare/058...059)
+
+> 2026-09-26
+
+### Ci
+
+* deploy stage from master
+
+### Docs
+
+* bring the README up to date
+* **devices:** learning about the claim over MQTT
+
+### Feat
+
+* **devices:** harden remote commands
+* **devices:** remote commands for MQTT-connected devices
+* **mqtt:** tell an unclaimed device the moment it is claimed
+
+### Fix
+
+* update petname dependency
+* **devices:** tell callers why a command was refused, and guard device-meta
+* **devices:** leave the output out of the command history
+* **devices:** index the command history, expire commands, delete them with the device
+* **devices:** take command rate-limit slots atomically
+* **mqtt:** clamp the command expiry to what the MQTT property holds
+* **mqtt:** refuse retained device reports other than status
+* **mqtt:** record command results before acknowledging them
+* **mqtt:** keep user sessions to their owner, and ownership answers fresh
+* **mqtt:** let the broker drop commands once they expire
+* **mqtt:** record the MQTT connection from the broker, per connection
+* **mqtt:** ignore the will of a session taken over by a reconnect
+
+### Test
+
+* **devices:** resolve the command routes' device by id, PRN and nick
+* **mqtt:** sign every test token with one key
+
+
 <a name="058"></a>
 ## [058](https://gitlab.com/pantacor/pantahub-base/compare/057...058)
 
 > 2026-09-22
 
+### Chore
+
+* update CHANGELOG.md for release 058
+
 ### Fix
 
 * **devices:** show strangers only the public view of a public device
-
-### Refactor
-
-* **devices,mcp:** read and write join tokens through one implementation
 
 
 <a name="057"></a>
@@ -33,7 +74,6 @@
 
 ### Fix
 
-* **exports,metrics:** resolve the caller before checking scopes
 * **stateops:** a file a signature excludes is not an unsigned part
 
 
@@ -212,28 +252,27 @@
 * **auth:** accept passkeys as second factor without user verification
 * **auth:** generate account challenges with crypto/rand
 * **ci:** bump gorilla/websocket to v1.5.3 to clear GO-2026-6278
+* **devices:** stop honoring client-chosen _id takeover on /register
 * **devices:** 403 non-owner delete, scrub public metas, no secrets in logs
+* **devices:** let any logged-in user delete an unclaimed device
 * **devices:** accept body-less register and claim requests
 * **devices:** never touch the secret in PUT; unbreak device claims
 * **devices:** restore anonymous device self-registration
-* **devices:** let any logged-in user delete an unclaimed device
-* **devices:** stop honoring client-chosen _id takeover on /register
 * **features:** send CORS headers on GET /features
-* **mqtt:** bind device sessions to their own client id
-* **mqtt:** close notifier reconcile and publish gaps
-* **mqtt:** users can no longer claim device-shaped session ids
 * **mqtt:** store logs through the registered logs backend
 * **mqtt:** close five review findings in the OTA message plane
+* **mqtt:** close notifier reconcile and publish gaps
+* **mqtt:** users can no longer claim device-shaped session ids
+* **mqtt:** bind device sessions to their own client id
 * **oauth:** carry social-connect state in the signed state param, not cross-site cookies
 * **objects:** re-check disk quota after the object insert
 * **objects:** stop signing object tokens with the placeholder secret
 * **profiles:** reject bad meta payloads; 403s no longer nil-deref
 * **querymongo:** stop panicking on crafted pagination params
 * **subscriptions:** stop mutating the default-subscription template
-* **tokens:** users can no longer mint SERVICE-type PATs
 * **tokens:** answer caller errors with 400/409 instead of 500 on create
+* **tokens:** users can no longer mint SERVICE-type PATs
 * **trails:** quota 412 without nil-deref, missing returns, decode check
-* **trails,objects:** validate client-supplied Mongo filters
 * **utils:** UserTypeFilter fails closed without auth info
 * **utils:** rate-limit on the ingress-observed client address
 
