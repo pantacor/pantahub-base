@@ -115,6 +115,32 @@ Date: Wed, 12 Jul 2017 21:15:49 GMT
 
 As you can see the challenge field is now reset and the owner is assigned.
 
+#### Learning about the claim over MQTT
+
+Instead of polling `GET /devices/{id}` until an owner shows up, an unclaimed
+device can wait on the MQTT message plane (`/mqtt/`):
+
+* CONNECT with its own credentials, exactly as a claimed device does: username
+  = its PRN, password = its secret (or its device token from `/auth/login`),
+  client id = its device id. The session must be clean, carry no will, and use
+  a keepalive of 1 to 300 seconds; anything else is refused.
+* SUBSCRIBE to `ph/v1/dev/<device-id>/claimed`, the only thing such a
+  "claim-wait" session may do: every other filter (wildcards, `$share/`,
+  `$SYS/`, its other topics, other devices) is refused and every PUBLISH is
+  refused (MQTT 3.1.1 closes the connection on a refused QoS 1 publish).
+* Once the device is claimed the Hub publishes `{"owner": "<owner prn>"}` on
+  that topic, QoS 1 and not retained, and closes the connection as soon as the
+  device acknowledged it (an MQTT 5 client gets a DISCONNECT with reason
+  0x98, administrative action). The device reconnects and, now claimed, gets
+  the usual device session.
+
+The broker also closes a claim-wait session whose device was claimed while
+the message could not be delivered, or deleted. A device whose claim-wait
+session is closed should check its owner over REST before waiting again. Each
+API replica holds at most `PANTAHUB_MQTT_MAX_CLAIM_WAIT_SESSIONS` claim-wait
+sessions (default 5000, 0 disables them); past that the CONNECT is refused and
+the device falls back to polling.
+
 ### Get Your Devices
 
 ... only yours!
