@@ -1,8 +1,22 @@
 
+<a name="060"></a>
+## [060](https://gitlab.com/pantacor/pantahub-base/compare/059...060)
+
+> 2026-09-28
+
+### Feat
+
+* **devices:** live device log sessions
+
+
 <a name="059"></a>
 ## [059](https://gitlab.com/pantacor/pantahub-base/compare/058...059)
 
 > 2026-09-26
+
+### Chore
+
+* update CHANGELOG.md for release 059
 
 ### Ci
 
