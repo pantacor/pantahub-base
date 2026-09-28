@@ -348,6 +348,11 @@ func (s *Service) Start(ctx context.Context) error {
 		go s.claims.runSweep(runCtx)
 	}
 
+	// Ends the log sessions whose client stopped renewing, freeing their
+	// slots and telling the device (through the notifier) even when nobody
+	// asks the API about them.
+	go devices.RunLogSessionSweep(runCtx, s.mongoClient)
+
 	s.heartbeatDone = make(chan struct{})
 	go func() {
 		defer close(s.heartbeatDone)

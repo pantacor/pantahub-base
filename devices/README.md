@@ -669,3 +669,38 @@ X-Runtime: 0.000664
     }
 ]
 ```
+
+## Live device logs
+
+The owner of a device connected over MQTT can stream its log files live, for
+a bounded time (wire contract: `docs/logs.md` in pv-mqtt-sdk). Opening,
+renewing and stopping a session needs the full API scope or `devices.logs`;
+reading the lines of your own session needs a device read scope or
+`devices.logs`.
+
+* `POST /devices/{id}/commands` `{"cmd": "LIST_LOG_SOURCES", "args": {"rev": "current"}}`
+  lists the revisions and log files the device has (a remote command, with
+  the commands' scope and rate limit).
+* `POST /devices/{id}/log-sessions`
+  `{"rev": "current", "sources": ["pantavisor/pantavisor.log"], "tail": 200, "follow": true}`
+  answers `201` with the session (`id`, `expires_at`, `deadline`). Sources
+  are paths relative to the revision's log directory (`""` is all of it): at
+  most 10, no `..`, not absolute; `tail` is 0 to 500. `409` when the device
+  is not connected over MQTT, `429` above 2 live sessions per device or 5 per
+  user.
+* `POST /devices/{id}/log-sessions/{sid}/renew` extends the 60 second lease
+  (renew every 20 s while watching), never past the 30 minute deadline; `410`
+  once the session has ended. A session that is not renewed ends by itself.
+* `DELETE /devices/{id}/log-sessions/{sid}` stops it (`204`).
+* `GET /devices/{id}/log-sessions/{sid}/lines?after=<seq>` waits up to 20 s
+  for batches after `seq` (start with `-1`) and answers
+  `{"batches": [{"seq", "lines": [{"src", "line"}], "dropped", "end", "reason"}], "next", "ended", "reason"}`;
+  pass `next` as `after` next time. `ended` is set once the session is over
+  and everything was read.
+
+The Hub tells the device on `ph/v1/dev/<id>/logs/session` and the device
+streams on `ph/v1/dev/<id>/logs/stream`. Users can neither subscribe nor
+publish on either: the API is the only way in. Batches are kept for 10
+minutes and never go to the persisted logs (`GET /logs`); each session start
+is logged with the caller, device and sources, and the session record is kept
+30 days.

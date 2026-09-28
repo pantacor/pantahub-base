@@ -109,8 +109,8 @@ func TestParseProgressRejectsNonNumericRevisions(t *testing.T) {
 }
 
 func TestDevicePermissionsAreDisjoint(t *testing.T) {
-	publishable := []string{SuffixDeviceMeta, SuffixLogs, SuffixStatus, SuffixCommandsResult, "steps/3/progress"}
-	subscribable := []string{SuffixStepsNew, SuffixUserMeta, SuffixCommands}
+	publishable := []string{SuffixDeviceMeta, SuffixLogs, SuffixStatus, SuffixCommandsResult, SuffixLogStream, "steps/3/progress"}
+	subscribable := []string{SuffixStepsNew, SuffixUserMeta, SuffixCommands, SuffixLogSession}
 
 	for _, suffix := range publishable {
 		if !DeviceMayPublish(suffix) {
@@ -132,7 +132,8 @@ func TestDevicePermissionsAreDisjoint(t *testing.T) {
 }
 
 func TestUnknownSuffixesAreDeniedBothWays(t *testing.T) {
-	for _, suffix := range []string{"", "steps", "steps/new/extra", "../logs", "user-meta/key", "commands/other", "commands/result/extra"} {
+	for _, suffix := range []string{"", "steps", "steps/new/extra", "../logs", "user-meta/key", "commands/other", "commands/result/extra",
+		"logs/", "logs/#", "logs/+", "logs/session/x", "logs/stream/x", "logs/other"} {
 		if DeviceMayPublish(suffix) {
 			t.Errorf("DeviceMayPublish(%q) = true", suffix)
 		}

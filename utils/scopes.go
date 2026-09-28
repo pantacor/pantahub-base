@@ -59,6 +59,7 @@ type IScopes struct {
 	ValidateDevices Scope
 	UpdateDevices   Scope
 	DeviceCommands  Scope
+	DeviceLogs      Scope
 	Objects         Scope
 	ReadObjects     Scope
 	WriteObjects    Scope
@@ -129,6 +130,11 @@ var Scopes = &IScopes{
 		ID:          "devices.commands",
 		Service:     PantahubServiceID,
 		Description: "Run remote commands on devices (reboot, SSH, ...)",
+	},
+	DeviceLogs: Scope{
+		ID:          "devices.logs",
+		Service:     PantahubServiceID,
+		Description: "Stream live logs from devices",
 	},
 	ReadUser: Scope{
 		ID:          "user.readonly",

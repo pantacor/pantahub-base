@@ -50,8 +50,33 @@ const (
 	// semantics: a null value unsets the key.
 	SuffixDeviceMeta = "device-meta"
 
-	// SuffixLogs carries a JSON array of log entries.
+	// SuffixLogs carries a JSON array of log entries, persisted by the logs
+	// service. Unrelated to the live log topics below.
 	SuffixLogs = "logs"
+
+	// SuffixLogSession tells the device to start, renew or stop streaming a
+	// live log session (devices/logsessions.go):
+	//
+	//	{"id": "<hex>", "action": "start|renew|stop", "rev": "current",
+	//	 "sources": ["..."], "tail": 200, "follow": true,
+	//	 "expires_at": "<RFC 3339>", "deadline": "<RFC 3339>"}
+	//
+	// Published by the Hub alone (the notifier, when a session is opened,
+	// renewed or ended through the REST API), live at QoS 1 and never
+	// retained. The device subscribes to its own; users never see it.
+	SuffixLogSession = "logs/session"
+
+	// SuffixLogStream carries the batches of a live log session from the
+	// device:
+	//
+	//	{"session": "<hex>", "seq": 12, "lines": [{"src": "...", "line": "..."}],
+	//	 "dropped": 0, "end": false, "reason": ""}
+	//
+	// QoS 0 or 1, never retained. Device-written only; the bridge stores a
+	// batch only for a live session of that device, for 10 minutes, and never
+	// in the persisted logs. Users neither publish nor subscribe: they read
+	// the batches through the REST API.
+	SuffixLogStream = "logs/stream"
 
 	// SuffixCommands carries out-of-band instructions to the device. Never
 	// retained: a command must not be replayed to a device that reconnects
@@ -164,7 +189,7 @@ func ParseProgress(suffix string) (rev int, ok bool) {
 func DeviceMayPublish(suffix string) bool {
 	switch suffix {
 	case SuffixDeviceMeta, SuffixLogs, SuffixStatus, SuffixUserMetaGet, SuffixStepsGet,
-		SuffixCommandsResult:
+		SuffixCommandsResult, SuffixLogStream:
 		return true
 	}
 
@@ -176,10 +201,26 @@ func DeviceMayPublish(suffix string) bool {
 // suffix within its own namespace.
 func DeviceMaySubscribe(suffix string) bool {
 	switch suffix {
-	case SuffixStepsNew, SuffixUserMeta, SuffixCommands:
+	case SuffixStepsNew, SuffixUserMeta, SuffixCommands, SuffixLogSession:
 		return true
 	}
 	return false
+}
+
+// UserMaySubscribe reports whether a user may subscribe to a suffix of a device
+// it owns. Users read what a device exposes, except the topics that are the
+// device's own business: the claimed topic, and the live log topics, which
+// the REST API alone opens (scope, limits, audit) and serves.
+//
+// suffix may hold a wildcard at SUBSCRIBE; the broker calls the ACL again for
+// every delivery with the concrete topic, which is where these refusals bite
+// for wildcard subscribers (see authHook.OnACLCheck).
+func UserMaySubscribe(suffix string) bool {
+	switch suffix {
+	case SuffixClaimed, SuffixLogSession, SuffixLogStream:
+		return false
+	}
+	return true
 }
 
 // ClaimWaitMaySubscribe reports whether the claim-wait session of an unclaimed

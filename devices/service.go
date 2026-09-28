@@ -50,6 +50,8 @@ type App struct {
 	jwtConfig   *jwtauth.Config
 	mongoClient *mongo.Client
 	subService  subscriptions.SubscriptionService
+	// logPolls bounds concurrent live-log long-polls per caller.
+	logPolls pollSlots
 }
 
 // Build factory a new Device App only with mongoClient
@@ -149,6 +151,14 @@ func New(jwtConfig *jwtauth.Config, subService subscriptions.SubscriptionService
 	err = app.EnsureCommandIndices()
 	if err != nil {
 		log.Println("Error creating indices for " + CommandsCollection + ": " + err.Error())
+		return nil
+	}
+
+	// The live-session limits are unique indexes: without them nothing caps
+	// log sessions, so the service does not start.
+	err = app.EnsureLogSessionIndices()
+	if err != nil {
+		log.Println("Error creating indices for " + LogSessionsCollection + ": " + err.Error())
 		return nil
 	}
 
@@ -277,6 +287,11 @@ func (app *App) Mount(s *echoutil.Server) {
 	g.POST("/:id/commands", echoutil.ScopeFilter(PostCommandScopes, app.handlePostCommand))
 	g.GET("/:id/commands", echoutil.ScopeFilter(readCommandScopes(readDevicesScopes), app.handleGetCommands))
 	g.GET("/:id/commands/:cid", echoutil.ScopeFilter(readCommandScopes(readDevicesScopes), app.handleGetCommand))
+	// live logs, streamed over MQTT
+	g.POST("/:id/log-sessions", echoutil.ScopeFilter(LogSessionScopes, app.handlePostLogSession))
+	g.POST("/:id/log-sessions/:sid/renew", echoutil.ScopeFilter(LogSessionScopes, app.handleRenewLogSession))
+	g.DELETE("/:id/log-sessions/:sid", echoutil.ScopeFilter(LogSessionScopes, app.handleDeleteLogSession))
+	g.GET("/:id/log-sessions/:sid/lines", echoutil.ScopeFilter(readLogSessionScopes(readDevicesScopes), app.handleGetLogLines))
 	// lookup by nick-path (np)
 	g.GET("/np/:usernick/:devicenick", echoutil.ScopeFilter(readDevicesScopes, app.handleGetUserDevice))
 }
