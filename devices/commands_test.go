@@ -46,12 +46,26 @@ func TestValidateCommandRequest(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, map[string]interface{}{}, args, "commands without arguments drop them")
 
+	args, err = ValidateCommandRequest(DeviceCommandRequest{Cmd: "LIST_LOG_SOURCES", Args: map[string]interface{}{"rev": "locals/hub-3", "message": "x"}})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]interface{}{"rev": "locals/hub-3"}, args, "only the revision is kept")
+
+	for _, empty := range []map[string]interface{}{nil, {"rev": nil}, {"rev": ""}} {
+		args, err = ValidateCommandRequest(DeviceCommandRequest{Cmd: "LIST_LOG_SOURCES", Args: empty})
+		require.NoError(t, err)
+		assert.Equal(t, map[string]interface{}{}, args, "the revision is optional: %v", empty)
+	}
+
 	for _, req := range []DeviceCommandRequest{
 		{Cmd: ""},
 		{Cmd: "list_containers"},
 		{Cmd: "RUN_SHELL"},
 		{Cmd: "REBOOT_DEVICE", Args: map[string]interface{}{"message": 42}},
 		{Cmd: "REBOOT_DEVICE", Args: map[string]interface{}{"message": strings.Repeat("x", maxCommandMessageLength+1)}},
+		{Cmd: "LIST_LOG_SOURCES", Args: map[string]interface{}{"rev": 3}},
+		{Cmd: "LIST_LOG_SOURCES", Args: map[string]interface{}{"rev": "../../etc"}},
+		{Cmd: "LIST_LOG_SOURCES", Args: map[string]interface{}{"rev": "/current"}},
+		{Cmd: "LIST_LOG_SOURCES", Args: map[string]interface{}{"rev": strings.Repeat("r", maxLogRevLength+1)}},
 	} {
 		_, err := ValidateCommandRequest(req)
 		assert.Error(t, err, "%+v", req)
@@ -60,14 +74,12 @@ func TestValidateCommandRequest(t *testing.T) {
 
 // The allowlist is the contract's table, exactly.
 func TestDeviceCommandsAllowlist(t *testing.T) {
-	want := []string{"REBOOT_DEVICE", "RUN_GC", "ENABLE_SSH", "DISABLE_SSH", "LIST_CONTAINERS",
-		"LIST_GROUPS", "LIST_DAEMONS", "LIST_DRIVERS", "LIST_WAKELOCKS", "GET_XCONNECT_GRAPH"}
-	assert.Len(t, DeviceCommands, len(want))
-	for _, cmd := range want {
-		takesMessage, ok := DeviceCommands[cmd]
-		assert.True(t, ok, cmd)
-		assert.Equal(t, cmd == "REBOOT_DEVICE", takesMessage, cmd)
+	want := map[string]string{
+		"REBOOT_DEVICE": "message", "RUN_GC": "", "ENABLE_SSH": "", "DISABLE_SSH": "", "LIST_CONTAINERS": "",
+		"LIST_GROUPS": "", "LIST_DAEMONS": "", "LIST_DRIVERS": "", "LIST_WAKELOCKS": "", "GET_XCONNECT_GRAPH": "",
+		"LIST_LOG_SOURCES": "rev",
 	}
+	assert.Equal(t, want, DeviceCommands)
 }
 
 func TestEffectiveCommandStatus(t *testing.T) {
@@ -231,6 +243,14 @@ func TestPostCommand(t *testing.T) {
 		FindOne(context.Background(), bson.M{"_id": id}).Decode(&stored))
 	assert.Equal(t, testOwnerPrn, stored.Owner)
 	assert.Equal(t, "pending", stored.Status)
+
+	// The live logs source picker lists a revision's log files.
+	code, view, body = f.post(t, testOwnerPrn, f.connected, `{"cmd":"LIST_LOG_SOURCES","args":{"rev":"locals/hub-3"}}`)
+	require.Equal(t, http.StatusCreated, code, body)
+	assert.Equal(t, map[string]interface{}{"rev": "locals/hub-3"}, view.Args)
+	code, _, body = f.post(t, testOwnerPrn, f.connected, `{"cmd":"LIST_LOG_SOURCES","args":{"rev":"../x"}}`)
+	assert.Equal(t, http.StatusBadRequest, code, body)
+	assert.Contains(t, body, "args.rev must not contain ..", "the reason reaches the caller")
 
 	code, _, body = f.post(t, testOwnerPrn, f.connected, `{"cmd":"RUN_SHELL"}`)
 	assert.Equal(t, http.StatusBadRequest, code, body)

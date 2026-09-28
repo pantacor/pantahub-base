@@ -170,6 +170,14 @@ func (n *Notifier) Run(ctx context.Context) error {
 			pipeline:   notifierPipeline("insert"),
 			handle:     n.handleCommandInsert,
 		},
+		{
+			// Log sessions are live messages too: a start, renew or stop
+			// missed during an outage is not replayed, and the device
+			// stops on its own at the lease end.
+			collection: devices.LogSessionsCollection,
+			pipeline:   logSessionPipeline(),
+			handle:     n.handleLogSessionChange,
+		},
 	}
 
 	var wg sync.WaitGroup
@@ -295,6 +303,23 @@ func notifierPipeline(types ...string) mongo.Pipeline {
 		bson.D{{Key: "$match", Value: bson.M{
 			"operationType": bson.M{"$in": types},
 		}}},
+	}
+}
+
+// logSessionPipeline passes the log session changes logSessionAction can act
+// on, and nothing else: an insert (start), or an update that set live (stop)
+// or expires_at (renew). Every stored batch also updates its session (the
+// storage budget, devices.StoreLogBatch); matching those here would make each
+// batch cost every replica a full-document lookup that is then thrown away.
+func logSessionPipeline() mongo.Pipeline {
+	return mongo.Pipeline{
+		bson.D{{Key: "$match", Value: bson.M{"$or": bson.A{
+			bson.M{"operationType": "insert"},
+			bson.M{"operationType": "update", "$or": bson.A{
+				bson.M{"updateDescription.updatedFields.live": bson.M{"$exists": true}},
+				bson.M{"updateDescription.updatedFields.expires_at": bson.M{"$exists": true}},
+			}},
+		}}}},
 	}
 }
 
@@ -729,8 +754,8 @@ func commandExpiryInterval(expiresAt, now time.Time) uint32 {
 	return uint32(seconds)
 }
 
-// publishCommand sends a command live (QoS 1, never retained) with an MQTT
-// message expiry. Every replica publishes every command, and a replica where
+// publishCommand sends a command, or a log session message, live (QoS 1,
+// never retained) with an MQTT message expiry. Every replica publishes every command, and a replica where
 // the device has a disconnected persistent session queues it there; the
 // expiry makes the broker drop it from the queue once the command expires,
 // rather than replay it on a later reconnect, whatever the device's clock
@@ -788,6 +813,124 @@ func commandMessage(command *devices.DeviceCommand, now time.Time) (topic string
 	}
 
 	return Topic(command.DeviceID.Hex(), SuffixCommands), payload, true
+}
+
+// Log session actions, as logs/session carries them.
+const (
+	logActionStart = "start"
+	logActionRenew = "renew"
+	logActionStop  = "stop"
+)
+
+// logSessionNotice is the payload published on the logs/session topic. Every
+// action carries the whole session, so a device that missed the start of a
+// session it is asked to renew knows what it is about.
+type logSessionNotice struct {
+	ID        string   `json:"id"`
+	Action    string   `json:"action"`
+	Rev       string   `json:"rev"`
+	Sources   []string `json:"sources"`
+	Tail      int      `json:"tail"`
+	Follow    bool     `json:"follow"`
+	ExpiresAt string   `json:"expires_at"`
+	Deadline  string   `json:"deadline"`
+}
+
+// handleLogSessionChange tells a device about its log sessions: a start when
+// one is opened, a renew when its lease is extended, and a stop when the Hub
+// ended it (stopped, expired, deadline). Every replica does this on its own
+// broker, so the message reaches the device on whichever replica holds its
+// connection, and is a no-op on the others.
+func (n *Notifier) handleLogSessionChange(_ context.Context, event *changeEvent) {
+	if len(event.FullDocument) == 0 {
+		return
+	}
+	session := devices.LogSession{}
+	if err := bson.Unmarshal(event.FullDocument, &session); err != nil {
+		log.Println("mqtt: notifier could not decode log session: " + err.Error())
+		return
+	}
+
+	action, ok := logSessionAction(event, &session)
+	if !ok {
+		return
+	}
+	now := time.Now()
+	topic, payload, ok := logSessionMessage(&session, action, now)
+	if !ok {
+		return
+	}
+
+	// Past the lease the device stops on its own: a message queued for a
+	// disconnected session is worth nothing after it.
+	n.publishCommand(topic, payload, commandExpiryInterval(logSessionEnd(&session), now))
+}
+
+// logSessionAction is what a change of a session tells the device, if
+// anything. The full document is the session as it is now, which may be
+// later than the change: a renew whose session was stopped since is not
+// sent, the stop is.
+func logSessionAction(event *changeEvent, session *devices.LogSession) (string, bool) {
+	switch event.OperationType {
+	case "insert":
+		return logActionStart, session.Live
+	case "update":
+		if updatedField(event, "live") {
+			// Ended. The device knows of the ends it reported itself.
+			return logActionStop, !session.Live && session.EndedBy == devices.LogEndedByHub
+		}
+		if updatedField(event, "expires_at") {
+			return logActionRenew, session.Live
+		}
+	}
+	return "", false
+}
+
+// updatedField reports whether an update set field.
+func updatedField(event *changeEvent, field string) bool {
+	_, err := event.UpdateDescription.UpdatedFields.LookupErr(field)
+	return err == nil
+}
+
+// logSessionEnd is when a session stops at the latest: its lease end, never
+// past its deadline.
+func logSessionEnd(session *devices.LogSession) time.Time {
+	if session.Deadline.Before(session.ExpiresAt) {
+		return session.Deadline
+	}
+	return session.ExpiresAt
+}
+
+// logSessionMessage builds the topic and payload of a session action. ok is
+// false for a start or renew the device would drop anyway (a stream resumed
+// after an outage replays old changes), and for a session without a device.
+func logSessionMessage(session *devices.LogSession, action string, now time.Time) (topic string, payload []byte, ok bool) {
+	if session.ID.IsZero() || session.DeviceID.IsZero() {
+		return "", nil, false
+	}
+	if action != logActionStop && !now.Before(logSessionEnd(session)) {
+		return "", nil, false
+	}
+
+	sources := session.Sources
+	if sources == nil {
+		sources = []string{}
+	}
+	payload, err := json.Marshal(logSessionNotice{
+		ID:        session.ID.Hex(),
+		Action:    action,
+		Rev:       session.Rev,
+		Sources:   sources,
+		Tail:      session.Tail,
+		Follow:    session.Follow,
+		ExpiresAt: session.ExpiresAt.UTC().Format(time.RFC3339),
+		Deadline:  session.Deadline.UTC().Format(time.RFC3339),
+	})
+	if err != nil {
+		log.Println("mqtt: notifier could not encode log session " + session.ID.Hex() + ": " + err.Error())
+		return "", nil, false
+	}
+	return Topic(session.DeviceID.Hex(), SuffixLogSession), payload, true
 }
 
 // publish sends a retained notification. A nil or empty payload clears the

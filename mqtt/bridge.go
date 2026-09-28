@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"strconv"
 	"strings"
 	"sync"
@@ -78,6 +79,14 @@ const (
 	// maxFallbackOutputLength caps the output kept as text when the output a
 	// device reported cannot be stored as JSON.
 	maxFallbackOutputLength = 64 * 1024
+
+	// logStreamWriteTimeout bounds storing one live log batch, which runs on
+	// the publishing device's read loop.
+	logStreamWriteTimeout = 5 * time.Second
+
+	// maxLogStreamQoS is the highest QoS a live log batch may be published
+	// at: a lost batch is a gap in seq, not worth QoS 2's round trips.
+	maxLogStreamQoS = 1
 )
 
 // errNoPendingCommand is a command result that completes nothing: an unknown
@@ -186,9 +195,27 @@ func (h *bridgeHook) OnPublish(cl *mochi.Client, pk packets.Packet) (packets.Pac
 		log.Printf("mqtt: bridge: rejecting retained publish on %s", pk.TopicName)
 		return pk, packets.ErrRejectPacket
 	}
+	_, suffix, _ := Parse(pk.TopicName)
+	logStream := suffix == SuffixLogStream
+	if logStream && pk.FixedHeader.Qos > maxLogStreamQoS {
+		slog.Debug("mqtt: bridge: rejecting live log batch above QoS 1", "topic", pk.TopicName)
+		return pk, packets.ErrRejectPacket
+	}
 	if err := h.ingest(cl, pk.TopicName, pk.Payload, nil); err != nil {
 		log.Printf("mqtt: bridge: rejecting publish on %s: %v", pk.TopicName, err)
 		return pk, packets.ErrRejectPacket
+	}
+
+	// A live log batch is for the Hub alone: users read it through the REST
+	// API, which checks the logs scope and keeps the audit record. Once it
+	// has been stored (or dropped) above, the broker is told to ignore it:
+	// the device still gets its PUBACK, but the batch is neither retained
+	// nor delivered to any subscriber, so no wildcard filter can pick it up
+	// and a flooding device is not amplified to whoever watches it. mochi
+	// stops calling later hooks' OnPublish for an ignored packet; none of
+	// them handles this topic.
+	if logStream {
+		return pk, packets.CodeSuccessIgnore
 	}
 
 	return pk, nil
@@ -294,6 +321,15 @@ func (h *bridgeHook) ingest(cl *mochi.Client, topic string, payload []byte, only
 			return err
 		}
 
+	case SuffixLogStream:
+		// Stored here, on the device's read loop, rather than queued: the
+		// batches of a session are stored in the order the device sent
+		// them, so a reader asking for the batches after seq n never skips
+		// one that was still in a queue. A batch that cannot be stored is
+		// dropped, never refused: it shows as a gap in seq, and a refused
+		// QoS 1 publish would close an MQTT 3.1.1 connection.
+		h.ingestLogBatch(topic, deviceObjectID, payload)
+
 	case SuffixLogs:
 		entries, err := unmarshalLogEntries(payload)
 		if err != nil {
@@ -329,6 +365,80 @@ func (h *bridgeHook) ingest(cl *mochi.Client, topic string, payload []byte, only
 	return nil
 }
 
+// ingestLogBatch stores one live log batch of a device, dropping it quietly
+// (at debug level) when it is malformed or its session is not a live session
+// of that device: a device streaming after its session ended must not flood
+// the log.
+func (h *bridgeHook) ingestLogBatch(topic string, deviceObjectID primitive.ObjectID, payload []byte) {
+	batch, err := devices.DecodeLogBatch(payload)
+	if err != nil {
+		slog.Debug("mqtt: bridge: dropping live log batch", "topic", topic, "error", err)
+		logDrops.note(deviceObjectID.Hex(), err, time.Now())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), logStreamWriteTimeout)
+	defer cancel()
+	err = devices.StoreLogBatch(ctx, h.mongoClient, deviceObjectID, batch, time.Now().UTC())
+	if err != nil {
+		slog.Debug("mqtt: bridge: dropping live log batch", "topic", topic, "error", err)
+		logDrops.note(deviceObjectID.Hex(), err, time.Now())
+	}
+}
+
+// logDrops makes dropped live log batches visible: each one is logged at
+// debug level only, so a device with broken firmware, or one flooding
+// sessions it no longer has, would otherwise go unnoticed. At most one
+// warning per device per logDropWindow, with the count and the last reason.
+var logDrops = &dropCounter{window: logDropWindow, max: 1024}
+
+const logDropWindow = time.Minute
+
+type dropCounter struct {
+	mu     sync.Mutex
+	window time.Duration
+	max    int
+	seen   map[string]*dropWindow
+}
+
+type dropWindow struct {
+	start time.Time
+	n     int
+}
+
+// note counts one drop for device and reports whether a warning was logged:
+// the first drop of a window at once, then a summary of the drops since.
+func (d *dropCounter) note(device string, err error, now time.Time) bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.seen == nil {
+		d.seen = map[string]*dropWindow{}
+	}
+	w, ok := d.seen[device]
+	if !ok {
+		if len(d.seen) >= d.max {
+			// Bounded: forget windows that have gone quiet.
+			for k, v := range d.seen {
+				if now.Sub(v.start) >= d.window {
+					delete(d.seen, k)
+				}
+			}
+		}
+		w = &dropWindow{start: now}
+		d.seen[device] = w
+		log.Printf("mqtt: bridge: dropping live log batches from device %s (%v)", device, err)
+		return true
+	}
+	w.n++
+	if now.Sub(w.start) < d.window {
+		return false
+	}
+	log.Printf("mqtt: bridge: dropped %d live log batches from device %s in the last %s (last: %v)",
+		w.n, device, now.Sub(w.start).Round(time.Second), err)
+	delete(d.seen, device)
+	return true
+}
+
 // mayRetain reports whether a publish on topic may be retained by the broker.
 // The Hub's own publishes may. Of what a device reports, only its liveness
 // (SuffixStatus) is state a later subscriber should be handed; anything else
@@ -337,11 +447,13 @@ func (h *bridgeHook) ingest(cl *mochi.Client, topic string, payload []byte, only
 //
 // The claimed topic is never retained, not even by the Hub: the claim is news
 // for the one claim-wait session waiting for it, and a retained copy would be
-// replayed to whatever subscribed to it later. Only a claimed device's own
-// identity retains its status; a claim-wait session publishes nothing at all.
+// replayed to whatever subscribed to it later. Nor is a log session message: a
+// start replayed to a later subscriber would stream logs nobody asked for.
+// Only a claimed device's own identity retains its status; a claim-wait
+// session publishes nothing at all.
 func mayRetain(cl *mochi.Client, topic string) bool {
 	_, suffix, ok := Parse(topic)
-	if ok && suffix == SuffixClaimed {
+	if ok && (suffix == SuffixClaimed || suffix == SuffixLogSession) {
 		return false
 	}
 	if cl == nil {
@@ -355,10 +467,11 @@ func mayRetain(cl *mochi.Client, topic string) bool {
 }
 
 // onlyHubPublishes reports whether topic is one only the Hub itself may
-// publish on, whoever the ACL let through: the claimed topic.
+// publish on, whoever the ACL let through: the claimed topic and the log
+// session topic.
 func onlyHubPublishes(cl *mochi.Client, topic string) bool {
 	_, suffix, ok := Parse(topic)
-	return ok && suffix == SuffixClaimed && (cl == nil || !cl.Net.Inline)
+	return ok && (suffix == SuffixClaimed || suffix == SuffixLogSession) && (cl == nil || !cl.Net.Inline)
 }
 
 // sessionOwnsDevice reports whether the session that published owns the device

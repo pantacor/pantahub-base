@@ -383,9 +383,12 @@ func userSessionsEndOnDisconnect(cl *mochi.Client) {
 // ownershipCacheTTL for a user identity, because the resolved identity and the
 // ownership answers are kept on the client.
 //
-// Topics outside the versioned device namespace are denied, and so are wildcard
-// filters: Parse leaves the wildcard in the device id or the suffix, neither of
-// which can match a scope or a permitted suffix.
+// Topics outside the versioned device namespace are denied. Parse leaves a
+// wildcard in the device id or the suffix: in the device id it matches no
+// scope and no owned device, so it is refused for everyone; in the suffix it
+// matches none of a device's permitted suffixes (an allowlist), while a user
+// may hold it over a device it owns (see the kindUser branch for why that
+// never delivers a denied topic).
 func (h *authHook) OnACLCheck(cl *mochi.Client, topic string, write bool) bool {
 	deviceID, suffix, ok := Parse(topic)
 	if !ok {
@@ -421,7 +424,19 @@ func (h *authHook) OnACLCheck(cl *mochi.Client, topic string, write bool) bool {
 		}
 		// The claimed topic is the device's own business: it only ever
 		// carries the claim to the claim-wait session of an unclaimed device.
-		if suffix == SuffixClaimed {
+		// The live log topics are only reached through the REST API.
+		//
+		// A wildcard filter (".../<id>/#", ".../+/session") passes this
+		// check at SUBSCRIBE, and that is deliberate: it is how a client
+		// watches everything a user may read of a device. It never delivers
+		// one of the denied topics, because mochi runs OnACLCheck again for
+		// every delivery (server.publishToClient) with the concrete topic,
+		// which lands here with the literal suffix and is refused. Live log
+		// batches are, on top of that, never fanned out at all (bridgeHook
+		// ignores them once stored). TestUserWildcardsNeverDeliverLiveLogs
+		// pins both, so a broker upgrade that drops the per-delivery check
+		// fails the tests.
+		if !UserMaySubscribe(suffix) {
 			return false
 		}
 		if !utils.MatchScope(mqttReadDeviceScopes, clientScopes(cl)) {

@@ -107,6 +107,9 @@ func (a *App) handleDeleteDevice(c *echo.Context) error {
 		if err := a.DeleteDeviceCommands(ctx, deviceObjectID); err != nil {
 			log.Printf("Error deleting the commands of device %s: %v", delID, err)
 		}
+		if err := a.DeleteDeviceLogSessions(ctx, deviceObjectID); err != nil {
+			log.Printf("Error deleting the log sessions of device %s: %v", delID, err)
+		}
 	}
 
 	device.Secret = ""

@@ -67,9 +67,13 @@ const (
 	// reports it as timed out.
 	CommandTimeout = 120 * time.Second
 
-	// CommandArgMessage is the only argument any command takes: the optional
-	// REBOOT_DEVICE message handed to pv-ctrl.
+	// CommandArgMessage is the optional REBOOT_DEVICE message handed to
+	// pv-ctrl.
 	CommandArgMessage = "message"
+
+	// CommandArgRev is the optional LIST_LOG_SOURCES revision ("current" by
+	// default), validated like the revision of a log session.
+	CommandArgRev = "rev"
 
 	// maxCommandMessageLength keeps the reboot message a message. A command
 	// travels in a single MQTT packet and the broker caps packet size, so an
@@ -91,19 +95,24 @@ const (
 
 // DeviceCommands is the allowlist of commands a device may be asked to run,
 // and the only one: the API refuses anything else, and the device agent
-// refuses it again. The value reports whether the command takes the optional
-// "message" argument; every other argument is dropped.
-var DeviceCommands = map[string]bool{
-	"REBOOT_DEVICE":      true,
-	"RUN_GC":             false,
-	"ENABLE_SSH":         false,
-	"DISABLE_SSH":        false,
-	"LIST_CONTAINERS":    false,
-	"LIST_GROUPS":        false,
-	"LIST_DAEMONS":       false,
-	"LIST_DRIVERS":       false,
-	"LIST_WAKELOCKS":     false,
-	"GET_XCONNECT_GRAPH": false,
+// refuses it again. The value names the one optional string argument the
+// command takes, if any; every other argument is dropped.
+//
+// LIST_LOG_SOURCES is answered by the device agent itself rather than
+// pv-ctrl: it lists the log files of a revision for a live log session
+// (docs/logs.md in pv-mqttsdk).
+var DeviceCommands = map[string]string{
+	"REBOOT_DEVICE":      CommandArgMessage,
+	"RUN_GC":             "",
+	"ENABLE_SSH":         "",
+	"DISABLE_SSH":        "",
+	"LIST_CONTAINERS":    "",
+	"LIST_GROUPS":        "",
+	"LIST_DAEMONS":       "",
+	"LIST_DRIVERS":       "",
+	"LIST_WAKELOCKS":     "",
+	"GET_XCONNECT_GRAPH": "",
+	"LIST_LOG_SOURCES":   CommandArgRev,
 }
 
 // Device-meta keys recording the device's MQTT connection. The broker writes
@@ -283,31 +292,42 @@ func EffectiveCommandStatus(status string, createdAt, now time.Time) string {
 }
 
 // ValidateCommandRequest checks a command against the allowlist and returns
-// the arguments to store: the optional string message for commands that take
-// one, nothing for the rest. Unknown arguments are dropped, not refused.
+// the arguments to store: the optional string argument of commands that take
+// one (the REBOOT_DEVICE message, the LIST_LOG_SOURCES revision), nothing for
+// the rest. Unknown arguments are dropped, not refused.
 func ValidateCommandRequest(req DeviceCommandRequest) (map[string]interface{}, error) {
-	takesMessage, ok := DeviceCommands[req.Cmd]
+	argName, ok := DeviceCommands[req.Cmd]
 	if !ok {
 		return nil, errors.New("unknown command: " + req.Cmd)
 	}
 
 	args := map[string]interface{}{}
-	if !takesMessage {
+	if argName == "" {
 		return args, nil
 	}
 
-	raw, present := req.Args[CommandArgMessage]
+	raw, present := req.Args[argName]
 	if !present || raw == nil {
 		return args, nil
 	}
-	message, isString := raw.(string)
+	value, isString := raw.(string)
 	if !isString {
-		return nil, errors.New("args.message must be a string")
+		return nil, errors.New("args." + argName + " must be a string")
 	}
-	if len(message) > maxCommandMessageLength {
-		return nil, errors.New("args.message is longer than " + strconv.Itoa(maxCommandMessageLength) + " bytes")
+	switch argName {
+	case CommandArgMessage:
+		if len(value) > maxCommandMessageLength {
+			return nil, errors.New("args.message is longer than " + strconv.Itoa(maxCommandMessageLength) + " bytes")
+		}
+	case CommandArgRev:
+		if value == "" {
+			return args, nil
+		}
+		if err := ValidateLogRev(value); err != nil {
+			return nil, errors.New("args." + err.Error())
+		}
 	}
-	args[CommandArgMessage] = message
+	args[argName] = value
 
 	return args, nil
 }
@@ -457,49 +477,71 @@ var errCommandRateLimited = errors.New("too many commands for this device, try a
 // slot: the one that finds the limit reached matches nothing, and its upsert
 // then collides with the device's existing document (a duplicate key).
 func (a *App) reserveCommandSlot(ctx context.Context, deviceID primitive.ObjectID, cmd string, now time.Time) error {
-	windowStart := now.Add(-commandRateWindow)
-
-	conditions := bson.A{
-		// Fewer than commandRateLimit commands ever, or the oldest of the
-		// last commandRateLimit is out of the window.
-		bson.M{"$or": bson.A{
-			bson.M{"sent." + strconv.Itoa(commandRateLimit-1): bson.M{"$exists": false}},
-			bson.M{"sent.0": bson.M{"$lt": windowStart}},
-		}},
-	}
-	set := bson.M{"updated_at": now}
+	var extra bson.A
+	set := bson.M{}
 	if cmd == rebootCommand {
-		conditions = append(conditions, bson.M{"$or": bson.A{
+		windowStart := now.Add(-commandRateWindow)
+		extra = bson.A{bson.M{"$or": bson.A{
 			bson.M{"reboot_at": bson.M{"$exists": false}},
 			bson.M{"reboot_at": bson.M{"$lt": windowStart}},
-		}})
+		}}}
 		set["reboot_at"] = now
 	}
+	limits := a.mongoClient.Database(utils.MongoDb).Collection(CommandLimitsCollection)
+	ok, err := reserveWindowSlot(ctx, limits, deviceID, commandRateLimit, commandRateWindow, now, extra, set)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return errCommandRateLimited
+	}
+	return nil
+}
 
-	filter := bson.M{"_id": deviceID, "$and": conditions}
+// reserveWindowSlot takes one of limit slots over a sliding window in the
+// document id of coll ({_id, sent: [<times of the last limit takes>],
+// updated_at}), and reports false when all are taken. Checking and taking
+// is a single conditional upsert, so concurrent requests, on any replica,
+// cannot both take the last slot: the one that finds the limit reached
+// matches nothing, and its upsert then collides with the existing document
+// (a duplicate key). extra adds conditions and set fields for the same
+// update (the reboot limit).
+func reserveWindowSlot(ctx context.Context, coll *mongo.Collection, id interface{}, limit int,
+	window time.Duration, now time.Time, extra bson.A, set bson.M) (bool, error) {
+	conditions := append(bson.A{
+		// Fewer than limit takes ever, or the oldest of the last limit is
+		// out of the window.
+		bson.M{"$or": bson.A{
+			bson.M{"sent." + strconv.Itoa(limit-1): bson.M{"$exists": false}},
+			bson.M{"sent.0": bson.M{"$lt": now.Add(-window)}},
+		}},
+	}, extra...)
+	fields := bson.M{"updated_at": now}
+	for k, v := range set {
+		fields[k] = v
+	}
+	filter := bson.M{"_id": id, "$and": conditions}
 	update := bson.M{
-		"$set": set,
+		"$set": fields,
 		"$push": bson.M{"sent": bson.M{
 			"$each":  bson.A{now},
 			"$sort":  1,
-			"$slice": -commandRateLimit,
+			"$slice": -limit,
 		}},
 	}
-
-	limits := a.mongoClient.Database(utils.MongoDb).Collection(CommandLimitsCollection)
-	// A duplicate key on the first attempt may also be two first commands to
-	// the same device racing to create its document; the second attempt
-	// finds the document and answers for real.
+	// A duplicate key on the first attempt may also be two first takes for
+	// the same id racing to create its document; the second attempt finds
+	// the document and answers for real.
 	for attempt := 0; attempt < 2; attempt++ {
-		_, err := limits.UpdateOne(ctx, filter, update, options.Update().SetUpsert(true))
+		_, err := coll.UpdateOne(ctx, filter, update, options.Update().SetUpsert(true))
 		if err == nil {
-			return nil
+			return true, nil
 		}
 		if !mongo.IsDuplicateKeyError(err) {
-			return err
+			return false, err
 		}
 	}
-	return errCommandRateLimited
+	return false, nil
 }
 
 // userError answers with a message meant for the caller: why a command was
@@ -588,8 +630,9 @@ func (a *App) mqttConnected(ctx context.Context, deviceMeta map[string]interface
 // @Summary Send a command to a device connected over MQTT
 // @Description Queues one of the allowlisted commands (REBOOT_DEVICE, RUN_GC,
 // @Description ENABLE_SSH, DISABLE_SSH, LIST_CONTAINERS, LIST_GROUPS, LIST_DAEMONS,
-// @Description LIST_DRIVERS, LIST_WAKELOCKS, GET_XCONNECT_GRAPH) for delivery over MQTT.
-// @Description REBOOT_DEVICE accepts an optional string args.message; other arguments are ignored.
+// @Description LIST_DRIVERS, LIST_WAKELOCKS, GET_XCONNECT_GRAPH, LIST_LOG_SOURCES) for delivery over MQTT.
+// @Description REBOOT_DEVICE accepts an optional string args.message, LIST_LOG_SOURCES an optional
+// @Description args.rev (default "current"); other arguments are ignored.
 // @Description Only the device owner may send commands, and only while the device is connected over MQTT.
 // @Description Requires the full API scope or devices.commands. At most 10 commands per device per minute, and 1 REBOOT_DEVICE.
 // @Accept  json
