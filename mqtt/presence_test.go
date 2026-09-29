@@ -371,3 +371,69 @@ func TestBrokerHeartbeat(t *testing.T) {
 		t.Error("heartbeat left behind by a retired broker")
 	}
 }
+
+// setConnected overwrites the stored flag, as a lost or raced write would
+// leave it.
+func setConnected(t *testing.T, client *mongo.Client, id primitive.ObjectID, connected bool) {
+	t.Helper()
+	_, err := client.Database(utils.MongoDb).Collection(devicesCollection).UpdateOne(context.Background(),
+		bson.M{"_id": id}, bson.M{"$set": bson.M{presenceKey(devices.DeviceMetaMqttConnected): connected}})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A live connection subscribed to commands that device-meta shows
+// disconnected (seen on production right after an agent restart) is
+// corrected by its replica's next heartbeat; nothing else is.
+func TestPresenceReassertHealsLostConnect(t *testing.T) {
+	client := newTestMongo(t)
+	a := newTestBrokerReplica(t, client, "A")
+	b := newTestBrokerReplica(t, client, "B")
+	ctx := context.Background()
+
+	device := insertTestDevice(t, client)
+	conn := a.dialDevice(t, device.Hex(), true)
+	setConnected(t, client, device, false)
+	if n := a.presence.reassert(ctx); n != 1 {
+		t.Fatalf("%d re-asserted", n)
+	}
+	if meta := loadDeviceMeta(t, client, device); meta[devices.DeviceMetaMqttConnected] != true {
+		t.Fatalf("not healed: %v", meta)
+	}
+	if n := a.presence.reassert(ctx); n != 0 {
+		t.Fatalf("%d re-asserted when already connected", n)
+	}
+
+	// Not subscribed to commands yet: a command would be lost, so no.
+	quiet := insertTestDevice(t, client)
+	defer a.dialDevice(t, quiet.Hex(), false).Close()
+	if n := a.presence.reassert(ctx); n != 0 {
+		t.Fatalf("%d re-asserted for a connection without commands", n)
+	}
+
+	// A newer connection on B is the current one: A's old socket, still
+	// open there, must not take the device back.
+	defer b.dialDevice(t, device.Hex(), true).Close()
+	setConnected(t, client, device, false)
+	a.presence.reassert(ctx)
+	if meta := loadDeviceMeta(t, client, device); meta[devices.DeviceMetaMqttConnected] != false || meta[devices.DeviceMetaMqttBroker] != "B" {
+		t.Fatalf("an older connection took the device over: %v", meta)
+	}
+	b.presence.reassert(ctx)
+	if meta := loadDeviceMeta(t, client, device); meta[devices.DeviceMetaMqttConnected] != true {
+		t.Fatalf("the current connection was not healed: %v", meta)
+	}
+
+	// An ended connection is never re-asserted.
+	other := insertTestDevice(t, client)
+	gone := a.dialDevice(t, other.Hex(), true)
+	gone.Close()
+	a.waitDisconnect(t)
+	a.runQueued(t)
+	a.presence.reassert(ctx)
+	if meta := loadDeviceMeta(t, client, other); meta[devices.DeviceMetaMqttConnected] != false {
+		t.Fatalf("an ended connection was re-asserted: %v", meta)
+	}
+	conn.Close()
+}

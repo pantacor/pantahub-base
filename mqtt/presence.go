@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -54,7 +55,14 @@ import (
 //     so they land in the order the connection went through them;
 //   - each replica refreshes a heartbeat, and the flag is only believed while
 //     the heartbeat of the replica that wrote it is fresh: a replica that is
-//     killed never runs its disconnects.
+//     killed never runs its disconnects;
+//   - with each heartbeat a replica also re-asserts the flag for its own live
+//     connections that hold the commands subscription and are still the
+//     device's current connection, so a write that was lost (a database
+//     error, a takeover race) cannot leave a connected device shown offline
+//     for longer than a heartbeat. A connection's re-asserts and its
+//     disconnect are serialised (connPresence), so a re-assert never lands
+//     after the disconnect.
 
 const (
 	// presenceTimeout bounds the connection-state writes. They run on the
@@ -86,6 +94,17 @@ type presenceHook struct {
 	mongoClient *mongo.Client
 	server      *mochi.Server
 	brokerID    string
+
+	// live holds a *connPresence per established device connection of this
+	// replica, for the heartbeat's re-asserts.
+	live sync.Map
+}
+
+// connPresence serialises the presence writes of one connection that run
+// off its goroutine (the heartbeat's re-asserts) with its disconnect.
+type connPresence struct {
+	mu     sync.Mutex
+	closed bool
 }
 
 // ID identifies the hook in broker logs.
@@ -145,6 +164,7 @@ func (h *presenceHook) OnSessionEstablished(cl *mochi.Client, pk packets.Packet)
 	if subscribed {
 		setClientProp(cl, propConnected, "1")
 	}
+	h.live.Store(cl, &connPresence{})
 }
 
 // OnSubscribed marks the device connected once its commands subscription is
@@ -174,13 +194,74 @@ func (h *presenceHook) OnSubscribed(cl *mochi.Client, pk packets.Packet, reasonC
 // after every other write of the same connection.
 func (h *presenceHook) OnDisconnect(cl *mochi.Client, err error, expire bool) {
 	kind, deviceID := identity(cl)
-	if kind != kindDevice || clientProp(cl, propConnected) == "" {
+	if kind != kindDevice {
+		return
+	}
+	// No re-assert of this connection may follow: wait for one in flight.
+	if v, ok := h.live.LoadAndDelete(cl); ok {
+		p := v.(*connPresence)
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		p.closed = true
+	}
+	if clientProp(cl, propConnected) == "" {
 		return
 	}
 
 	if err := h.writeConnected(deviceID, clientProp(cl, propConnection), false); err != nil {
 		log.Printf("mqtt: presence: cannot record disconnect of %s: %v", deviceID, err)
 	}
+}
+
+// reassert marks connected every live device connection of this replica
+// that holds the commands subscription and is still its device's current
+// connection, where the flag says otherwise. It heals a connected write that
+// was lost; it never takes the device over from a newer connection, and a
+// connection that has ended is not re-asserted (see connPresence).
+func (h *presenceHook) reassert(ctx context.Context) (healed int) {
+	if h.mongoClient == nil {
+		return 0
+	}
+	h.live.Range(func(k, v any) bool {
+		if ctx.Err() != nil {
+			return false
+		}
+		cl, p := k.(*mochi.Client), v.(*connPresence)
+		kind, deviceID := identity(cl)
+		connection := clientProp(cl, propConnection)
+		if kind != kindDevice || connection == "" || clientProp(cl, propConnected) == "" {
+			return true
+		}
+		id, err := primitive.ObjectIDFromHex(deviceID)
+		if err != nil {
+			return true
+		}
+
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		if p.closed {
+			return true
+		}
+		wctx, cancel := context.WithTimeout(ctx, presenceTimeout)
+		defer cancel()
+		result, err := h.mongoClient.Database(utils.MongoDb).Collection(devicesCollection).UpdateOne(wctx,
+			bson.M{
+				"_id": id,
+				presenceKey(devices.DeviceMetaMqttConnection): connection,
+				presenceKey(devices.DeviceMetaMqttConnected):  bson.M{"$ne": true},
+			},
+			presenceUpdate(bson.M{presenceKey(devices.DeviceMetaMqttConnected): true}),
+		)
+		switch {
+		case err != nil:
+			log.Printf("mqtt: presence: cannot re-assert connection of %s: %v", deviceID, err)
+		case result.ModifiedCount > 0:
+			log.Printf("mqtt: presence: %s was recorded disconnected on its live connection %s, corrected", deviceID, connection)
+			healed++
+		}
+		return true
+	})
+	return healed
 }
 
 // writeEstablished makes connection the device's current one, on this broker.
@@ -272,6 +353,7 @@ func (h *presenceHook) runHeartbeat(ctx context.Context) {
 		if err := h.beat(ctx); err != nil && ctx.Err() == nil {
 			log.Printf("mqtt: presence: heartbeat failed: %v", err)
 		}
+		h.reassert(ctx)
 		select {
 		case <-ctx.Done():
 			return
