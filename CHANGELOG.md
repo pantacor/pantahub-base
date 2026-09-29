@@ -1,8 +1,22 @@
 
+<a name="062"></a>
+## [062](https://gitlab.com/pantacor/pantahub-base/compare/061...062)
+
+> 2026-09-29
+
+### Fix
+
+* enforce log read scopes and MQTT token lifetime
+
+
 <a name="061"></a>
 ## [061](https://gitlab.com/pantacor/pantahub-base/compare/060...061)
 
 > 2026-09-29
+
+### Chore
+
+* update CHANGELOG.md for release 061
 
 ### Feat
 
