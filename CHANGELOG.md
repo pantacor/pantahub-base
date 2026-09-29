@@ -1,8 +1,23 @@
 
+<a name="061"></a>
+## [061](https://gitlab.com/pantacor/pantahub-base/compare/060...061)
+
+> 2026-09-29
+
+### Feat
+
+* **devices:** filter live log sessions on the device
+* **devices:** web SSH sessions relayed over MQTT
+
+
 <a name="060"></a>
 ## [060](https://gitlab.com/pantacor/pantahub-base/compare/059...060)
 
 > 2026-09-28
+
+### Chore
+
+* update CHANGELOG.md for release 060
 
 ### Feat
 
@@ -924,19 +939,19 @@
 
 
 <a name="010-rc1"></a>
-## [010-rc1](https://gitlab.com/pantacor/pantahub-base/compare/009-rc1...010-rc1)
+## [010-rc1](https://gitlab.com/pantacor/pantahub-base/compare/009...010-rc1)
 
 > 2020-01-14
 
 
-<a name="009-rc1"></a>
-## [009-rc1](https://gitlab.com/pantacor/pantahub-base/compare/009...009-rc1)
+<a name="009"></a>
+## [009](https://gitlab.com/pantacor/pantahub-base/compare/009-rc1...009)
 
 > 2019-08-15
 
 
-<a name="009"></a>
-## [009](https://gitlab.com/pantacor/pantahub-base/compare/007...009)
+<a name="009-rc1"></a>
+## [009-rc1](https://gitlab.com/pantacor/pantahub-base/compare/007...009-rc1)
 
 > 2019-08-15
 
