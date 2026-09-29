@@ -52,6 +52,16 @@ type App struct {
 	backend     Backend
 }
 
+// Reading stored logs exposes the same device output as a live log session.
+// A dedicated devices.logs token may read them too.
+var readLogsScopes = []utils.Scope{
+	utils.Scopes.API,
+	utils.Scopes.APIReadOnly,
+	utils.Scopes.Devices,
+	utils.Scopes.ReadDevices,
+	utils.Scopes.DeviceLogs,
+}
+
 // Filters uses a prototype Entry instance to filter
 // the values. It honours the string fields: Device, Owner,
 // Source, Level and Text, where a non-empty field will
@@ -388,8 +398,8 @@ func (app *App) Mount(s *echoutil.Server) {
 		echoutil.Auth(),
 	)
 
-	g.GET("/", app.handleGetLogs)
-	g.GET("/cursor", app.handleGetLogsCursor)
-	g.POST("/cursor", app.handleGetLogsCursor)
+	g.GET("/", echoutil.ScopeFilter(readLogsScopes, app.handleGetLogs))
+	g.GET("/cursor", echoutil.ScopeFilter(readLogsScopes, app.handleGetLogsCursor))
+	g.POST("/cursor", echoutil.ScopeFilter(readLogsScopes, app.handleGetLogsCursor))
 	g.POST("/", app.handlePostLogs)
 }

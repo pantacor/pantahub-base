@@ -53,6 +53,9 @@ const (
 	// token, so the ACL hook can hold a scope-narrowed token to the same
 	// device privileges the REST plane would.
 	propScopes = "ph-identity-scopes"
+	// propExpiresAt is the expiry of the JWT that opened this connection.
+	// Device-secret connections have no token expiry.
+	propExpiresAt = "ph-identity-expires-at"
 
 	// propOwnsPrefix + <device-id> caches the per-connection outcome of an
 	// ownership lookup, "1" for owned and "0" for definitely not owned.
@@ -144,6 +147,11 @@ type authHook struct {
 	// claims admits and tracks the claim-wait sessions of unclaimed devices.
 	// Nil refuses unclaimed devices, as before claim-wait sessions existed.
 	claims *claimHook
+
+	// One timer per JWT connection. OnDisconnect stops it so an old connection
+	// does not stay in memory until the token's original expiry.
+	mu     sync.Mutex
+	timers map[*mochi.Client]*time.Timer
 }
 
 // ID identifies the hook to the broker.
@@ -151,10 +159,10 @@ func (h *authHook) ID() string {
 	return "pantahub-auth"
 }
 
-// Provides advertises only the two events this hook implements.
+// Provides advertises the authentication, ACL and connection lifecycle events.
 func (h *authHook) Provides(b byte) bool {
 	switch b {
-	case mochi.OnConnectAuthenticate, mochi.OnACLCheck:
+	case mochi.OnConnectAuthenticate, mochi.OnACLCheck, mochi.OnSessionEstablished, mochi.OnDisconnect:
 		return true
 	}
 	return false
@@ -207,7 +215,7 @@ func (h *authHook) OnConnectAuthenticate(cl *mochi.Client, pk packets.Packet) bo
 	}
 
 	if claims, ok := parseToken(password); ok {
-		if !authenticateWithToken(cl, device, claims) {
+		if !authenticateWithExpiringToken(cl, device, claims) {
 			return false
 		}
 	} else {
@@ -221,6 +229,13 @@ func (h *authHook) OnConnectAuthenticate(cl *mochi.Client, pk packets.Packet) bo
 	}
 
 	if kind, _ := identity(cl); kind == kindClaimWait && !h.admitClaimWait(cl, pk) {
+		return false
+	}
+	// mochi uses the CONNECT packet's Clean flag when inheriting a session.
+	// For a user, an inherited QoS 1 message is replayed without a new ACL
+	// check, even if this connection has a narrower token. A user session is
+	// ephemeral, so it must start clean as well as end on disconnect.
+	if !userSessionStartsClean(cl, pk) {
 		return false
 	}
 
@@ -260,6 +275,54 @@ func (h *authHook) OnConnectAuthenticate(cl *mochi.Client, pk packets.Packet) bo
 	}
 
 	return true
+}
+
+// OnSessionEstablished starts the expiry clock only after the broker has
+// accepted the connection. Passing the client pointer, rather than its ID,
+// ensures an old timer can never close a newer connection with the same ID.
+func (h *authHook) OnSessionEstablished(cl *mochi.Client, _ packets.Packet) {
+	expiresAt, ok := tokenExpiry(cl)
+	if !ok || h.server == nil {
+		return
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.timers == nil {
+		h.timers = make(map[*mochi.Client]*time.Timer)
+	}
+	h.timers[cl] = time.AfterFunc(time.Until(expiresAt), func() {
+		if cl.StopTime() != 0 {
+			return
+		}
+		_ = h.server.DisconnectClient(cl, packets.ErrNotAuthorized)
+	})
+}
+
+// userSessionStartsClean prevents mochi from inheriting queued messages and
+// subscriptions from a previous connection carrying broader user scopes.
+func userSessionStartsClean(cl *mochi.Client, pk packets.Packet) bool {
+	kind, _ := identity(cl)
+	return kind != kindUser || pk.Connect.Clean
+}
+
+// OnDisconnect releases the expiry timer when a JWT connection closes early.
+func (h *authHook) OnDisconnect(cl *mochi.Client, _ error, _ bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if timer := h.timers[cl]; timer != nil {
+		timer.Stop()
+		delete(h.timers, cl)
+	}
+}
+
+func (h *authHook) Stop() error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for cl, timer := range h.timers {
+		timer.Stop()
+		delete(h.timers, cl)
+	}
+	return nil
 }
 
 // mayClaimSession reports whether the authenticated identity may open an MQTT
@@ -395,6 +458,9 @@ func userSessionsEndOnDisconnect(cl *mochi.Client) {
 // may hold it over a device it owns (see the kindUser branch for why that
 // never delivers a denied topic).
 func (h *authHook) OnACLCheck(cl *mochi.Client, topic string, write bool) bool {
+	if expiresAt, ok := tokenExpiry(cl); ok && !time.Now().Before(expiresAt) {
+		return false
+	}
 	deviceID, suffix, ok := Parse(topic)
 	if !ok {
 		return false
@@ -499,6 +565,18 @@ func authenticateWithToken(cl *mochi.Client, device *devices.Device, claims jwtg
 	return false
 }
 
+// authenticateWithExpiringToken also records the expiry that the broker must
+// enforce for the lifetime of the connection. REST-issued tokens have one;
+// refusing a token without it avoids an MQTT session with perpetual access.
+func authenticateWithExpiringToken(cl *mochi.Client, device *devices.Device, claims jwtgo.MapClaims) bool {
+	expiresAt, err := claims.GetExpirationTime()
+	if err != nil || expiresAt == nil || !authenticateWithToken(cl, device, claims) {
+		return false
+	}
+	setTokenExpiry(cl, expiresAt.Time)
+	return true
+}
+
 // parseToken verifies a bearer token against the REST API's public key and
 // signing algorithm, exactly as the JWT middleware's parseToken does for an
 // Authorization header. Expiry is enforced by the claim validation jwtgo runs
@@ -600,8 +678,7 @@ func (h *authHook) lookupDevice(ctx context.Context, id string) (*devices.Device
 // The identity and the ownership answers live in the client's MQTT v5 user
 // properties. mochi copies them per connection in Client.ParseConnect and never
 // reads or transmits them itself, so they are private per-connection storage
-// that is released with the client — unlike a hook-side map, which would need a
-// disconnect event this hook deliberately does not subscribe to. Access is
+// that is released with the client. Access is
 // serialized with the client's own mutex because OnACLCheck runs concurrently:
 // a subscriber's ACL check is performed on the publisher's goroutine.
 
@@ -621,6 +698,28 @@ func setIdentity(cl *mochi.Client, kind, subject, scopes string) {
 		props = append(props, packets.UserProperty{Key: propScopes, Val: scopes})
 	}
 	cl.Properties.Props.User = props
+}
+
+func setTokenExpiry(cl *mochi.Client, expiresAt time.Time) {
+	cl.Lock()
+	defer cl.Unlock()
+	cl.Properties.Props.User = append(cl.Properties.Props.User,
+		packets.UserProperty{Key: propExpiresAt, Val: strconv.FormatInt(expiresAt.Unix(), 10)})
+}
+
+func tokenExpiry(cl *mochi.Client) (time.Time, bool) {
+	cl.RLock()
+	defer cl.RUnlock()
+	for _, prop := range cl.Properties.Props.User {
+		if prop.Key == propExpiresAt {
+			seconds, err := strconv.ParseInt(prop.Val, 10, 64)
+			if err != nil {
+				return time.Time{}, false
+			}
+			return time.Unix(seconds, 0), true
+		}
+	}
+	return time.Time{}, false
 }
 
 // identity returns the kind and subject recorded at CONNECT. An unauthenticated
