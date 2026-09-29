@@ -29,6 +29,7 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/fatih/structs"
@@ -169,6 +170,40 @@ type AccessLogFluentRecord struct {
 	UserAgent      string
 }
 
+// credentialHeaders are request headers an access log never records: they
+// carry credentials.
+var credentialHeaders = map[string]struct{}{
+	"Authorization":       {},
+	"Proxy-Authorization": {},
+	"Cookie":              {},
+}
+
+// webSocketCredentialPrefixes mark the WebSocket subprotocols that carry a
+// credential: a session ticket (echoutil.WebSocketTicketPrefix) or a bearer
+// token (echoutil.WebSocketBearerPrefix, refused but still offered by old
+// clients); echoutil cannot be imported here.
+var webSocketCredentialPrefixes = []string{"ticket.", "bearer."}
+
+// redactWebSocketProtocols replaces every offered "ticket.<ticket>" or
+// "bearer.<token>" subprotocol with "<prefix>[redacted]", keeping the other
+// offers. echoutil.WebSocketTicket already removes them from the request;
+// this is the net for any route it does not cover.
+func redactWebSocketProtocols(values []string) []string {
+	out := make([]string, 0, len(values))
+	for _, header := range values {
+		offers := strings.Split(header, ",")
+		for i, offer := range offers {
+			for _, prefix := range webSocketCredentialPrefixes {
+				if strings.HasPrefix(strings.ToLower(strings.TrimSpace(offer)), prefix) {
+					offers[i] = " " + prefix + "[redacted]"
+				}
+			}
+		}
+		out = append(out, strings.TrimSpace(strings.Join(offers, ",")))
+	}
+	return out
+}
+
 // BuildAccessLogFluentRecord builds a record from r.Env-style values. r must carry
 // the prefix-stripped URL the service saw.
 func BuildAccessLogFluentRecord(mw *AccessLogFluentMiddleware, r *http.Request, env map[string]interface{}, responseSize uint64, requestBody, responseBody []byte) *AccessLogFluentRecord {
@@ -203,8 +238,11 @@ func BuildAccessLogFluentRecord(mw *AccessLogFluentMiddleware, r *http.Request, 
 	// help by using interface{} value type instead
 	reqMap := map[string]interface{}{}
 	for k, v := range r.Header {
-		if k == "Authorization" {
+		if _, secret := credentialHeaders[http.CanonicalHeaderKey(k)]; secret {
 			continue
+		}
+		if http.CanonicalHeaderKey(k) == "Sec-Websocket-Protocol" {
+			v = redactWebSocketProtocols(v)
 		}
 		reqMap[k] = v
 	}

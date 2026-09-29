@@ -178,6 +178,19 @@ func (n *Notifier) Run(ctx context.Context) error {
 			pipeline:   logSessionPipeline(),
 			handle:     n.handleLogSessionChange,
 		},
+		{
+			// SSH sessions, likewise live messages.
+			collection: devices.SSHSessionsCollection,
+			pipeline:   sshSessionPipeline(),
+			handle:     n.handleSSHSessionChange,
+		},
+		{
+			// The browser's SSH bytes: every replica sees every up frame,
+			// and the one holding the device's connection publishes it.
+			collection: devices.SSHFramesCollection,
+			pipeline:   sshUpFramePipeline(),
+			handle:     n.handleSSHUpFrame,
+		},
 	}
 
 	var wg sync.WaitGroup
@@ -320,6 +333,26 @@ func logSessionPipeline() mongo.Pipeline {
 				bson.M{"updateDescription.updatedFields.expires_at": bson.M{"$exists": true}},
 			}},
 		}}}},
+	}
+}
+
+// sshSessionPipeline passes the SSH session changes sshSessionAction acts on:
+// an insert (start), or an update that set live (stop) or expires_at (renew).
+// Every frame also updates its session (the byte counts, the rate window, the
+// last activity); matching those here would make each frame cost every
+// replica a full-document lookup that is then thrown away.
+func sshSessionPipeline() mongo.Pipeline {
+	return logSessionPipeline()
+}
+
+// sshUpFramePipeline passes the inserts of up frames alone: the down frames
+// are read by the WebSocket that serves their session.
+func sshUpFramePipeline() mongo.Pipeline {
+	return mongo.Pipeline{
+		bson.D{{Key: "$match", Value: bson.M{
+			"operationType":    "insert",
+			"fullDocument.dir": devices.SSHDirUp,
+		}}},
 	}
 }
 
@@ -931,6 +964,151 @@ func logSessionMessage(session *devices.LogSession, action string, now time.Time
 		return "", nil, false
 	}
 	return Topic(session.DeviceID.Hex(), SuffixLogSession), payload, true
+}
+
+// sshSessionNotice is the payload published on the ssh/session topic. Every
+// action carries the whole session, as log session notices do.
+type sshSessionNotice struct {
+	ID     string `json:"id"`
+	Action string `json:"action"`
+	// Target is the target the Hub approved for the session (_pv_, a
+	// container, or tty@container): the device lets the session's key log
+	// in as that SSH user only.
+	Target    string `json:"target"`
+	Pubkey    string `json:"pubkey"`
+	ExpiresAt string `json:"expires_at"`
+	Deadline  string `json:"deadline"`
+}
+
+// handleSSHSessionChange tells a device about its SSH sessions: a start when
+// one is opened, a renew when its lease is extended, and a stop when the Hub
+// ended it. Every replica does this on its own broker, so the message reaches
+// the device on whichever replica holds its connection.
+func (n *Notifier) handleSSHSessionChange(_ context.Context, event *changeEvent) {
+	if len(event.FullDocument) == 0 {
+		return
+	}
+	session := devices.SSHSession{}
+	if err := bson.Unmarshal(event.FullDocument, &session); err != nil {
+		log.Println("mqtt: notifier could not decode ssh session: " + err.Error())
+		return
+	}
+
+	action, ok := sshSessionAction(event, &session)
+	if !ok {
+		return
+	}
+	now := time.Now()
+	topic, payload, ok := sshSessionMessage(&session, action, now)
+	if !ok {
+		return
+	}
+	n.publishCommand(topic, payload, commandExpiryInterval(sshSessionEnd(&session), now))
+}
+
+// sshSessionAction is what a change of an SSH session tells the device, if
+// anything; see logSessionAction.
+func sshSessionAction(event *changeEvent, session *devices.SSHSession) (string, bool) {
+	switch event.OperationType {
+	case "insert":
+		return logActionStart, session.Live
+	case "update":
+		if updatedField(event, "live") {
+			return logActionStop, !session.Live && session.EndedBy == devices.SSHEndedByHub
+		}
+		if updatedField(event, "expires_at") {
+			return logActionRenew, session.Live
+		}
+	}
+	return "", false
+}
+
+// sshSessionEnd is when a session stops at the latest: its lease end, never
+// past its deadline.
+func sshSessionEnd(session *devices.SSHSession) time.Time {
+	if session.Deadline.Before(session.ExpiresAt) {
+		return session.Deadline
+	}
+	return session.ExpiresAt
+}
+
+// sshSessionMessage builds the topic and payload of an SSH session action. ok
+// is false for a start or renew past the lease (a stream resumed after an
+// outage replays old changes), and for a session without a device.
+func sshSessionMessage(session *devices.SSHSession, action string, now time.Time) (topic string, payload []byte, ok bool) {
+	if session.ID.IsZero() || session.DeviceID.IsZero() {
+		return "", nil, false
+	}
+	if action != logActionStop && !now.Before(sshSessionEnd(session)) {
+		return "", nil, false
+	}
+	payload, err := json.Marshal(sshSessionNotice{
+		ID:        session.ID.Hex(),
+		Action:    action,
+		Target:    session.Target,
+		Pubkey:    session.Pubkey,
+		ExpiresAt: session.ExpiresAt.UTC().Format(time.RFC3339),
+		Deadline:  session.Deadline.UTC().Format(time.RFC3339),
+	})
+	if err != nil {
+		log.Println("mqtt: notifier could not encode ssh session " + session.ID.Hex() + ": " + err.Error())
+		return "", nil, false
+	}
+	return Topic(session.DeviceID.Hex(), SuffixSSHSession), payload, true
+}
+
+// sshUpFrameExpiry drops an up frame from a queue it could not leave in time:
+// past it, the session has lost the frame anyway (SSHGapTimeout).
+const sshUpFrameExpiry = 30
+
+// handleSSHUpFrame publishes an up frame to its device, when this replica
+// holds the device's connection, and then deletes the stored frame. The change stream delivers the inserts of a
+// session in the order the WebSocket stored them, one at a time, which is seq
+// order; the broker keeps it on the device's single topic. The replicas that
+// do not hold the device publish nothing: a copy queued for a stale session of
+// the device would reach it out of order on a later reconnect.
+func (n *Notifier) handleSSHUpFrame(_ context.Context, event *changeEvent) {
+	if event.OperationType != "insert" || len(event.FullDocument) == 0 {
+		return
+	}
+	frame := devices.SSHFrame{}
+	if err := bson.Unmarshal(event.FullDocument, &frame); err != nil {
+		log.Println("mqtt: notifier could not decode ssh frame: " + err.Error())
+		return
+	}
+	if frame.Dir != devices.SSHDirUp || frame.Session.IsZero() || frame.DeviceID.IsZero() {
+		return
+	}
+	deviceID := frame.DeviceID.Hex()
+	if !n.holdsDevice(deviceID) {
+		return
+	}
+	payload, err := devices.EncodeSSHFrame(&frame)
+	if err != nil {
+		log.Println("mqtt: notifier could not encode ssh frame of session " + frame.Session.Hex() + ": " + err.Error())
+		return
+	}
+	n.publishCommand(SSHDataTopic(deviceID, frame.Session.Hex(), sshUp), payload, sshUpFrameExpiry)
+
+	// Published: the stored copy is no longer needed (the TTL takes the
+	// frames no replica published).
+	ctx, cancel := context.WithTimeout(context.Background(), notifierQueryTimeout)
+	defer cancel()
+	if _, err := n.mongoClient.Database(utils.MongoDb).Collection(devices.SSHFramesCollection).
+		DeleteOne(ctx, bson.M{"_id": frame.ID}); err != nil {
+		log.Println("mqtt: notifier could not delete ssh frame of session " + frame.Session.Hex() + ": " + err.Error())
+	}
+}
+
+// holdsDevice reports whether this replica's broker holds the live connection
+// of the device.
+func (n *Notifier) holdsDevice(deviceID string) bool {
+	cl, ok := n.server.Clients.Get(deviceID)
+	if !ok || cl.Closed() {
+		return false
+	}
+	kind, subject := identity(cl)
+	return kind == kindDevice && subject == deviceID
 }
 
 // publish sends a retained notification. A nil or empty payload clears the

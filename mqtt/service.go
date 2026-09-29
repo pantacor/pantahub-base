@@ -352,6 +352,9 @@ func (s *Service) Start(ctx context.Context) error {
 	// slots and telling the device (through the notifier) even when nobody
 	// asks the API about them.
 	go devices.RunLogSessionSweep(runCtx, s.mongoClient)
+	// Likewise for SSH sessions, which also end idle, and whose ends are
+	// audited once whatever ended them.
+	go devices.RunSSHSessionSweep(runCtx, s.mongoClient)
 
 	s.heartbeatDone = make(chan struct{})
 	go func() {

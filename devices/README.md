@@ -704,3 +704,87 @@ publish on either: the API is the only way in. Batches are kept for 10
 minutes and never go to the persisted logs (`GET /logs`); each session start
 is logged with the caller, device and sources, and the session record is kept
 30 days.
+
+## Web SSH
+
+The owner of a device connected over MQTT can open an SSH terminal on it from
+the browser (wire contract: `docs/ssh.md` in pv-mqtt-sdk). SSH runs end to
+end, from the browser to the device's own SSH server: the Hub only relays the
+encrypted bytes and never holds anything that can log in. Every endpoint needs
+the full API scope or `devices.ssh`.
+
+* `POST /devices/{id}/ssh-sessions` `{"target": "_pv_", "pubkey": "ssh-ed25519 AAAA..."}`
+  answers `201` with `{id, target, expires_at, deadline}`. `target` is the SSH
+  user name: `_pv_` (the Pantavisor host), a container name
+  (`[A-Za-z0-9._-]{1,64}`) or `<tty>@<container>`; `pubkey` is the browser's
+  per-session ssh-ed25519 public key, which the device accepts for the length
+  of the session. `400` invalid target or key, `404` unknown device, `409` when
+  the device is not connected over MQTT, `429` above 2 live sessions per device
+  or 3 per user, or 10 starts per device or 30 per owner a minute.
+* `POST /devices/{id}/ssh-sessions/{sid}/renew` extends the 60 second lease
+  (renew every 20 s while the tab is open), never past the 60 minute deadline;
+  `410` once the session has ended. A session also ends after 15 minutes
+  without a byte either way.
+* `DELETE /devices/{id}/ssh-sessions/{sid}` stops it (`204`).
+* `POST /devices/{id}/ssh-sessions/{sid}/ticket` (normal bearer auth, owner
+  only, same scopes) answers `201` with `{ticket, expires_at}`: the credential
+  of the WebSocket, since the session's JWT must never go into a handshake
+  (the chosen subprotocol is echoed back in the `101`, where proxies and HAR
+  files record it). A ticket is 43 characters of `[A-Za-z0-9_-]`, bound to
+  its session, lives 30 seconds and is single use; a new ticket replaces the
+  previous one, and only its SHA-256 and expiry are stored. `409` while a
+  WebSocket is attached, `410` once the session has ended.
+* `GET /devices/{id}/ssh-sessions/{sid}/ws` is a WebSocket carrying the raw SSH
+  bytes both ways as binary messages. The client offers the ticket as the
+  subprotocol `ticket.<ticket>`, which is echoed back; the upgrade consumes
+  the ticket atomically (it is also the attach claim), so a used, expired or
+  wrong ticket, or one for another session or device, is `401` without
+  telling which. Nothing else authenticates on this route, which the JWT
+  middleware does not run on: a request with an `Authorization` header
+  (Basic with a personal token, or Bearer) or a `bearer.<token>` offer is
+  refused with `401`, and cookies are dropped, so that credentials a browser
+  attaches on its own never open a terminal. The ticket is removed from the
+  request headers before anything logs them, and the access logs redact any
+  `ticket.*` or `bearer.*` offer that reaches them. One WebSocket per session
+  (no ticket can be issued while one is attached); closing it stops the
+  session, and the end of the session closes it with the reason. The caller
+  of record is the session's creator; issuing a ticket, attaching, and a
+  refused attach are logged.
+
+The Hub tells the device on `ph/v1/dev/<id>/ssh/session` (the start carries
+the session's key and its approved `target`); the bytes travel on
+`ph/v1/dev/<id>/ssh/<sid>/up` (Hub to device) and `.../down` (device to Hub),
+at most 32 KiB a frame and 256 KiB/s each way. The device may publish on the
+down topic of any session id under its own namespace; frames of a session that
+is unknown, another device's, or over are dropped (and counted) by the bridge,
+since refusing a QoS 1 publish would disconnect an MQTT 3.1.1 device. Users can
+neither subscribe nor publish on any of them. Between replicas the frames go
+through `pantahub_ssh_frames`: the replica serving the WebSocket stores up
+frames and follows down frames with a change stream, and the replica holding
+the device's MQTT connection publishes up frames (its notifier follows the up
+frames with a change stream). A frame is deleted once forwarded (down frames
+by seq watermark once written to the WebSocket, up frames once published), and
+every frame of a session when the session ends and when its WebSocket closes;
+a one-minute TTL catches the rest. While no WebSocket is attached the device
+may send 64 KiB (the SSH banner and key exchange, which it sends before the
+browser's first byte); past that the session ends with `error: device
+streamed without a client`, so a device streaming with nobody to take the
+frames cannot fill the collection for the length of its lease. The relay
+buffers at most 256 out-of-order down frames or 1 MiB
+(else the session ends with `overflow`), and a missing frame ends the session
+10 s after the oldest frame waiting for it arrived. Each session start
+(caller, device, target, key fingerprint) and end (reason, duration, bytes
+each way) is logged, and the session record is kept 30 days, also when the
+device is deleted (its live sessions are ended and audited first); the bytes
+are never recorded.
+
+Operator note: the TTL index of `pantahub_ssh_frames` is created with the
+retention of the running code. When it already exists with another expiry
+(a deployment from before the retention changed), the API tries `collMod`,
+which needs a privilege the service's database user may not have; it then
+keeps the old expiry, starts anyway (the TTL is only the backstop), and logs
+a WARNING with the command to run once as a user that has it:
+
+```
+db.runCommand({collMod: "pantahub_ssh_frames", index: {keyPattern: {created_at: 1}, expireAfterSeconds: 60}})
+```

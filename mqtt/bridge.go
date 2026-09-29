@@ -87,6 +87,13 @@ const (
 	// maxLogStreamQoS is the highest QoS a live log batch may be published
 	// at: a lost batch is a gap in seq, not worth QoS 2's round trips.
 	maxLogStreamQoS = 1
+
+	// sshFrameWriteTimeout bounds storing one SSH frame, which runs on the
+	// publishing device's read loop.
+	sshFrameWriteTimeout = 5 * time.Second
+
+	// maxSSHFrameQoS is the highest QoS an SSH frame may be published at.
+	maxSSHFrameQoS = 1
 )
 
 // errNoPendingCommand is a command result that completes nothing: an unknown
@@ -201,6 +208,11 @@ func (h *bridgeHook) OnPublish(cl *mochi.Client, pk packets.Packet) (packets.Pac
 		slog.Debug("mqtt: bridge: rejecting live log batch above QoS 1", "topic", pk.TopicName)
 		return pk, packets.ErrRejectPacket
 	}
+	sshDown := isSSHDown(suffix) && (cl == nil || !cl.Net.Inline)
+	if sshDown && pk.FixedHeader.Qos > maxSSHFrameQoS {
+		slog.Debug("mqtt: bridge: rejecting ssh frame above QoS 1", "topic", pk.TopicName)
+		return pk, packets.ErrRejectPacket
+	}
 	if err := h.ingest(cl, pk.TopicName, pk.Payload, nil); err != nil {
 		log.Printf("mqtt: bridge: rejecting publish on %s: %v", pk.TopicName, err)
 		return pk, packets.ErrRejectPacket
@@ -215,6 +227,10 @@ func (h *bridgeHook) OnPublish(cl *mochi.Client, pk packets.Packet) (packets.Pac
 	// stops calling later hooks' OnPublish for an ignored packet; none of
 	// them handles this topic.
 	if logStream {
+		return pk, packets.CodeSuccessIgnore
+	}
+	// An SSH frame too: the WebSocket of the REST API is the only reader.
+	if sshDown {
 		return pk, packets.CodeSuccessIgnore
 	}
 
@@ -343,6 +359,13 @@ func (h *bridgeHook) ingest(cl *mochi.Client, topic string, payload []byte, only
 		})
 
 	default:
+		if sessionID, dir, ok := ParseSSHData(suffix); ok && dir == sshDown {
+			// Stored here, on the device's read loop, like live log
+			// batches: in the order the device sent them, dropped rather
+			// than refused when they cannot be stored.
+			h.ingestSSHFrame(topic, deviceObjectID, sessionID, payload)
+			return nil
+		}
 		rev, ok := ParseProgress(suffix)
 		if !ok {
 			return nil
@@ -386,6 +409,30 @@ func (h *bridgeHook) ingestLogBatch(topic string, deviceObjectID primitive.Objec
 	}
 }
 
+// ingestSSHFrame stores one SSH down frame of a device, dropping it quietly
+// (at debug level, counted in sshDrops) when it is malformed or its session
+// does not take it. A device above the rate, or streaming on while no
+// WebSocket is attached to take the frames, has its session ended.
+func (h *bridgeHook) ingestSSHFrame(topic string, deviceObjectID, sessionID primitive.ObjectID, payload []byte) {
+	frame, err := devices.DecodeSSHFrame(payload)
+	if err != nil {
+		slog.Debug("mqtt: bridge: dropping ssh frame", "topic", topic, "error", err)
+		sshDrops.note(deviceObjectID.Hex(), err, time.Now())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), sshFrameWriteTimeout)
+	defer cancel()
+	err = devices.StoreSSHDownFrame(ctx, h.mongoClient, deviceObjectID, sessionID, frame, time.Now().UTC())
+	if err != nil {
+		slog.Debug("mqtt: bridge: dropping ssh frame", "topic", topic, "error", err)
+		sshDrops.note(deviceObjectID.Hex(), err, time.Now())
+	}
+}
+
+// sshDrops reports dropped SSH frames as logDrops does live log batches.
+var sshDrops = &dropCounter{window: logDropWindow, max: 1024, what: "ssh frames"}
+
 // logDrops makes dropped live log batches visible: each one is logged at
 // debug level only, so a device with broken firmware, or one flooding
 // sessions it no longer has, would otherwise go unnoticed. At most one
@@ -398,7 +445,9 @@ type dropCounter struct {
 	mu     sync.Mutex
 	window time.Duration
 	max    int
-	seen   map[string]*dropWindow
+	// what is dropped, for the log; live log batches by default.
+	what string
+	seen map[string]*dropWindow
 }
 
 type dropWindow struct {
@@ -426,17 +475,24 @@ func (d *dropCounter) note(device string, err error, now time.Time) bool {
 		}
 		w = &dropWindow{start: now}
 		d.seen[device] = w
-		log.Printf("mqtt: bridge: dropping live log batches from device %s (%v)", device, err)
+		log.Printf("mqtt: bridge: dropping %s from device %s (%v)", d.name(), device, err)
 		return true
 	}
 	w.n++
 	if now.Sub(w.start) < d.window {
 		return false
 	}
-	log.Printf("mqtt: bridge: dropped %d live log batches from device %s in the last %s (last: %v)",
-		w.n, device, now.Sub(w.start).Round(time.Second), err)
+	log.Printf("mqtt: bridge: dropped %d %s from device %s in the last %s (last: %v)",
+		w.n, d.name(), device, now.Sub(w.start).Round(time.Second), err)
 	delete(d.seen, device)
 	return true
+}
+
+func (d *dropCounter) name() string {
+	if d.what == "" {
+		return "live log batches"
+	}
+	return d.what
 }
 
 // mayRetain reports whether a publish on topic may be retained by the broker.
@@ -448,12 +504,13 @@ func (d *dropCounter) note(device string, err error, now time.Time) bool {
 // The claimed topic is never retained, not even by the Hub: the claim is news
 // for the one claim-wait session waiting for it, and a retained copy would be
 // replayed to whatever subscribed to it later. Nor is a log session message: a
-// start replayed to a later subscriber would stream logs nobody asked for.
+// start replayed to a later subscriber would stream logs nobody asked for; nor
+// anything under ssh/, sessions and frames alike.
 // Only a claimed device's own identity retains its status; a claim-wait
 // session publishes nothing at all.
 func mayRetain(cl *mochi.Client, topic string) bool {
 	_, suffix, ok := Parse(topic)
-	if ok && (suffix == SuffixClaimed || suffix == SuffixLogSession) {
+	if ok && (suffix == SuffixClaimed || suffix == SuffixLogSession || isSSHTopic(suffix)) {
 		return false
 	}
 	if cl == nil {
@@ -467,11 +524,18 @@ func mayRetain(cl *mochi.Client, topic string) bool {
 }
 
 // onlyHubPublishes reports whether topic is one only the Hub itself may
-// publish on, whoever the ACL let through: the claimed topic and the log
-// session topic.
+// publish on, whoever the ACL let through: the claimed topic, the log and SSH
+// session topics, and the SSH up topics.
 func onlyHubPublishes(cl *mochi.Client, topic string) bool {
 	_, suffix, ok := Parse(topic)
-	return ok && (suffix == SuffixClaimed || suffix == SuffixLogSession) && (cl == nil || !cl.Net.Inline)
+	if !ok || (cl != nil && cl.Net.Inline) {
+		return false
+	}
+	if suffix == SuffixClaimed || suffix == SuffixLogSession || suffix == SuffixSSHSession {
+		return true
+	}
+	_, dir, isSSH := ParseSSHData(suffix)
+	return isSSH && dir == sshUp
 }
 
 // sessionOwnsDevice reports whether the session that published owns the device
