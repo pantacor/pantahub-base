@@ -682,10 +682,14 @@ reading the lines of your own session needs a device read scope or
   lists the revisions and log files the device has (a remote command, with
   the commands' scope and rate limit).
 * `POST /devices/{id}/log-sessions`
-  `{"rev": "current", "sources": ["pantavisor/pantavisor.log"], "tail": 200, "follow": true}`
+  `{"rev": "current", "sources": ["pantavisor/pantavisor.log"], "tail": 200, "follow": true, "filter": "error"}`
   answers `201` with the session (`id`, `expires_at`, `deadline`). Sources
   are paths relative to the revision's log directory (`""` is all of it): at
-  most 10, no `..`, not absolute; `tail` is 0 to 500. `409` when the device
+  most 10, no `..`, not absolute; `tail` is 0 to 500. `filter` (optional) is
+  plain text: only lines that contain it, compared case-insensitively, are
+  sent, and `tail` counts matching lines; at most 256 bytes of UTF-8 without
+  control characters. The device filters before anything goes on the
+  network; a change of filter is a new session. `409` when the device
   is not connected over MQTT, `429` above 2 live sessions per device or 5 per
   user.
 * `POST /devices/{id}/log-sessions/{sid}/renew` extends the 60 second lease
@@ -702,8 +706,8 @@ The Hub tells the device on `ph/v1/dev/<id>/logs/session` and the device
 streams on `ph/v1/dev/<id>/logs/stream`. Users can neither subscribe nor
 publish on either: the API is the only way in. Batches are kept for 10
 minutes and never go to the persisted logs (`GET /logs`); each session start
-is logged with the caller, device and sources, and the session record is kept
-30 days.
+is logged with the caller, device, sources and filter, and the session record
+is kept 30 days.
 
 ## Web SSH
 

@@ -865,6 +865,7 @@ type logSessionNotice struct {
 	Sources   []string `json:"sources"`
 	Tail      int      `json:"tail"`
 	Follow    bool     `json:"follow"`
+	Filter    string   `json:"filter"`
 	ExpiresAt string   `json:"expires_at"`
 	Deadline  string   `json:"deadline"`
 }
@@ -956,6 +957,7 @@ func logSessionMessage(session *devices.LogSession, action string, now time.Time
 		Sources:   sources,
 		Tail:      session.Tail,
 		Follow:    session.Follow,
+		Filter:    session.Filter,
 		ExpiresAt: session.ExpiresAt.UTC().Format(time.RFC3339),
 		Deadline:  session.Deadline.UTC().Format(time.RFC3339),
 	})

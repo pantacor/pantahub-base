@@ -26,6 +26,7 @@ import (
 	"sync"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/labstack/echo/v5"
 	"gitlab.com/pantacor/pantahub-base/utils"
@@ -120,6 +121,10 @@ const (
 	maxLogSourceLength = 512
 	maxLogRevLength    = 128
 
+	// MaxLogFilterLength bounds the filter text a session asks the device to
+	// match lines against.
+	MaxLogFilterLength = 256
+
 	// maxLogSessionRequestSize caps the body of the session endpoints.
 	maxLogSessionRequestSize = 8 * 1024
 
@@ -186,6 +191,7 @@ type LogSession struct {
 	Sources    []string           `bson:"sources"`
 	Tail       int                `bson:"tail"`
 	Follow     bool               `bson:"follow"`
+	Filter     string             `bson:"filter"`
 	CreatedAt  time.Time          `bson:"created_at"`
 	ExpiresAt  time.Time          `bson:"expires_at"`
 	Deadline   time.Time          `bson:"deadline"`
@@ -207,6 +213,9 @@ type LogSessionRequest struct {
 	Sources []string `json:"sources"`
 	Tail    int      `json:"tail"`
 	Follow  bool     `json:"follow"`
+	// Filter keeps only the lines that contain it (case-insensitively); the
+	// device applies it before anything goes on the network. "" is no filter.
+	Filter string `json:"filter"`
 }
 
 // LogSessionView is a session as the API returns it.
@@ -217,6 +226,7 @@ type LogSessionView struct {
 	Sources   []string   `json:"sources"`
 	Tail      int        `json:"tail"`
 	Follow    bool       `json:"follow"`
+	Filter    string     `json:"filter"`
 	CreatedAt time.Time  `json:"created_at"`
 	ExpiresAt time.Time  `json:"expires_at"`
 	Deadline  time.Time  `json:"deadline"`
@@ -239,6 +249,7 @@ func (s *LogSession) View() LogSessionView {
 		Sources:   sources,
 		Tail:      s.Tail,
 		Follow:    s.Follow,
+		Filter:    s.Filter,
 		CreatedAt: s.CreatedAt,
 		ExpiresAt: s.ExpiresAt,
 		Deadline:  s.Deadline,
@@ -328,6 +339,22 @@ func notPathSafe(r rune) bool {
 	return r == '\\' || r == unicode.ReplacementChar || unicode.IsControl(r)
 }
 
+// ValidateLogFilter checks a filter: plain text the device matches lines
+// against, at most MaxLogFilterLength bytes of valid UTF-8 without control
+// characters ("" is no filter). It is matched, never interpreted, so any
+// other text is fine.
+func ValidateLogFilter(filter string) error {
+	switch {
+	case len(filter) > MaxLogFilterLength:
+		return errors.New("filter is longer than " + strconv.Itoa(MaxLogFilterLength) + " bytes")
+	case !utf8.ValidString(filter):
+		return errors.New("filter is not valid UTF-8")
+	case strings.ContainsFunc(filter, unicode.IsControl):
+		return errors.New("filter contains a control character")
+	}
+	return nil
+}
+
 // ValidateLogSessionRequest checks a request and returns it normalised: the
 // revision defaults to "current", duplicate sources are dropped.
 func ValidateLogSessionRequest(req LogSessionRequest) (LogSessionRequest, error) {
@@ -359,6 +386,9 @@ func ValidateLogSessionRequest(req LogSessionRequest) (LogSessionRequest, error)
 
 	if req.Tail < 0 || req.Tail > MaxLogTail {
 		return req, errors.New("tail must be between 0 and " + strconv.Itoa(MaxLogTail))
+	}
+	if err := ValidateLogFilter(req.Filter); err != nil {
+		return req, err
 	}
 	return req, nil
 }
@@ -473,6 +503,7 @@ func RunLogSessionSweep(ctx context.Context, client *mongo.Client) {
 // @Description Asks the device to stream the selected log sources of a revision ("current" by default).
 // @Description Sources are paths relative to the revision's log directory; "" is the whole revision.
 // @Description At most 10 sources and a tail of 500 lines. The session lasts 60 seconds unless renewed, 30 minutes at most.
+// @Description An optional filter (plain text, at most 256 bytes of UTF-8 without control characters) keeps only the lines that contain it, case-insensitively; the device applies it and the tail counts matching lines.
 // @Description Only the device owner may stream, and only while the device is connected over MQTT.
 // @Description Requires the full API scope or devices.logs. At most 2 live sessions per device and 5 per user.
 // @Accept  json
@@ -566,6 +597,7 @@ func (a *App) handlePostLogSession(c *echo.Context) error {
 		Sources:   req.Sources,
 		Tail:      req.Tail,
 		Follow:    req.Follow,
+		Filter:    req.Filter,
 		CreatedAt: now,
 		ExpiresAt: now.Add(LogSessionLease),
 		Deadline:  now.Add(LogSessionMaxDuration),
@@ -590,9 +622,9 @@ func (a *App) handlePostLogSession(c *echo.Context) error {
 // session document is the durable record (kept LogSessionRetention); this is
 // the line an operator greps for.
 func auditLogSession(session *LogSession) {
-	log.Printf("devices: audit: log session %s started by %s on device %s (owner %s): rev %s, sources %s, tail %d, follow %t",
+	log.Printf("devices: audit: log session %s started by %s on device %s (owner %s): rev %s, sources %s, tail %d, follow %t, filter %s",
 		session.ID.Hex(), session.CreatedBy, session.DeviceID.Hex(), session.Owner,
-		strconv.Quote(session.Rev), quoteAll(session.Sources), session.Tail, session.Follow)
+		strconv.Quote(session.Rev), quoteAll(session.Sources), session.Tail, session.Follow, strconv.Quote(session.Filter))
 }
 
 func quoteAll(values []string) string {
