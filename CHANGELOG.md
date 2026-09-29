@@ -1,3 +1,13 @@
+<a name="063"></a>
+## [063](https://gitlab.com/pantacor/pantahub-base/compare/062...063)
+
+> 2026-09-29
+
+### Fix
+
+* **mqtt:** re-assert device presence with each broker heartbeat
+
+
 
 <a name="062"></a>
 ## [062](https://gitlab.com/pantacor/pantahub-base/compare/061...062)
