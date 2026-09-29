@@ -110,6 +110,9 @@ func (a *App) handleDeleteDevice(c *echo.Context) error {
 		if err := a.DeleteDeviceLogSessions(ctx, deviceObjectID); err != nil {
 			log.Printf("Error deleting the log sessions of device %s: %v", delID, err)
 		}
+		if err := a.EndDeviceSSHSessions(ctx, deviceObjectID); err != nil {
+			log.Printf("Error ending the SSH sessions of device %s: %v", delID, err)
+		}
 	}
 
 	device.Secret = ""

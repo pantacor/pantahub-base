@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -316,7 +317,7 @@ func TestLogSessionMessage(t *testing.T) {
 	session := devices.LogSession{
 		ID: primitive.NewObjectID(), DeviceID: primitive.NewObjectID(),
 		Rev: "current", Sources: []string{"pantavisor/pantavisor.log", "telegraf/lxc/console.log"},
-		Tail: 200, Follow: true, Live: true,
+		Tail: 200, Follow: true, Filter: "error", Live: true,
 		ExpiresAt: now.Add(time.Minute), Deadline: now.Add(30 * time.Minute),
 	}
 
@@ -328,10 +329,18 @@ func TestLogSessionMessage(t *testing.T) {
 		t.Errorf("topic = %q", topic)
 	}
 	want := `{"id":"` + session.ID.Hex() + `","action":"start","rev":"current",` +
-		`"sources":["pantavisor/pantavisor.log","telegraf/lxc/console.log"],"tail":200,"follow":true,` +
+		`"sources":["pantavisor/pantavisor.log","telegraf/lxc/console.log"],"tail":200,"follow":true,"filter":"error",` +
 		`"expires_at":"2026-09-28T15:10:00Z","deadline":"2026-09-28T15:39:00Z"}`
 	if string(payload) != want {
 		t.Errorf("payload = %s\nwant      %s", payload, want)
+	}
+
+	// Without a filter the field is still there, empty: the device need not
+	// tell a missing key from an old Hub.
+	unfiltered := session
+	unfiltered.Filter = ""
+	if _, payload, ok := logSessionMessage(&unfiltered, logActionStart, now); !ok || !strings.Contains(string(payload), `"filter":""`) {
+		t.Errorf("unfiltered payload = %s", payload)
 	}
 
 	if _, _, ok := logSessionMessage(&session, logActionStart, now.Add(time.Minute)); ok {
@@ -502,9 +511,9 @@ func TestNotifierDeliversLogSessionsAcrossReplicas(t *testing.T) {
 	}
 
 	sessions := client.Database(utils.MongoDb).Collection(devices.LogSessionsCollection)
-	session := insertLogSession(t, client, device, nil)
+	session := insertLogSession(t, client, device, func(s *devices.LogSession) { s.Filter = "[ctrl]: état" })
 	notice := expect(logActionStart, session)
-	if notice.Rev != "current" || len(notice.Sources) != 1 || notice.Tail != 10 || !notice.Follow ||
+	if notice.Rev != "current" || len(notice.Sources) != 1 || notice.Tail != 10 || !notice.Follow || notice.Filter != "[ctrl]: état" ||
 		notice.ExpiresAt != session.ExpiresAt.Format(time.RFC3339) || notice.Deadline != session.Deadline.Format(time.RFC3339) {
 		t.Errorf("start = %+v", notice)
 	}

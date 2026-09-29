@@ -108,12 +108,25 @@ func (w *lastWriteRecorder) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
+// Unwrap lets http.ResponseController reach the underlying writer, so a
+// WebSocket upgrade can still hijack the connection.
+func (w *lastWriteRecorder) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
 // AccessLogFluent mirrors utils.AccessLogFluentMiddleware. Must wrap Instrument.
 func AccessLogFluent(mw *utils.AccessLogFluentMiddleware, stripPrefix string) echo.MiddlewareFunc {
 	if !mw.Init() {
 		return func(next echo.HandlerFunc) echo.HandlerFunc { return next }
 	}
+	var post func(*utils.AccessLogFluentRecord)
+	if mw.Logger != nil {
+		post = mw.Post
+	}
+	return accessLogFluent(mw, stripPrefix, post)
+}
 
+// accessLogFluent builds each request's fluent record, once the request is
+// served, and hands it to post (nothing is built when post is nil).
+func accessLogFluent(mw *utils.AccessLogFluentMiddleware, stripPrefix string, post func(*utils.AccessLogFluentRecord)) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
 			var requestBody, responseBody []byte
@@ -133,7 +146,7 @@ func AccessLogFluent(mw *utils.AccessLogFluentMiddleware, stripPrefix string) ec
 				return err
 			}
 
-			if mw.Logger == nil {
+			if post == nil {
 				return nil
 			}
 
@@ -143,7 +156,7 @@ func AccessLogFluent(mw *utils.AccessLogFluentMiddleware, stripPrefix string) ec
 				responseSize = uint64(size)
 			}
 
-			mw.Post(utils.BuildAccessLogFluentRecord(mw, serviceRequest(c.Request(), stripPrefix),
+			post(utils.BuildAccessLogFluentRecord(mw, serviceRequest(c.Request(), stripPrefix),
 				accessEnv(c), responseSize, requestBody, responseBody))
 			return nil
 		}

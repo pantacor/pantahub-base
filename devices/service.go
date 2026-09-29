@@ -52,6 +52,8 @@ type App struct {
 	subService  subscriptions.SubscriptionService
 	// logPolls bounds concurrent live-log long-polls per caller.
 	logPolls pollSlots
+	// sshRelayTiming overrides the SSH relay's timing (tests).
+	sshRelayTiming *sshRelayTiming
 }
 
 // Build factory a new Device App only with mongoClient
@@ -162,6 +164,13 @@ func New(jwtConfig *jwtauth.Config, subService subscriptions.SubscriptionService
 		return nil
 	}
 
+	// Same for SSH sessions.
+	err = app.EnsureSSHSessionIndices()
+	if err != nil {
+		log.Println("Error creating indices for " + SSHSessionsCollection + ": " + err.Error())
+		return nil
+	}
+
 	// hash legacy plaintext device secrets in small throttled batches in the
 	// background; devices that log in meanwhile upgrade themselves on the way
 	go RunSecretMigration(context.Background(), mongoClient.Database(utils.MongoDb).Collection("pantahub_devices"))
@@ -179,6 +188,14 @@ func needsAuth(r *http.Request) bool {
 	}
 	return !((r.Method == "POST" && r.URL.Path == "/") ||
 		(r.Method == "POST" && r.URL.Path == "/register"))
+}
+
+// needsJWT is needsAuth without the SSH WebSocket: its credential is a
+// session ticket, which its handler consumes, not a JWT (the JWT middleware
+// would refuse the ticket request). An Authorization header on that route is
+// refused before this is asked (echoutil.WebSocketTicket).
+func needsJWT(r *http.Request) bool {
+	return needsAuth(r) && !isSSHWebSocketPath(r)
 }
 
 // Mount registers devices on echo with its previous middleware stack.
@@ -220,9 +237,13 @@ func (app *App) Mount(s *echoutil.Server) {
 			AccessControlAllowCredentials: true,
 			AccessControlMaxAge:           3600,
 		}),
+		// Browsers cannot set headers on a WebSocket: the SSH session's
+		// socket takes a short-lived ticket from the subprotocol, which its
+		// handler consumes; the JWT middleware stays off that one route.
+		echoutil.If(prefix, isSSHWebSocketPath, echoutil.WebSocketTicket()),
 		echoutil.BasicAuthToBearer(&utils.BasicAuthToBearerMiddleware{JWT: app.jwtConfig, Mongo: app.mongoClient}),
-		echoutil.If(prefix, needsAuth, echoutil.JWT(app.jwtConfig)),
-		echoutil.If(prefix, needsAuth, echoutil.Auth()),
+		echoutil.If(prefix, needsJWT, echoutil.JWT(app.jwtConfig)),
+		echoutil.If(prefix, needsJWT, echoutil.Auth()),
 	)
 
 	writeDevicesScopes := []utils.Scope{
@@ -292,6 +313,13 @@ func (app *App) Mount(s *echoutil.Server) {
 	g.POST("/:id/log-sessions/:sid/renew", echoutil.ScopeFilter(LogSessionScopes, app.handleRenewLogSession))
 	g.DELETE("/:id/log-sessions/:sid", echoutil.ScopeFilter(LogSessionScopes, app.handleDeleteLogSession))
 	g.GET("/:id/log-sessions/:sid/lines", echoutil.ScopeFilter(readLogSessionScopes(readDevicesScopes), app.handleGetLogLines))
+	// SSH terminals, relayed over MQTT
+	g.POST("/:id/ssh-sessions", echoutil.ScopeFilter(SSHSessionScopes, app.handlePostSSHSession))
+	g.POST("/:id/ssh-sessions/:sid/renew", echoutil.ScopeFilter(SSHSessionScopes, app.handleRenewSSHSession))
+	g.DELETE("/:id/ssh-sessions/:sid", echoutil.ScopeFilter(SSHSessionScopes, app.handleDeleteSSHSession))
+	g.POST("/:id/ssh-sessions/:sid/ticket", echoutil.ScopeFilter(SSHSessionScopes, app.handleSSHSessionTicket))
+	// The ticket carries the owner's authority: no JWT, no scope filter.
+	g.GET("/:id/ssh-sessions/:sid/ws", app.handleSSHWebSocket)
 	// lookup by nick-path (np)
 	g.GET("/np/:usernick/:devicenick", echoutil.ScopeFilter(readDevicesScopes, app.handleGetUserDevice))
 }

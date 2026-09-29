@@ -26,6 +26,8 @@ package mqtt
 import (
 	"strconv"
 	"strings"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // Topic namespace. Every topic a device may touch lives under
@@ -78,6 +80,17 @@ const (
 	// the batches through the REST API.
 	SuffixLogStream = "logs/stream"
 
+	// SuffixSSHSession tells the device to start, renew or stop an SSH session
+	// (devices/sshsessions.go):
+	//
+	//	{"id": "<hex>", "action": "start|renew|stop",
+	//	 "pubkey": "ssh-ed25519 AAAA...",
+	//	 "expires_at": "<RFC 3339>", "deadline": "<RFC 3339>"}
+	//
+	// Published by the Hub alone (the notifier), live at QoS 1 and never
+	// retained. The device subscribes to its own; users never see it.
+	SuffixSSHSession = "ssh/session"
+
 	// SuffixCommands carries out-of-band instructions to the device. Never
 	// retained: a command must not be replayed to a device that reconnects
 	// later.
@@ -116,6 +129,61 @@ const (
 	// devices neither subscribe nor publish here, and users never do.
 	SuffixClaimed = "claimed"
 )
+
+// SSH data topics are "ssh/<session id>/up" (Hub -> device) and
+// "ssh/<session id>/down" (device -> Hub), carrying
+//
+//	{"seq": 12, "data": "<base64 bytes>", "end": false, "reason": ""}
+//
+// QoS 1, never retained. The device publishes on its own down topics, any
+// session id (authHook checks the namespace only); the bridge stores the
+// frames of the device's sessions that take them, drops the others, and never
+// fans them out. The Hub alone publishes the up topics,
+// from the replica holding the device's connection. Users neither publish nor
+// subscribe: the WebSocket of the REST API is the only way in.
+const (
+	sshPrefix = "ssh/"
+	sshUp     = "up"
+	sshDown   = "down"
+
+	// sshUpFilter is the filter a device subscribes to for the up frames of
+	// all its sessions.
+	sshUpFilter = sshPrefix + "+/" + sshUp
+)
+
+// SSHDataTopic builds the up or down topic of an SSH session.
+func SSHDataTopic(deviceID, sessionID, dir string) string {
+	return Topic(deviceID, sshPrefix+sessionID+"/"+dir)
+}
+
+// ParseSSHData splits "ssh/<session id>/<up|down>". The session id must be an
+// ObjectID, so neither a wildcard nor any other string is a session.
+func ParseSSHData(suffix string) (sessionID primitive.ObjectID, dir string, ok bool) {
+	rest, found := strings.CutPrefix(suffix, sshPrefix)
+	if !found {
+		return primitive.NilObjectID, "", false
+	}
+	hex, dir, found := strings.Cut(rest, "/")
+	if !found || (dir != sshUp && dir != sshDown) || len(hex) != 24 {
+		return primitive.NilObjectID, "", false
+	}
+	sessionID, err := primitive.ObjectIDFromHex(hex)
+	if err != nil {
+		return primitive.NilObjectID, "", false
+	}
+	return sessionID, dir, true
+}
+
+// isSSHDown reports whether suffix is the down topic of an SSH session.
+func isSSHDown(suffix string) bool {
+	_, dir, ok := ParseSSHData(suffix)
+	return ok && dir == sshDown
+}
+
+// isSSHTopic reports whether suffix is under ssh/, a real topic or a filter.
+func isSSHTopic(suffix string) bool {
+	return suffix == "ssh" || strings.HasPrefix(suffix, sshPrefix)
+}
 
 // progress topics are "steps/<rev>/progress".
 const (
@@ -193,6 +261,9 @@ func DeviceMayPublish(suffix string) bool {
 		return true
 	}
 
+	if isSSHDown(suffix) {
+		return true
+	}
 	_, ok := ParseProgress(suffix)
 	return ok
 }
@@ -201,16 +272,19 @@ func DeviceMayPublish(suffix string) bool {
 // suffix within its own namespace.
 func DeviceMaySubscribe(suffix string) bool {
 	switch suffix {
-	case SuffixStepsNew, SuffixUserMeta, SuffixCommands, SuffixLogSession:
+	case SuffixStepsNew, SuffixUserMeta, SuffixCommands, SuffixLogSession, SuffixSSHSession, sshUpFilter:
 		return true
 	}
-	return false
+	// Each delivery of the up filter is checked with its concrete topic.
+	_, dir, ok := ParseSSHData(suffix)
+	return ok && dir == sshUp
 }
 
 // UserMaySubscribe reports whether a user may subscribe to a suffix of a device
 // it owns. Users read what a device exposes, except the topics that are the
-// device's own business: the claimed topic, and the live log topics, which
-// the REST API alone opens (scope, limits, audit) and serves.
+// device's own business: the claimed topic, and the live log and SSH topics,
+// which the REST API alone opens (scope, limits, audit) and serves. Every
+// suffix under ssh/, filters included, is refused.
 //
 // suffix may hold a wildcard at SUBSCRIBE; the broker calls the ACL again for
 // every delivery with the concrete topic, which is where these refusals bite
@@ -220,7 +294,7 @@ func UserMaySubscribe(suffix string) bool {
 	case SuffixClaimed, SuffixLogSession, SuffixLogStream:
 		return false
 	}
-	return true
+	return !isSSHTopic(suffix)
 }
 
 // ClaimWaitMaySubscribe reports whether the claim-wait session of an unclaimed

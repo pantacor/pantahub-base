@@ -52,6 +52,10 @@ func TestValidateLogSessionRequest(t *testing.T) {
 		{Rev: "12", Sources: []string{"telegraf/"}, Tail: MaxLogTail},
 		{Rev: "current", Sources: []string{"os/var/log/messages", "a..b.log"}, Tail: 0},
 		{Sources: make([]string, MaxLogSources)},
+		{Sources: []string{"x"}, Filter: "error"},
+		{Sources: []string{"x"}, Filter: "[ctrl]: état=\"ok\" 100%"},
+		{Sources: []string{"x"}, Filter: strings.Repeat("f", MaxLogFilterLength)},
+		{Sources: []string{"x"}, Filter: strings.Repeat("é", MaxLogFilterLength/2)},
 	} {
 		_, err := ValidateLogSessionRequest(ok)
 		assert.NoError(t, err, "%+v", ok)
@@ -83,6 +87,16 @@ func TestValidateLogSessionRequest(t *testing.T) {
 		{Rev: strings.Repeat("r", maxLogRevLength+1), Sources: []string{"x"}},
 		{Sources: []string{"x"}, Tail: -1},
 		{Sources: []string{"x"}, Tail: MaxLogTail + 1},
+		{Sources: []string{"x"}, Filter: strings.Repeat("f", MaxLogFilterLength+1)},
+		{Sources: []string{"x"}, Filter: strings.Repeat("é", MaxLogFilterLength/2) + "é"},
+		{Sources: []string{"x"}, Filter: "err\x00or"},
+		{Sources: []string{"x"}, Filter: "err\nor"},
+		{Sources: []string{"x"}, Filter: "err\tor"},
+		{Sources: []string{"x"}, Filter: "err\x1b[0mor"},
+		{Sources: []string{"x"}, Filter: "err\x7for"},
+		{Sources: []string{"x"}, Filter: "err\u0085or"},
+		{Sources: []string{"x"}, Filter: "err\xffor"},
+		{Sources: []string{"x"}, Filter: "err\xc3or"},
 	} {
 		_, err := ValidateLogSessionRequest(bad)
 		assert.Error(t, err, "%+v", bad)
@@ -184,13 +198,14 @@ func (f *logFixture) setTimes(t *testing.T, id string, set bson.M) {
 func TestPostLogSession(t *testing.T) {
 	f := newLogFixture(t)
 
-	code, view, body := f.create(t, testOwnerPrn, f.connected, `{"sources":["pantavisor/pantavisor.log","telegraf/lxc/console.log"],"tail":200,"follow":true}`)
+	code, view, body := f.create(t, testOwnerPrn, f.connected, `{"sources":["pantavisor/pantavisor.log","telegraf/lxc/console.log"],"tail":200,"follow":true,"filter":"Error"}`)
 	require.Equal(t, http.StatusCreated, code, body)
 	assert.Equal(t, f.connected.Hex(), view.DeviceID)
 	assert.Equal(t, "current", view.Rev)
 	assert.Equal(t, []string{"pantavisor/pantavisor.log", "telegraf/lxc/console.log"}, view.Sources)
 	assert.Equal(t, 200, view.Tail)
 	assert.True(t, view.Follow)
+	assert.Equal(t, "Error", view.Filter, "the filter is returned as sent, the device matches case-insensitively")
 	assert.False(t, view.Ended)
 	assert.Equal(t, LogSessionLease, view.ExpiresAt.Sub(view.CreatedAt))
 	assert.Equal(t, LogSessionMaxDuration, view.Deadline.Sub(view.CreatedAt))
@@ -206,15 +221,27 @@ func TestPostLogSession(t *testing.T) {
 	assert.Equal(t, testOwnerPrn, stored.Owner)
 	assert.Equal(t, testOwnerPrn, stored.CreatedBy, "the session is the audit record")
 	assert.Equal(t, []string{"pantavisor/pantavisor.log", "telegraf/lxc/console.log"}, stored.Sources)
+	assert.Equal(t, "Error", stored.Filter, "the filter is part of the audit record")
+
+	// No filter is stored and returned as "".
+	code, view, body = f.create(t, testOwnerPrn, f.connected, `{"sources":["pantavisor/pantavisor.log"]}`)
+	require.Equal(t, http.StatusCreated, code, body)
+	assert.Equal(t, "", view.Filter)
+	assert.Contains(t, body, `"filter":""`)
+	assert.Equal(t, "", f.load(t, view.ID).Filter)
 
 	for body, want := range map[string]string{
-		`{"sources":["/etc/shadow"]}`:     "absolute path",
-		`{"sources":["../x"]}`:            "contains ..",
-		`{"sources":[]}`:                  "at least one source",
-		`{"sources":["x"],"tail":501}`:    "tail must be between",
-		`{"rev":"/x","sources":["x"]}`:    "must not start with /",
-		`{"sources":["x"],"tail":"lots"}`: "Error parsing",
-		`not json`:                        "Error parsing",
+		`{"sources":["/etc/shadow"]}`:           "absolute path",
+		`{"sources":["../x"]}`:                  "contains ..",
+		`{"sources":[]}`:                        "at least one source",
+		`{"sources":["x"],"tail":501}`:          "tail must be between",
+		`{"rev":"/x","sources":["x"]}`:          "must not start with /",
+		`{"sources":["x"],"tail":"lots"}`:       "Error parsing",
+		`{"sources":["x"],"filter":"a\u0000b"}`: "control character",
+		`{"sources":["x"],"filter":"a\nb"}`:     "control character",
+		`{"sources":["x"],"filter":"` + strings.Repeat("f", MaxLogFilterLength+1) + `"}`: "longer than 256 bytes",
+		`{"sources":["x"],"filter":42}`: "Error parsing",
+		`not json`:                      "Error parsing",
 		`{"sources":["1","2","3","4","5","6","7","8","9","10","11"]}`: "at most 10 sources",
 	} {
 		code, _, got := f.create(t, testOwnerPrn, f.connected, body)

@@ -249,6 +249,11 @@ func (h *authHook) OnConnectAuthenticate(cl *mochi.Client, pk packets.Packet) bo
 	if pk.Connect.WillFlag && !h.OnACLCheck(cl, pk.Connect.WillTopic, true) {
 		return false
 	}
+	// Nor may a will land on a session's SSH stream: whether the device may
+	// publish there depends on the session being live when it is sent.
+	if _, suffix, ok := Parse(pk.Connect.WillTopic); pk.Connect.WillFlag && ok && isSSHTopic(suffix) {
+		return false
+	}
 	// Nor may a will be retained where a live publish may not be.
 	if pk.Connect.WillFlag && pk.Connect.WillRetain && !mayRetain(cl, pk.Connect.WillTopic) {
 		return false
@@ -409,6 +414,13 @@ func (h *authHook) OnACLCheck(cl *mochi.Client, topic string, write bool) bool {
 			return false
 		}
 		if write {
+			// That includes the down topic of any SSH session id under its
+			// own namespace, live or not: the bridge drops (and counts) the
+			// frames of a session that is unknown, another device's, or
+			// over. Refusing them here would disconnect the device, since
+			// mochi answers a refused QoS 1 publish from an MQTT 3.1.1
+			// client by closing its connection, and a late frame after a
+			// session ends is normal.
 			return DeviceMayPublish(suffix)
 		}
 		return DeviceMaySubscribe(suffix)
@@ -424,7 +436,7 @@ func (h *authHook) OnACLCheck(cl *mochi.Client, topic string, write bool) bool {
 		}
 		// The claimed topic is the device's own business: it only ever
 		// carries the claim to the claim-wait session of an unclaimed device.
-		// The live log topics are only reached through the REST API.
+		// The live log and SSH topics are only reached through the REST API.
 		//
 		// A wildcard filter (".../<id>/#", ".../+/session") passes this
 		// check at SUBSCRIBE, and that is deliberate: it is how a client
